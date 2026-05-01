@@ -622,6 +622,7 @@ class NetworkListenerService {
 
         const onError = (error) => {
             console.error(`[NetworkListener] Error for source ${source.name} (${id}):`, error.message);
+            
             // Auto-reconnect for TCP after 10s
             if (protocol === 'tcp') {
                 // Hapus dari activeListeners agar loop generasi ini berhenti

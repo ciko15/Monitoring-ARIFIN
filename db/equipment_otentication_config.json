@@ -87,13 +87,13 @@
   {
     "id": 1777100000000,
     "name": "PM5560 MDP",
-    "equipt_id": "101",
+    "equipt_id": "1777000000100",
     "ip_address": "192.168.26.58",
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
     "extra_config": null,
-    "sup_category": "DVOR"
+    "sup_category": "Power Meter"
   },
   {
     "id": 1777100000001,

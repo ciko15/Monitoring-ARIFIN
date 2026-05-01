@@ -10,5 +10,12 @@
     "username": "super",
     "password": "ciko1234",
     "role": "superadmin"
+  },
+  {
+    "username": "ciko",
+    "password": "ciko",
+    "name": "Vickra Anugrah ",
+    "role": "user",
+    "id": 1777678425048
   }
 ]

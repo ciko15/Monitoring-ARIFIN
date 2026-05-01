@@ -24,30 +24,77 @@
   <!-- Login Modal -->
   <div class="login-modal hidden" id="loginModal">
     <div class="login-container">
+      <button class="modal-close" onclick="document.getElementById('loginModal').classList.add('hidden')" style="position: absolute; top: 15px; right: 15px;">
+        <i class="fas fa-times"></i>
+      </button>
       <div class="login-header">
         <img src="icon.png" alt="Logo" class="login-logo">
-        <h2>Equipment Management</h2>
-        <p>Direct Login - No Public View</p>
+        <h2>Monitoring ARIFIN</h2>
+        <p>Silakan login untuk mengakses fitur konfigurasi</p>
       </div>
       <form id="loginForm" autocomplete="off">
         <div class="form-group">
           <label for="username">Username</label>
           <input type="text" id="username" name="username" autocomplete="username" required
-            placeholder="admin or superadmin">
+            placeholder="Username">
         </div>
         <div class="form-group">
           <label for="password">Password</label>
           <input type="password" id="password" name="password" autocomplete="current-password" required
-            placeholder="password">
+            placeholder="Password">
         </div>
         <button type="submit" class="btn btn-primary btn-block">
           <i class="fas fa-sign-in-alt"></i> Login
         </button>
       </form>
-      <div class="login-info">
-        <p><strong>Accounts:</strong></p>
-        <p>admin / ciko → Equipment config</p>
-        <p>super / ciko1234 → Templates</p>
+      <div class="auth-footer" style="margin-top: 15px; text-align: center;">
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+          Belum punya akun? <a href="#" id="showRegisterLink" style="color: var(--accent-primary); font-weight: 600; text-decoration: none;">Daftar sekarang</a>
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Register Modal -->
+  <div class="login-modal hidden" id="registerModal">
+    <div class="login-container">
+      <button class="modal-close" onclick="document.getElementById('registerModal').classList.add('hidden')" style="position: absolute; top: 15px; right: 15px;">
+        <i class="fas fa-times"></i>
+      </button>
+      <div class="login-header">
+        <img src="icon.png" alt="Logo" class="login-logo">
+        <h2>Daftar Akun Baru</h2>
+        <p>Lengkapi data untuk mendaftar sebagai personil</p>
+      </div>
+      <form id="registerForm" autocomplete="off">
+        <div class="form-group">
+          <label for="regName">Nama Lengkap</label>
+          <input type="text" id="regName" name="name" required placeholder="Nama Lengkap">
+        </div>
+        <div class="form-group">
+          <label for="regUsername">Username</label>
+          <input type="text" id="regUsername" name="username" required placeholder="Username">
+        </div>
+        <div class="form-group">
+          <label for="regPassword">Password</label>
+          <input type="password" id="regPassword" name="password" required placeholder="Password">
+        </div>
+        <!-- Role is forced to 'user' -->
+        <div class="form-group">
+          <label>Level Akun</label>
+          <input type="text" value="user" disabled style="background: var(--bg-secondary); cursor: not-allowed;">
+          <input type="hidden" name="role" value="user">
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">
+          <i class="fas fa-user-plus"></i> Daftar Sekarang
+        </button>
+      </form>
+      <div class="auth-footer" style="margin-top: 15px; text-align: center;">
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+          Sudah punya akun? <a href="#" id="showLoginLink" style="color: var(--accent-primary); font-weight: 600; text-decoration: none;">Login di sini</a>
+        </p>
       </div>
     </div>
   </div>
@@ -386,9 +433,8 @@
               <label for="userRole">Role</label>
               <div class="custom-select-wrapper" style="flex: 1;">
                 <select id="userRole" name="userRole" required style="width: 100%;">
-                  <option value="user_cabang">User</option>
-                  <option value="teknisi_cabang">Teknisi</option>
-                  <option value="user_pusat">User Pusat</option>
+                  <option value="user">User</option>
+                  <option value="teknisi">Teknisi</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
@@ -850,7 +896,7 @@
           <img src="icon.png" alt="Logo" class="sidebar-logo">
           <div class="logo-text-container">
             <span class="logo-text-main">AirNav Indonesia</span>
-            <span class="logo-text-sub">Technical Operation Center</span>
+            <span class="logo-text-sub">Monitoring ARIFIN</span>
           </div>
         </div>
       </div>
@@ -913,20 +959,11 @@
         </a> -->
       </nav>
       <div class="sidebar-footer">
-        <!-- Sidebar Login Form (Shown when not logged in) -->
-        <div id="sidebarLoginForm" class="sidebar-login-container">
-          <form id="sidebarAuthForm" class="sidebar-auth-form">
-            <div class="sidebar-auth-group">
-              <input type="text" id="sidebarUsername" placeholder="Username" required>
-            </div>
-            <div class="sidebar-auth-group">
-              <input type="password" id="sidebarPassword" placeholder="Password" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block btn-small">
-              <i class="fas fa-sign-in-alt"></i> Login
-            </button>
-          </form>
-        </div>
+        <!-- Sidebar Login Button (Shown when not logged in) -->
+        <button id="sidebarLoginBtn" class="sidebar-login-btn">
+          <i class="fas fa-sign-in-alt"></i>
+          <span>Login</span>
+        </button>
 
         <!-- User Panel (Shown when logged in) -->
         <div class="sidebar-user-panel hidden" id="sidebarUserPanel">
@@ -1782,9 +1819,8 @@
                 <select id="filterRole" class="filter-select">
                   <option value="">All Roles</option>
                   <option value="admin">Admin</option>
-                  <option value="user_pusat">User Pusat</option>
-                  <option value="teknisi_cabang">Teknisi</option>
-                  <option value="user_cabang">User Cabang</option>
+                  <option value="teknisi">Teknisi</option>
+                  <option value="user">User</option>
                 </select>
                 <button class="btn btn-primary" id="addUserBtn">
                   <i class="fas fa-plus"></i> Add User

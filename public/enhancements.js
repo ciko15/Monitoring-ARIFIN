@@ -33,6 +33,17 @@
         grid.addEventListener('click', (e) => {
             const card = e.target.closest('.cabang-card');
             if (!card || !card.dataset.id) return;
+            
+            // Check for authentication
+            if (!localStorage.getItem('authToken')) {
+                if (window.showToast) {
+                    window.showToast('Silakan login untuk melihat detail peralatan.', 'warning');
+                } else {
+                    alert('Silakan login untuk melihat detail peralatan.');
+                }
+                return;
+            }
+            
             openSourcePanel(card.dataset.id, card);
         });
     }
@@ -113,10 +124,6 @@
                     <p>Belum ada data source</p>
                 </div>
                 <div style="padding:0 14px 14px">
-                    <button class="btn btn-primary" style="width:100%"
-                        onclick="window.showAddDataSourceForm('${equipmentId}')">
-                        <i class="fas fa-plus"></i> Tambah Source
-                    </button>
                 </div>`;
             return;
         }
@@ -181,12 +188,6 @@
                         <div class="sp-card-header-right">
                             <span class="source-status-pill ${statusCls}">${status}</span>
                             <div class="sp-card-actions" onclick="event.stopPropagation()">
-                                <button class="btn-mini" title="Edit" onclick="editSourceFromPanel('${src.id}','${equipmentId}')">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-mini btn-mini-danger" title="Hapus" onclick="deleteSourceFromPanel('${src.id}','${equipmentId}')">
-                                    <i class="fas fa-trash"></i>
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -212,9 +213,6 @@
             <div class="sp-panel-wrapper">
                 <div class="sp-panel-toolbar">
                     <span class="sp-panel-count"><i class="fas fa-database"></i> DATA SOURCES (${sources.length})</span>
-                    <button class="btn-mini" onclick="window.showAddDataSourceForm('${equipmentId}')">
-                        <i class="fas fa-plus"></i> Tambah
-                    </button>
                 </div>
                 <div class="sp-sources-grid">
                     ${cards}
@@ -248,6 +246,11 @@
 
     // ── Source Detail Modal ───────────────────────────────────────────────────
     window.openSourceDetail = async function(sourceId) {
+        if (!localStorage.getItem('authToken')) {
+            window.showToast('Silakan login untuk melihat detail parameter.', 'warning');
+            return;
+        }
+        
         // Close the sliding panel when opening detail modal
         const panel   = document.getElementById('equipmentDetailPanel');
         const overlay = document.getElementById('detailPanelOverlay');

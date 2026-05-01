@@ -10,6 +10,7 @@ const SUP_CATEGORY_PATH = path.join(__dirname, 'sup_category.json');
 const AUTH_CONFIG_PATH = path.join(__dirname, 'equipment_otentication_config.json');
 const LIMITATION_CONFIG_PATH = path.join(__dirname, 'limitation_config.json');
 const TEMPLATE_CONFIG_PATH = path.join(__dirname, 'templates_config.json');
+const LOGS_DATA_PATH = path.join(__dirname, 'equipment_logs.json');
 
 // --- PARSER PARAMETER TEMPLATES ---
 // Used to show placeholders (-) when data is missing
@@ -102,8 +103,71 @@ async function writeAirportConfig(data) {
   return await writeJson(AIRPORT_CONFIG_PATH, data);
 }
 
-// --- IN-MEMORY DATA (HISTORICAL/NON-PERSISTENT) ---
+/**
+ * Mencari file log terbaru dengan memindai folder tanggal secara mundur
+ */
+function getLatestTimestampFromHistory(equipmentName) {
+  try {
+    const baseDir = path.resolve(__dirname, '../data');
+    if (!fs.existsSync(baseDir)) return null;
+
+    // Sanitize name sama dengan fileLogger.js
+    const safeName = equipmentName.toLowerCase().replace(/[^a-z0-9\s_-]/gi, '_').replace(/\s+/g, '_').substring(0, 50);
+    const fileName = `${safeName}.log`;
+
+    // Ambil semua folder bulan (YYYY-MM), urutkan terbaru di atas
+    const months = fs.readdirSync(baseDir)
+      .filter(f => /^\d{4}-\d{2}$/.test(f))
+      .sort((a, b) => b.localeCompare(a));
+
+    for (const month of months) {
+      const monthPath = path.join(baseDir, month);
+      // Ambil semua folder hari (DD), urutkan terbaru di atas
+      const days = fs.readdirSync(monthPath)
+        .filter(f => /^\d{2}$/.test(f))
+        .sort((a, b) => b.localeCompare(a));
+
+      for (const day of days) {
+        const filePath = path.join(monthPath, day, fileName);
+        if (fs.existsSync(filePath)) {
+          // Ketemu! Ambil mtime file atau baca baris terakhir
+          const stats = fs.statSync(filePath);
+          
+          // Lebih akurat: baca baris terakhir untuk ambil field "timestamp"
+          const content = fs.readFileSync(filePath, 'utf8').trim().split('\n');
+          if (content.length > 0) {
+            try {
+              const lastLine = JSON.parse(content[content.length - 1]);
+              return lastLine.timestamp;
+            } catch (e) {
+              return stats.mtime.toISOString();
+            }
+          }
+          return stats.mtime.toISOString();
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[DB] Error scanning history:', err);
+  }
+  return null;
+}
+
+// --- IN-MEMORY DATA (ENRICHED WITH PERSISTENCE) ---
 let equipmentLogsDB = [];
+// Load logs from file on startup
+(async () => {
+  try {
+    if (fs.existsSync(LOGS_DATA_PATH)) {
+      const data = fs.readFileSync(LOGS_DATA_PATH, 'utf8');
+      equipmentLogsDB = JSON.parse(data);
+      console.log(`[DB] Persistent logs loaded: ${equipmentLogsDB.length} records`);
+    }
+  } catch (err) {
+    console.error('[DB] Failed to load persistent logs:', err);
+  }
+})();
+
 let surveillanceStationsDB = [];
 let radarTargetsDB = [];
 let adsbAircraftDB = [];
@@ -180,9 +244,14 @@ async function getAllEquipment(filters = {}) {
   // Enrich with latest data if requested
   if (filters.includeData) {
     const allSources = await readJson(AUTH_CONFIG_PATH);
+    const fileLogger = require('../src/utils/fileLogger'); // Import fileLogger helper
 
     for (const item of resultData) {
+      // 1. Dapatkan log terakhir dari memori (untuk kecepatan)
       const latestLogs = getLatestLogsBySource(item.id);
+      
+      // 2. Jika log memori kosong, scan folder /data/ secara mundur
+      let latestTimeFromFile = getLatestTimestampFromHistory(item.name);
 
       // Initialize with ALL configured sources for this equipment
       const mergedData = {};
@@ -256,9 +325,25 @@ async function getAllEquipment(filters = {}) {
         }
       }
 
+      for (const src of configSources) {
+        // Ambil data yang sudah ada (mungkin isi placeholder '-')
+        const sourceLog = mergedData[src.name] || {};
+        
+        // JIKA waktu log kosong, paksa gunakan waktu dari scan history /data/
+        if (!sourceLog._logged_at) {
+          sourceLog._logged_at = latestTimeFromFile;
+        }
+
+        mergedData[src.name] = {
+          ...sourceLog,
+          _status: sourceLog._status || 'Disconnect'
+        };
+      }
+
       item.lastData = mergedData;
-      item.lastUpdate = latestTime;
-      item.UTC_Time = latestTime ? new Date(latestTime).toISOString() : null;
+      // Gunakan waktu dari file jika lebih baru atau jika data log memori kosong
+      item.lastUpdate = latestTime || latestTimeFromFile;
+      item.UTC_Time = item.lastUpdate ? new Date(item.lastUpdate).toISOString() : null;
 
       // Real-time Status Aggregation (Refined logic for issue requirements)
       const sourceStatuses = Object.values(mergedData).map((src) => src._status);
@@ -715,6 +800,10 @@ async function createEquipmentLog(data) {
   }
   // Hard cap total agar memory tidak habis
   if (equipmentLogsDB.length > 5000) equipmentLogsDB.shift();
+  
+  // Persist to file
+  await writeJson(LOGS_DATA_PATH, equipmentLogsDB);
+  
   return log;
 }
 

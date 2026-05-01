@@ -291,6 +291,31 @@ const app = new Elysia()
             user: { username: user.username, role: user.role }
         };
     })
+
+    .post('/api/register', async ({ body, set }) => {
+        const { username, password, name } = body as any;
+        
+        // Check if user already exists
+        const existingUser = await db.getUserByUsername(username);
+        if (existingUser) {
+            set.status = 400;
+            return { success: false, message: 'Username sudah terdaftar' };
+        }
+
+        // Create user with role 'user' strictly
+        const newUser = await db.createUser({
+            username,
+            password,
+            name: name || username,
+            role: 'user' // Hardcoded as requested
+        });
+
+        return {
+            success: true,
+            message: 'Registrasi berhasil! Silakan login.',
+            user: { username: newUser.username, role: newUser.role }
+        };
+    })
     
     // --- HISTORY LOGS ROUTES (File-based) ---
     .group('/api/history-logs', app => app

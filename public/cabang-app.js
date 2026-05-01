@@ -127,11 +127,15 @@ const cabangModule = (function () {
 
     try {
       const token = localStorage.getItem('authToken');
-      if (!token) return;
+      
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
       // Fetch all equipment with includeData=true
       const response = await fetch('/api/equipment?limit=1000&isActive=true&includeData=true', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: headers
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -205,12 +209,22 @@ const cabangModule = (function () {
 
       // Unified Data Source Table (Requested by USER)
       if (item.lastData) {
-        const sources = Object.keys(item.lastData);
+        // Ambil semua source dan urutkan berdasarkan waktu update terbaru (_logged_at)
+        const sources = Object.keys(item.lastData).sort((a, b) => {
+          const timeA = item.lastData[a]._logged_at ? new Date(item.lastData[a]._logged_at).getTime() : 0;
+          const timeB = item.lastData[b]._logged_at ? new Date(item.lastData[b]._logged_at).getTime() : 0;
+          return timeB - timeA; // Terbaru di atas
+        });
+
         if (sources.length > 0) {
           const cardsHtml = sources.map(sourceName => {
             const sourceData = item.lastData[sourceName];
             const srcStatus = sourceData._status || 'Normal';
-            const srcTime = sourceData._logged_at ? new Date(sourceData._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-';
+            const logDate = sourceData._logged_at ? new Date(sourceData._logged_at) : null;
+            const isToday = logDate && logDate.toDateString() === new Date().toDateString();
+            const srcTime = logDate 
+              ? logDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + (isToday ? '' : ` (${logDate.toLocaleDateString('id-ID', {day:'numeric', month:'short'})})`)
+              : '-';
             // Map status to color
             let dotColor = '#10b981'; // normal
             let statusClass = srcStatus.toLowerCase();
@@ -234,7 +248,7 @@ const cabangModule = (function () {
                     <span class="status-dot ${statusClass}" style="background-color: ${dotColor}"></span>
                     <span class="source-name">${sourceName}</span>
                   </div>
-                  <span class="status-kedxpill ${statusClass}">${srcStatus}</span>
+                  <span class="status-pill ${statusClass}">${srcStatus}</span>
                 </div>
                 <div class="source-card-footer">
                   <span class="update-label"><i class="far fa-clock"></i></span>
@@ -246,6 +260,7 @@ const cabangModule = (function () {
 
           dataHtml = `
             <div class="source-cards-container">
+              <div class="source-cards-title"><i class="fas fa-layer-group"></i> DATA SOURCES</div>
               ${cardsHtml}
             </div>
           `;

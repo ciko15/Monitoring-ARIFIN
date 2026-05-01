@@ -1449,26 +1449,56 @@ window.editAirport = function (id) {
 
 // Auth UI
 function updateAuthUI() {
-  const sidebarLogin = document.getElementById('sidebarLoginForm');
+  const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
   const sidebarPanel = document.getElementById('sidebarUserPanel');
   const logoutBtn = document.getElementById('sidebarLogoutBtn');
   const userNameEl = document.getElementById('sidebarUserName');
   const loginModal = document.getElementById('loginModal');
 
+  const ACCESS_MAP = {
+    user: ['dashboard', 'cabang', 'equipment-logs'],
+    teknisi: ['dashboard', 'cabang', 'equipment', 'analytics-dashboard', 'network-tools', 'network-monitor', 'equipment-logs'],
+    admin: ['dashboard', 'cabang', 'equipment', 'analytics-dashboard', 'network-tools', 'network-monitor', 'users', 'equipment-logs'],
+    superadmin: ['dashboard', 'cabang', 'equipment', 'airports', 'equipment-logs', 'analytics-dashboard', 'users', 'configure', 'network-tools', 'network-monitor']
+  };
+
   if (currentUser) {
-    if (sidebarLogin) sidebarLogin.classList.add('hidden');
+    if (sidebarLoginBtn) sidebarLoginBtn.classList.add('hidden');
     if (sidebarPanel) sidebarPanel.classList.remove('hidden');
     if (logoutBtn) logoutBtn.classList.remove('hidden');
     if (userNameEl) userNameEl.textContent = currentUser.username;
     if (loginModal) loginModal.classList.add('hidden');
 
-    document.querySelectorAll('.hidden-initial').forEach(el => el.classList.remove('hidden-initial'));
+    // Show/Hide menu items based on role
+    const userRole = currentUser.role || 'user';
+    const allowedSections = ACCESS_MAP[userRole] || ACCESS_MAP.user;
+
+    document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+      const section = item.getAttribute('data-section');
+      if (allowedSections.includes(section)) {
+        item.classList.remove('hidden');
+        item.classList.remove('hidden-initial');
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+
+    document.querySelectorAll('.hidden-initial').forEach(el => {
+       if (!el.classList.contains('nav-item')) el.classList.remove('hidden-initial');
+    });
   } else {
-    if (sidebarLogin) sidebarLogin.classList.remove('hidden');
+    if (sidebarLoginBtn) sidebarLoginBtn.classList.remove('hidden');
     if (sidebarPanel) sidebarPanel.classList.add('hidden');
     if (logoutBtn) logoutBtn.classList.add('hidden');
-    // Don't force show login modal on load, allow dashboard view
-    // if (loginModal) loginModal.classList.remove('hidden');
+    
+    document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+      const section = item.getAttribute('data-section');
+      if (section === 'dashboard' || section === 'cabang') {
+          item.classList.remove('hidden');
+      } else {
+          item.classList.add('hidden');
+      }
+    });
 
     document.querySelectorAll('.hidden-initial').forEach(el => el.classList.add('hidden-initial'));
   }
@@ -1533,10 +1563,27 @@ function initNavigation() {
   const lastSection = localStorage.getItem('currentSection') || 'dashboard';
 
   const switchSection = (sectionId) => {
-    // Basic protection: don't allow restricted sections without a token
-    const restrictedSections = ['equipment', 'airports', 'equipment-logs', 'users', 'configure', 'network-tools', 'network-monitor', 'analytics-dashboard'];
-    if (!authToken && restrictedSections.includes(sectionId)) {
-      sectionId = 'dashboard';
+    // Role-based protection
+    const ACCESS_MAP = {
+      user: ['dashboard', 'cabang', 'equipment-logs'],
+      teknisi: ['dashboard', 'cabang', 'equipment', 'analytics-dashboard', 'network-tools', 'network-monitor', 'equipment-logs'],
+      admin: ['dashboard', 'cabang', 'equipment', 'analytics-dashboard', 'network-tools', 'network-monitor', 'users', 'equipment-logs'],
+      superadmin: ['dashboard', 'cabang', 'equipment', 'airports', 'equipment-logs', 'analytics-dashboard', 'users', 'configure', 'network-tools', 'network-monitor']
+    };
+
+    const userRole = currentUser ? currentUser.role : null;
+    
+    if (!userRole) {
+      // Guest access
+      if (sectionId !== 'dashboard' && sectionId !== 'cabang') {
+        sectionId = 'dashboard';
+      }
+    } else {
+      const allowedSections = ACCESS_MAP[userRole] || ACCESS_MAP.user;
+      if (!allowedSections.includes(sectionId)) {
+        showToast('Anda tidak memiliki akses ke menu ini', 'warning');
+        sectionId = allowedSections[0] || 'dashboard';
+      }
     }
 
     navItems.forEach(i => {
@@ -1667,16 +1714,88 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadEquipment();
   }
 
-  const sidebarAuthForm = document.getElementById('sidebarAuthForm');
-  if (sidebarAuthForm) sidebarAuthForm.addEventListener('submit', handleLogin);
+  const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
+  if (sidebarLoginBtn) {
+    sidebarLoginBtn.addEventListener('click', () => {
+      document.getElementById('loginModal').classList.remove('hidden');
+    });
+  }
 
   const loginForm = document.getElementById('loginForm');
   if (loginForm) loginForm.addEventListener('submit', handleLogin);
-  document.getElementById('sidebarLogoutBtn').addEventListener('click', () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
-    location.reload();
-  });
+
+  // Registration Logic
+  const registerForm = document.getElementById('registerForm');
+  if (registerForm) {
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(registerForm);
+      const data = Object.fromEntries(formData.entries());
+
+      try {
+        const res = await fetch(`${API_URL}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          showToast(result.message, 'success');
+          document.getElementById('registerModal').classList.add('hidden');
+          document.getElementById('loginModal').classList.remove('hidden');
+        } else {
+          showToast(result.message || 'Registrasi gagal', 'error');
+        }
+      } catch (err) {
+        console.error('Registration error:', err);
+        showToast('Terjadi kesalahan saat mendaftar', 'error');
+      }
+    });
+  }
+
+  // Modal Switching Logic
+  const showRegisterLink = document.getElementById('showRegisterLink');
+  if (showRegisterLink) {
+    showRegisterLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('loginModal').classList.add('hidden');
+      document.getElementById('registerModal').classList.remove('hidden');
+    });
+  }
+
+  const showLoginLink = document.getElementById('showLoginLink');
+  if (showLoginLink) {
+    showLoginLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('registerModal').classList.add('hidden');
+      document.getElementById('loginModal').classList.remove('hidden');
+    });
+  }
+
+  const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
+  if (sidebarLogoutBtn) {
+    sidebarLogoutBtn.addEventListener('click', () => {
+      document.getElementById('logoutModal').classList.remove('hidden');
+    });
+  }
+
+  const confirmLogout = document.getElementById('confirmLogout');
+  if (confirmLogout) {
+    confirmLogout.addEventListener('click', () => {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('cabang_equipment_cache'); // Clear cache on logout
+      location.reload();
+    });
+  }
+
+  const cancelLogout = document.getElementById('cancelLogout');
+  if (cancelLogout) {
+    cancelLogout.addEventListener('click', () => {
+      document.getElementById('logoutModal').classList.add('hidden');
+    });
+  }
   if (document.getElementById('addDataSourceBtn')) {
     document.getElementById('addDataSourceBtn').addEventListener('click', async () => {
       const equipmentIdInput = document.getElementById('equipmentId');
@@ -2355,7 +2474,9 @@ async function loadUsers() {
     const res = await fetch(`${API_URL}/users`, { headers: getAuthHeaders() });
     if (res.ok) {
       usersData = await res.json();
-      renderUserTable(usersData);
+      // Only show roles: admin, teknisi, user. Hide superadmin.
+      const filteredUsers = usersData.filter(u => ['admin', 'teknisi', 'user'].includes(u.role));
+      renderUserTable(filteredUsers);
     } else {
       console.error('Failed to load users');
     }
