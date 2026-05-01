@@ -1,0 +1,2336 @@
+/* ============================================
+   CABANG MONITORING STYLES
+   TOC - Remote Status Facilities
+   ============================================ */
+
+/* CSS Variables for Cabang Monitoring - DARK MODE (default) */
+:root {
+  --monitoring-bg: #0f172a;
+  --monitoring-card-bg: #1e293b;
+  --monitoring-card-hover: #334155;
+  --monitoring-border: #334155;
+  --monitoring-text: #f1f5f9;
+  --monitoring-text-muted: #94a3b8;
+  --monitoring-accent: #2563eb;
+  --monitoring-accent-hover: #3b82f6;
+  --monitoring-success: #10b981;
+  --monitoring-warning: #f59e0b;
+  --monitoring-danger: #ef4444;
+  --monitoring-info: #3b82f6;
+  --monitoring-purple: #8b5cf6;
+  --monitoring-pink: #ec4899;
+  --monitoring-glow-success: 0 0 20px rgba(16, 185, 129, 0.4);
+  --monitoring-glow-warning: 0 0 20px rgba(245, 158, 11, 0.4);
+  --monitoring-glow-danger: 0 0 20px rgba(239, 68, 68, 0.4);
+  --monitoring-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --monitoring-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  --monitoring-radius: 12px;
+  --monitoring-radius-sm: 8px;
+  --monitoring-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* LIGHT MODE support for Cabang Monitoring */
+[data-theme="light"] {
+  --monitoring-bg: #f8fafc;
+  --monitoring-card-bg: #ffffff;
+  --monitoring-card-hover: #f1f5f9;
+  --monitoring-border: #e2e8f0;
+  --monitoring-text: #1e293b;
+  --monitoring-text-muted: #64748b;
+  --monitoring-accent: #2563eb;
+  --monitoring-accent-hover: #3b82f6;
+  --monitoring-success: #10b981;
+  --monitoring-warning: #f59e0b;
+  --monitoring-danger: #ef4444;
+  --monitoring-glow-success: 0 0 15px rgba(16, 185, 129, 0.3);
+  --monitoring-glow-warning: 0 0 15px rgba(245, 158, 11, 0.3);
+  --monitoring-glow-danger: 0 0 15px rgba(239, 68, 68, 0.3);
+  --monitoring-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --monitoring-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================
+   MONITORING SECTION
+   ============================================ */
+
+.monitoring-section {
+  padding: 25px;
+  min-height: calc(100vh - var(--header-height));
+  background: var(--monitoring-bg);
+}
+
+/* Monitoring Header */
+.monitoring-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.monitoring-header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.monitoring-header-left .page-icon {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, var(--monitoring-accent) 0%, var(--monitoring-accent-hover) 100%);
+  border-radius: var(--monitoring-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+}
+
+.monitoring-header-left h2 {
+  color: var(--monitoring-text);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.monitoring-header-left .subtitle {
+  color: var(--monitoring-text-muted);
+  font-size: 0.9rem;
+  margin: 4px 0 0 0;
+}
+
+/* Monitoring Filters */
+.monitoring-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  background: var(--monitoring-card-bg);
+  border: 1px solid var(--monitoring-border);
+  border-radius: 20px;
+  color: var(--monitoring-text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--monitoring-transition);
+}
+
+.filter-btn:hover {
+  background: var(--monitoring-card-hover);
+  border-color: var(--monitoring-accent);
+  color: var(--monitoring-text);
+}
+
+.filter-btn.active {
+  background: var(--monitoring-accent);
+  border-color: var(--monitoring-accent);
+  color: white;
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+}
+
+/* ============================================
+   EQUIPMENT CARDS GRID - NOC STYLE
+   Improved for professional monitoring
+   ============================================ */
+
+.equipment-grid {
+  display: grid;
+  /* NOC Style: 4 cards per row on large screens, 3 on medium, 2 on tablet, 1 on mobile */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+/* Equipment Card - Fixed Size for NOC Style */
+.equipment-card {
+  background: var(--monitoring-card-bg);
+  border: 1px solid var(--monitoring-border);
+  border-radius: var(--monitoring-radius);
+  padding: 20px;
+  transition: var(--monitoring-transition);
+  position: relative;
+  overflow: hidden;
+  /* Fixed minimum height to prevent shrinking */
+  min-height: 180px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  cursor: pointer;
+  /* Prevent card from stretching too wide */
+  max-width: 100%;
+  width: 100%;
+}
+
+.equipment-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--monitoring-accent);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.equipment-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--monitoring-shadow-lg);
+  border-color: var(--monitoring-accent);
+}
+
+.equipment-card:hover::before {
+  transform: scaleX(1);
+}
+
+/* Status-based left border colors */
+.equipment-card.status-normal {
+  border-left: 3px solid var(--monitoring-success);
+}
+
+.equipment-card.status-warning {
+  border-left: 3px solid var(--monitoring-warning);
+}
+
+.equipment-card.status-alert {
+  border-left: 3px solid var(--monitoring-danger);
+}
+
+.equipment-card.status-disconnect {
+  border-left: 3px solid var(--text-muted);
+}
+
+.equipment-card.status-standby {
+  border-left: 3px solid #9ca3af;
+}
+
+/* ============================================
+   STATUS GLOW ANIMATIONS - NOC STYLE
+   ============================================ */
+
+/* Normal status - subtle green glow pulse */
+.equipment-card.status-normal {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+}
+
+.equipment-card.status-normal::before {
+  background: var(--monitoring-success);
+  box-shadow: 0 0 10px var(--monitoring-success);
+}
+
+/* Warning status - orange glow with subtle pulse */
+.equipment-card.status-warning {
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+  animation: warningPulse 2s ease-in-out infinite;
+}
+
+.equipment-card.status-warning::before {
+  background: var(--monitoring-warning);
+  box-shadow: 0 0 10px var(--monitoring-warning);
+}
+
+/* Alert status - red glow with faster pulse */
+.equipment-card.status-alert {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  animation: alertPulse 1.5s ease-in-out infinite;
+}
+
+.equipment-card.status-alert::before {
+  background: var(--monitoring-danger);
+  box-shadow: 0 0 15px var(--monitoring-danger);
+}
+
+/* Disconnect status - gray, no animation */
+.equipment-card.status-disconnect {
+  box-shadow: 0 0 10px rgba(148, 163, 184, 0.1);
+  opacity: 0.85;
+}
+
+.equipment-card.status-disconnect::before {
+  background: #9ca3af;
+}
+
+/* Standby status - gray */
+.equipment-card.status-standby {
+  box-shadow: 0 0 10px rgba(148, 163, 184, 0.1);
+}
+
+.equipment-card.status-standby::before {
+  background: #9ca3af;
+}
+
+/* Keyframe animations for status glow */
+@keyframes warningPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.4);
+  }
+}
+
+@keyframes alertPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(239, 68, 68, 0.5);
+  }
+}
+
+/* Status indicator dot animation */
+.equipment-status.normal::before {
+  animation: pulse 2s infinite;
+}
+
+.equipment-status.warning::before {
+  animation: warningDot 1.5s infinite;
+}
+
+.equipment-status.alert::before {
+  animation: alertDot 1s infinite;
+}
+
+@keyframes warningDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes alertDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.4);
+  }
+}
+
+/* Card Header */
+.equipment-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center; /* Membuat status badge dan icon persis sejajar di tengah */
+  margin-bottom: 15px;
+}
+
+/* ============================================
+   EQUIPMENT CARD ICONS - NOC STYLE
+   All icons white for consistency
+   ============================================ */
+
+.equipment-card-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: var(--monitoring-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: #FFFFFF !important;
+  background: transparent;
+  border: none;
+}
+
+/* Light mode - keep icons white but with colored background */
+[data-theme="light"] .equipment-card-icon {
+  color: #FFFFFF !important;
+}
+
+/* Status Badge */
+.equipment-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================
+   STATUS INDICATORS - NOC STYLE
+   NORMAL=green, WARNING=yellow/orange, 
+   DOWN/DISCONNECT=red, STANDBY=gray
+   ============================================ */
+
+.equipment-status.normal {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--monitoring-success);
+  box-shadow: var(--monitoring-glow-success);
+}
+
+.equipment-status.warning {
+  /* FIX: Yellow/Orange for warning status */
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--monitoring-warning);
+  box-shadow: var(--monitoring-glow-warning);
+}
+
+.equipment-status.alert {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--monitoring-danger);
+  box-shadow: var(--monitoring-glow-danger);
+}
+
+.equipment-status.disconnect {
+  /* FIX: Gray for disconnect status */
+  background: rgba(148, 163, 184, 0.15);
+  color: #9ca3af;
+}
+
+.equipment-status.standby {
+  /* FIX: Gray for standby status */
+  background: rgba(148, 163, 184, 0.15);
+  color: #9ca3af;
+}
+
+.equipment-status::before {
+  display: none; /* Menghilangkan dot/titik sebelum status */
+}
+
+/* Stale Data Styling */
+.source-group.stale {
+  border-color: var(--monitoring-border);
+  opacity: 0.8;
+}
+
+.data-point.stale .data-value {
+  color: var(--monitoring-text-muted);
+  font-style: italic;
+}
+
+.stale-value {
+  text-decoration: line-through rgba(148, 163, 184, 0.5);
+  margin-right: 4px;
+}
+
+/* Card Body */
+.equipment-card-body {
+  margin-bottom: 15px;
+  flex: 1; /* Membiarkan konten memanjang dan menekan footer merata ke bawah */
+}
+
+.equipment-name {
+  color: var(--monitoring-text);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Card Footer */
+.equipment-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 15px;
+  border-top: 1px solid var(--monitoring-border);
+}
+
+.equipment-last-update {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--monitoring-text-muted);
+  font-size: 0.8rem;
+}
+
+.equipment-signal {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.signal-bar {
+  width: 4px;
+  background: var(--monitoring-border);
+  border-radius: 2px;
+  transition: var(--monitoring-transition);
+}
+
+.signal-bar.active {
+  background: var(--monitoring-success);
+}
+
+.signal-bar:nth-child(1) { height: 8px; }
+.signal-bar:nth-child(2) { height: 12px; }
+.signal-bar:nth-child(3) { height: 16px; }
+.signal-bar:nth-child(4) { height: 20px; }
+
+/* Empty State */
+.monitoring-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--monitoring-text-muted);
+}
+
+.monitoring-empty-state i {
+  font-size: 3rem;
+  margin-bottom: 20px;
+  color: var(--monitoring-accent);
+  opacity: 0.5;
+}
+
+.monitoring-empty-state h3 {
+  color: var(--monitoring-text);
+  font-size: 1.3rem;
+  margin-bottom: 10px;
+}
+
+.monitoring-empty-state p {
+  font-size: 0.95rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 1024px) {
+  .monitoring-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .monitoring-filters {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    flex-wrap: nowrap;
+  }
+  
+  .equipment-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .monitoring-section {
+    padding: 15px;
+  }
+  
+  .monitoring-header-left h2 {
+    font-size: 1.2rem;
+  }
+  
+  .equipment-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.equipment-card {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.equipment-card:nth-child(1) { animation-delay: 0.05s; }
+.equipment-card:nth-child(2) { animation-delay: 0.1s; }
+.equipment-card:nth-child(3) { animation-delay: 0.15s; }
+.equipment-card:nth-child(4) { animation-delay: 0.2s; }
+.equipment-card:nth-child(5) { animation-delay: 0.25s; }
+.equipment-card:nth-child(6) { animation-delay: 0.3s; }
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.equipment-status.normal::before {
+  animation: pulse 2s infinite;
+}
+
+/* Hover Effects */
+.branch-item,
+.filter-btn,
+.equipment-card {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Focus States */
+.sidebar-search-input:focus,
+.filter-btn:focus {
+  outline: none;
+}
+
+/* Selection Color */
+::selection {
+  background: rgba(37, 99, 235, 0.3);
+  color: var(--monitoring-text);
+}
+
+/* ============================================
+   CABANG SECTION - AIRPORT LIST
+   ============================================ */
+
+.cabang-container {
+  padding: 25px;
+  min-height: calc(100vh - var(--header-height));
+  background: var(--monitoring-bg);
+}
+
+.cabang-header {
+  margin-bottom: 25px;
+}
+
+.cabang-header h2 {
+  color: var(--monitoring-text);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cabang-header h2 i {
+  color: var(--monitoring-accent);
+}
+
+.cabang-header .subtitle {
+  color: var(--monitoring-text-muted);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* Cabang Grid - Airport Cards - 4 columns layout */
+.cabang-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* Diubah menjadi 3 kolom per baris */
+  gap: 20px;
+}
+
+/* Responsive breakpoints for cabang grid */
+@media (max-width: 1400px) {
+  .cabang-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .cabang-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .cabang-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.airport-card {
+  background: var(--monitoring-card-bg);
+  border: 1px solid var(--monitoring-border);
+  border-radius: var(--monitoring-radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: var(--monitoring-transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.airport-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--monitoring-accent);
+  transform: scaleY(0);
+  transition: transform 0.3s ease;
+}
+
+.airport-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--monitoring-shadow-lg);
+  border-color: var(--monitoring-accent);
+}
+
+.airport-card:hover::before {
+  transform: scaleY(1);
+}
+
+.airport-card-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.airport-icon {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, var(--monitoring-accent) 0%, var(--monitoring-accent-hover) 100%);
+  border-radius: var(--monitoring-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+}
+
+.airport-icon.has-children {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.airport-basic-info h3 {
+  color: var(--monitoring-text);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.airport-basic-info .city {
+  color: var(--monitoring-text-muted);
+  font-size: 0.85rem;
+}
+
+.airport-stats-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.airport-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.airport-stat i {
+  color: var(--monitoring-accent);
+}
+
+.airport-stat span {
+  color: var(--monitoring-text-muted);
+}
+
+.airport-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.airport-status-badge.normal {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--monitoring-success);
+}
+
+.airport-status-badge.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--monitoring-warning);
+}
+
+.airport-status-badge.alert {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--monitoring-danger);
+}
+
+.airport-status-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.airport-children-hint {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--monitoring-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--monitoring-text-muted);
+  font-size: 0.8rem;
+}
+
+.airport-children-hint i {
+  color: #8b5cf6;
+}
+
+/* Loading State */
+.loading-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--monitoring-text-muted);
+}
+
+.loading-state i {
+  font-size: 2rem;
+  margin-bottom: 15px;
+  color: var(--monitoring-accent);
+}
+
+/* ============================================
+   MONITORING LAYOUT - TWO PANEL (UPDATED)
+   ============================================ */
+
+.monitoring-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  /* FIX: Calculate height properly to prevent double scrollbar */
+  height: calc(100vh - var(--header-height) - 120px);
+  max-height: calc(100vh - var(--header-height) - 80px);
+  overflow: hidden;
+}
+
+/* Branch List Sidebar */
+.branch-list-sidebar {
+  background: var(--bg-secondary);
+  border: 1px solid var(--monitoring-border);
+  border-radius: var(--monitoring-radius);
+  padding: 15px;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* FIX: Sticky Search Box in Branch List with Visual Divider */
+.branch-list-sidebar .search-box {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-secondary);
+  padding: 0;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--monitoring-border);
+  padding-bottom: 10px;
+}
+
+.branch-list-sidebar .search-box input {
+  background: var(--monitoring-bg);
+  border-color: var(--monitoring-border);
+  box-shadow: none !important;
+}
+
+/* FIX: Independent Scrolling - Scrollable Branch List */
+.branch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 5px;
+  /* FIX: Add padding top for spacing from search box */
+  padding-top: 5px;
+}
+
+/* Custom scrollbar for branch list */
+.branch-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.branch-list::-webkit-scrollbar-track {
+  background: var(--monitoring-bg);
+  border-radius: 3px;
+}
+
+.branch-list::-webkit-scrollbar-thumb {
+  background: var(--monitoring-border);
+  border-radius: 3px;
+}
+
+.branch-list::-webkit-scrollbar-thumb:hover {
+  background: var(--monitoring-accent);
+}
+
+/* Branch List */
+.branch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Branch Item */
+.branch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--monitoring-bg);
+  border: 1px solid var(--monitoring-border);
+  border-radius: var(--monitoring-radius-sm);
+  cursor: pointer;
+  transition: var(--monitoring-transition);
+}
+
+.branch-item:hover {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: var(--monitoring-accent);
+}
+
+.branch-item.active {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: var(--monitoring-accent);
+  border-left: 3px solid var(--monitoring-accent);
+}
+
+.branch-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--monitoring-accent) 0%, var(--monitoring-accent-hover) 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.branch-icon.has-children {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.branch-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.branch-name {
+  color: var(--monitoring-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch-city {
+  color: var(--monitoring-text-muted);
+  font-size: 0.75rem;
+}
+
+.branch-badge {
+  flex-shrink: 0;
+}
+
+.equipment-count {
+  background: var(--monitoring-accent);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.branch-item.active .equipment-count {
+  background: var(--monitoring-accent-hover);
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+}
+
+/* Empty Branch List */
+.empty-branch-list {
+  text-align: center;
+  padding: 30px 15px;
+  color: var(--monitoring-text-muted);
+}
+
+.empty-branch-list i {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+  opacity: 0.5;
+}
+
+.empty-branch-list p {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* Equipment Display */
+.equipment-display {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* FIX: Sticky Filter Buttons with Visual Divider */
+.monitoring-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 15px;
+  margin: -20px -20px 15px -20px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--monitoring-border);
+  /* FIX: Add padding for spacing */
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+
+/* ============================================
+   EQUIPMENT CARDS CONTAINER - SCROLLABLE
+   NOC Style: Fixed card sizes, vertical scroll
+   ============================================ */
+
+/* Independent Scrolling - Scrollable Equipment Cards */
+.equipment-cards-container {
+  display: grid;
+  /* NOC Style: 4 cards per row on large screens, 3 on medium, 2 on tablet, 1 on mobile */
+  /* minmax(280px, 1fr) ensures cards don't stretch too much - adjust 280px for more/fewer cards per row */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 15px;
+  overflow-y: auto;
+  flex: 1;
+  padding: 10px;
+  align-content: start;
+  /* Ensure minimum height for scrolling */
+  min-height: 200px;
+  max-height: calc(100vh - var(--header-height) - 250px);
+}
+
+/* Force specific column counts for different screen sizes */
+@media (min-width: 1400px) {
+  .equipment-cards-container {
+    grid-template-columns: repeat(3, 1fr); /* Diubah menjadi maks 3 kolom */
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .equipment-cards-container {
+    grid-template-columns: repeat(3, 1fr); /* Tetap 3 kolom */
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .equipment-cards-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .equipment-cards-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Custom scrollbar for equipment cards */
+.equipment-cards-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.equipment-cards-container::-webkit-scrollbar-track {
+  background: var(--monitoring-bg);
+  border-radius: 3px;
+}
+
+.equipment-cards-container::-webkit-scrollbar-thumb {
+  background: var(--monitoring-border);
+  border-radius: 3px;
+}
+
+.equipment-cards-container::-webkit-scrollbar-thumb:hover {
+  background: var(--monitoring-accent);
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  background: var(--monitoring-card-bg);
+  border: 1px solid var(--monitoring-border);
+  border-radius: 20px;
+  color: var(--monitoring-text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--monitoring-transition);
+  white-space: nowrap;
+}
+
+.filter-btn:hover {
+  background: var(--monitoring-card-hover);
+  border-color: var(--monitoring-accent);
+  color: var(--monitoring-text);
+}
+
+.filter-btn.active {
+  background: var(--monitoring-accent);
+  border-color: var(--monitoring-accent);
+  color: white;
+}
+
+/* Responsive for Monitoring Layout */
+@media (max-width: 1024px) {
+  .monitoring-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .branch-list-sidebar {
+    max-height: 300px;
+    order: 2;
+  }
+  
+  .equipment-display {
+    order: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .cabang-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .monitoring-layout {
+    gap: 15px;
+  }
+  
+  .branch-list-sidebar {
+    padding: 12px;
+  }
+  
+  .branch-item {
+    padding: 8px 10px;
+  }
+  
+  .branch-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+  
+  .branch-name {
+    font-size: 0.85rem;
+  }
+}
+
+/* ============================================
+   EQUIPMENT DETAIL PANEL - SLIDING PANEL
+   NOC Style right-side panel
+   ============================================ */
+
+.equipment-detail-panel {
+  position: fixed;
+  top: 0;
+  right: -600px;
+  width: 600px;
+  height: 100vh;
+  background: var(--monitoring-card-bg);
+  border-left: 1px solid var(--monitoring-border);
+  box-shadow: -5px 0 30px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.equipment-detail-panel.open {
+  right: 0;
+}
+
+.detail-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--monitoring-border);
+  background: var(--monitoring-bg);
+  flex-shrink: 0;
+}
+
+.detail-panel-header h3 {
+  color: var(--monitoring-text);
+  font-size: 1.2rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-panel-header h3 i {
+  color: var(--monitoring-accent);
+}
+
+.detail-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+}
+
+.detail-panel-close:hover {
+  color: var(--accent-danger);
+  font-size: 1.4rem;
+}
+
+.detail-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* Equipment Info Section */
+.detail-section {
+  margin-bottom: 25px;
+}
+
+.detail-section-title {
+  color: var(--monitoring-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-section-title i {
+  color: var(--monitoring-accent);
+}
+
+.detail-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.detail-info-item {
+  background: var(--monitoring-bg);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--monitoring-border);
+}
+
+.detail-info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-info-item label {
+  display: block;
+  color: var(--monitoring-text-muted);
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.detail-info-item span {
+  color: var(--monitoring-text);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+/* Status Badge in Detail Panel */
+.detail-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.detail-status-badge.normal {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--monitoring-success);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+.detail-status-badge.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--monitoring-warning);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+}
+
+.detail-status-badge.alert {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--monitoring-danger);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+.detail-status-badge.disconnect {
+  background: rgba(148, 163, 184, 0.15);
+  color: #9ca3af;
+}
+
+.detail-status-badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Timeline / Log Section */
+.detail-timeline {
+  position: relative;
+  padding-left: 20px;
+}
+
+.detail-timeline::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--monitoring-border);
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 15px;
+  padding-left: 15px;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -17px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--monitoring-accent);
+  border: 2px solid var(--monitoring-card-bg);
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-item.status-normal::before {
+  background: var(--monitoring-success);
+}
+
+.timeline-item.status-warning::before {
+  background: var(--monitoring-warning);
+}
+
+.timeline-item.status-alert::before {
+  background: var(--monitoring-danger);
+}
+
+.timeline-item.status-disconnect::before {
+  background: #9ca3af;
+}
+
+.timeline-time {
+  color: var(--monitoring-text-muted);
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+}
+
+.timeline-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.timeline-status.normal {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--monitoring-success);
+}
+
+.timeline-status.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--monitoring-warning);
+}
+
+.timeline-status.alert {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--monitoring-danger);
+}
+
+.timeline-status.disconnect {
+  background: rgba(148, 163, 184, 0.15);
+  color: #9ca3af;
+}
+
+.timeline-message {
+  color: var(--monitoring-text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.timeline-source {
+  color: var(--monitoring-text-muted);
+  font-size: 0.7rem;
+  margin-top: 4px;
+}
+
+/* Panel Overlay */
+.detail-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.detail-panel-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Loading State */
+.detail-panel-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--monitoring-text-muted);
+}
+
+.detail-panel-loading i {
+  font-size: 2rem;
+  margin-bottom: 15px;
+  color: var(--monitoring-accent);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.detail-panel-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--monitoring-text-muted);
+}
+
+.detail-panel-empty i {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  opacity: 0.5;
+}
+
+/* Responsive for Detail Panel */
+@media (max-width: 500px) {
+  .equipment-detail-panel {
+    width: 100%;
+    right: -100%;
+  }
+  
+  .detail-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   MONITORING TABLE & ACTION DATA GRID
+   ============================================ */
+
+.monitoring-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 10px;
+}
+
+.monitoring-table th {
+  background: rgba(30, 41, 59, 0.5);
+  color: var(--monitoring-text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 2px solid var(--monitoring-border);
+}
+
+.monitoring-table td {
+  padding: 15px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--monitoring-border);
+  color: var(--monitoring-text);
+  transition: background 0.2s ease;
+}
+
+.monitoring-table tr:hover td {
+  background: rgba(51, 65, 85, 0.3);
+}
+
+/* Action Data Grid inside Table Cell */
+.action-data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  min-width: 250px;
+}
+
+.data-item {
+  background: rgba(15, 23, 42, 0.4);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.data-label {
+  font-size: 0.7rem;
+  color: var(--monitoring-text-muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.data-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--monitoring-accent-hover);
+}
+
+.category-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.category-badge.communication { background: rgba(37, 99, 235, 0.2); color: #60a5fa; }
+.category-badge.navigation { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+.category-badge.surveillance { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+.category-badge.data-processing { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.category-badge.support { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+
+.empty-state {
+  text-align: center;
+  padding: 40px !important;
+  color: var(--monitoring-text-muted);
+}
+
+/* =====================================================
+   CABANG MONITORING - GRID/CARD LAYOUT (ISSUE #6)
+   ===================================================== */
+
+.cabang-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 10px 0;
+}
+
+@media (max-width: 1200px) {
+  .cabang-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .cabang-grid-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cabang-card {
+  background: var(--monitoring-card-bg);
+  border: 1px solid var(--monitoring-border);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  pointer-events: auto; /* Ensure card itself always receives clicks */
+  -webkit-tap-highlight-color: rgba(0, 180, 255, 0.1); /* Mobile tap feedback */
+  touch-action: manipulation; /* Prevent double-tap delay on mobile */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  height: 480px; /* Fixed height for uniformity */
+}
+
+.cabang-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--monitoring-accent);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.cabang-card.alarm { border-left: 4px solid var(--monitoring-danger); }
+.cabang-card.warning { border-left: 4px solid var(--monitoring-warning); }
+.cabang-card.normal { border-left: 4px solid var(--monitoring-success); }
+.cabang-card.offline { border-left: 4px solid var(--monitoring-text-muted); }
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.card-info h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--monitoring-text);
+  line-height: 1.2;
+}
+
+.card-info .code {
+  font-size: 0.75rem;
+  color: var(--monitoring-text-muted);
+  display: block;
+  margin-top: 4px;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.normal { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.status-badge.alarm { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.status-badge.warning { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.status-badge.offline { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+
+.card-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--monitoring-text-muted);
+}
+
+.card-location i { font-size: 0.75rem; color: var(--monitoring-accent); }
+
+.card-data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 4px;
+}
+
+.data-point {
+  display: flex;
+  flex-direction: column;
+}
+
+.data-label {
+  font-size: 0.65rem;
+  color: var(--monitoring-text-muted);
+  text-transform: uppercase;
+}
+
+.data-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--monitoring-text);
+}
+
+.card-footer {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--monitoring-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.last-update {
+  font-size: 0.65rem;
+  color: var(--monitoring-text-muted);
+}
+
+.category-tag {
+  font-size: 0.65rem;
+  background: var(--monitoring-border);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--monitoring-text);
+}
+
+.empty-data {
+  font-size: 0.75rem;
+  color: var(--monitoring-text-muted);
+  font-style: italic;
+  padding: 10px;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.3);
+  border-radius: 6px;
+  border: 1px dashed var(--monitoring-border);
+}
+
+.empty-data.unconfigured {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--monitoring-danger);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 15px;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.empty-data.unconfigured i {
+  font-size: 1.2rem;
+  opacity: 0.8;
+}
+
+.card-data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 5px;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Status Pulse Animations */
+@keyframes status-pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.status-badge.normal, .status-badge.alarm, .status-badge.warning {
+  animation: status-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.data-value {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--monitoring-accent);
+}
+
+.cabang-card h3 {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+/* ============================================
+   SOURCE GROUPS & DATA DISPLAY
+   ============================================ */
+
+.card-sources-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  flex: 1;
+  overflow: visible; /* No inner scroll — prevents touch/click interception */
+  padding-right: 0;
+  pointer-events: none; /* Let clicks pass through to the card */
+}
+
+/* Custom Scrollbar for Card Sources */
+.card-sources-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.card-sources-container::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.2);
+  border-radius: 10px;
+}
+
+.card-sources-container::-webkit-scrollbar-thumb {
+  background: var(--monitoring-accent);
+  border-radius: 10px;
+  opacity: 0.5;
+}
+
+.card-sources-container::-webkit-scrollbar-thumb:hover {
+  background: var(--monitoring-accent-hover);
+}
+
+.source-group {
+  background: rgba(15, 23, 42, 0.3);
+  border-radius: var(--monitoring-radius-sm);
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: var(--monitoring-transition);
+  pointer-events: none; /* Pass clicks up to .cabang-card */
+}
+
+.source-group.warning { border-left: 2px solid var(--monitoring-warning); }
+.source-group.alarm, .source-group.fail { border-left: 2px solid var(--monitoring-danger); }
+.source-group.disconnect { opacity: 0.7; border-left: 2px solid var(--monitoring-text-muted); }
+
+.source-header {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.source-header-main {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--monitoring-accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.5px;
+}
+
+.source-status-pill {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.source-status-pill.normal { background: var(--monitoring-success); }
+.source-status-pill.warning { background: var(--monitoring-warning); }
+.source-status-pill.alarm, .source-status-pill.fail { background: var(--monitoring-danger); }
+.source-status-pill.disconnect { background: var(--monitoring-text-muted); }
+
+.source-header-time {
+  font-size: 0.7rem;
+  color: var(--monitoring-text-muted);
+  font-weight: 500;
+}
+
+.source-header i {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.card-data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.data-point {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.data-label {
+  font-size: 0.65rem;
+  color: var(--monitoring-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.data-value {
+  font-size: 0.85rem;
+  color: var(--monitoring-text);
+  font-weight: 600;
+}
+
+[data-theme="light"] .source-group {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .data-point {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SOURCE PANEL — Card Grid Layout (Level 2 Drill-down)
+   ═══════════════════════════════════════════════════════════════ */
+
+.sp-panel-wrapper {
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.sp-panel-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sp-panel-count {
+  font-size: 10px;
+  color: var(--monitoring-text-muted);
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sp-panel-count i {
+  color: var(--monitoring-accent);
+}
+
+/* Grid: 2 kolom kalau panel cukup lebar, 1 kolom kalau sempit */
+.sp-sources-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  align-content: start;
+}
+
+@media (max-width: 640px) {
+  .sp-sources-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Individual Source Card ── */
+.sp-source-card {
+  background: rgba(10, 20, 40, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sp-source-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--monitoring-text-muted);
+  border-radius: 8px 0 0 8px;
+}
+
+.sp-source-card.normal::before   { background: var(--monitoring-success); }
+.sp-source-card.alarm::before,
+.sp-source-card.fail::before     { background: var(--monitoring-danger); }
+.sp-source-card.warning::before  { background: var(--monitoring-warning); }
+.sp-source-card.disconnect::before { background: var(--monitoring-text-muted); opacity: 0.5; }
+
+.sp-source-card:hover {
+  border-color: var(--monitoring-accent);
+  background: rgba(0, 100, 160, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 180, 255, 0.1);
+}
+
+.sp-source-card.disconnect {
+  opacity: 0.75;
+}
+
+/* Card Header */
+.sp-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.sp-card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sp-card-icon {
+  color: var(--monitoring-accent);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.sp-card-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--monitoring-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.sp-card-actions {
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.sp-source-card:hover .sp-card-actions {
+  opacity: 1;
+}
+
+/* Connection info row */
+.sp-card-conn-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.sp-conn-badge {
+  font-size: 9px;
+  color: #4a7a9a;
+  background: rgba(0, 20, 40, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  padding: 2px 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: monospace;
+}
+
+.sp-parser-badge {
+  color: #1a9abe;
+  border-color: rgba(0, 150, 200, 0.2);
+}
+
+/* Live data preview grid (2 columns) */
+.sp-card-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+}
+
+.sp-card-preview-point {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  padding: 5px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sp-preview-label {
+  font-size: 9px;
+  color: var(--monitoring-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-preview-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--monitoring-text);
+}
+
+/* No data state inside card */
+.sp-card-no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 0;
+  color: #2a4a6a;
+  font-size: 11px;
+}
+
+.sp-card-no-data i {
+  font-size: 13px;
+  animation: fa-spin 2s linear infinite;
+}
+
+/* Card Footer */
+.sp-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  color: #2a4a6a;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sp-card-detail-hint {
+  color: var(--monitoring-accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sp-source-card:hover .sp-card-detail-hint {
+  opacity: 0.7;
+}
+
+/* Panel responsive - on smaller screens go full width */
+@media (max-width: 768px) {
+  .equipment-detail-panel {
+    width: 100vw !important;
+    right: -100vw !important;
+  }
+  .equipment-detail-panel.open {
+    right: 0 !important;
+  }
+}
+
+
+/* ============================================
+   UNIFIED SOURCE MONITORING CARDS
+   ============================================ */
+
+.source-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 15px 0;
+}
+
+.source-card {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--monitoring-radius-sm);
+  padding: 12px;
+  transition: var(--monitoring-transition);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  backdrop-filter: blur(8px);
+  position: relative;
+  overflow: hidden;
+}
+
+.source-card:hover {
+  background: rgba(30, 41, 59, 0.8);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.source-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: transparent;
+}
+
+.source-card.normal::before { background: var(--monitoring-success); }
+.source-card.warning::before { background: var(--monitoring-warning); }
+.source-card.alarm::before { background: var(--monitoring-danger); }
+.source-card.offline::before { background: var(--monitoring-text-muted); }
+
+.source-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.source-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.source-name {
+  font-weight: 700;
+  color: var(--monitoring-text);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-pill {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.status-pill.normal { background: rgba(16, 185, 129, 0.15); color: var(--monitoring-success); }
+.status-pill.warning { background: rgba(245, 158, 11, 0.15); color: var(--monitoring-warning); }
+.status-pill.alarm { background: rgba(239, 68, 68, 0.15); color: var(--monitoring-danger); }
+.status-pill.offline { background: rgba(148, 163, 184, 0.15); color: var(--monitoring-text-muted); }
+
+.source-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: auto;
+}
+
+.update-label {
+  color: var(--monitoring-text-muted);
+  font-size: 0.7rem;
+}
+
+.update-time {
+  color: var(--monitoring-text-muted);
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-weight: 500;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: block;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Status Dot Animations */
+.status-dot.normal { box-shadow: 0 0 8px var(--monitoring-success); }
+.status-dot.normal::after {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  border-radius: 50%;
+  border: 1px solid var(--monitoring-success);
+  animation: dotPulse 2s infinite;
+  opacity: 0;
+}
+
+.status-dot.alarm { box-shadow: 0 0 8px var(--monitoring-danger); }
+.status-dot.alarm::after {
+  content: '';
+  position: absolute;
+  top: -3px; left: -3px; right: -3px; bottom: -3px;
+  border-radius: 50%;
+  background: var(--monitoring-danger);
+  animation: dotAlarmPulse 1s infinite;
+  opacity: 0.4;
+  z-index: -1;
+}
+
+.status-dot.warning { box-shadow: 0 0 8px var(--monitoring-warning); }
+.status-dot.warning::after {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  border-radius: 50%;
+  background: var(--monitoring-warning);
+  animation: dotWarningPulse 1.5s infinite;
+  opacity: 0.3;
+  z-index: -1;
+}
+
+@keyframes dotPulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes dotAlarmPulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+@keyframes dotWarningPulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Ensure card can fit the cards */
+.cabang-card {
+  min-width: 350px;
+}
+

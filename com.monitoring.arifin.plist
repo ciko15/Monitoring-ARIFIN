@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.monitoring.arifin</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/pm2</string>
+        <string>start</string>
+        <string>/Volumes/MUSIC CAR/Monitoring-ARIFIN-main/ecosystem.config.js</string>
+        <string>--env</string>
+        <string>production</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Volumes/MUSIC CAR/Monitoring-ARIFIN-main/logs/launchd-out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Volumes/MUSIC CAR/Monitoring-ARIFIN-main/logs/launchd-error.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Volumes/MUSIC CAR/Monitoring-ARIFIN-main</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/vickra/.bun/bin</string>
+        <key>NODE_ENV</key>
+        <string>production</string>
+        <key>PORT</key>
+        <string>3100</string>
+    </dict>
+</dict>
+</plist>

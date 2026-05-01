@@ -1,0 +1,45 @@
+{
+  "name": "my-fullstack-app",
+  "version": "1.0.0",
+  "description": "SNMP Airport Management System - Full-stack Bun application with ElysiaJS backend",
+  "main": "src/server.ts",
+  "scripts": {
+    "start": "/Users/vickra/.bun/bin/bun src/server.ts",
+    "dev": "/Users/vickra/.bun/bin/bun --watch src/server.ts",
+    "init-db": "/Users/vickra/.bun/bin/bun db/init.js",
+    "pm2:start": "pm2 start ecosystem.config.js --env production",
+    "pm2:stop": "pm2 stop ecosystem.config.js",
+    "pm2:restart": "pm2 restart ecosystem.config.js",
+    "pm2:delete": "pm2 delete ecosystem.config.js",
+    "pm2:logs": "pm2 logs monitoring-arifin",
+    "pm2:monit": "pm2 monit",
+    "pm2:setup-startup": "pm2 startup && pm2 save",
+    "pm2:setup": "./setup_pm2.sh"
+  },
+  "keywords": [
+    "bun",
+    "elysia",
+    "postgresql",
+    "snmp",
+    "airport",
+    "monitoring"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.1",
+    "@elysiajs/server-timing": "^1.4.0",
+    "@elysiajs/static": "^1.4.7",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^16.3.1",
+    "elysia": "^1.4.28",
+    "ems-airnav-package": "git+http://172.20.16.115:5500/DEV-INHOUSE-AIRNAV/EMS-AIRNAV-PACKAGE.git",
+    "node-cron": "^4.2.1",
+    "pg": "^8.18.0",
+    "ping": "^1.0.0",
+    "snmp": "^0.0.3",
+    "snmp-native": "^1.2.0",
+    "socket.io": "^4.8.3",
+    "systeminformation": "^5.31.4"
+  }
+}

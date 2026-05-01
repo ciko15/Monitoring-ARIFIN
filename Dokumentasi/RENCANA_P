@@ -1,0 +1,321 @@
+# RENCANA PENGEMBANGAN APLIKASI TOC
+# Technical Operation Center - Rencana Fitur Baru
+
+---
+
+## DAFTAR ISI
+
+1. [Ringkasan Kebutuhan](#ringkasan-kebutuhan)
+2. [Status Fitur Saat Ini](#status-fitur-saat-ini)
+3. [Rencana Pengembangan](#rencana-pengembangan)
+4. [Detail Setiap Tahap](#detail-setiap-tahap)
+5. [Solusi untuk Serial via MOXA](#solusi-untuk-serial-via-moxa)
+6. [Prioritas Pengembangan](#prioritas-pengembangan)
+
+---
+
+## 1. RINGKASAN KEBUTUHAN
+
+### Kebutuhan Komunikasi Data
+| No | Metode | Keterangan |
+|----|--------|------------|
+| 1 | SNMP | Sudah ada dan berfungsi |
+| 2 | JSON/API | Perlu dikembangkan |
+| 3 | Serial via LAN (Real COM) | Perlu solusi - MOXA Serial to IP |
+
+### Kebutuhan Fitur
+1. **Preview Data Real-time**: Bisa cek data update tanpa harus simpan ke database
+2. **Kolom Active**: Peralatan yang tidak aktif tidak dihitung dalam total peralatan
+3. **Cek Komunikasi**: Tetap bisa cek komunikasi data meskipun peralatan tidak aktif
+
+---
+
+## 2. STATUS FITUR SAAT INI
+
+| Fitur | Status | Keterangan |
+|-------|--------|-------------|
+| SNMP | ✅ Berfungsi | Pengumpulan data otomatis per 1 menit |
+| JSON/API | ⚠️ Parsial | Hanya buat log dasar |
+| MQTT | ⚠️ Parsial | Hanya buat log dasar |
+| Modbus | ⚠️ Parsial | Hanya buat log dasar |
+| Serial | ⚠️ Parsial | Hanya buat log dasar |
+| TCP/IP | ⚠️ Parsial | Hanya buat log dasar |
+| Kolom Active | ❌ Belum | Perlu ditambahkan |
+| Preview Real-time | ❌ Belum | Perlu ditambahkan |
+
+---
+
+## 3. RENCANA PENGEMBANGAN
+
+### Tahap 1: Fitur Dasar (Priority Tinggi)
+- [ ] Tambahkan kolom "Active" di tabel equipment
+- [ ] Filter peralatan aktif/non-aktif di dashboard
+- [ ] Preview data real-time (tanpa simpan)
+
+### Tahap 2: JSON/API Integration (Priority Tinggi)
+- [ ] Implementasi fetch data dari JSON endpoint
+- [ ] Parse response JSON
+- [ ] Tampilkan di equipment logs
+
+### Tahap 3: TCP Serial/Real COM (Priority Sedang)
+- [ ] Koneksi ke TCP port (MOXA)
+- [ ] Parser data serial
+- [ ] Format data handling
+
+### Tahap 4: MQTT Integration (Priority Rendah)
+- [ ] Subscribe ke MQTT broker
+- [ ] Parse message
+- [ ] Handle QoS
+
+### Tahap 5: Modbus Integration (Priority Rendah)
+- [ ] Koneksi Modbus TCP
+- [ ] Read holding registers
+- [ ] Parse data
+
+---
+
+## 4. DETAIL SETIAP TAHAP
+
+### TAHAP 1: FITUR DASAR
+
+#### 1.1 Kolom "Active" di Equipment
+
+**Database Changes:**
+```
+sql
+-- Tambah kolom is_active di tabel equipment
+ALTER TABLE equipment ADD COLUMN is_active BOOLEAN DEFAULT true;
+```
+
+**Frontend Changes:**
+- Tambah switch/checkbox di form equipment
+- Tambah filter "Active Only" / "Show Inactive"
+- Hitung total equipment hanya yang aktif
+
+**Logic Changes:**
+```
+javascript
+// Di hitung total equipment
+const totalActive = equipment.filter(e => e.is_active).length;
+```
+
+#### 1.2 Preview Data Real-time
+
+**Fitur:**
+- Tombol "Test Connection" / "Preview" di equipment
+- Langsung ambil data tanpa simpan ke database
+- Tampilkan hasil di popup modal
+- Indicator warna: berhasil/gagal
+
+**UI Mockup:**
+```
+┌─────────────────────────────────────┐
+│  Preview Data - Radio HF #1         │
+├─────────────────────────────────────┤
+│  Status: ✅ Connected               │
+│  IP: 10.18.141.202                │
+│  Last Response: 2 detik yang lalu   │
+│                                     │
+│  Data Received:                     │
+│  {                                 │
+│    "temperature": 28,              │
+│    "humidity": 65,                 │
+│    "status": "Normal"              │
+│  }                                 │
+│                                     │
+│  [Tutup]                           │
+└─────────────────────────────────────┘
+```
+
+---
+
+### TAHAP 2: JSON/API INTEGRATION
+
+#### 2.1 Konfigurasi Equipment JSON
+
+**Form Fields:**
+| Field | Keterangan |
+|-------|------------|
+| API URL | URL endpoint JSON |
+| Interval | polling interval dalam detik |
+| Auth Type | None / Basic / Bearer |
+| Auth Value | Token atau credentials |
+| JSON Path | Path untuk extract data (opsional) |
+
+#### 2.2 Logic Fetch JSON
+
+```
+javascript
+async function fetchJsonData(config) {
+  const options = {
+    method: 'GET',
+    headers: {}
+  };
+  
+  if (config.auth === 'basic') {
+    // Basic auth
+  } else if (config.auth === 'bearer') {
+    options.headers['Authorization'] = `Bearer ${config.authValue}`;
+  }
+  
+  const response = await fetch(config.url, options);
+  const data = await response.json();
+  
+  // Extract data jika ada JSON path
+  if (config.jsonPath) {
+    return getNestedValue(data, config.jsonPath);
+  }
+  
+  return data;
+}
+```
+
+---
+
+### TAHAP 3: TCP SERIAL / REAL COM (MOXA)
+
+#### 3.1 Solusi untuk MOXA Serial to IP
+
+**Opsi A: MOXA Built-in SNMP (Direkomendasikan)**
+- MOXA memiliki SNMP agent built-in
+- Konfigurasi SNMP di MOXA untuk expose serial data
+- Aplikasi mengambil data via SNMP seperti biasa
+
+**Opsi B: TCP Socket Connection**
+- Buka koneksi TCP ke IP MOXA
+- Baca data dari port yang dikonfigurasi
+- Parse data serial
+
+#### 3.2 Konfigurasi TCP Serial
+
+**Form Fields:**
+| Field | Keterangan |
+|-------|------------|
+| Bridge IP | IP address MOXA |
+| Bridge Port | Port TCP MOXA (default 9000) |
+| Remote Port | Port serial remote |
+| Baud Rate | Kecepatan serial |
+
+#### 3.3 Logic TCP Serial
+
+```
+javascript
+const net = require('net');
+
+async function fetchSerialData(config) {
+  return new Promise((resolve, reject) => {
+    const client = new net.Socket();
+    
+    client.connect(config.port, config.ip, () => {
+      // Kirim perintah jika perlu
+    });
+    
+    client.on('data', (data) => {
+      // Parse data serial
+      const parsed = parseSerialData(data);
+      resolve(parsed);
+    });
+    
+    client.on('error', (err) => {
+      reject(err);
+    });
+    
+    // Timeout 5 detik
+    setTimeout(() => {
+      client.destroy();
+      reject(new Error('Connection timeout'));
+    }, 5000);
+  });
+}
+```
+
+---
+
+## 5. SOLUSI UNTUK SERIAL VIA MOXA
+
+### Rekomendasi: Gunakan SNMP di MOXA
+
+Perangkat MOXA Serial to IP (seperti NPort, MGate) memiliki SNMP agent built-in. Berikut konfigurasinya:
+
+**Langkah Konfigurasi di MOXA:**
+
+1. **Aktifkan SNMP di MOXA**
+   - Web interface MOXA
+   - Enable SNMP v1/v2c
+   - Set community string
+
+2. **Map Serial Data ke SNMP OIDs**
+   - Konfigurasi Input/Output mapping
+   - Serial data akan tersedia sebagai SNMP variables
+
+3. **Test dengan snmpwalk**
+   
+```
+bash
+   snmpwalk -v2c -c public <MOXA_IP>
+   
+```
+
+4. **Tambah Equipment di Aplikasi**
+   - Gunakan metode SNMP
+   - IP: IP MOXA
+   - Port: 161
+   - Template: Sesuai device
+
+### Alternatif: TCP Socket (Jika SNMP tidak tersedia)
+
+Jika MOXA tidak bisa dikonfigurasi SNMP:
+
+1. Install driver Real COM di server
+2. Gunakan TCP socket untuk membaca data
+3. Parse data sesuai format serial
+
+---
+
+## 6. PRIORITAS PENGEMBANGAN
+
+### Urutan Pengembangan yang Disarankan:
+
+| Priority | Fitur | Alasan |
+|----------|-------|--------|
+| 1 | Kolom Active | Dasar untuk filtering |
+| 2 | Preview Real-time | UTAMA - User perlu cek data |
+| 3 | JSON/API | Umum digunakan |
+| 4 | TCP Serial/MOXA | Untuk peralatan existing |
+| 5 | MQTT | IoT devices |
+| 6 | Modbus | Perangkat industri |
+
+### Estimasi Waktu:
+
+| Fitur | Estimasi |
+|-------|----------|
+| Kolom Active | 1-2 jam |
+| Preview Real-time | 2-3 jam |
+| JSON/API | 4-6 jam |
+| TCP Serial | 4-6 jam |
+| MQTT | 6-8 jam |
+| Modbus | 6-8 jam |
+
+---
+
+## NEXT STEPS
+
+Mohon konfirmasi:
+
+1. **Prioritas mana yang ingin dikembangkan terlebih dahulu?**
+   - Opsi A: Kolom Active + Preview Real-time
+   - Opsi B: JSON/API (karena umum digunakan)
+   - Opsi C: TCP Serial (untuk MOXA)
+
+2. **Apakah Anda sudah memiliki perangkat MOXA?**
+   - Jika ya,型号 apa?
+
+3. **Apakah ada contoh format data JSON dari perangkat Anda?**
+
+4. **Berapa banyak peralatan yang akan dimonitor?**
+
+Setelah mendapat konfirmasi, saya akan mulai mengembangkan fitur tersebut.
+
+---
+
+**Dokumen ini akan diupdate seiring pengembangan**

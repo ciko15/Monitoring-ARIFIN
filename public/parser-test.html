@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parser Test Tool - TOC Project</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .test-section {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+
+        .test-section h3 {
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+        }
+
+        .form-group textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .result-section {
+            margin-top: 24px;
+        }
+
+        .result-json {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .status-error { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .status-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+
+        .changes-highlight {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid #3b82f6;
+            padding: 8px 12px;
+            margin: 4px 0;
+        }
+
+        .template-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .template-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .template-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .template-card.selected {
+            border-color: var(--primary-color);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .template-card h4 {
+            margin: 0 0 8px 0;
+            color: var(--text-primary);
+        }
+
+        .template-card p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1><i class="fas fa-flask"></i> Parser Test Tool</h1>
+        <p>Test your equipment templates with sample data before deploying to production.</p>
+
+        <!-- Template Selection -->
+        <div class="test-section">
+            <h3><i class="fas fa-list"></i> Select Template</h3>
+            <div id="templateSelector" class="template-selector">
+                <!-- Templates will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Test Configuration -->
+        <div class="test-section">
+            <h3><i class="fas fa-cogs"></i> Test Configuration</h3>
+            <div class="form-group">
+                <label for="connectionType">Connection Type:</label>
+                <select id="connectionType">
+                    <option value="json">JSON</option>
+                    <option value="rcms">RCMS</option>
+                    <option value="tcp">TCP</option>
+                    <option value="udp">UDP</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="sampleData">Sample Data (paste your equipment data here):</label>
+                <textarea id="sampleData" placeholder="Paste your JSON data here...
+
+Example DME data:
+{&quot;TXP1&quot;: {&quot;active&quot;: false, &quot;ident&quot;: &quot;JPA&quot;, &quot;mon1&quot;: {&quot;sys_delay&quot;: 50.15, &quot;reply_eff&quot;: 99}}, &quot;system&quot;: {&quot;packets&quot;: 81591, &quot;connected&quot;: true}}
+
+Example DVOR data:
+{&quot;MON1&quot;: {&quot;carrier_power&quot;: 92.4, &quot;azimuth&quot;: 117.8}, &quot;system&quot;: {&quot;packets&quot;: 19648}}"></textarea>
+            </div>
+
+            <button id="testBtn" class="btn btn-primary">
+                <i class="fas fa-play"></i> Test Parser
+            </button>
+        </div>
+
+        <!-- Results -->
+        <div id="resultsSection" class="test-section result-section" style="display: none;">
+            <h3><i class="fas fa-chart-bar"></i> Test Results</h3>
+
+            <div id="testStatus" class="status-badge" style="margin-bottom: 16px;"></div>
+
+            <h4>Parsed Data:</h4>
+            <div id="parsedResult" class="result-json"></div>
+
+            <h4 style="margin-top: 24px;">Changes Detected:</h4>
+            <div id="changesResult" class="result-json"></div>
+
+            <h4 style="margin-top: 24px;">Raw Parser Output:</h4>
+            <div id="rawResult" class="result-json"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        let authToken = localStorage.getItem('authToken');
+        let selectedTemplate = null;
+
+        // Load templates
+        async function loadTemplates() {
+            try {
+                const response = await fetch(`${API_URL}/templates`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load templates');
+
+                const templates = await response.json();
+                renderTemplates(templates);
+            } catch (error) {
+                console.error('Error loading templates:', error);
+                document.getElementById('templateSelector').innerHTML =
+                    '<div class="empty-state">Error loading templates</div>';
+            }
+        }
+
+        function renderTemplates(templates) {
+            const container = document.getElementById('templateSelector');
+
+            if (!templates || templates.length === 0) {
+                container.innerHTML = '<div class="empty-state">No templates available</div>';
+                return;
+            }
+
+            container.innerHTML = templates.map(template => `
+                <div class="template-card ${selectedTemplate && selectedTemplate.id === template.id ? 'selected' : ''}"
+                     onclick="selectTemplate(${template.id})">
+                    <h4>${template.name}</h4>
+                    <p><strong>Type:</strong> ${template.equipment_type}</p>
+                    <p><strong>Brand:</strong> ${template.brand || 'N/A'}</p>
+                    <p><strong>Model:</strong> ${template.model || 'N/A'}</p>
+                    <p>${template.description || 'No description'}</p>
+                </div>
+            `).join('');
+        }
+
+        function selectTemplate(templateId) {
+            // Find template by ID
+            fetch(`${API_URL}/templates/${templateId}`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            })
+            .then(response => response.json())
+            .then(template => {
+                selectedTemplate = template;
+                renderTemplates([selectedTemplate]); // Re-render to show selection
+                console.log('Selected template:', template);
+            })
+            .catch(error => console.error('Error selecting template:', error));
+        }
+
+        // Test parser
+        document.getElementById('testBtn').addEventListener('click', async () => {
+            if (!selectedTemplate) {
+                alert('Please select a template first');
+                return;
+            }
+
+            const connectionType = document.getElementById('connectionType').value;
+            const sampleData = document.getElementById('sampleData').value.trim();
+
+            if (!sampleData) {
+                alert('Please enter sample data');
+                return;
+            }
+
+            const testBtn = document.getElementById('testBtn');
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+
+            try {
+                const response = await fetch(`${API_URL}/parser/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        connectionType: connectionType,
+                        parserConfig: selectedTemplate.parser_config,
+                        sampleData: sampleData,
+                        equipmentId: 1 // Optional, for change detection
+                    })
+                });
+
+                const result = await response.json();
+                displayResults(result);
+
+            } catch (error) {
+                console.error('Test error:', error);
+                displayResults({
+                    success: false,
+                    error: error.message,
+                    parsed: null,
+                    changes: {}
+                });
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = '<i class="fas fa-play"></i> Test Parser';
+            }
+        });
+
+        function displayResults(result) {
+            const resultsSection = document.getElementById('resultsSection');
+            const testStatus = document.getElementById('testStatus');
+            const parsedResult = document.getElementById('parsedResult');
+            const changesResult = document.getElementById('changesResult');
+            const rawResult = document.getElementById('rawResult');
+
+            resultsSection.style.display = 'block';
+
+            // Status
+            if (result.success) {
+                testStatus.className = 'status-badge status-success';
+                testStatus.textContent = 'SUCCESS';
+            } else {
+                testStatus.className = 'status-badge status-error';
+                testStatus.textContent = 'FAILED';
+            }
+
+            // Parsed data
+            if (result.parsed && result.parsed.data) {
+                parsedResult.textContent = JSON.stringify(result.parsed.data, null, 2);
+            } else {
+                parsedResult.textContent = 'No parsed data';
+            }
+
+            // Changes
+            if (result.changes && Object.keys(result.changes).length > 0) {
+                let changesHtml = '';
+                for (const [key, change] of Object.entries(result.changes)) {
+                    changesHtml += `<div class="changes-highlight">
+                        <strong>${key}:</strong> ${change.old} → ${change.new}
+                    </div>`;
+                }
+                changesResult.innerHTML = changesHtml;
+            } else {
+                changesResult.textContent = 'No changes detected';
+            }
+
+            // Raw result
+            rawResult.textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!authToken) {
+                alert('Please login first');
+                window.location.href = '/';
+                return;
+            }
+            loadTemplates();
+        });
+    </script>
+</body>
+</html>

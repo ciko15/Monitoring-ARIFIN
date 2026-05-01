@@ -1,0 +1,33 @@
+[
+  {
+    "id": "dvor_maru_220",
+    "name": "DVOR MARU 220",
+    "protocol": "snmp",
+    "category": "Navigation",
+    "description": "Standard DVOR MARU 220 template with 4 main parameters",
+    "parsing_logic": "// Example: Sequence for DVOR parsing\n// 1. Read OIDs\n// 2. Map to internal state\n// 3. Evaluate thresholds",
+    "parameters": [
+      { "name": "ref_tx1", "label": "Reference TX1", "oid": "1.3.6.1.4.1.50000.1.1.1", "unit": "V" },
+      { "name": "ref_tx2", "label": "Reference TX2", "oid": "1.3.6.1.4.1.50000.1.1.2", "unit": "V" },
+      { "name": "battery_voltage", "label": "Battery Voltage", "oid": "1.3.6.1.4.1.50000.1.1.3", "unit": "V" },
+      { "name": "ambient_temp", "label": "Ambient Temp", "oid": "1.3.6.1.4.1.50000.1.1.4", "unit": "°C" }
+    ],
+    "isDefault": true,
+    "isSystem": true
+  },
+  {
+    "id": "dme_maru_310_320",
+    "name": "DME MARU 310/320",
+    "protocol": "snmp",
+    "category": "Navigation",
+    "description": "Standard DME MARU 310/320 template with 3 main parameters",
+    "parsing_logic": "// Example: DME Parsing Logic\n// Polling interval: 60s\n// Parser: DME_Standard",
+    "parameters": [
+      { "name": "rf_power", "label": "RF Power", "oid": "1.3.6.1.4.1.60000.1.1.1", "unit": "W" },
+      { "name": "vswr", "label": "VSWR", "oid": "1.3.6.1.4.1.60000.1.1.2", "unit": "" },
+      { "name": "supply_voltage", "label": "Supply Voltage", "oid": "1.3.6.1.4.1.60000.1.1.3", "unit": "V" }
+    ],
+    "isDefault": true,
+    "isSystem": true
+  }
+]

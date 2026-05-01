@@ -1,0 +1,13 @@
+node_modules/
+*.log
+.DS_Store
+db/*.sqlite*
+public/data/
+dist/
+build/
+.env
+.agents/
+.agent/
+_agents/
+_agent/
+brain/

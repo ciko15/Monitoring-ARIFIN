@@ -1,0 +1,114 @@
+[
+  {
+    "id": "dvor_maru_220",
+    "name": "DVOR MARU 220",
+    "category": "Navigation",
+    "files": "/src/parsers/asterix.js",
+    "configId": "dvor_maru_220",
+    "configType": "parsing",
+    "updatedAt": "2026-04-06T03:35:17.534Z"
+  },
+  {
+    "id": "dme_maru_310_320",
+    "name": "DME Maru 310/320",
+    "category": "Navigation",
+    "files": "/src/parsers/dme_maru_310_320.js",
+    "createdAt": "2026-04-06T03:40:08.830Z"
+  },
+  {
+    "id": "custom_1775512889323",
+    "name": "RADAR",
+    "category": "Surveillance",
+    "files": "/src/parsers/asterix.js",
+    "createdAt": "2026-04-06T22:01:29.323Z"
+  },
+  {
+    "id": "custom_1775563814757",
+    "name": "VHF Merk PAE",
+    "category": "Communication",
+    "files": "/src/parsers/factory.js",
+    "createdAt": "2026-04-07T12:10:14.758Z",
+    "configId": "custom_1775563814757",
+    "configType": "parsing",
+    "configMode": "edit",
+    "updatedAt": "2026-04-07T12:46:07.463Z"
+  },
+  {
+    "id": "snmp_host_resources_01",
+    "name": "SNMP Host Resources",
+    "description": "Parser untuk membaca kapasitas RAM, Disk, dan CPU via SNMP",
+    "files": "/src/parsers/snmp_host_resources.js",
+    "category": "Data Processing"
+  },
+  {
+    "id": "vhf_t6tv",
+    "name": "VHF T6TV (WebSocket)",
+    "category": "Communication",
+    "files": "/src/parsers/vhf_t6tv.js",
+    "createdAt": "2026-04-20T00:00:00.000Z"
+  },
+  {
+    "id": "pm5560_modbus",
+    "name": "PM5560 Modbus TCP",
+    "description": "Parser untuk Schneider PowerLogic PM5560 — Voltage, Current, Power, PF, Hz, KWh via Modbus FC03",
+    "files": "/src/parsers/pm5560_modbus.js",
+    "category": "Support",
+    "createdAt": "2026-04-25T01:50:44.000Z"
+  },
+  {
+    "id": "ils_gp_thales421",
+    "name": "ILS GlidePath Thales 421",
+    "description": "Parser biner PKT_C 92-byte untuk GP Thales 421 via Moxa NPort TCP. Sync 0x118D[b2]0C, float32 LE, DDM×100.",
+    "category": "Navigation",
+    "files": "/src/parsers/ils_gp_thales421.js",
+    "createdAt": "2026-04-28T00:00:00.000Z"
+  },
+  {
+    "id": "ils_llz_thales421",
+    "name": "ILS Localizer Thales 421",
+    "description": "Parser biner PKT_C 92-byte untuk LLZ Thales 421 via Moxa NPort TCP. Sync 0x118D[b2]0C, float32 LE, DDM×100.",
+    "category": "Navigation",
+    "files": "/src/parsers/ils_llz_thales421.js",
+    "createdAt": "2026-04-28T00:00:00.000Z"
+  },
+  {
+    "id": "vhf_marc_rse",
+    "name": "VHF MARC RSE (TCP/SLIP)",
+    "description": "Parser binary MARC/RSE protocol via Moxa NPort TCP port 950. SLIP framing, CRC-16/CCITT. Polling aktif T6 command ke radio T6T/T6R. Satu koneksi TCP shared antar equipment.",
+    "category": "Communication",
+    "files": "/src/parsers/vhf_marc_rse.js",
+    "createdAt": "2026-04-28T00:00:00.000Z"
+  },
+  {
+    "id": "temp_humidity_modbus",
+    "name": "Temp/Humidity Sensor (Modbus TCP)",
+    "description": "Parser sensor suhu & kelembaban via Modbus TCP FC03 port 502. Register 0=temp×10, 1=humidity×10. Threshold WARN≥30°C, ALARM≥35°C.",
+    "category": "Support",
+    "files": "/src/parsers/temp_humidity_modbus.js",
+    "createdAt": "2026-04-29T00:00:00.000Z"
+  },
+  {
+    "id": "asterix_radar",
+    "name": "ASTERIX CAT034 Radar MSSR",
+    "description": "Parser ASTERIX CAT034 untuk Radar MSSR via UDP Multicast. Status connectivity, SAC/SIC, last update per radar site.",
+    "category": "Navigation",
+    "files": "/src/parsers/asterix_radar.js",
+    "createdAt": "2026-04-28T00:00:00.000Z"
+  },
+  {
+    "id": "asterix_adsb",
+    "name": "ASTERIX CAT021 ADS-B",
+    "description": "Parser ASTERIX CAT021 untuk ADS-B via UDP Multicast 239.71.40.2:50000. Identifikasi station by SAC/SIC.",
+    "category": "Navigation",
+    "files": "/src/parsers/asterix_adsb.js",
+    "createdAt": "2026-04-28T00:00:00.000Z"
+  },
+  {
+    "id": "snmp_system",
+    "name": "SNMP System Monitor (Server/Workstation/Switch)",
+    "description": "SNMP v2c HOST-RESOURCES-MIB. CPU, RAM, Disk usage via snmpwalk. Threshold Warning>=80%, Alarm>=95%.",
+    "category": "Data Processing",
+    "files": "/src/parsers/snmp_system.js",
+    "createdAt": "2026-04-29T00:00:00.000Z"
+  }
+]

@@ -1,0 +1,997 @@
+/**
+ * enhancements.js
+ * Menambahkan fitur ke aplikasi Arifin tanpa mengubah file yang sudah ada:
+ *  1. Klik card equipment → panel kanan menampilkan sources
+ *  2. Klik source card → modal detail parameter
+ */
+
+(function () {
+    'use strict';
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let _selectedEqId  = null;
+    let _sourcesCache  = {};   // equipmentId → [{...source}]
+
+    // ── Wait until cabang-app renders ────────────────────────────────────────
+    function waitForGrid(cb) {
+        const grid = document.getElementById('cabangGrid');
+        if (!grid) { setTimeout(() => waitForGrid(cb), 300); return; }
+        // Wait until cards are rendered
+        const check = () => {
+            if (grid.querySelectorAll('.cabang-card').length > 0) cb(grid);
+            else setTimeout(check, 300);
+        };
+        check();
+    }
+
+    // ── Patch cabang-app: add click + drag to every card after render ─────────
+    // ── Event Delegation: single click listener on grid (survives re-renders) ──
+    function setupGridClickDelegation() {
+        const grid = document.getElementById('cabangGrid');
+        if (!grid || grid.dataset.delegated === '1') return;
+        grid.dataset.delegated = '1';
+        grid.addEventListener('click', (e) => {
+            const card = e.target.closest('.cabang-card');
+            if (!card || !card.dataset.id) return;
+            openSourcePanel(card.dataset.id, card);
+        });
+    }
+
+    function patchCards() {
+        const grid = document.getElementById('cabangGrid');
+        if (!grid) return;
+
+        // Setup delegation
+        setupGridClickDelegation();
+
+        const cards = grid.querySelectorAll('.cabang-card');
+        cards.forEach((card) => {
+            const id = card.dataset.id;
+            if (!id || card.dataset.enhanced === '1') return;
+            card.dataset.enhanced = '1';
+            card.style.cursor = 'pointer';
+        });
+    }
+
+
+    // ── Observer: re-patch whenever grid re-renders ───────────────────────────
+    function observeGrid() {
+        const grid = document.getElementById('cabangGrid');
+        if (!grid) return;
+        // Setup delegation immediately — before any cards exist
+        setupGridClickDelegation();
+        const obs = new MutationObserver(() => {
+            // Delegation already set, only need drag/drop re-patch
+            setTimeout(patchCards, 100);
+        });
+        obs.observe(grid, { childList: true, subtree: false });
+        patchCards();
+    }
+
+    // ── Source Panel ──────────────────────────────────────────────────────────
+    window.openSourcePanel = async function openSourcePanel(equipmentId, cardEl) {
+        _selectedEqId = equipmentId;
+
+        // Highlight selected card
+        document.querySelectorAll('.cabang-card').forEach(c => c.classList.remove('card-selected'));
+        if (cardEl) cardEl.classList.add('card-selected');
+
+        // Get equipment name
+        const eqName = cardEl ? cardEl.querySelector('h3')?.textContent || 'Equipment' : 'Equipment';
+
+        // Open panel
+        const panel = document.getElementById('equipmentDetailPanel');
+        const body  = document.getElementById('detailPanelBody');
+        if (!panel || !body) return;
+
+        body.innerHTML = `<div style="padding:20px;text-align:center;color:#4a7a9a">
+            <i class="fas fa-spinner fa-spin"></i><p style="margin-top:8px">Loading sources...</p>
+        </div>`;
+        panel.classList.add('open');
+
+        // Update panel header
+        const header = panel.querySelector('.detail-panel-header h3');
+        if (header) header.innerHTML = `<i class="fas fa-satellite-dish"></i> ${eqName}`;
+
+        // Fetch sources
+        try {
+            const res = await fetch(`/api/otentication/${equipmentId}`);
+            const data = await res.json();
+            const sources = Array.isArray(data) ? data : [];
+            _sourcesCache[equipmentId] = sources;
+            renderSourcePanel(sources, body, equipmentId);
+        } catch(e) {
+            body.innerHTML = `<div style="padding:20px;color:#ff3355">Gagal memuat sources: ${e.message}</div>`;
+        }
+    }
+
+    function renderSourcePanel(sources, body, equipmentId) {
+        if (sources.length === 0) {
+            body.innerHTML = `
+                <div style="padding:20px;text-align:center;color:#4a7a9a">
+                    <i class="fas fa-plug" style="font-size:24px;margin-bottom:8px"></i>
+                    <p>Belum ada data source</p>
+                </div>
+                <div style="padding:0 14px 14px">
+                    <button class="btn btn-primary" style="width:100%"
+                        onclick="window.showAddDataSourceForm('${equipmentId}')">
+                        <i class="fas fa-plus"></i> Tambah Source
+                    </button>
+                </div>`;
+            return;
+        }
+
+        const cards = sources.map(src => {
+            const status    = getSourceStatus(src);
+            const statusCls = status.toLowerCase();
+            const ip        = src.ip_address || '—';
+            const port      = src.tcp_port || src.udp_port || '—';
+            const parserName = src.parsing_id || '—';
+
+            // Get live data preview for this source from equipment cache
+            let previewHtml = '';
+            let lastTime = '—';
+            if (window.equipmentDataCache) {
+                const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
+                if (eq && eq.lastData) {
+                    const srcData = eq.lastData[src.name];
+                    if (srcData) {
+                        // Timestamp
+                        if (srcData._logged_at) {
+                            lastTime = new Date(srcData._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        }
+                        // Preview: up to 6 first non-underscore params
+                        const previewKeys = Object.keys(srcData)
+                            .filter(k => !k.startsWith('_') && k !== 'error' && k !== 'cached')
+                            .slice(0, 6);
+                        if (previewKeys.length > 0) {
+                            previewHtml = `<div class="sp-card-preview-grid">
+                                ${previewKeys.map(k => {
+                                    const valObj = srcData[k];
+                                    const isObj  = valObj !== null && typeof valObj === 'object';
+                                    const label  = isObj && valObj.label ? valObj.label : k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                    const val    = isObj ? (valObj.value ?? '—') : (valObj ?? '—');
+                                    const unit   = isObj && valObj.unit ? valObj.unit : '';
+                                    return `<div class="sp-card-preview-point">
+                                        <span class="sp-preview-label">${label}</span>
+                                        <span class="sp-preview-value">${val}${unit}</span>
+                                    </div>`;
+                                }).join('')}
+                            </div>`;
+                        }
+                    }
+                }
+            }
+
+            if (!previewHtml) {
+                previewHtml = `<div class="sp-card-no-data">
+                    <i class="fas fa-satellite-dish"></i>
+                    <span>Menunggu data...</span>
+                </div>`;
+            }
+
+            return `
+                <div class="sp-source-card ${statusCls}" data-src-id="${src.id}" onclick="window.openSourceDetail('${src.id}')">
+                    <!-- Card Header -->
+                    <div class="sp-card-header">
+                        <div class="sp-card-header-left">
+                            <i class="fas fa-microchip sp-card-icon"></i>
+                            <span class="sp-card-name">${src.name}</span>
+                        </div>
+                        <div class="sp-card-header-right">
+                            <span class="source-status-pill ${statusCls}">${status}</span>
+                            <div class="sp-card-actions" onclick="event.stopPropagation()">
+                                <button class="btn-mini" title="Edit" onclick="editSourceFromPanel('${src.id}','${equipmentId}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-mini btn-mini-danger" title="Hapus" onclick="deleteSourceFromPanel('${src.id}','${equipmentId}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Connection Info -->
+                    <div class="sp-card-conn-info">
+                        <span class="sp-conn-badge"><i class="fas fa-network-wired"></i> ${ip}:${port}</span>
+                        <span class="sp-conn-badge sp-parser-badge"><i class="fas fa-code"></i> ${parserName}</span>
+                    </div>
+
+                    <!-- Live Data Preview -->
+                    ${previewHtml}
+
+                    <!-- Card Footer -->
+                    <div class="sp-card-footer">
+                        <span><i class="fas fa-clock"></i> ${lastTime}</span>
+                        <span class="sp-card-detail-hint"><i class="fas fa-expand-alt"></i> Klik untuk detail</span>
+                    </div>
+                </div>`;
+        }).join('');
+
+        body.innerHTML = `
+            <div class="sp-panel-wrapper">
+                <div class="sp-panel-toolbar">
+                    <span class="sp-panel-count"><i class="fas fa-database"></i> DATA SOURCES (${sources.length})</span>
+                    <button class="btn-mini" onclick="window.showAddDataSourceForm('${equipmentId}')">
+                        <i class="fas fa-plus"></i> Tambah
+                    </button>
+                </div>
+                <div class="sp-sources-grid">
+                    ${cards}
+                </div>
+            </div>`;
+
+        // Update equipment card color berdasarkan status terburuk dari semua source
+        const statuses = sources.map(s => getSourceStatus(s).toLowerCase());
+        const eqCard = document.querySelector(`.cabang-card[data-id="${equipmentId}"]`);
+        if (eqCard) {
+            eqCard.classList.remove('has-alarm', 'has-warning');
+            if (statuses.includes('alarm'))   eqCard.classList.add('has-alarm');
+            else if (statuses.includes('warning')) eqCard.classList.add('has-warning');
+        }
+    }
+
+    function getSourceStatus(src) {
+        if (window.equipmentDataCache) {
+            const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
+            if (eq && eq.lastData) {
+                // lastData keyed by source name
+                const srcData = eq.lastData[src.name];
+                if (srcData) return srcData._status || 'Normal';
+                // Fallback: try first available
+                const first = Object.values(eq.lastData)[0];
+                if (first) return first._status || 'Normal';
+            }
+        }
+        return 'Disconnect';
+    }
+
+    // ── Source Detail Modal ───────────────────────────────────────────────────
+    window.openSourceDetail = async function(sourceId) {
+        // Close the sliding panel when opening detail modal
+        const panel   = document.getElementById('equipmentDetailPanel');
+        const overlay = document.getElementById('detailPanelOverlay');
+        if (panel) panel.classList.remove('open');
+        if (overlay) overlay.classList.remove('open');
+
+        // Find source from cache
+        let src = null;
+        for (const sources of Object.values(_sourcesCache)) {
+            src = sources.find(s => String(s.id) === String(sourceId));
+            if (src) break;
+        }
+        if (!src) return;
+
+        // Get latest data from equipment cache (lastData keyed by source name)
+        let latestData = null;
+        if (window.equipmentDataCache) {
+            const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
+            if (eq && eq.lastData) {
+                if (src.parsing_id === 'vhf_marc_rse') {
+                    // 1 source = 1 radio — key di lastData = src.name
+                    const radioData = eq.lastData[src.name] || null;
+                    latestData = radioData ? { _isMarcMulti: true, radios: { [src.name]: radioData } } : null;
+                } else {
+                    latestData = eq.lastData[src.name] || null;
+                }
+            }
+        }
+
+        // Build modal
+        const modal   = document.getElementById('dataSourceDetailModal');
+        if (!modal) { createDetailModal(); }
+        showDetailModal(src, latestData);
+    };
+
+    function createDetailModal() {
+        const div = document.createElement('div');
+        div.id = 'dataSourceDetailModal';
+        div.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:5000;align-items:center;justify-content:center;';
+        div.innerHTML = `
+            <div style="background:#0a1628;border:1px solid #1a3a5c;border-radius:10px;width:90vw;max-width:800px;max-height:85vh;display:flex;flex-direction:column;">
+                <div style="display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid #1a3a5c;gap:12px">
+                    <span id="srcDetailTitle" style="font-size:14px;font-weight:bold;color:#00d4ff;flex:1"></span>
+                    <span id="srcDetailStatus"></span>
+                    <button onclick="document.getElementById('dataSourceDetailModal').style.display='none'"
+                        style="background:none;border:none;color:#4a7a9a;font-size:18px;cursor:pointer">✕</button>
+                </div>
+                <div id="srcDetailBody" style="flex:1;overflow-y:auto;padding:16px"></div>
+            </div>`;
+        div.addEventListener('click', e => { if (e.target === div) div.style.display = 'none'; });
+        document.body.appendChild(div);
+    }
+
+    function showDetailModal(src, data) {
+        let modal = document.getElementById('dataSourceDetailModal');
+        if (!modal) { createDetailModal(); modal = document.getElementById('dataSourceDetailModal'); }
+
+        document.getElementById('srcDetailTitle').textContent = src.name + ' — ' + (src.ip_address || '');
+
+        const status = data ? (data._status || 'Normal') : 'Disconnect';
+        const statusColors = { Normal:'#00ff88', Alarm:'#ff3355', Warning:'#ffcc00', Disconnect:'#3a5a7a' };
+        document.getElementById('srcDetailStatus').innerHTML =
+            `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${statusColors[status]}22;color:${statusColors[status]};border:1px solid ${statusColors[status]}">${status}</span>`;
+
+        const body = document.getElementById('srcDetailBody');
+
+        if (!data || Object.keys(data).filter(k => !k.startsWith('_')).length === 0) {
+            body.innerHTML = `<div style="text-align:center;padding:40px;color:#4a7a9a">
+                <i class="fas fa-satellite-dish fa-2x" style="margin-bottom:12px"></i>
+                <p>Belum ada data diterima</p>
+            </div>`;
+        } else if (data._isMarcMulti) {
+            // MARC RSE: render radio detail (1 radio per source)
+            body.innerHTML = renderMarcMultiRadioDetail(data.radios);
+        } else if (data._parsing_id === 'vhf_marc_rse') {
+            // MARC RSE single radio (direct lastData entry)
+            const radioName = src ? src.name : 'Radio';
+            body.innerHTML = renderMarcMultiRadioDetail({ [radioName]: data });
+        } else {
+            body.innerHTML = renderDetailData(src.parsing_id, data);
+        }
+
+        modal.style.display = 'flex';
+    }
+
+
+    function renderMarcMultiRadioDetail(radios) {
+        if (!radios || Object.keys(radios).length === 0) {
+            return `<div style="text-align:center;padding:40px;color:#4a7a9a">
+                <i class="fas fa-satellite-dish fa-2x"></i>
+                <p>Belum ada data diterima</p>
+            </div>`;
+        }
+
+        const TX_PARAMS = [
+            ['Frequency (MHz)',   'frequency_mhz'],
+            ['Mode',              'mode'],
+            ['Status',            'status'],
+            ['Fwd Power (W)',     'fwd_power_w'],
+            ['Refl Power (W)',    'refl_power_w'],
+            ['PA Temp (°C)',      'pa_temp_c'],
+            ['Modulation (%)',    'modulation_pct'],
+            ['Supply Voltage (V)','supply_voltage'],
+        ];
+        const RX_PARAMS = [
+            ['Frequency (MHz)',     'frequency_mhz'],
+            ['Sensitivity (dBm)',   'sensitivity_dbm'],
+            ['Squelch (dBm)',       'squelch_dbm'],
+            ['Supply Voltage (V)',  'rx_supply_voltage'],
+        ];
+
+        return Object.entries(radios).map(([radioName, rd]) => {
+            const isRx = rd.is_rx;
+            const radioType = rd.radio_type || (isRx ? 'RX' : 'TX');
+            const params = isRx ? RX_PARAMS : TX_PARAMS;
+            const status = rd._status || 'Disconnect';
+            const statusColors = { Normal:'#00ff88', Alarm:'#ff3355', Warning:'#ffcc00', Disconnect:'#3a5a7a' };
+            const sc = statusColors[status] || '#3a5a7a';
+            const loggedAt = rd._logged_at
+                ? new Date(rd._logged_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
+                : '—';
+
+            return `
+            <div style="margin-bottom:14px;border:1px solid #1a3a5c;border-radius:8px;overflow:hidden;">
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#0d1e35;border-bottom:1px solid #1a3a5c;">
+                    <i class="fas fa-broadcast-tower" style="color:${isRx?'#00d4ff':'#e8a000'};font-size:12px;"></i>
+                    <span style="font-size:12px;font-weight:bold;color:${isRx?'#00d4ff':'#e8a000'};flex:1;">${radioName}</span>
+                    <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${isRx?'#001a33':'#1a1000'};color:${isRx?'#00d4ff':'#e8a000'};border:1px solid ${isRx?'#00d4ff':'#e8a000'};font-weight:bold;">${radioType}</span>
+                    <span style="font-size:10px;font-weight:bold;padding:2px 8px;border-radius:4px;background:${sc}22;color:${sc};border:1px solid ${sc};">${status}</span>
+                    <span style="font-size:9px;color:#3a6a8a;">${loggedAt}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;padding:10px 12px;background:#080f1e;">
+                    ${params.map(([label, key]) => {
+                        const val = rd[key];
+                        const display = (val === null || val === undefined || val === '-' || val === '—') ? '—' : val;
+                        const isStale = status === 'Disconnect';
+                        const valColor = isStale ? '#3a5a7a' : '#e8f4ff';
+                        return `<div style="background:#0f1e35;border:1px solid #0d2a45;border-radius:5px;padding:8px 10px;">
+                            <div style="font-size:9px;color:#4a7a9a;letter-spacing:1px;margin-bottom:3px;">${label}</div>
+                            <div style="font-size:13px;font-weight:bold;color:${valColor};">${display}</div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderDetailData(parserId, data) {
+        // Group by section based on parser
+        const sections = getDetailSections(parserId, data);
+        return sections.map(sec => `
+            <div style="margin-bottom:16px">
+                <div style="font-size:10px;color:#007a9e;letter-spacing:2px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #0d2a45">${sec.title}</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
+                    ${sec.params.map(([label, val, cls]) => `
+                        <div style="background:#0f1e35;border:1px solid #0d2a45;border-radius:5px;padding:8px 10px">
+                            <div style="font-size:9px;color:#4a7a9a;letter-spacing:1px;margin-bottom:3px">${label}</div>
+                            <div style="font-size:13px;font-weight:bold;color:${cls || '#e8f4ff'}">${val !== null && val !== undefined ? val : '—'}</div>
+                        </div>`).join('')}
+                </div>
+            </div>`).join('');
+    }
+
+    function getDetailSections(parserId, data) {
+        const sections = [];
+
+        // Helper function to unflatten DVOR data
+        function unflattenDvorData(flatData) {
+            const result = {};
+            const prefixes = ['mon1_', 'mon2_', 'tx1_', 'tx2_', 'lcu_'];
+
+            prefixes.forEach(prefix => {
+                const sectionKey = prefix.replace('_', '');
+                result[sectionKey] = {};
+
+                Object.keys(flatData).forEach(key => {
+                    if (key.startsWith(prefix)) {
+                        const fieldName = key.replace(prefix, '');
+                        result[sectionKey][fieldName] = flatData[key];
+                    }
+                });
+            });
+
+            // Handle tx_active separately
+            if (flatData.tx_active !== undefined) {
+                result.tx_active = flatData.tx_active;
+            }
+
+            return result;
+        }
+
+        if (parserId === 'dvor_maru_220') {
+            // Unflatten the data first
+            const unflattenedData = unflattenDvorData(data);
+
+            const LIMITS = { carrier_power:[80,120], rf_input:[-25,0], azimuth:[116.2,118.2], fm_index:[15,17], am_30hz:[28,32], am_9960hz:[25,32.5], am_1020hz:[6,8] };
+            const colorVal = (key, v) => {
+                if (v === null || v === undefined || v === '-' || v === '—') return '#4a7a9a';
+                const l = LIMITS[key]; if (!l) return '#e8f4ff';
+                return (v >= l[0] && v <= l[1]) ? '#00ff88' : '#ff3355';
+            };
+            if (unflattenedData.mon1) {
+                sections.push({ title: 'MONITOR 1', params: [
+                    ['Carrier Power (W)', unflattenedData.mon1.carrier_power, colorVal('carrier_power', unflattenedData.mon1.carrier_power)],
+                    ['RF Input (dBm)',    unflattenedData.mon1.rf_input,      colorVal('rf_input',      unflattenedData.mon1.rf_input)],
+                    ['Azimuth (°)',       unflattenedData.mon1.azimuth,       colorVal('azimuth',       unflattenedData.mon1.azimuth)],
+                    ['FM Index',         unflattenedData.mon1.fm_index,      colorVal('fm_index',      unflattenedData.mon1.fm_index)],
+                    ['30Hz AM (%)',       unflattenedData.mon1.am_30hz,       colorVal('am_30hz',       unflattenedData.mon1.am_30hz)],
+                    ['9960Hz AM (%)',     unflattenedData.mon1.am_9960hz,     colorVal('am_9960hz',     unflattenedData.mon1.am_9960hz)],
+                    ['1020Hz AM (%)',     unflattenedData.mon1.am_1020hz,     colorVal('am_1020hz',     unflattenedData.mon1.am_1020hz)],
+                    ['Carrier Freq (MHz)', unflattenedData.mon1.carrier_freq, '#e8f4ff'],
+                    ['USB Freq (MHz)',    unflattenedData.mon1.usb_freq,      '#e8f4ff'],
+                    ['LSB Freq (MHz)',    unflattenedData.mon1.lsb_freq,      '#e8f4ff'],
+                    ['Ident',            unflattenedData.mon1.ident,         '#00d4ff'],
+                    ['TSG 30Hz',         unflattenedData.mon1.tsg_30hz,      '#e8f4ff'],
+                    ['TSG Azimuth',      unflattenedData.mon1.tsg_azimuth,   '#e8f4ff'],
+                ]});
+            }
+            if (unflattenedData.mon2) {
+                sections.push({ title: 'MONITOR 2', params: [
+                    ['Carrier Power (W)', unflattenedData.mon2.carrier_power, colorVal('carrier_power', unflattenedData.mon2.carrier_power)],
+                    ['RF Input (dBm)',    unflattenedData.mon2.rf_input,      colorVal('rf_input',      unflattenedData.mon2.rf_input)],
+                    ['Azimuth (°)',       unflattenedData.mon2.azimuth,       colorVal('azimuth',       unflattenedData.mon2.azimuth)],
+                    ['FM Index',         unflattenedData.mon2.fm_index,      colorVal('fm_index',      unflattenedData.mon2.fm_index)],
+                    ['30Hz AM (%)',       unflattenedData.mon2.am_30hz,       colorVal('am_30hz',       unflattenedData.mon2.am_30hz)],
+                    ['9960Hz AM (%)',     unflattenedData.mon2.am_9960hz,     colorVal('am_9960hz',     unflattenedData.mon2.am_9960hz)],
+                    ['1020Hz AM (%)',     unflattenedData.mon2.am_1020hz,     colorVal('am_1020hz',     unflattenedData.mon2.am_1020hz)],
+                    ['Carrier Freq (MHz)', unflattenedData.mon2.carrier_freq, '#e8f4ff'],
+                    ['USB Freq (MHz)',    unflattenedData.mon2.usb_freq,      '#e8f4ff'],
+                    ['LSB Freq (MHz)',    unflattenedData.mon2.lsb_freq,      '#e8f4ff'],
+                    ['Ident',            unflattenedData.mon2.ident,         '#00d4ff'],
+                ]});
+            }
+            if (unflattenedData.tx1 || unflattenedData.tx2) {
+                sections.push({ title: 'TRANSMITTER', params: [
+                    ['TX Active',        unflattenedData.tx_active ? 'TX'+unflattenedData.tx_active : '—', '#00ffcc'],
+                    ['TX1 Carrier (W)',  unflattenedData.tx1?.carrier_power, '#e8f4ff'],
+                    ['TX1 USB Sin',      unflattenedData.tx1?.usb_sin,       '#e8f4ff'],
+                    ['TX1 USB Cos',      unflattenedData.tx1?.usb_cos,       '#e8f4ff'],
+                    ['TX1 LSB Sin',      unflattenedData.tx1?.lsb_sin,       '#e8f4ff'],
+                    ['TX1 LSB Cos',      unflattenedData.tx1?.lsb_cos,       '#e8f4ff'],
+                    ['TX1 Az Offset',    unflattenedData.tx1?.az_offset,     '#e8f4ff'],
+                    ['TX1 AM 30Hz',      unflattenedData.tx1?.am_30hz,       '#e8f4ff'],
+                    ['TX1 AM 1020Hz',    unflattenedData.tx1?.am_1020hz,     '#e8f4ff'],
+                    ['TX1 Phase Offset', unflattenedData.tx1?.phase_offset,  '#e8f4ff'],
+                    ['TX1 CPA Temp (°C)', unflattenedData.tx1?.cpa_temp,     '#e8f4ff'],
+                    ['TX1 MSG Temp (°C)', unflattenedData.tx1?.msg_temp,     '#e8f4ff'],
+                    ['TX1 Ident',        unflattenedData.tx1?.ident,         '#00d4ff'],
+                    ['TX2 Carrier (W)',  unflattenedData.tx2?.carrier_power, '#e8f4ff'],
+                    ['TX2 USB Sin',      unflattenedData.tx2?.usb_sin,       '#e8f4ff'],
+                    ['TX2 USB Cos',      unflattenedData.tx2?.usb_cos,       '#e8f4ff'],
+                    ['TX2 LSB Sin',      unflattenedData.tx2?.lsb_sin,       '#e8f4ff'],
+                    ['TX2 LSB Cos',      unflattenedData.tx2?.lsb_cos,       '#e8f4ff'],
+                    ['TX2 Az Offset',    unflattenedData.tx2?.az_offset,     '#e8f4ff'],
+                    ['TX2 AM 30Hz',      unflattenedData.tx2?.am_30hz,       '#e8f4ff'],
+                    ['TX2 AM 1020Hz',    unflattenedData.tx2?.am_1020hz,     '#e8f4ff'],
+                    ['TX2 Phase Offset', unflattenedData.tx2?.phase_offset,  '#e8f4ff'],
+                    ['TX2 CPA Temp (°C)', unflattenedData.tx2?.cpa_temp,     '#e8f4ff'],
+                    ['TX2 MSG Temp (°C)', unflattenedData.tx2?.msg_temp,     '#e8f4ff'],
+                    ['TX2 Ident',        unflattenedData.tx2?.ident,         '#00d4ff'],
+                ]});
+            }
+            if (unflattenedData.lcu) {
+                const vc = (v, lo, hi) => v !== null && v !== undefined ? ((v>=lo&&v<=hi)?'#00ff88':'#ff3355') : '#4a7a9a';
+                sections.push({ title: 'LCU — POWER SUPPLY', params: [
+                    ['DC +5V',  unflattenedData.lcu.dc_5v,  vc(unflattenedData.lcu.dc_5v,  4.5, 5.5)],
+                    ['DC +7V',  unflattenedData.lcu.dc_7v,  vc(unflattenedData.lcu.dc_7v,  6.0, 8.0)],
+                    ['DC +15V', unflattenedData.lcu.dc_15v, vc(unflattenedData.lcu.dc_15v, 13.5,16.0)],
+                    ['DC +28V', unflattenedData.lcu.dc_28v, vc(unflattenedData.lcu.dc_28v, 24.0,30.0)],
+                    ['AC +28V', unflattenedData.lcu.ac_28v, '#e8f4ff'],
+                    ['MSG1 Comm', unflattenedData.lcu.msg1_comm, '#00d4ff'],
+                    ['MSG2 Comm', unflattenedData.lcu.msg2_comm, '#00d4ff'],
+                    ['MON1 Comm', unflattenedData.lcu.mon1_comm, '#00d4ff'],
+                    ['MON2 Comm', unflattenedData.lcu.mon2_comm, '#00d4ff'],
+                    ['Battery 1', unflattenedData.lcu.battery1,  '#e8f4ff'],
+                    ['Battery 2', unflattenedData.lcu.battery2,  '#e8f4ff'],
+                    ['ACDC 1',    unflattenedData.lcu.acdc1,     '#e8f4ff'],
+                    ['ACDC 2',    unflattenedData.lcu.acdc2,     '#e8f4ff'],
+                ]});
+            }
+        } else if (parserId === 'dme_maru_310_320') {
+            const vc = (v, lo, hi) => v !== null && v !== undefined ? ((v>=lo&&v<=hi)?'#00ff88':'#ff3355') : '#4a7a9a';
+            sections.push({ title: 'STATUS', params: [
+                ['TXP Active', data.txp_active || '—', '#00ffcc'],
+                ['Ident',      data.ident || '—',      '#00d4ff'],
+            ]});
+            sections.push({ title: 'TXP1 — MON1', params: [
+                ['Sys Delay',   data.txp1_m1_sys_delay,  vc(data.txp1_m1_sys_delay, 49.5, 50.5)],
+                ['Reply Eff (%)', data.txp1_m1_reply_eff, vc(data.txp1_m1_reply_eff, 70, 100)],
+                ['Pair Rate',   data.txp1_m1_pair_rate,  '#e8f4ff'],
+                ['Fwd Power (W)', data.txp1_m1_fwd_power, vc(data.txp1_m1_fwd_power, 800, 1200)],
+                ['Dur A',       data.txp1_m1_dur_a,      vc(data.txp1_m1_dur_a, 3.0, 3.8)],
+                ['Dur B',       data.txp1_m1_dur_b,      vc(data.txp1_m1_dur_b, 3.0, 3.8)],
+                ['Rise A',      data.txp1_m1_rise_a,     vc(data.txp1_m1_rise_a, 1.5, 2.5)],
+                ['Rise B',      data.txp1_m1_rise_b,     vc(data.txp1_m1_rise_b, 1.5, 2.5)],
+                ['Decay A',     data.txp1_m1_decay_a,    vc(data.txp1_m1_decay_a, 1.5, 2.5)],
+                ['Decay B',     data.txp1_m1_decay_b,    vc(data.txp1_m1_decay_b, 1.5, 2.5)],
+                ['Spacing',     data.txp1_m1_spacing,    vc(data.txp1_m1_spacing, 11.5, 12.5)],
+            ]});
+            sections.push({ title: 'TXP1 — MON2', params: [
+                ['Sys Delay',   data.txp1_m2_sys_delay,  vc(data.txp1_m2_sys_delay, 49.5, 50.5)],
+                ['Reply Eff (%)', data.txp1_m2_reply_eff, vc(data.txp1_m2_reply_eff, 70, 100)],
+                ['Pair Rate',   data.txp1_m2_pair_rate,  '#e8f4ff'],
+                ['Fwd Power (W)', data.txp1_m2_fwd_power, vc(data.txp1_m2_fwd_power, 800, 1200)],
+                ['Dur A',       data.txp1_m2_dur_a,      vc(data.txp1_m2_dur_a, 3.0, 3.8)],
+                ['Dur B',       data.txp1_m2_dur_b,      vc(data.txp1_m2_dur_b, 3.0, 3.8)],
+                ['Rise A',      data.txp1_m2_rise_a,     vc(data.txp1_m2_rise_a, 1.5, 2.5)],
+                ['Rise B',      data.txp1_m2_rise_b,     vc(data.txp1_m2_rise_b, 1.5, 2.5)],
+                ['Decay A',     data.txp1_m2_decay_a,    vc(data.txp1_m2_decay_a, 1.5, 2.5)],
+                ['Decay B',     data.txp1_m2_decay_b,    vc(data.txp1_m2_decay_b, 1.5, 2.5)],
+                ['Spacing',     data.txp1_m2_spacing,    vc(data.txp1_m2_spacing, 11.5, 12.5)],
+            ]});
+            sections.push({ title: 'TXP2 — MON1', params: [
+                ['Sys Delay',   data.txp2_m1_sys_delay,  vc(data.txp2_m1_sys_delay, 49.5, 50.5)],
+                ['Reply Eff (%)', data.txp2_m1_reply_eff, vc(data.txp2_m1_reply_eff, 70, 100)],
+                ['Pair Rate',   data.txp2_m1_pair_rate,  '#e8f4ff'],
+                ['Fwd Power (W)', data.txp2_m1_fwd_power, vc(data.txp2_m1_fwd_power, 800, 1200)],
+                ['Dur A',       data.txp2_m1_dur_a,      vc(data.txp2_m1_dur_a, 3.0, 3.8)],
+                ['Dur B',       data.txp2_m1_dur_b,      vc(data.txp2_m1_dur_b, 3.0, 3.8)],
+                ['Rise A',      data.txp2_m1_rise_a,     vc(data.txp2_m1_rise_a, 1.5, 2.5)],
+                ['Rise B',      data.txp2_m1_rise_b,     vc(data.txp2_m1_rise_b, 1.5, 2.5)],
+                ['Decay A',     data.txp2_m1_decay_a,    vc(data.txp2_m1_decay_a, 1.5, 2.5)],
+                ['Decay B',     data.txp2_m1_decay_b,    vc(data.txp2_m1_decay_b, 1.5, 2.5)],
+                ['Spacing',     data.txp2_m1_spacing,    vc(data.txp2_m1_spacing, 11.5, 12.5)],
+            ]});
+            sections.push({ title: 'TXP2 — MON2', params: [
+                ['Sys Delay',   data.txp2_m2_sys_delay,  vc(data.txp2_m2_sys_delay, 49.5, 50.5)],
+                ['Reply Eff (%)', data.txp2_m2_reply_eff, vc(data.txp2_m2_reply_eff, 70, 100)],
+                ['Pair Rate',   data.txp2_m2_pair_rate,  '#e8f4ff'],
+                ['Fwd Power (W)', data.txp2_m2_fwd_power, vc(data.txp2_m2_fwd_power, 800, 1200)],
+                ['Dur A',       data.txp2_m2_dur_a,      vc(data.txp2_m2_dur_a, 3.0, 3.8)],
+                ['Dur B',       data.txp2_m2_dur_b,      vc(data.txp2_m2_dur_b, 3.0, 3.8)],
+                ['Rise A',      data.txp2_m2_rise_a,     vc(data.txp2_m2_rise_a, 1.5, 2.5)],
+                ['Rise B',      data.txp2_m2_rise_b,     vc(data.txp2_m2_rise_b, 1.5, 2.5)],
+                ['Decay A',     data.txp2_m2_decay_a,    vc(data.txp2_m2_decay_a, 1.5, 2.5)],
+                ['Decay B',     data.txp2_m2_decay_b,    vc(data.txp2_m2_decay_b, 1.5, 2.5)],
+                ['Spacing',     data.txp2_m2_spacing,    vc(data.txp2_m2_spacing, 11.5, 12.5)],
+            ]});
+        } else if (parserId === 'vhf_t6tv') {
+            const ok = '#00ff88', warn = '#ffcc00', err = '#ff3355', info = '#e8f4ff', accent = '#00d4ff';
+            const pwr = (v) => !v || v === '—' ? '#4a7a9a' : (v.includes('Not') || v === 'OFF' || v === '0') ? err : ok;
+
+            sections.push({ title: 'SERVICE STATUS', params: [
+                ['Overall Status', data.overall_status, data.overall_status?.includes('Full Service') ? ok : err],
+                ['AC Power',       data.ac_power,       pwr(data.ac_power)],
+                ['DC Power',       data.dc_power,       pwr(data.dc_power)],
+                ['DC Supply (V)',   data.dc_supply_v,    info],
+                ['Ambient Temp',   data.ambient_temp,   info],
+                ['Internal Temp',  data.internal_temp,  info],
+                ['Elapsed Time',   data.elapsed_time,   info],
+                ['Status Messages',data.status_messages,data.status_messages && data.status_messages !== '—' ? warn : '#4a7a9a'],
+            ]});
+
+            const fwdColor = (v) => {
+                const n = parseFloat(v); if (isNaN(n)) return '#4a7a9a';
+                return n >= 80 ? ok : n >= 60 ? warn : err;
+            };
+            const reflColor = (v) => {
+                const n = parseFloat(v); if (isNaN(n)) return '#4a7a9a';
+                return n <= 5 ? ok : n <= 10 ? warn : err;
+            };
+            const sinadColor = (v) => {
+                const n = parseFloat(v); if (isNaN(n)) return '#4a7a9a';
+                return n >= 20 ? ok : n >= 12 ? warn : err;
+            };
+
+            // RADIO SETTINGS — hanya tampilkan yang bukan boolean True/False murni
+            // (Channel tetap tampil, boolean lain disembunyikan karena tidak informatif)
+            const radioRows = (data._radio_rows || []).filter(r => {
+                if (r[0] === 'Channel') return true;
+                const v = String(r[1]).trim().toLowerCase();
+                return v !== 'true' && v !== 'false'; // sembunyikan pure boolean
+            });
+            if (radioRows.length > 0) {
+                sections.push({ title: 'RADIO SETTINGS', params:
+                    radioRows.map(r => [r[0], r[1], r[0] === 'Channel' ? accent : info])
+                });
+            }
+
+            // BIT_ESC — Normal/Escalated status per parameter
+            const escRows = data._bit_esc_rows || [];
+            if (escRows.length > 0) {
+                sections.push({ title: 'BIT ESCALATION STATUS', params:
+                    escRows.map(([k, v]) => {
+                        const vl = String(v).toLowerCase();
+                        const col = vl.includes('escalat') ? err
+                                  : vl.includes('normal') ? ok : info;
+                        return [k, v, col];
+                    })
+                });
+            }
+
+            // AMV_TXS — TX settings (hanya tampil jika ada data, sembunyikan pure boolean)
+            const txRows = (data._amv_txs_rows || []).filter(r => {
+                const v = String(r[1]).trim().toLowerCase();
+                return v !== 'true' && v !== 'false';
+            });
+            if (txRows.length > 0) {
+                sections.push({ title: 'AM VOICE TX SETTINGS', params:
+                    txRows.map(([k, v]) => [k, v, info])
+                });
+            }
+
+            // AMV_RXS — tampilkan hanya parameter yang punya nilai informatif (bukan pure boolean)
+            const rxRows = (data._amv_rxs_rows || []).filter(r => {
+                const v = String(r[1]).trim().toLowerCase();
+                return v !== 'true' && v !== 'false';
+            });
+            if (rxRows.length > 0) {
+                sections.push({ title: 'AM VOICE RX', params:
+                    rxRows.map(([k, v]) => [k, v, info])
+                });
+            }
+
+            sections.push({ title: 'SYSTEM INFO', params: [
+                ['SNMP Name',      data.snmp_name,      accent],
+                ['Model',          data.model,          info],
+                ['Equipment',      data.equipment,      info],
+                ['Serial Number',  data.serial_number,  info],
+                ['Firmware',       data.firmware,       info],
+                ['Boot Installed', data.boot_installed, info],
+            ]});
+        } else if (parserId === 'pm5560_modbus') {
+            const vc = (v, lo, hi) => {
+                if (v === null || v === undefined || isNaN(parseFloat(v))) return '#4a7a9a';
+                const val = parseFloat(v);
+                return (val >= lo && val <= hi) ? '#00ff88' : '#ff3355';
+            };
+            const fn = (v, d) => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(d) : '—';
+            const vn = (v) => (v != null && !isNaN(parseFloat(v))) ? '#e8f4ff' : '#4a7a9a';
+
+            sections.push({ title: 'STATUS', params: [
+                ['Tegangan VLN Avg (V)',  fn(data.VLN_avg, 1), vc(data.VLN_avg, 200, 240)],
+                ['Tegangan VLL Avg (V)',  fn(data.VLL_avg, 1), vc(data.VLL_avg, 340, 430)],
+                ['Frekuensi (Hz)',        fn(data.HZ, 2),      vc(data.HZ, 49.5, 50.5)],
+                ['Power Factor',         fn(data.PF, 3),      vc(Math.abs(data.PF||0), 0.8, 1.05)],
+                ['Alarm',                (data.alarmDetail && data.alarmDetail.length > 0) ? data.alarmDetail.join(' | ') : 'Tidak Ada', data.alarmDetail && data.alarmDetail.length > 0 ? '#ff3355' : '#00ff88'],
+            ]});
+
+            sections.push({ title: 'TEGANGAN LINE-TO-NEUTRAL (V)', params: [
+                ['Van (L1-N)',  fn(data.VL1N, 1), vc(data.VL1N, 200, 240)],
+                ['Vbn (L2-N)',  fn(data.VL2N, 1), vc(data.VL2N, 200, 240)],
+                ['Vcn (L3-N)',  fn(data.VL3N, 1), vc(data.VL3N, 200, 240)],
+            ]});
+
+            sections.push({ title: 'TEGANGAN LINE-TO-LINE (V)', params: [
+                ['Vab (L1-L2)', fn(data.VL12, 1), vc(data.VL12, 340, 430)],
+                ['Vbc (L2-L3)', fn(data.VL23, 1), vc(data.VL23, 340, 430)],
+                ['Vca (L3-L1)', fn(data.VL31, 1), vc(data.VL31, 340, 430)],
+            ]});
+
+            sections.push({ title: 'ARUS (A)', params: [
+                ['Ia (L1)',  fn(data.IL1, 2), vn(data.IL1)],
+                ['Ib (L2)',  fn(data.IL2, 2), vn(data.IL2)],
+                ['Ic (L3)',  fn(data.IL3, 2), vn(data.IL3)],
+            ]});
+
+            sections.push({ title: 'DAYA', params: [
+                ['Real (kW)',      fn(data.KW, 3),   vn(data.KW)],
+                ['Reaktif (kVAR)', fn(data.KVAR, 3), vn(data.KVAR)],
+                ['Semu (kVA)',     fn(data.KVA, 3),  vn(data.KVA)],
+                ['Power Factor',   fn(data.PF, 3),   vc(Math.abs(data.PF||0), 0.8, 1.05)],
+                ['Frekuensi (Hz)', fn(data.HZ, 2),   vc(data.HZ, 49.5, 50.5)],
+                ['Energi (kWh)',   data.KWH  != null ? (+data.KWH).toLocaleString('id-ID', {minimumFractionDigits:1}) : '—', '#00d4ff'],
+            ]});
+        } else if (parserId === 'snmp_system') {
+            const isConn = data.connectivity === 'Connected';
+            const cc = isConn ? '#00ff88' : '#ff3355';
+            const pctColor = v => {
+                const n = parseFloat(v);
+                return isNaN(n) ? '#4a7a9a' : n >= 95 ? '#ff3355' : n >= 80 ? '#ffcc00' : '#00ff88';
+            };
+            sections.push({ title: 'SISTEM', params: [
+                ['Konektivitas', data.connectivity || '—', cc],
+                ['Hostname',     data.sys_name     || '—', '#00d4ff'],
+                ['Deskripsi',    data.sys_descr    || '—', '#5a8aaa'],
+                ['Uptime',       data.sys_uptime   || '—', '#5a8aaa'],
+            ]});
+            sections.push({ title: 'CPU', params: [
+                ['CPU Usage (%)', data.cpu_usage !== '—' ? `${data.cpu_usage} %` : '—', pctColor(data.cpu_usage)],
+            ]});
+            sections.push({ title: 'MEMORY (RAM)', params: [
+                ['RAM Total (MB)', data.ram_total_mb  || '—', '#e8f4ff'],
+                ['RAM Used (MB)',  data.ram_used_mb   || '—', '#e8f4ff'],
+                ['RAM Usage (%)',  data.ram_usage_pct !== '—' ? `${data.ram_usage_pct} %` : '—', pctColor(data.ram_usage_pct)],
+            ]});
+            sections.push({ title: 'DISK', params: [
+                ['Disk Total (GB)', data.disk_total_gb  || '—', '#e8f4ff'],
+                ['Disk Used (GB)',  data.disk_used_gb   || '—', '#e8f4ff'],
+                ['Disk Usage (%)',  data.disk_usage_pct !== '—' ? `${data.disk_usage_pct} %` : '—', pctColor(data.disk_usage_pct)],
+            ]});
+
+        } else if (parserId === 'asterix_radar') {
+            const isConn = data.connectivity === 'Connected';
+            const cc = isConn ? '#00ff88' : '#ff3355';
+            sections.push({ title: 'STATUS RADAR MSSR', params: [
+                ['Konektivitas',  data.connectivity  || '—', cc],
+                ['Nama Radar',    data.radar_name    || '—', '#00d4ff'],
+                ['SAC',           data.sac           || '—', '#e8f4ff'],
+                ['SIC',           data.sic           || '—', '#e8f4ff'],
+                ['Radar ID',      data.radar_id      || '—', '#e8f4ff'],
+                ['Last CAT034',   data.last_cat034   || '—', '#5a8aaa'],
+                ['Koordinat',     data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', '#5a8aaa'],
+                ['Data Source',   data.data_source   || '—', '#3a6a8a'],
+            ]});
+
+        } else if (parserId === 'asterix_adsb') {
+            const isConn = data.connectivity === 'Connected';
+            const cc = isConn ? '#00ff88' : '#ff3355';
+            sections.push({ title: 'STATUS ADS-B STATION', params: [
+                ['Konektivitas',    data.connectivity   || '—', cc],
+                ['Station',         data.station        || '—', '#00d4ff'],
+                ['SAC',             data.sac            || '—', '#e8f4ff'],
+                ['SIC',             data.sic            || '—', '#e8f4ff'],
+                ['Radar ID',        data.radar_id       || '—', '#e8f4ff'],
+                ['Multicast IP',    data.multicast_ip   || '—', '#5a8aaa'],
+                ['Multicast Port',  data.multicast_port || '—', '#5a8aaa'],
+                ['Last CAT021',     data.last_cat021    || '—', '#5a8aaa'],
+                ['Koordinat',       data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', '#5a8aaa'],
+                ['Data Source',     data.data_source    || '—', '#3a6a8a'],
+            ]});
+
+        } else if (parserId === 'temp_humidity_modbus') {
+            const temp = parseFloat(data.temperature_c);
+            const humi = parseFloat(data.humidity_pct);
+            const tempColor = isNaN(temp) ? '#4a7a9a' : temp >= 35 ? '#ff3355' : temp >= 30 ? '#ffcc00' : '#00ff88';
+            const humiColor = isNaN(humi) ? '#4a7a9a' : humi > 80 ? '#ffcc00' : '#00d4ff';
+            sections.push({ title: 'SENSOR SUHU & KELEMBABAN', params: [
+                ['Suhu (°C)',       isNaN(temp) ? '—' : `${temp.toFixed(1)} °C`, tempColor],
+                ['Kelembaban (%)',  isNaN(humi) ? '—' : `${humi.toFixed(1)} %`,  humiColor],
+                ['Lokasi',         data.location  || '—', '#00d4ff'],
+                ['Status',         data.status_text || '—',
+                    data.status_text === 'Alarm' ? '#ff3355' : data.status_text === 'Warning' ? '#ffcc00' : '#00ff88'],
+            ]});
+            sections.push({ title: 'THRESHOLD', params: [
+                ['Warning threshold', '≥ 30.0 °C', '#ffcc00'],
+                ['Alarm threshold',   '≥ 35.0 °C', '#ff3355'],
+            ]});
+        } else {
+            const params = Object.entries(data)
+                .filter(([k]) => !k.startsWith('_'))
+                .map(([k, v]) => [k.replace(/_/g,' ').toUpperCase(), v, '#e8f4ff']);
+            sections.push({ title: 'DATA', params });
+        }
+
+        return sections;
+    }
+
+    // ── Edit/Delete source from panel ────────────────────────────────────────
+    window.editSourceFromPanel = function(sourceId, equipmentId) {
+        const sources = _sourcesCache[equipmentId] || [];
+        const src     = sources.find(s => String(s.id) === String(sourceId));
+        if (src && window.showAddDataSourceForm) {
+            window.showAddDataSourceForm(equipmentId, src);
+        }
+    };
+
+    window.deleteSourceFromPanel = async function(sourceId, equipmentId) {
+        if (!confirm('Hapus data source ini?')) return;
+        if (window.deleteDataSource) {
+            window.deleteDataSource(sourceId, equipmentId);
+            // Refresh panel after delete
+            setTimeout(() => openSourcePanel(equipmentId, document.querySelector(`.cabang-card[data-id="${equipmentId}"]`)), 500);
+        }
+    };
+
+    // ── Cache equipment data for detail view ─────────────────────────────────
+    // Hook into existing data refresh
+    const _origFetch = window.fetch;
+    window.fetch = function(url, opts) {
+        return _origFetch(url, opts).then(res => {
+            const clone = res.clone();
+            if (typeof url === 'string' && url.includes('/api/equipment') && !url.includes('otentication')) {
+                clone.json().then(data => {
+                    const list = data.data || (Array.isArray(data) ? data : null);
+                    if (list) window.equipmentDataCache = list;
+                }).catch(() => {});
+            }
+            return res;
+        });
+    };
+
+    // ── Close panel ───────────────────────────────────────────────────────────
+    function initClosePanel() {
+        const closeBtn = document.getElementById('closeDetailPanel');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                const panel = document.getElementById('equipmentDetailPanel');
+                if (panel) panel.classList.remove('open');
+                document.querySelectorAll('.cabang-card').forEach(c => c.classList.remove('card-selected'));
+                _selectedEqId = null;
+            });
+        }
+    }
+
+    // ── Helper: get auth token ────────────────────────────────────────────────
+    function getToken() {
+        return localStorage.getItem('authToken') || '';
+    }
+
+    // Intercept login to capture token
+    const _origXHROpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...args) {
+        this._url = url;
+        return _origXHROpen.call(this, method, url, ...args);
+    };
+
+    // ── Add CSS ───────────────────────────────────────────────────────────────
+    function addStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .cabang-card { cursor: pointer; transition: all .15s; }
+            .cabang-card:hover { transform: translateY(-1px); }
+            .cabang-card.card-selected { outline: 2px solid #00d4ff !important; }
+            .cabang-card.drag-over-card { outline: 2px dashed #00d4ff; opacity: .8; }
+
+            .source-item-card {
+                background: #0f1e35;
+                border: 1px solid #1a3a5c;
+                border-radius: 6px;
+                padding: 12px;
+                cursor: pointer;
+                transition: all .15s;
+            }
+            .source-item-card:hover { border-color: #007a9e; background: #162540; }
+
+            .source-status-pill {
+                font-size: 10px;
+                font-weight: bold;
+                padding: 2px 8px;
+                border-radius: 3px;
+            }
+            .source-status-pill.normal   { background: #005533; color: #00ff88; border: 1px solid #00ff88; }
+            .source-status-pill.alarm    { background: #660022; color: #ff3355; border: 1px solid #ff3355; }
+            .source-status-pill.warning  { background: #332200; color: #ffcc00; border: 1px solid #ffcc00; }
+            .source-status-pill.disconnect { background: #0f1e35; color: #3a5a7a; border: 1px solid #1a3a5c; }
+
+            .btn-mini {
+                background: transparent;
+                border: 1px solid #1a3a5c;
+                color: #a0c8e8;
+                border-radius: 4px;
+                padding: 3px 8px;
+                font-size: 10px;
+                cursor: pointer;
+                transition: all .15s;
+                font-family: inherit;
+            }
+            .btn-mini:hover { border-color: #00d4ff; color: #00d4ff; }
+            .btn-mini-danger:hover { border-color: #ff3355; color: #ff3355; }
+
+            /* ── Source card status styling ─────────────────────────────── */
+            .sp-source-card {
+                background: #0a1628;
+                border: 1px solid #1a3a5c;
+                border-radius: 8px;
+                padding: 12px;
+                cursor: pointer;
+                transition: all .2s;
+                position: relative;
+            }
+            .sp-source-card:hover { border-color: #007a9e; background: #0d1e38; }
+
+            /* NORMAL — border hijau tipis */
+            .sp-source-card.normal {
+                border-color: #1a4a2e;
+            }
+            .sp-source-card.normal:hover { border-color: #00ff88; }
+
+            /* WARNING — border kuning */
+            .sp-source-card.warning {
+                border-color: #4a3a00;
+                background: #0f1a08;
+            }
+            .sp-source-card.warning:hover { border-color: #ffcc00; }
+
+            /* ALARM — border merah tebal + background merah gelap + pulse */
+            .sp-source-card.alarm {
+                border: 2px solid #ff3355 !important;
+                background: #1a0810 !important;
+                box-shadow: 0 0 12px #ff335544, inset 0 0 20px #ff335511;
+                animation: alarm-pulse 1.5s ease-in-out infinite;
+            }
+            @keyframes alarm-pulse {
+                0%   { box-shadow: 0 0 8px #ff335544,  inset 0 0 20px #ff335511; }
+                50%  { box-shadow: 0 0 20px #ff335599, inset 0 0 30px #ff335522; }
+                100% { box-shadow: 0 0 8px #ff335544,  inset 0 0 20px #ff335511; }
+            }
+
+            /* DISCONNECT — redup */
+            .sp-source-card.disconnect {
+                border-color: #0f2030;
+                opacity: 0.6;
+            }
+
+            /* Alarm indicator dot di pojok kiri atas */
+            .sp-source-card.alarm::before {
+                content: '';
+                position: absolute;
+                top: 8px; left: 8px;
+                width: 8px; height: 8px;
+                border-radius: 50%;
+                background: #ff3355;
+                animation: dot-blink 1s step-end infinite;
+            }
+            .sp-source-card.warning::before {
+                content: '';
+                position: absolute;
+                top: 8px; left: 8px;
+                width: 8px; height: 8px;
+                border-radius: 50%;
+                background: #ffcc00;
+                animation: dot-blink 2s step-end infinite;
+            }
+            @keyframes dot-blink {
+                0%, 100% { opacity: 1; }
+                50%       { opacity: 0; }
+            }
+
+            /* cabang-card (equipment card di grid) juga ikut merah saat ada source alarm */
+            .cabang-card.has-alarm {
+                border-color: #ff3355 !important;
+                box-shadow: 0 0 10px #ff335533;
+            }
+            .cabang-card.has-warning {
+                border-color: #ffcc00 !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // ── INIT ──────────────────────────────────────────────────────────────────
+    function init() {
+        addStyles();
+        initClosePanel();
+        waitForGrid(() => {
+            observeGrid();
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+})();
