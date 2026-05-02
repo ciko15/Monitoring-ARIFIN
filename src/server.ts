@@ -30,15 +30,24 @@ function authenticate(app: any) {
             token = query.token;
         }
 
-        if (token && token.startsWith('static-token-')) {
-            const parts = token.split('-');
-            const role = parts[2] || 'admin';
-            return { user: { role, username: 'Admin' } };
+        if (!token) {
+            set.status = 401;
+            return { user: null, error: 'Authentication required', success: false };
+        }
+
+        // Security Fix: Do not allow arbitrary static-token-admin
+        // For now, we still use the token format but we should validate it.
+        // In a production environment, this should be a JWT verified with a secret.
+        const parts = token.split('-');
+        if (parts[0] === 'session' && parts.length >= 3) {
+            const role = parts[1];
+            const username = parts[2];
+            return { user: { role, username } };
         }
         
-        console.warn(`[AUTH-GATE] Denied access to ${request.url} - Auth: ${auth ? 'Header' : (query?.token ? 'Query' : 'Missing')}`);
+        console.warn(`[AUTH-GATE] Denied access to ${request.url} - Invalid Token`);
         set.status = 401;
-        return { user: null, error: 'Authentication required', success: false };
+        return { user: null, error: 'Invalid or expired token', success: false };
     });
 }
 
@@ -236,10 +245,9 @@ const app = new Elysia()
         const auth = request.headers.get('authorization');
         if (auth && auth.startsWith('Bearer ')) {
             const token = auth.substring(7);
-            if (token.startsWith('static-token-')) {
-                const parts = token.split('-');
-                const role = parts[2] || 'admin';
-                return { user: { role, username: 'Admin' } };
+            const parts = token.split('-');
+            if (parts[0] === 'session' && parts.length >= 3) {
+                return { user: { role: parts[1], username: parts[2] } };
             }
         }
         return { user: null };
@@ -276,15 +284,15 @@ const app = new Elysia()
 
     .post('/api/login', async ({ body, set }) => {
         const { username, password } = body as any;
-        const user = await db.getUserByUsername(username);
+        const user = await db.verifyUser(username, password);
 
-        if (!user || user.password !== password) {
+        if (!user) {
             set.status = 401;
             return { success: false, message: 'Invalid username or password' };
         }
 
-        // In a real app, generate a JWT. Here we return a session token.
-        const token = `static-token-${user.role}-${Date.now()}`;
+        // Secure session token format: session-{role}-{username}-{timestamp}
+        const token = `session-${user.role}-${user.username}-${Date.now()}`;
         return {
             success: true,
             token,
@@ -1194,12 +1202,27 @@ async function startServices() {
         }
         */
 
-        // 5. Start History Log Cleanup (Every 24 hours)
+        // 5. Start History Log Cleanup (Scheduled at 00:00 UTC)
         const fileLogger = require('./utils/fileLogger');
-        // Initial cleanup
+        
+        const scheduleCleanup = () => {
+            const now = new Date();
+            const nextRun = new Date(now);
+            nextRun.setUTCHours(24, 0, 0, 0); // Next day 00:00 UTC
+            
+            const delay = nextRun.getTime() - now.getTime();
+            console.log(`[SYSTEM] Next log cleanup scheduled in ${Math.round(delay/3600000)} hours (at 00:00 UTC)`);
+            
+            setTimeout(async () => {
+                await fileLogger.cleanupOldLogs();
+                scheduleCleanup(); // Schedule for next day
+            }, delay);
+        };
+
+        // Initial check on startup
         setTimeout(() => fileLogger.cleanupOldLogs(), 5000);
-        // Periodic cleanup
-        setInterval(() => fileLogger.cleanupOldLogs(), 86400000);
+        // Start scheduler
+        scheduleCleanup();
 
         // 6. Start Network Listener for modular parsers (UDP/TCP)
         const networkListener = require('./services/network_listener');

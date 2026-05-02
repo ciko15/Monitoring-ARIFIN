@@ -1,101 +1,87 @@
-# CIKO - Direct Equipment Monitoring (No Gateway)
+# CIKO - Monitoring ARIFIN (Advanced Real-time Interface)
 
-## 🚀 Quick Start
+Sistem monitoring peralatan navigasi dan komunikasi penerbangan secara real-time dengan dukungan multi-protokol (UDP, TCP, SNMP, Modbus) dan visualisasi geografis.
 
+## 🚀 Cara Menjalankan Aplikasi
+
+### Persyaratan Sistem
+- **Bun Runtime** (Direkomendasikan) atau **Node.js v18+**
+- **Sistem Operasi**: Linux, macOS, atau Windows
+- **Port Default**: 3100
+
+### Instalasi & Menjalankan (Development)
 ```bash
-# Install dependencies
+# 1. Install dependensi
 npm install
 
-# Start server
-npm start
-
-# Or development mode
+# 2. Jalankan aplikasi (Development mode)
 npm run dev
 ```
 
-## 🔄 PM2 Production Setup (Auto-start on Boot)
-
+### Jalankan di Produksi (PM2)
+Sangat disarankan menggunakan PM2 agar aplikasi otomatis berjalan kembali jika server restart atau aplikasi crash.
 ```bash
-# Setup PM2 dengan automatic startup
+# 1. Setup PM2 (Sekali saja)
 npm run pm2:setup
 
-# Atau manual setup:
+# 2. Jalankan dan simpan konfigurasi
 npm run pm2:start
 npm run pm2:save
-sudo env PATH=$PATH:/usr/local/bin /usr/local/lib/node_modules/pm2/bin/pm2 startup launchd -u vickra --hp /Users/vickra
 ```
 
-### ✅ Status: PM2 Configured & Running
-- ✅ PM2 process: `monitoring-arifin` (PID dinamis)
-- ✅ Auto-restart on crash: Enabled
-- ✅ Memory monitoring: 1GB limit
-- ✅ Logs: `./logs/pm2-*.log`
-- ✅ API accessible: http://localhost:3100
+---
 
-### PM2 Management Commands
+## 🔒 Sistem Keamanan & User Management
 
-```bash
-# Check status
-npm run pm2:logs
+### Login & Autentikasi
+Sistem menggunakan **Hashed Passwords** (keamanan tinggi) dan **Session-based Token**.
+- **Admin Default**: `admin` / `admin`
+- **Session Timeout**: Otomatis logout jika token tidak valid.
 
-# Monitor resources
-npm run pm2:monit
+### Level Pengguna (Roles)
+1. **Admin**: Akses penuh ke seluruh menu (Konfigurasi, User Management, Network Tools).
+2. **Teknisi**: Akses ke Dashboard, History Logs, dan Network Tools. Tidak dapat menghapus konfigurasi alat.
+3. **User**: Hanya akses Monitoring Dashboard (Read-only).
 
-# Restart application
-npm run pm2:restart
+---
 
-# Stop application
-npm run pm2:stop
+## 📋 SOP Penggunaan per Menu
 
-# Remove from PM2
-npm run pm2:delete
-```
+### 1. Monitoring Dashboard (Peta & List)
+- **Tujuan**: Memantau status kesehatan seluruh peralatan secara visual.
+- **Indikator Status**:
+    - 🟢 **Normal**: Semua parameter dalam ambang batas aman.
+    - 🟡 **Warning**: Satu atau lebih parameter melewati batas peringatan.
+    - 🔴 **Alarm/Fail**: Parameter kritis melewati batas bahaya.
+    - ⚪ **Disconnect**: Server tidak menerima data dari alat (Timeout > 4 menit).
+- **Aksi**: Klik ikon alat di peta atau daftar untuk melihat panel detail parameter real-time.
 
-**Benefits:**
-- ✅ Auto-restart on crash
-- ✅ Auto-start on server boot (setelah setup manual)
-- ✅ Memory monitoring
-- ✅ Log management
-- ✅ Process clustering ready
+### 2. History Logs
+- **Tujuan**: Melakukan audit data historis peralatan.
+- **Penggunaan**: Pilih alat dari dropdown, pilih rentang waktu, lalu klik filter.
+- **Penyimpanan**: Sistem melakukan **Auto-Cleanup** setiap jam **00:00 UTC**. Data log yang lebih tua dari **2 hari** akan dihapus otomatis untuk menjaga performa server.
 
-**Files Created:**
-- `ecosystem.config.js` - PM2 configuration
-- `pm2-start.sh` - Startup script
-- `com.monitoring.arifin.plist` - macOS launchd service
-- `logs/` - Log directory
+### 3. Configuration (Master Data)
+- **Bandara**: Mengatur lokasi pusat monitoring.
+- **Equipment**: Menambah unit alat. Setiap alat harus memiliki koordinat di peta.
+- **Data Source**: Menghubungkan alat ke sensor/IP tertentu. 
+    - Gunakan fitur **"Pick from Map"** untuk menentukan lokasi spesifik sensor.
+    - Secara default, lokasi sensor akan mengikuti lokasi alat induk.
+- **Limitation**: Mengatur nilai ambang batas (Threshold). Nilai ini yang menentukan kapan alat berubah status menjadi Warning atau Alarm.
+- **Parsing**: Mengelola skrip pembaca data. Mendukung penambahan parser baru secara dinamis dengan mengunggah file skrip ke folder `src/parsers/`.
 
-## 📱 Features
+### 4. Network Tools (Analisis Jaringan)
+- **Interface Stats**: Memantau penggunaan bandwidth pada network interface server.
+- **Packet Sniffer**: Menangkap trafik masuk untuk melihat isi data mentah (raw data) yang dikirim alat. Sangat berguna untuk troubleshooting parser yang salah.
+- **TCP Analyzer**: Mengetes konektivitas ke IP & Port tertentu dan memvalidasi "Sync Marker" data untuk memastikan integritas data dari peralatan.
 
-✅ **Direct Equipment Connection** - No gateway ping dependency  
-✅ **Public Dashboard** - View stats without login  
-✅ **Role-based Access**  
-   - `admin/admin` → Equipment management  
-   - `superadmin/superadmin` → Full templates access  
+---
 
-✅ **Live Auto-refresh** (20s intervals)  
-✅ **Network Tools** - Ping, SNMP test, packet capture  
-✅ **File Logging** - Hourly logs per equipment  
+## 🛠️ Pemeliharaan (Maintenance)
 
-## 📍 Login (Optional - Sidebar)
+- **Logs**: File log PM2 tersimpan di folder `./logs/`.
+- **Database**: Menggunakan file JSON di folder `./db/`. Lakukan backup rutin pada folder ini.
+- **Update Parser**: Jika ada alat tipe baru, tambahkan parser di `src/parsers/` dan daftarkan di menu Configuration > Parsing.
 
-```
-Click User Panel → Login
-admin/admin
-superadmin/superadmin
-```
-
-## 🎯 Branch Deployment
-
-App starts **directly** - monitors equipment IP only. Perfect for cabang install!
-
-## 🛠️ API Endpoints
-
-```
-GET /api/equipment/stats     → Public dashboard
-GET /api/airports           → Map data  
-POST /api/ping/start        → Ping tool
-```
-
-## ✅ Status: Production Ready
-
-**Gateway removal complete** - Direct connect works!
+---
+*CIKO Monitoring System - Developed for High Availability & Real-time Reliability.*

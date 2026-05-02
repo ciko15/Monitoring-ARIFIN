@@ -630,6 +630,8 @@ async function createOtentication(data) {
     udp_port: data.udp_port || null,
     parsing_id: data.parsing_id || null,
     sup_category: data.sup_category || null,
+    latitude: data.latitude !== undefined ? parseFloat(data.latitude) : null,
+    longitude: data.longitude !== undefined ? parseFloat(data.longitude) : null,
     // MARC RSE specific
     ...(data.marc_ports !== undefined ? { marc_ports: data.marc_ports } : {}),
     ...(data.poll_interval !== undefined ? { poll_interval: data.poll_interval } : {}),
@@ -738,19 +740,28 @@ async function getAllUsers() {
   return await readJson(USERS_CONFIG_PATH);
 }
 
-async function getUserByUsername(username) {
-  const users = await readJson(USERS_CONFIG_PATH);
-  return users.find(u => u.username === username) || null;
-}
-
 async function getUserById(id) {
   const users = await readJson(USERS_CONFIG_PATH);
   return users.find(u => u.id == id) || null;
 }
 
+async function getUserByUsername(username) {
+  const users = await readJson(USERS_CONFIG_PATH);
+  return users.find(u => u.username === username) || null;
+}
+
 async function createUser(data) {
   let users = await readJson(USERS_CONFIG_PATH);
-  const newUser = { ...data, id: Date.now() };
+  
+  // Hash password before saving
+  const hashedPassword = await (globalThis.Bun ? globalThis.Bun.password.hash(data.password) : data.password);
+  
+  const newUser = { 
+    ...data, 
+    password: hashedPassword,
+    id: Date.now() 
+  };
+  
   users.push(newUser);
   await writeJson(USERS_CONFIG_PATH, users);
   return newUser;
@@ -760,11 +771,42 @@ async function updateUser(id, data) {
   let users = await readJson(USERS_CONFIG_PATH);
   const index = users.findIndex(u => u.id == id);
   if (index !== -1) {
-    users[index] = { ...users[index], ...data, id: Number(id) };
+    const updatedData = { ...data };
+    
+    // Hash password if it's being updated
+    if (data.password) {
+      updatedData.password = await (globalThis.Bun ? globalThis.Bun.password.hash(data.password) : data.password);
+    }
+    
+    users[index] = { ...users[index], ...updatedData, id: Number(id) };
     await writeJson(USERS_CONFIG_PATH, users);
     return users[index];
   }
   return null;
+}
+
+async function verifyUser(username, password) {
+  const user = await getUserByUsername(username);
+  if (!user) return null;
+  
+  if (globalThis.Bun) {
+    try {
+      const isMatch = await globalThis.Bun.password.verify(password, user.password);
+      if (isMatch) return user;
+    } catch (e) {
+      // If verify throws, it might be plain text
+    }
+
+    // Fallback check for plain text (for existing users)
+    if (user.password === password) {
+      console.log(`[AUTH] Auto-hashing password for user: ${username}`);
+      await updateUser(user.id, { password }); // This will trigger hashing in updateUser
+      return user;
+    }
+    return null;
+  }
+  
+  return user.password === password ? user : null;
 }
 
 async function deleteUser(id) {
@@ -884,8 +926,47 @@ async function syncOtenticationSupCategory() {
   }
 }
 
+async function syncAllOtenticationLocations() {
+  console.log('[DB] Starting location synchronization for Data Sources...');
+  const equipmentList = await readJson(EQUIPMENT_CONFIG_PATH);
+  let authList = await readJson(AUTH_CONFIG_PATH);
+  let updateCount = 0;
+
+  authList = authList.map(auth => {
+    const parentEquip = equipmentList.find(e => String(e.id) === String(auth.equipt_id));
+    if (parentEquip) {
+      // Only update if current auth lat/lng is missing
+      if (auth.latitude === undefined || auth.latitude === null || auth.longitude === undefined || auth.longitude === null) {
+        auth.latitude = parentEquip.lat || parentEquip.latitude || null;
+        auth.longitude = parentEquip.lng || parentEquip.longitude || null;
+        updateCount++;
+      }
+    }
+    return auth;
+  });
+
+  if (updateCount > 0) {
+    await writeJson(AUTH_CONFIG_PATH, authList);
+    console.log(`[DB] Successfully synced ${updateCount} Data Source locations.`);
+  } else {
+    console.log('[DB] No Data Source locations needed synchronization.');
+  }
+}
+
+// Initial sync call
+setTimeout(syncAllOtenticationLocations, 1000);
+
 module.exports = {
+  // Config helpers
+  readAirportConfig,
+  writeAirportConfig,
+  readJson,
+  writeJson,
+  
+  // Analytics/History scan
+  getLatestTimestampFromHistory,
   query,
+
   // Airports
   getAllAirports,
   getAirportsPaginated,
@@ -893,62 +974,81 @@ module.exports = {
   createAirport,
   updateAirport,
   deleteAirport,
+
   // Equipment
   getAllEquipment,
-  getEquipmentStatsSummary,
   getEquipmentById,
+  getEquipmentStatsSummary,
   createEquipment,
   updateEquipment,
   updateEquipmentStatus,
   deleteEquipment,
-  // Parsing Configs
+
+  // Parsing Config
   getAllParsingConfigs,
   getParsingConfigById,
   createParsingConfig,
   updateParsingConfig,
   deleteParsingConfig,
-  // Sup Categories
+
+  // SNMP Templates
+  getAllSnmpTemplates,
+  getSnmpTemplateById,
+  createSnmpTemplate,
+  updateSnmpTemplate,
+  deleteSnmpTemplate,
+
+  // Sup Category
   getAllSupCategories,
   getSupCategoriesByCategory,
   createSupCategory,
   updateSupCategory,
   deleteSupCategory,
-  // Equipment Otentication
+
+  // Otentication
   getAllOtentication,
   getOtenticationByEquipment,
   createOtentication,
   updateOtentication,
   deleteOtentication,
   deleteOtenticationByEquipment,
-  // Limitation Configs
+  syncAllOtenticationLocations,
+
+  // Limitations
   getAllLimitations,
   getLimitationsByEquipment,
   createLimitation,
   updateLimitation,
   deleteLimitation,
-  // Categories
-  getAllCategories,
-  // Equipment Logs
-  createEquipmentLog,
-  getEquipmentLogs,
-  getLatestEquipmentLog,
+
   // Threshold Settings
   getThresholdsByEquipment,
   createThreshold,
   updateThreshold,
   deleteThreshold,
   syncOtenticationSupCategory,
+
   // Users
   getAllUsers,
-  getUserByUsername,
   getUserById,
+  getUserByUsername,
   createUser,
   updateUser,
   deleteUser,
-  // SNMP Templates
-  getAllSnmpTemplates,
-  getSnmpTemplateById,
-  createSnmpTemplate,
-  updateSnmpTemplate,
-  deleteSnmpTemplate
+  verifyUser,
+
+  // Categories
+  getAllCategories,
+
+  // Logs
+  createEquipmentLog,
+  getLatestLogsBySource,
+  getEquipmentLogs,
+  getLatestEquipmentLog,
+
+  // Surveillance
+  surveillanceStationsDB,
+  radarTargetsDB,
+  adsbAircraftDB,
+  surveillanceLogsDB
 };

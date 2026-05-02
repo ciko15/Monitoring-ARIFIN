@@ -7,7 +7,9 @@
     "tcp_port": "950",
     "udp_port": null,
     "parsing_id": "dvor_maru_220",
-    "sup_category": "DVOR"
+    "sup_category": "DVOR",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1776701977823,
@@ -17,7 +19,9 @@
     "tcp_port": "950",
     "udp_port": null,
     "parsing_id": "dme_maru_310_320",
-    "sup_category": "DME"
+    "sup_category": "DME",
+    "latitude": -2.578416,
+    "longitude": 140.516489
   },
   {
     "id": 1776701762335,
@@ -28,7 +32,9 @@
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": "{\"ws_path\":\"/ws\",\"interval\":60,\"username\":\"admin\",\"password\":\"admin\"}",
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1776722121472,
@@ -39,7 +45,9 @@
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": "{\"ws_path\":\"/ws\",\"interval\":60,\"username\":\"admin\",\"password\":\"admin\"}",
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1776723145907,
@@ -49,7 +57,9 @@
     "tcp_port": "80",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572243,
+    "longitude": 140.51488
   },
   {
     "id": 1776995982654,
@@ -60,7 +70,9 @@
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": "{\"ws_path\": \"/ws\", \"interval\": 60, \"username\": \"admin\", \"password\": \"admin\"}",
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572243,
+    "longitude": 140.51488
   },
   {
     "id": 1776996021969,
@@ -71,7 +83,9 @@
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": "{\"ws_path\": \"/ws\", \"interval\": 60, \"username\": \"admin\", \"password\": \"admin\"}",
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1776996045848,
@@ -82,7 +96,9 @@
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": "{\"ws_path\": \"/ws\", \"interval\": 60, \"username\": \"admin\", \"password\": \"admin\"}",
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777100000000,
@@ -93,7 +109,9 @@
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
     "extra_config": null,
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000001,
@@ -103,7 +121,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000002,
@@ -113,7 +133,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000003,
@@ -123,7 +145,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000004,
@@ -133,7 +157,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000005,
@@ -143,7 +169,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000006,
@@ -153,7 +181,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000007,
@@ -163,7 +193,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000008,
@@ -173,7 +205,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000009,
@@ -183,7 +217,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000010,
@@ -193,7 +229,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000011,
@@ -203,7 +241,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000012,
@@ -213,7 +253,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000013,
@@ -223,7 +265,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000014,
@@ -233,7 +277,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777100000015,
@@ -243,7 +289,9 @@
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
-    "sup_category": "Power Meter"
+    "sup_category": "Power Meter",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777400000211,
@@ -253,7 +301,9 @@
     "tcp_port": "950",
     "udp_port": null,
     "parsing_id": "ils_gp_thales421",
-    "sup_category": "ILS-GP"
+    "sup_category": "ILS-GP",
+    "latitude": -2.57835,
+    "longitude": 140.516483
   },
   {
     "id": 1777400000212,
@@ -264,7 +314,9 @@
     "udp_port": null,
     "parsing_id": "ils_llz_thales421",
     "extra_config": null,
-    "sup_category": "ILS-LLZ"
+    "sup_category": "ILS-LLZ",
+    "latitude": -2.5785,
+    "longitude": 140.5167
   },
   {
     "id": 1777500020002,
@@ -278,7 +330,9 @@
       2
     ],
     "poll_interval": 30,
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777500020003,
@@ -292,7 +346,9 @@
       3
     ],
     "poll_interval": 30,
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777500020008,
@@ -306,7 +362,9 @@
       8
     ],
     "poll_interval": 30,
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777500020009,
@@ -320,7 +378,9 @@
       9
     ],
     "poll_interval": 30,
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777500020004,
@@ -334,7 +394,9 @@
       4
     ],
     "poll_interval": 30,
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572243,
+    "longitude": 140.51488
   },
   {
     "id": 1777500020005,
@@ -348,7 +410,9 @@
       5
     ],
     "poll_interval": 30,
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.572243,
+    "longitude": 140.51488
   },
   {
     "id": 1777500020006,
@@ -362,7 +426,9 @@
       6
     ],
     "poll_interval": 30,
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.5721,
+    "longitude": 140.51482
   },
   {
     "id": 1777500020007,
@@ -376,7 +442,9 @@
       7
     ],
     "poll_interval": 30,
-    "sup_category": "VHF A/G"
+    "sup_category": "VHF A/G",
+    "latitude": -2.5721,
+    "longitude": 140.51482
   },
   {
     "id": 1777600010000,
@@ -388,7 +456,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung RX",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010001,
@@ -400,7 +470,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung RX",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010002,
@@ -412,7 +484,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Ruang MER",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010003,
@@ -424,7 +498,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Ruang MER",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010004,
@@ -436,7 +512,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung GP",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010005,
@@ -448,7 +526,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung GP",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010006,
@@ -460,7 +540,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung DVOR",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010007,
@@ -472,7 +554,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung DVOR",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010008,
@@ -484,7 +568,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung LLZ",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010009,
@@ -496,7 +582,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung LLZ",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010010,
@@ -508,7 +596,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung Radar",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010011,
@@ -520,7 +610,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Gedung Radar",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010012,
@@ -532,7 +624,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Ruang Tower",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777600010013,
@@ -544,7 +638,9 @@
     "parsing_id": "temp_humidity_modbus",
     "location": "Ruang Tower",
     "poll_interval": 10,
-    "sup_category": "Environment"
+    "sup_category": "Environment",
+    "latitude": -2.572,
+    "longitude": 140.5148
   },
   {
     "id": 1777700010001,
@@ -559,7 +655,9 @@
     "lat": -2.599,
     "lon": 140.528,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR"
+    "sup_category": "Radar/MSSR",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700010002,
@@ -574,7 +672,9 @@
     "lat": -1.187,
     "lon": 136.112,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR"
+    "sup_category": "Radar/MSSR",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700010003,
@@ -589,7 +689,9 @@
     "lat": -8.513,
     "lon": 140.411,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR"
+    "sup_category": "Radar/MSSR",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700010004,
@@ -604,7 +706,9 @@
     "lat": -0.891,
     "lon": 131.288,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR"
+    "sup_category": "Radar/MSSR",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700010005,
@@ -619,7 +723,9 @@
     "lat": -4.528,
     "lon": 136.887,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR"
+    "sup_category": "Radar/MSSR",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020001,
@@ -637,7 +743,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020002,
@@ -655,7 +763,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020003,
@@ -673,7 +783,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020004,
@@ -691,7 +803,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020005,
@@ -709,7 +823,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020006,
@@ -727,7 +843,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020007,
@@ -745,7 +863,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020008,
@@ -763,7 +883,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020009,
@@ -781,7 +903,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020010,
@@ -799,7 +923,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020011,
@@ -817,7 +943,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020012,
@@ -835,7 +963,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777700020013,
@@ -853,7 +983,9 @@
     "multicast_ip": "239.71.40.2",
     "multicast_port": 50000,
     "timeout_ms": 5000,
-    "sup_category": "ADS-B"
+    "sup_category": "ADS-B",
+    "latitude": -2.599,
+    "longitude": 140.528
   },
   {
     "id": 1777800010030,
@@ -868,7 +1000,9 @@
     "snmp_version": "2c",
     "location": "FDPS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010031,
@@ -883,7 +1017,9 @@
     "snmp_version": "2c",
     "location": "FDPS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010032,
@@ -898,7 +1034,9 @@
     "snmp_version": "2c",
     "location": "FDPS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010033,
@@ -913,7 +1051,9 @@
     "snmp_version": "2c",
     "location": "SDPS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010034,
@@ -928,7 +1068,9 @@
     "snmp_version": "2c",
     "location": "SDPS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010035,
@@ -943,7 +1085,9 @@
     "snmp_version": "2c",
     "location": "SDPS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010036,
@@ -958,7 +1102,9 @@
     "snmp_version": "2c",
     "location": "SNET",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010037,
@@ -973,7 +1119,9 @@
     "snmp_version": "2c",
     "location": "SNET",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010038,
@@ -988,7 +1136,9 @@
     "snmp_version": "2c",
     "location": "DREC",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010039,
@@ -1003,7 +1153,9 @@
     "snmp_version": "2c",
     "location": "DREC",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010040,
@@ -1018,7 +1170,9 @@
     "snmp_version": "2c",
     "location": "CMS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010041,
@@ -1033,7 +1187,9 @@
     "snmp_version": "2c",
     "location": "CMS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010042,
@@ -1048,7 +1204,9 @@
     "snmp_version": "2c",
     "location": "TMSS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777800010043,
@@ -1063,7 +1221,9 @@
     "snmp_version": "2c",
     "location": "TMSS",
     "poll_interval": 60,
-    "sup_category": "Server"
+    "sup_category": "Server",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   },
   {
     "id": 1777599057496,
@@ -1074,6 +1234,8 @@
     "udp_port": null,
     "parsing_id": "snmp_system",
     "extra_config": null,
-    "sup_category": "Workstation"
+    "sup_category": "Workstation",
+    "latitude": -2.572069,
+    "longitude": 140.514756
   }
 ]

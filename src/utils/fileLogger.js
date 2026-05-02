@@ -358,17 +358,15 @@ class FileLogger {
     }
 
     /**
-     * Cleanup folders older than 3 months
+     * Cleanup logs older than 2 days
      */
     async cleanupOldLogs() {
-        console.log('[FILELOG] Starting automated cleanup...');
+        console.log('[FILELOG] Starting automated cleanup (Retention: 2 days)...');
         const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth(); // 0-11
+        now.setUTCHours(0, 0, 0, 0);
         
-        // Calculate the threshold (3 months ago)
-        const thresholdDate = new Date(year, month - 3, 1);
-        const thresholdStr = thresholdDate.toISOString().slice(0, 7); // YYYY-MM
+        // Calculate the threshold (2 days ago)
+        const thresholdDate = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
         
         try {
             if (!fs.existsSync(this.baseDir)) return;
@@ -377,16 +375,30 @@ class FileLogger {
                 .filter(f => /^\d{4}-\d{2}$/.test(f));
             
             let deletedCount = 0;
-            for (const folder of monthFolders) {
-                if (folder < thresholdStr) {
-                    const fullPath = path.join(this.baseDir, folder);
-                    console.log(`[FILELOG] Deleting old log directory: ${folder}`);
-                    fs.rmSync(fullPath, { recursive: true, force: true });
-                    deletedCount++;
+            for (const month of monthFolders) {
+                const monthPath = path.join(this.baseDir, month);
+                const dayFolders = fs.readdirSync(monthPath)
+                    .filter(f => /^\d{2}$/.test(f));
+                
+                for (const day of dayFolders) {
+                    const folderDate = new Date(`${month}-${day}`);
+                    folderDate.setUTCHours(0, 0, 0, 0);
+
+                    if (folderDate < thresholdDate) {
+                        const fullPath = path.join(monthPath, day);
+                        console.log(`[FILELOG] Deleting old log directory: ${month}/${day}`);
+                        fs.rmSync(fullPath, { recursive: true, force: true });
+                        deletedCount++;
+                    }
+                }
+
+                // If month folder is now empty, delete it too
+                if (fs.readdirSync(monthPath).length === 0) {
+                    fs.rmSync(monthPath, { recursive: true, force: true });
                 }
             }
             
-            console.log(`[FILELOG] Cleanup complete. Deleted ${deletedCount} folders.`);
+            console.log(`[FILELOG] Cleanup complete. Deleted ${deletedCount} day folders.`);
             return deletedCount;
         } catch (error) {
             console.error('[FILELOG] cleanupOldLogs error:', error.message);

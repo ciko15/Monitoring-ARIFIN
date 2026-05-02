@@ -21,23 +21,34 @@ class ParserFactory {
      * @returns {BaseParser|null} Parser instance or null if type not supported
      */
     static createParser(connectionType, config) {
-        // --- DYNAMIC LOADING LOGIC ---
-        // If a specific parser file is defined in the configuration, try to load it dynamically
+        // --- SECURE DYNAMIC LOADING LOGIC ---
+        // If a specific parser file is defined, try to load it safely from the same directory
         const parserFile = config.parser_file || config.files;
         if (parserFile) {
             try {
                 const path = require('path');
-                // Resolve path relative to project root or absolute
-                const absolutePath = path.isAbsolute(parserFile) 
-                    ? parserFile 
-                    : path.resolve(process.cwd(), parserFile);
+                // Security: Prevent path traversal by only taking the basename
+                const safeFileName = path.basename(parserFile);
                 
-                const DynamicParser = require(absolutePath);
-                console.log(`[ParserFactory] Dynamically loaded parser from: ${absolutePath}`);
-                return new DynamicParser(config);
+                // Only allow .js files
+                if (!safeFileName.endsWith('.js')) {
+                    throw new Error('Only .js parser files are allowed');
+                }
+
+                const absolutePath = path.resolve(__dirname, safeFileName);
+                
+                // Verify file exists before requiring
+                const fs = require('fs');
+                if (fs.existsSync(absolutePath)) {
+                    const DynamicParser = require(absolutePath);
+                    console.log(`[ParserFactory] Securely loaded parser: ${safeFileName}`);
+                    return new DynamicParser(config);
+                } else {
+                    console.warn(`[ParserFactory] Dynamic parser file not found: ${safeFileName}`);
+                }
             } catch (err) {
-                console.error(`[ParserFactory] Failed to load dynamic parser from ${parserFile}:`, err.message);
-                // Fallback to static switch if dynamic load fails
+                console.error(`[ParserFactory] Failed to load dynamic parser safely:`, err.message);
+                // Fallback to static switch
             }
         }
 

@@ -16,8 +16,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Font Awesome for Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Chart.js for Analytic Dashboard -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Font Awesome for Icons -->
 </head>
 
 <body>
@@ -368,6 +367,23 @@
               <div style="font-size:10px; color:#3a6a8a; margin-top:4px;">
                 <span style="color:#5a8aaa;">RX ports (2,3):</span> frequency, sensitivity, squelch &nbsp;|&nbsp;
                 <span style="color:#e8a000;">TX ports (4-9):</span> frequency, mode, fwd power, PA temp
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="dataSourceLatitude">Latitude</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="dataSourceLatitude" placeholder="e.g. -6.1754" style="flex: 1;">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="dataSourceLongitude">Longitude</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="dataSourceLongitude" placeholder="e.g. 106.8272" style="flex: 1;">
+                <button type="button" class="btn btn-secondary" onclick="openMapPicker('dataSource')" title="Pick from map">
+                  <i class="fas fa-map-marker-alt"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -929,10 +945,6 @@
           <i class="fas fa-history"></i>
           <span>History Logs</span>
         </a>
-        <a href="#" class="nav-item hidden-initial" data-section="analytics-dashboard" id="analyticsDashboardNavItem">
-          <i class="fas fa-chart-line"></i>
-          <span>Analytic Dashboard</span>
-        </a>
         <a href="#" class="nav-item hidden-initial" data-section="users" id="usersNavItem">
           <i class="fas fa-users"></i>
           <span>User Management</span>
@@ -947,10 +959,6 @@
         <a href="#" class="nav-item hidden-initial" data-section="network-tools" id="networkToolsNavItem">
           <i class="fas fa-network-wired"></i>
           <span>Network Tools</span>
-        </a>
-        <a href="#" class="nav-item hidden-initial" data-section="network-monitor" id="networkMonitorNavItem">
-          <i class="fas fa-chart-line"></i>
-          <span>Network Monitor</span>
         </a>
         <!-- Threshold Settings moved to Equipment Templates -->
         <!-- <a href="#" class="nav-item" data-section="threshold-settings" id="thresholdSettingsNavItem">
@@ -2255,160 +2263,6 @@
         </div>
       </section>
 
-      <!-- Network Monitoring Dashboard Section -->
-      <section class="content-section hidden" id="network-monitorSection">
-        <div class="crud-container">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="margin: 0;"><i class="fas fa-chart-line"></i> Network Monitor Dashboard</h2>
-            <button class="btn btn-primary" onclick="initNetworkMonitor()">
-              <i class="fas fa-sync-alt"></i> Refresh All
-            </button>
-          </div>
-
-          <div class="monitor-scroll-container">
-            <!-- System & Local Info Row -->
-            <div class="monitor-dashboard-grid" style="margin-bottom: 20px;">
-              <div class="card">
-                <div class="card-header">
-                  <h3><i class="fas fa-laptop-code"></i> System Info</h3>
-                </div>
-                <div class="card-body" id="systemNetworkInfoContent">
-                  <div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="card-header">
-                  <h3><i class="fas fa-network-wired"></i> Local Network</h3>
-                </div>
-                <div class="card-body" id="localNetworkInfoContent">
-                  <div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Interfaces & Traffic Row -->
-            <div class="monitor-dashboard-grid" style="margin-bottom: 20px;">
-              <div class="card">
-                <div class="card-header">
-                  <h3><i class="fas fa-ethernet"></i> Network Interfaces</h3>
-                </div>
-                <div class="card-body" id="networkInterfacesContent">
-                  <div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="card-header">
-                  <h3><i class="fas fa-exchange-alt"></i> Traffic Statistics</h3>
-                </div>
-                <div class="card-body" id="trafficStatsContent">
-                  <div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Connectivity Test -->
-            <div class="card" style="margin-bottom: 20px;">
-              <div class="card-header">
-                <h3><i class="fas fa-globe"></i> Connectivity Test</h3>
-                <button class="btn btn-secondary btn-sm" onclick="testConnectivity()">
-                  <i class="fas fa-vial"></i> Run Test
-                </button>
-              </div>
-              <div class="card-body" id="connectivityContent">
-                <div class="empty-state">Click "Run Test" to check connection to external hosts</div>
-              </div>
-            </div>
-
-            <!-- Connected Devices (ARP Table) -->
-            <div class="card" id="deviceScanSection">
-              <div class="card-header">
-                <h3><i class="fas fa-sitemap"></i> Connected Devices (ARP Table)</h3>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                  <span>Devices: <strong id="connectedDevicesCount">0</strong></span>
-                  <button class="btn btn-primary btn-sm" id="scanDevicesBtn" onclick="discoverNetworkDevices()">
-                    <i class="fas fa-search"></i> Scan Network
-                  </button>
-                </div>
-              </div>
-              <div class="card-body">
-                <div id="connectedDevicesContent">
-                  <div class="empty-state">Loading connected devices...</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Network Discovery Results (Scan) -->
-            <div class="card" style="margin-top: 20px;">
-              <div class="card-header">
-                <h3><i class="fas fa-binoculars"></i> Network Discovery Results</h3>
-              </div>
-              <div class="card-body" id="discoveredDevicesContent">
-                <div class="empty-state">Run "Scan Network" to discover active devices</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Analytics Dashboard Section -->
-      <section class="content-section hidden" id="analytics-dashboardSection">
-        <div class="card" style="margin-bottom: 20px;">
-          <div class="card-header">
-            <h3><i class="fas fa-filter"></i> Analytics Filters</h3>
-          </div>
-          <div class="card-body">
-            <form id="analyticsFilterForm" style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
-              <div class="form-group" style="flex: 1; min-width: 300px;">
-                <label for="analyticEquipments">Select Equipment(s)</label>
-                <div style="margin-bottom: 8px;">
-                  <input type="text" id="analyticSearch" placeholder="🔍 Search equipment name or category..." 
-                    style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
-                </div>
-                <select id="analyticEquipments" multiple style="height: 150px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
-                  <!-- dynamically populated -->
-                </select>
-                <small style="display: block; margin-top: 5px; color: var(--text-muted); font-style: italic;">
-                  Tip: Hold Ctrl (Windows) or Cmd (Mac) to select multiple items.
-                </small>
-              </div>
-              
-              <div style="display: flex; gap: 15px; flex-wrap: wrap; flex: 1;">
-                <div class="form-group">
-                  <label for="analyticStartDate">Start Date</label>
-                  <input type="date" id="analyticStartDate" required style="padding: 9px; border-radius: 6px;">
-                </div>
-                <div class="form-group">
-                  <label for="analyticEndDate">End Date</label>
-                  <input type="date" id="analyticEndDate" required style="padding: 9px; border-radius: 6px;">
-                </div>
-                <div class="form-group">
-                  <label for="analyticInterval">Aggregation Interval</label>
-                  <select id="analyticInterval" required style="padding: 9px; border-radius: 6px;">
-                    <option value="hour">Per Hour (Last 24h)</option>
-                    <option value="day" selected>Per Day (Last 7d-30d)</option>
-                    <option value="week">Per Week (Last 30d+)</option>
-                    <option value="month">Per Month (Yearly)</option>
-                  </select>
-                </div>
-                <div class="form-group" style="align-self: flex-end;">
-                  <button type="submit" class="btn btn-primary" style="padding: 10px 25px; font-weight: 600;">
-                    <i class="fas fa-sync-alt"></i> Update Charts
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3><i class="fas fa-chart-line"></i> Performance Comparison</h3>
-          </div>
-          <div class="card-body" style="position: relative; height: 50vh; width: 100%;">
-            <canvas id="analyticChart"></canvas>
-          </div>
-        </div>
-      </section>
 
     </main>
   </div>
@@ -2493,8 +2347,6 @@
   <script src="enhancements.js"></script>
   <script src="snmp-tools.js"></script>
   <script src="network-tools.js"></script>
-  <script src="network-monitoring-dashboard.js"></script>
-  <script src="analytics-dashboard.js"></script>
 
   <script src="template-app.js"></script>
 

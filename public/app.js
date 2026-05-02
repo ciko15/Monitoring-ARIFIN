@@ -267,9 +267,12 @@ window.enableMapPick = function (type) {
   let currentLng = 140.5163;
 
   // Try to get current values from the form to center map
-  const prefix = type === 'airport' ? 'airport' : 'equipment';
-  const valLat = document.getElementById(prefix + 'Lat')?.value;
-  const valLng = document.getElementById(prefix + 'Lng')?.value;
+  let prefix = 'equipment';
+  if (type === 'airport') prefix = 'airport';
+  if (type === 'dataSource') prefix = 'dataSource';
+
+  const valLat = document.getElementById(prefix + (type === 'dataSource' ? 'Latitude' : 'Lat'))?.value;
+  const valLng = document.getElementById(prefix + (type === 'dataSource' ? 'Longitude' : 'Lng'))?.value;
 
   if (valLat && !isNaN(parseFloat(valLat))) currentLat = parseFloat(valLat);
   if (valLng && !isNaN(parseFloat(valLng))) currentLng = parseFloat(valLng);
@@ -331,6 +334,9 @@ document.getElementById('confirmLocationBtn')?.addEventListener('click', () => {
     } else if (type === 'airport') {
       document.getElementById('airportLat').value = pos.lat.toFixed(6);
       document.getElementById('airportLng').value = pos.lng.toFixed(6);
+    } else if (type === 'dataSource') {
+      document.getElementById('dataSourceLatitude').value = pos.lat.toFixed(6);
+      document.getElementById('dataSourceLongitude').value = pos.lng.toFixed(6);
     }
 
     document.getElementById('mapPickerModal').classList.add('hidden');
@@ -433,6 +439,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   const supCategorySelect = document.getElementById('dataSourceSupCategory');
   const ipInput = document.getElementById('dataSourceIp');
   const portInput = document.getElementById('dataSourceUdpPort');
+  const latInput = document.getElementById('dataSourceLatitude');
+  const lngInput = document.getElementById('dataSourceLongitude');
 
   // Set Modal Title
   if (titleEl) titleEl.innerHTML = editSource
@@ -484,6 +492,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     if (ipInput) ipInput.value = editSource.ip_address || '';
     if (supCategorySelect) supCategorySelect.value = editSource.sup_category || '';
     if (portInput) portInput.value = editSource.tcp_port || editSource.udp_port || '';
+    if (latInput) latInput.value = editSource.latitude || '';
+    if (lngInput) lngInput.value = editSource.longitude || '';
     // Populate T6TV extra fields if editing
     const extra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? JSON.parse(editSource.extra_config) : editSource.extra_config) : {};
     const t6tvDiv = document.getElementById('t6tvExtraFields');
@@ -513,6 +523,13 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     clearMarcPortsCheckboxes();
     if (equipmentSelect) equipmentSelect.value = equipmentId;
     if (dataSourceIdInput) dataSourceIdInput.value = generateUniqueCode(8);
+    
+    // Default Lat/Lng from Equipment
+    const equipment = (equipmentData || []).find(e => String(e.id) === String(equipmentId));
+    if (equipment) {
+      if (latInput) latInput.value = equipment.latitude || '';
+      if (lngInput) lngInput.value = equipment.longitude || '';
+    }
   }
 
   // Handle Add New Sup Category for Data Source
@@ -582,6 +599,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       sup_category: supCategorySelect ? supCategorySelect.value : null,
       parsing_id: templateSelect.value,
       tcp_port: portInput.value,
+      latitude: latInput.value,
+      longitude: lngInput.value,
       extra_config: templateSelect.value === 'vhf_t6tv' ? JSON.stringify({
         ws_path:  document.getElementById('t6tvWsPath')    ? document.getElementById('t6tvWsPath').value    : '/ws',
         interval: document.getElementById('t6tvInterval')  ? parseInt(document.getElementById('t6tvInterval').value) || 5 : 5,
@@ -1603,12 +1622,6 @@ function initNavigation() {
       if (sectionId === 'network-tools' && typeof window.initNetworkTools === 'function') {
         window.initNetworkTools();
       }
-      if (sectionId === 'network-monitor' && typeof window.initNetworkMonitor === 'function') {
-        window.initNetworkMonitor();
-      }
-      if (sectionId === 'analytics-dashboard' && typeof window.populateEquipmentSelect === 'function') {
-        window.populateEquipmentSelect();
-      }
     }
 
     localStorage.setItem('currentSection', sectionId);
@@ -1623,7 +1636,6 @@ function initNavigation() {
         'equipment-logs': 'History Logs',
         users: 'Users',
         configure: 'System Configuration',
-        'analytics-dashboard': 'Analytic Dashboard'
       };
       hb.innerHTML = `<span>${labels[sectionId] || sectionId}</span>`;
     }

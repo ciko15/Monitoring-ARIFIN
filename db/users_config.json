@@ -8,7 +8,7 @@
   {
     "id": 2,
     "username": "super",
-    "password": "ciko1234",
+    "password": "$argon2id$v=19$m=65536,t=2,p=1$cSIn6IQw+IjS62oXNz9yRSPUiZPLWvIcSxvzAJsWzgY$2FvVoXpm9X0q82JsoSZjJlcTYotIXDCD7xT9qWkeqCw",
     "role": "superadmin"
   },
   {
