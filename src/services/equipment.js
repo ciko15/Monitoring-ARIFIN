@@ -229,6 +229,7 @@ class EquipmentService {
                 const fileLogger = require('../utils/fileLogger');
                 await fileLogger.log(equipName, equipmentId, {
                     ...parsedData,
+                    source: connectionType,
                     status,
                     _ip: parsedData._ip || (equipment ? equipment.ip || equipment.host : 'unknown')
                 });

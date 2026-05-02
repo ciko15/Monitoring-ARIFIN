@@ -21,10 +21,31 @@ class ParserFactory {
      * @returns {BaseParser|null} Parser instance or null if type not supported
      */
     static createParser(connectionType, config) {
-        switch (connectionType.toLowerCase()) {
+        // --- DYNAMIC LOADING LOGIC ---
+        // If a specific parser file is defined in the configuration, try to load it dynamically
+        const parserFile = config.parser_file || config.files;
+        if (parserFile) {
+            try {
+                const path = require('path');
+                // Resolve path relative to project root or absolute
+                const absolutePath = path.isAbsolute(parserFile) 
+                    ? parserFile 
+                    : path.resolve(process.cwd(), parserFile);
+                
+                const DynamicParser = require(absolutePath);
+                console.log(`[ParserFactory] Dynamically loaded parser from: ${absolutePath}`);
+                return new DynamicParser(config);
+            } catch (err) {
+                console.error(`[ParserFactory] Failed to load dynamic parser from ${parserFile}:`, err.message);
+                // Fallback to static switch if dynamic load fails
+            }
+        }
+
+        // --- STATIC FALLBACK ---
+        switch (connectionType?.toLowerCase()) {
             case 'rcms':
                 return new RcmsParser(config);
-                
+            
             case 'vhf_t6tv':
                 return new VhfT6tvParser(config);
 
@@ -38,7 +59,6 @@ class ParserFactory {
                 return new AsterixParser(config);
             
             case 'snmp':
-                // SNMP uses different mechanism - handled by SNMP service
                 console.warn('[ParserFactory] SNMP uses SNMP service, not parser');
                 return null;
             
@@ -55,12 +75,10 @@ class ParserFactory {
                 return new Pm5560ModbusParser(config);
 
             case 'json':
-                // JSON parser for API-based equipment
                 return new JsonParser(config);
             
             case 'tcp':
             case 'udp':
-                // Raw TCP/UDP - treat as binary
                 return new RcmsParser(config);
             
             default:

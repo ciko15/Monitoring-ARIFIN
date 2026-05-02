@@ -85,6 +85,7 @@ class FileLogger {
                 equipmentName,
                 ip: _ip,
                 status: status,
+                source: inputData.source || 'unknown',
                 data: actualData,
                 triggered: triggered
             };
@@ -164,39 +165,55 @@ class FileLogger {
                 for (const day of dayFolders) {
                     const dayPath = path.join(monthPath, day);
                     const files = (await fs.promises.readdir(dayPath))
-                        .filter(f => f.endsWith('.log'))
-                        .sort((a, b) => b.localeCompare(a));
+                        .filter(f => f.endsWith('.log'));
                     
+                    const dayEntries = [];
                     for (const file of files) {
                         const filePath = path.join(dayPath, file);
                         const content = await fs.promises.readFile(filePath, 'utf8');
                         const lines = content.split(os.EOL).filter(l => l.trim());
                         
-                        // Process lines in reverse to get newest first
                         for (let i = lines.length - 1; i >= 0; i--) {
                             try {
                                 const entry = JSON.parse(lines[i]);
                                 
                                 // Apply filters
-                                if (search && !entry.equipmentName?.toLowerCase().includes(search.toLowerCase()) && 
-                                    !entry.status?.toLowerCase().includes(search.toLowerCase())) {
-                                    continue;
+                                if (search) {
+                                    const searchLower = search.toLowerCase();
+                                    const terms = searchLower.split(' ');
+                                    const matchesAll = terms.every(term => 
+                                        entry.equipmentName?.toLowerCase().includes(term) || 
+                                        entry.status?.toLowerCase().includes(term) ||
+                                        entry.ip?.toLowerCase().includes(term) ||
+                                        entry.source?.toLowerCase().includes(term)
+                                    );
+                                    if (!matchesAll) continue;
                                 }
                                 
-                                if (startDate && new Date(entry.timestamp) < new Date(startDate)) continue;
-                                if (endDate && new Date(entry.timestamp) > new Date(endDate)) continue;
+                                if (startDate) {
+                                    const sDate = new Date(startDate);
+                                    sDate.setHours(0, 0, 0, 0);
+                                    if (new Date(entry.timestamp) < sDate) continue;
+                                }
+                                if (endDate) {
+                                    const eDate = new Date(endDate);
+                                    eDate.setHours(23, 59, 59, 999);
+                                    if (new Date(entry.timestamp) > eDate) continue;
+                                }
                                 
-                                allEntries.push(entry);
-                                
-                                // If we have enough entries for the current page and more, we can potentially stop
-                                if (allEntries.length >= page * limit + 200) break;
-                            } catch (e) { /* ignore malformed lines */ }
+                                dayEntries.push(entry);
+                            } catch (e) { /* ignore */ }
                         }
-                        if (allEntries.length >= page * limit + 200) break;
                     }
-                    if (allEntries.length >= page * limit + 200) break;
+                    
+                    // Sort day entries by timestamp descending
+                    dayEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    allEntries.push(...dayEntries);
+
+                    // If we have more than enough entries for the requested page, we can stop searching older days
+                    if (allEntries.length >= page * limit + 100) break;
                 }
-                if (allEntries.length >= page * limit + 200) break;
+                if (allEntries.length >= page * limit + 100) break;
             }
             
             // 2. Final sort

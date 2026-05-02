@@ -1772,6 +1772,12 @@
                   <option value="modbus">Modbus</option>
                   <option value="manual">Manual</option>
                 </select>
+                <div class="filter-group" style="display: flex; align-items: center; gap: 8px;">
+                  <label for="filterLogStartDate" style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">From:</label>
+                  <input type="date" id="filterLogStartDate" class="filter-select" style="width: 140px; padding: 4px 8px;">
+                  <label for="filterLogEndDate" style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">To:</label>
+                  <input type="date" id="filterLogEndDate" class="filter-select" style="width: 140px; padding: 4px 8px;">
+                </div>
                 <button class="btn btn-secondary" id="refreshLogsBtn">
                   <i class="fas fa-sync-alt"></i> Refresh
                 </button>

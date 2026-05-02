@@ -880,6 +880,7 @@ async function loadEquipment() {
     const result = await res.json();
     equipmentData = result.data || result;
     renderEquipmentTable(equipmentData);
+    updateLogEquipmentFilterOptions();
   } catch (err) { console.error('Equipment load error:', err); }
 }
 
@@ -1977,10 +1978,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Filter listeners for logs
-  ['logsPageSize', 'filterLogEquipment', 'filterLogSource'].forEach(id => {
+  ['logsPageSize', 'filterLogEquipment', 'filterLogSource', 'filterLogStartDate', 'filterLogEndDate'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => loadHistoryLogs());
   });
+
+  // Set default dates for logs (Today)
+  const today = new Date().toISOString().split('T')[0];
+  const startEl = document.getElementById('filterLogStartDate');
+  const endEl = document.getElementById('filterLogEndDate');
+  if (startEl && !startEl.value) startEl.value = today;
+  if (endEl && !endEl.value) endEl.value = today;
 });
 
 // Configure Section Logic
@@ -2194,8 +2202,10 @@ window.renderConfigTable = function (tab, data, tbody) {
         <td><span class="badge badge-secondary">${item.category}</span></td>
         <td><code>${item.files || '-'}</code></td>
         <td>
-          <button class="btn-edit" onclick="editConfig('parsing', '${item.id}')" title="Edit"><i class="fas fa-edit"></i></button>
-          <button class="btn-delete" onclick="deleteConfigData('parsing', '${item.id}')" title="Delete"><i class="fas fa-trash"></i></button>
+          <div class="action-buttons">
+            <button class="btn-edit" onclick="editConfig('parsing', '${item.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+            <button class="btn-delete" onclick="deleteConfigData('parsing', '${item.id}')" title="Delete"><i class="fas fa-trash"></i></button>
+          </div>
         </td>
       `;
     } else if (tab === 'sup-category') {
@@ -2203,8 +2213,10 @@ window.renderConfigTable = function (tab, data, tbody) {
         <td><strong>${item.category}</strong></td>
         <td>${(item.sub_categories || []).map(s => `<span class="badge badge-outline">${s}</span>`).join(' ')}</td>
         <td>
-          <button class="btn-edit" onclick="editConfig('sup-category', '${item.id || item.category}')" title="Edit"><i class="fas fa-edit"></i></button>
-          <button class="btn-delete" onclick="deleteConfigData('sup-category', '${item.id || item.category}')" title="Delete"><i class="fas fa-trash"></i></button>
+          <div class="action-buttons">
+            <button class="btn-edit" onclick="editConfig('sup-category', '${item.id || item.category}')" title="Edit"><i class="fas fa-edit"></i></button>
+            <button class="btn-delete" onclick="deleteConfigData('sup-category', '${item.id || item.category}')" title="Delete"><i class="fas fa-trash"></i></button>
+          </div>
         </td>
       `;
     } else if (tab === 'category') {
@@ -2616,11 +2628,20 @@ async function loadHistoryLogs() {
     const limit = document.getElementById('logsPageSize')?.value || 50;
     const search = document.getElementById('filterLogEquipment')?.value || '';
     const source = document.getElementById('filterLogSource')?.value || '';
+    const startDate = document.getElementById('filterLogStartDate')?.value || '';
+    const endDate = document.getElementById('filterLogEndDate')?.value || '';
 
     // We combine search and source for the backend query for now
-    const querySearch = search || source;
+    // But if we have both, we favor the specific equipment search
+    let querySearch = search;
+    if (source) {
+      querySearch = querySearch ? `${querySearch} ${source}` : source;
+    }
 
-    const url = `/api/history-logs?page=${page}&limit=${limit}&search=${encodeURIComponent(querySearch)}`;
+    let url = `/api/history-logs?page=${page}&limit=${limit}&search=${encodeURIComponent(querySearch)}`;
+    if (startDate) url += `&startDate=${startDate}`;
+    if (endDate) url += `&endDate=${endDate}`;
+
     const res = await fetch(url, { headers: getAuthHeaders() });
 
     if (res.ok) {
@@ -2633,6 +2654,23 @@ async function loadHistoryLogs() {
     console.error('Error loading history logs:', err);
     tbody.innerHTML = '<tr><td colspan="5" class="empty-state text-danger">Error: ' + err.message + '</td></tr>';
   }
+}
+
+function updateLogEquipmentFilterOptions() {
+  const select = document.getElementById('filterLogEquipment');
+  if (!select || !equipmentData) return;
+
+  const currentValue = select.value;
+  select.innerHTML = '<option value="">All Equipment</option>';
+
+  const sortedEquip = [...equipmentData].sort((a, b) => a.name.localeCompare(b.name));
+  sortedEquip.forEach(equip => {
+    const option = document.createElement('option');
+    option.value = equip.name; // Use name for backend search
+    option.textContent = equip.name;
+    if (equip.name === currentValue) option.selected = true;
+    select.appendChild(option);
+  });
 }
 
 function renderHistoryLogsTable(data) {
@@ -2652,7 +2690,10 @@ function renderHistoryLogsTable(data) {
         <tr>
           <td style="font-family: monospace; white-space: nowrap;">${date}</td>
           <td><strong>${log.equipmentName || 'Unknown'}</strong></td>
-          <td><span class="badge badge-outline">${log.ip || 'N/A'}</span></td>
+          <td>
+            <div style="font-weight: 600; text-transform: uppercase; font-size: 0.75rem;">${log.source || 'N/A'}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">${log.ip || 'N/A'}</div>
+          </td>
           <td class="text-muted" style="font-size: 0.85rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${dataPreview}</td>
           <td>
             <button class="btn-view" onclick='viewLogDetail(${JSON.stringify(log).replace(/'/g, "&apos;")})' title="View Detail"><i class="fas fa-search-plus"></i></button>
