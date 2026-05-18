@@ -5,9 +5,15 @@
  *
  * Manages one WebSocket connection per radio source.
  * Called by NetworkListener when parsing_id = 'vhf_t6tv'
+ *
+ * [FIX] Digest params (realm/nonce) sekarang di-cache per instance.
+ * HTTP GET ke radio hanya dilakukan sekali saat pertama konek, atau
+ * ketika WebSocket mendapat response 401 (nonce expired).
+ * Ini mencegah HTTP request berulang ke radio setiap reconnect yang
+ * sebelumnya menyebabkan session browser/aplikasi lain terputus.
  */
 
-const http  = require('http');
+const http   = require('http');
 const crypto = require('crypto');
 
 const CMD_GET    = '#+GET+#+';
@@ -17,7 +23,7 @@ const CMD_UPDATE = 'UPDTE';
 
 const ALL_PANES = ['BIT_STS', 'SYS_SET', 'RADIO_C', 'BIT_ESC', 'AMV_TXS', 'AMV_RXS', 'S_N_M_P'];
 
-const POLL_INTERVAL = 5000;  // ms between poll cycles
+const POLL_INTERVAL  = 30000;  // ms between poll cycles
 const RECONNECT_DELAY = 5000;
 
 function md5(text) {
@@ -64,10 +70,16 @@ class T6tvConnector {
         this.onData       = onData;
         this.onError      = onError;
 
-        this._ws       = null;
-        this._running  = false;
-        this._connected = false;
-        this._pollTimer = null;
+        this._ws          = null;
+        this._running     = false;
+        this._connected   = false;
+        this._pollTimer   = null;
+        this._pollCount   = 0;
+
+        // [FIX] Cache digest params — { realm, nonce }
+        // null  = belum pernah fetch, perlu HTTP GET
+        // false = fetch sudah dicoba tapi gagal (radio tidak respond), skip auth
+        this._digestCache = null;
     }
 
     start() {
@@ -83,20 +95,41 @@ class T6tvConnector {
         }
     }
 
+    // [FIX] Panggil ini hanya saat: pertama kali konek, atau dapat 401
+    async _fetchDigestParams() {
+        console.log(`[T6TV] Fetching digest params from ${this.host}...`);
+        const params = await getDigestParams(this.host, this.port);
+        if (params) {
+            this._digestCache = params;
+            console.log(`[T6TV] Digest params cached — realm="${params.realm}"`);
+        } else {
+            // Radio tidak kirim WWW-Authenticate, tandai false agar tidak retry terus
+            this._digestCache = false;
+            console.warn(`[T6TV] No WWW-Authenticate from ${this.host}, akan konek tanpa auth header`);
+        }
+    }
+
     async _connect() {
         if (!this._running) return;
 
         try {
-            // Get Digest params
-            const params = await getDigestParams(this.host, this.port);
+            // [FIX] Hanya fetch digest params kalau cache masih kosong (null)
+            // Kalau sudah ada (realm+nonce) atau sudah dicoba gagal (false), skip HTTP GET
+            if (this._digestCache === null) {
+                await this._fetchDigestParams();
+            }
+
             const headers = {
                 'Origin': `http://${this.host}`,
-                'Host': this.host,
+                'Host'  : this.host,
             };
-            if (params) {
+
+            if (this._digestCache) {
                 headers['Authorization'] = buildDigestHeader(
                     this.username, this.password,
-                    params.realm, params.nonce, this.wsPath
+                    this._digestCache.realm,
+                    this._digestCache.nonce,
+                    this.wsPath
                 );
             }
 
@@ -108,14 +141,14 @@ class T6tvConnector {
             this._ws.onopen = () => {
                 this._connected = true;
                 console.log(`[T6TV] Connected to ${this.host} (source: ${this.sourceId})`);
-                // Request all panes on connect - stagger by 300ms to avoid flooding device
+                // Request all panes on connect — stagger 300ms agar tidak flood device
                 ALL_PANES.forEach((pane, i) => {
                     setTimeout(() => {
                         console.log(`[T6TV] Requesting pane: ${pane} from ${this.host}`);
                         this._send(`#+GET+# ${CMD_TABLE} ${pane}`);
                     }, i * 300);
                 });
-                // Start poll loop after all initial requests sent
+                // Start poll loop setelah semua initial request terkirim
                 const startDelay = ALL_PANES.length * 300 + 500;
                 setTimeout(() => {
                     this._pollTimer = setInterval(() => this._pollCycle(), this.pollInterval);
@@ -127,14 +160,23 @@ class T6tvConnector {
             };
 
             this._ws.onerror = (err) => {
-                console.error(`[T6TV] WS error for ${this.host}:`, err.message || err);
+                const msg = err.message || String(err);
+                console.error(`[T6TV] WS error for ${this.host}:`, msg);
+
+                // [FIX] Kalau 401 — nonce sudah expired, clear cache agar fetch ulang
+                if (msg.includes('401') || msg.includes('Unauthorized')) {
+                    console.warn(`[T6TV] 401 detected for ${this.host} — clearing digest cache, will re-fetch on next connect`);
+                    this._digestCache = null;
+                }
+
                 if (this.onError) this.onError(err);
             };
 
             this._ws.onclose = () => {
                 this._connected = false;
                 if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
-                console.log(`[T6TV] Disconnected from ${this.host}, reconnecting in ${RECONNECT_DELAY/1000}s...`);
+                console.log(`[T6TV] Disconnected from ${this.host}, reconnecting in ${RECONNECT_DELAY / 1000}s...`);
+                // [FIX] Reconnect TIDAK fetch ulang digest — pakai cache yang ada
                 if (this._running) {
                     setTimeout(() => this._connect(), RECONNECT_DELAY);
                 }
@@ -149,15 +191,14 @@ class T6tvConnector {
 
     _pollCycle() {
         if (!this._connected) return;
-        this._pollCount = (this._pollCount || 0) + 1;
+        this._pollCount++;
 
-        // BIT_STS: device pushes automatically, but also poll with UPDTE for safety
+        // BIT_STS: device push otomatis, tapi poll UPDTE untuk safety
         this._send(`#+GET+# ${CMD_UPDATE} BIT_STS`);
 
-        // Other panes: use TABLE request (more reliable than UPDTE for settings panes)
-        // Rotate through non-status panes to avoid flooding (2 per cycle)
+        // Setting panes: rotasi 2 per cycle agar tidak flood device
         const settingPanes = ['SYS_SET', 'RADIO_C', 'S_N_M_P', 'AMV_TXS', 'AMV_RXS', 'BIT_ESC'];
-        const idx = (this._pollCount - 1) % settingPanes.length;
+        const idx  = (this._pollCount - 1) % settingPanes.length;
         const paneA = settingPanes[idx];
         const paneB = settingPanes[(idx + 1) % settingPanes.length];
         this._send(`#+GET+# ${CMD_TABLE} ${paneA}`);

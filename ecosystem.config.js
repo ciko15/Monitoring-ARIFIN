@@ -1,9 +1,24 @@
+const os = require('os');
+const path = require('path');
+
+// Deteksi OS dan tentukan interpreter path
+let interpreterPath = 'bun'; // default, gunakan bun dari PATH
+
+if (os.platform() === 'win32') {
+  // Windows: gunakan full path ke bun.exe
+  const userHome = process.env.USERPROFILE || process.env.HOME;
+  interpreterPath = path.join(userHome, '.bun', 'bin', 'bun.exe');
+} else if (os.platform() === 'darwin') {
+  // macOS: gunakan full path ke bun
+  const userHome = process.env.HOME;
+  interpreterPath = path.join(userHome, '.bun', 'bin', 'bun');
+}
+
 module.exports = {
   apps: [{
     name: 'monitoring-arifin',
-    script: '/Users/vickra/.bun/bin/bun',
-    args: ['src/server.ts'],
-    interpreter: 'none',
+    script: 'src/server.ts',
+    interpreter: interpreterPath,
     exec_mode: 'fork',
     instances: 1,
     autorestart: true,

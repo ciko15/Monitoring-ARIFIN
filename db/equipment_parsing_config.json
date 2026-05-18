@@ -35,7 +35,7 @@
   },
   {
     "id": "snmp_host_resources_01",
-    "name": "SNMP Host Resources",
+    "name": "Host Resources",
     "description": "Parser untuk membaca kapasitas RAM, Disk, dan CPU via SNMP",
     "files": "/src/parsers/snmp_host_resources.js",
     "category": "Data Processing"
@@ -105,7 +105,7 @@
   },
   {
     "id": "snmp_system",
-    "name": "SNMP System Monitor (Server/Workstation/Switch)",
+    "name": "System Monitor (Server/Workstation/Switch)",
     "description": "SNMP v2c HOST-RESOURCES-MIB. CPU, RAM, Disk usage via snmpwalk. Threshold Warning>=80%, Alarm>=95%.",
     "category": "Data Processing",
     "files": "/src/parsers/snmp_system.js",

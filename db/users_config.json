@@ -2,7 +2,7 @@
   {
     "id": 1,
     "username": "admin",
-    "password": "ciko",
+    "password": "$argon2id$v=19$m=65536,t=2,p=1$teVptLpZs+SSiGsEPBUDl8i9BnNukjSvr089IIj7Ay4$ZGHyOv6+Vmq0dMri/jOoRJNaOI6i3WYCrhyL41570OM",
     "role": "admin"
   },
   {
@@ -17,5 +17,12 @@
     "name": "Vickra Anugrah ",
     "role": "user",
     "id": 1777678425048
+  },
+  {
+    "username": "Electrical",
+    "password": "$argon2id$v=19$m=65536,t=2,p=1$VCLwoU/0YxKcuBN+Z6k/QbGQvPlJwOck6Dlw+Lh0T/0$XBNEHUwZIjKAaeXSfhOmPhgEdQcbdU2c59iUP9GhZPs",
+    "name": "Simon Sapan Sampebua",
+    "role": "user",
+    "id": 1778589119071
   }
 ]

@@ -376,14 +376,14 @@ async function loadParsingConfig() {
     const res = await fetch(`${API_URL}/config/parsings`, {
       headers: getAuthHeaders()
     });
-    
+
     if (!res.ok) {
       console.error(`Failed to load parsing config: ${res.status} ${res.statusText}`);
       const errorText = await res.text().catch(() => '');
       console.error('Error details:', errorText);
       return [];
     }
-    
+
     const data = await res.json();
     const parsingList = Array.isArray(data) ? data : (data.data || []);
     console.log(`[Config] Loaded ${parsingList.length} parsing templates`);
@@ -450,7 +450,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   // Populate equipmentSelect
   if (equipmentSelect) {
     const sortedEquip = (equipmentData || []).sort((a, b) => a.name.localeCompare(b.name));
-    equipmentSelect.innerHTML = '<option value="">Pilih Equipment</option>' + 
+    equipmentSelect.innerHTML = '<option value="">Pilih Equipment</option>' +
       sortedEquip.map(e => `<option value="${e.id}">${e.name} (${e.code || e.id})</option>`).join('');
     equipmentSelect.value = equipmentId;
 
@@ -470,16 +470,16 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     supCategoriesData.forEach(cat => {
       if (cat.sub_categories) cat.sub_categories.forEach(sub => allSubs.add(sub));
     });
-    
+
     // Ensure the current equipment's sup_category is also in the list
     const equipment = (equipmentData || []).find(e => String(e.id) === String(equipmentId));
     if (equipment && equipment.sup_category) {
       allSubs.add(equipment.sup_category);
     }
-    
-    supCategorySelect.innerHTML = '<option value="">Pilih Sub Kategori</option>' + 
+
+    supCategorySelect.innerHTML = '<option value="">Pilih Sub Kategori</option>' +
       Array.from(allSubs).sort().map(sub => `<option value="${sub}">${sub}</option>`).join('');
-    
+
     // Set initial value for new source
     if (!editSource && equipment && equipment.sup_category) {
       supCategorySelect.value = equipment.sup_category;
@@ -499,10 +499,10 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     const t6tvDiv = document.getElementById('t6tvExtraFields');
     if (editSource.parsing_id === 'vhf_t6tv' && t6tvDiv) {
       t6tvDiv.style.display = 'block';
-      document.getElementById('t6tvWsPath').value    = extra.ws_path  || '/ws';
-      document.getElementById('t6tvInterval').value  = extra.interval || 5;
-      document.getElementById('t6tvUsername').value  = extra.username || 'admin';
-      document.getElementById('t6tvPassword').value  = extra.password || 'admin';
+      document.getElementById('t6tvWsPath').value = extra.ws_path || '/ws';
+      document.getElementById('t6tvInterval').value = extra.interval || 5;
+      document.getElementById('t6tvUsername').value = extra.username || 'admin';
+      document.getElementById('t6tvPassword').value = extra.password || 'admin';
       if (portInput && !portInput.value) portInput.value = '80';
     } else if (t6tvDiv) {
       t6tvDiv.style.display = 'none';
@@ -523,7 +523,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     clearMarcPortsCheckboxes();
     if (equipmentSelect) equipmentSelect.value = equipmentId;
     if (dataSourceIdInput) dataSourceIdInput.value = generateUniqueCode(8);
-    
+
     // Default Lat/Lng from Equipment
     const equipment = (equipmentData || []).find(e => String(e.id) === String(equipmentId));
     if (equipment) {
@@ -568,7 +568,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const isSelected = editSource && String(editSource.parsing_id) === String(p.id);
       return `<option value="${p.id}" ${isSelected ? 'selected' : ''}>${p.name}</option>`;
     });
-    
+
     templateSelect.innerHTML = '<option value="">Pilih Template</option>' + options.join('');
     console.log(`[UI] Populated ${options.length} options into template selector`);
   }
@@ -602,14 +602,21 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       latitude: latInput.value,
       longitude: lngInput.value,
       extra_config: templateSelect.value === 'vhf_t6tv' ? JSON.stringify({
-        ws_path:  document.getElementById('t6tvWsPath')    ? document.getElementById('t6tvWsPath').value    : '/ws',
-        interval: document.getElementById('t6tvInterval')  ? parseInt(document.getElementById('t6tvInterval').value) || 5 : 5,
-        username: document.getElementById('t6tvUsername')  ? document.getElementById('t6tvUsername').value  : 'admin',
-        password: document.getElementById('t6tvPassword')  ? document.getElementById('t6tvPassword').value  : 'admin',
+        ws_path: document.getElementById('t6tvWsPath') ? document.getElementById('t6tvWsPath').value : '/ws',
+        interval: document.getElementById('t6tvInterval') ? parseInt(document.getElementById('t6tvInterval').value) || 5 : 5,
+        username: document.getElementById('t6tvUsername') ? document.getElementById('t6tvUsername').value : 'admin',
+        password: document.getElementById('t6tvPassword') ? document.getElementById('t6tvPassword').value : 'admin',
       }) : null,
       // MARC RSE: simpan marc_ports langsung di root object (bukan extra_config)
       ...(templateSelect.value === 'vhf_marc_rse' ? { marc_ports: getMarcPortsFromCheckboxes() } : {}),
-      ...(templateSelect.value === 'vhf_marc_rse' ? { poll_interval: 30 } : {})
+      ...(templateSelect.value === 'vhf_marc_rse' ? { poll_interval: 30 } : {}),
+      // SNMP System: isi default parameter SNMP
+      ...(templateSelect.value === 'snmp_system' ? {
+        protocol: 'snmp',
+        community: 'public',
+        snmp_version: '2c',
+        poll_interval: 60
+      } : {})
     };
 
     try {
@@ -912,30 +919,36 @@ function renderEquipmentTable(data) {
     return;
   }
 
-  tbody.innerHTML = data.map(item => `
-    <tr>
-      <td style="text-align: center;">
-        <span class="status-badge ${item.isActive !== false ? 'Active' : 'Inactive'}">
-          ${item.isActive !== false ? 'Active' : 'Inactive'}
-        </span>
-      </td>
-      <td style="text-align: center;">${item.name}</td>
-      <td style="text-align: center;">${item.category} (${item.sup_category || '-'})</td>
-      <td style="text-align: center;">${item.merk || '-'} / ${item.type || '-'}</td>
-      <td style="text-align: center;">${item.lat}, ${item.lng}</td>
-      <td style="text-align: center; white-space: nowrap;">
-        <button class="btn-view" title="View Details" onclick="viewEquipmentDetail(${item.id})">
-          <i class="fas fa-eye"></i>
-        </button>
-        <button class="btn-edit" title="Edit" onclick="editEquipment(${item.id})">
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="btn-delete" title="Delete" onclick="deleteEquipment('${item.id}')">
-          <i class="fas fa-trash"></i>
-        </button>
-      </td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = data.map(item => {
+    const airport = (window.airportsData || []).find(a => String(a.id) === String(item.airportId || item.branch_id));
+    const airportName = airport ? airport.name : '-';
+
+    return `
+      <tr>
+        <td style="text-align: center;">
+          <span class="status-badge ${item.isActive !== false ? 'Active' : 'Inactive'}">
+            ${item.isActive !== false ? 'Active' : 'Inactive'}
+          </span>
+        </td>
+        <td style="text-align: center;">${item.name}</td>
+        <td style="text-align: center;">${item.category} (${item.sup_category || '-'})</td>
+        <td style="text-align: center;">${airportName}</td>
+        <td style="text-align: center;">${item.merk || '-'} / ${item.type || '-'}</td>
+        <td style="text-align: center;">${item.lat}, ${item.lng}</td>
+        <td style="text-align: center; white-space: nowrap;">
+          <button class="btn-view" title="View Details" onclick="viewEquipmentDetail(${item.id})">
+            <i class="fas fa-eye"></i>
+          </button>
+          <button class="btn-edit" title="Edit" onclick="editEquipment(${item.id})">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="btn-delete" title="Delete" onclick="deleteEquipment('${item.id}')">
+            <i class="fas fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 async function handleEquipmentSubmit(e) {
@@ -951,8 +964,7 @@ async function handleEquipmentSubmit(e) {
     sup_category: document.getElementById('equipmentSupCategory').value,
     merk: document.getElementById('equipmentMerk').value,
     type: document.getElementById('equipmentType').value,
-    status: 'Active',
-    status: 'Normal',
+    status: 'Normal',  // fix: hapus duplikat key status (sebelumnya ada 'Active' dan 'Normal')
     airportId: document.getElementById('equipmentAirport').value,
     lat: latVal ? parseFloat(latVal) : null,
     lng: lngVal ? parseFloat(lngVal) : null,
@@ -978,8 +990,30 @@ async function handleEquipmentSubmit(e) {
       loadEquipment();
       loadStats();
       loadEquipmentMarkers();
+      showToast(`Equipment berhasil ${isEdit ? 'diperbarui' : 'ditambahkan'}`, 'success');
+    } else {
+      // Tampilkan pesan error spesifik dari server
+      let errMsg = `Gagal menyimpan (HTTP ${res.status})`;
+      try {
+        const errBody = await res.json();
+        if (errBody.message) errMsg = errBody.message;
+      } catch (_) {}
+
+      if (res.status === 401) {
+        errMsg = 'Sesi habis, silakan login ulang';
+      } else if (res.status === 403) {
+        errMsg = 'Akun Anda tidak memiliki izin untuk menyimpan equipment';
+      } else if (res.status === 404) {
+        errMsg = 'Equipment tidak ditemukan';
+      }
+
+      console.error('Equipment save error:', res.status, errMsg);
+      showToast(errMsg, 'error');
     }
-  } catch (err) { console.error('Form submit error:', err); }
+  } catch (err) {
+    console.error('Form submit error:', err);
+    showToast('Koneksi ke server gagal, coba lagi', 'error');
+  }
 }
 
 window.editEquipment = async function (id) {
@@ -1025,7 +1059,9 @@ window.editEquipment = async function (id) {
   if (equipmentType) equipmentType.value = item.type || '';
 
   const equipmentAirport = getElement('equipmentAirport');
-  if (equipmentAirport) equipmentAirport.value = item.airportId || '';
+  if (equipmentAirport) {
+    equipmentAirport.value = item.airportId || item.branch_id || '';
+  }
   // Status Ops is removed as requested
 
   const equipmentLat = getElement('equipmentLat');
@@ -1068,7 +1104,13 @@ window.viewEquipmentDetail = async function (id) {
   content.innerHTML = '<div class="loading-spinner">Loading details...</div>';
   document.getElementById('equipmentDetailModal').classList.remove('hidden');
 
-  try {
+  if (window.activeDetailInterval) {
+    clearInterval(window.activeDetailInterval);
+    window.activeDetailInterval = null;
+  }
+
+  const loadAndRender = async () => {
+    try {
     // 1. Fetch latest Data Sources (Authentications)
     if (typeof loadAuthentications === 'function' && (!authenticationsData || authenticationsData.length === 0)) {
       await loadAuthentications();
@@ -1118,18 +1160,18 @@ window.viewEquipmentDetail = async function (id) {
 
       const txFields = [
         { key: 'frequency_mhz', label: 'Frequency MHz' },
-        { key: 'mode',          label: 'Mode' },
-        { key: 'status',        label: 'Status' },
-        { key: 'fwd_power_w',   label: 'Fwd Power (W)' },
-        { key: 'refl_power_w',  label: 'Refl Power (W)' },
-        { key: 'pa_temp_c',     label: 'PA Temp (°C)' },
-        { key: 'modulation_pct',label: 'Modulation (%)' },
-        { key: 'supply_voltage',label: 'Supply Voltage (V)' },
+        { key: 'mode', label: 'Mode' },
+        { key: 'status', label: 'Status' },
+        { key: 'fwd_power_w', label: 'Fwd Power (W)' },
+        { key: 'refl_power_w', label: 'Refl Power (W)' },
+        { key: 'pa_temp_c', label: 'PA Temp (°C)' },
+        { key: 'modulation_pct', label: 'Modulation (%)' },
+        { key: 'supply_voltage', label: 'Supply Voltage (V)' },
       ];
       const rxFields = [
-        { key: 'frequency_mhz',     label: 'Frequency MHz' },
-        { key: 'sensitivity_dbm',   label: 'Sensitivity (dBm)' },
-        { key: 'squelch_dbm',       label: 'Squelch (dBm)' },
+        { key: 'frequency_mhz', label: 'Frequency MHz' },
+        { key: 'sensitivity_dbm', label: 'Sensitivity (dBm)' },
+        { key: 'squelch_dbm', label: 'Squelch (dBm)' },
         { key: 'rx_supply_voltage', label: 'Supply Voltage (V)' },
       ];
       const fields = isRx ? rxFields : txFields;
@@ -1153,7 +1195,7 @@ window.viewEquipmentDetail = async function (id) {
             <div class="source-header-main">
               <i class="fas fa-broadcast-tower" style="color:${isRx ? '#00d4ff' : '#e8a000'};"></i>
               <span class="source-name-text">${radioName}</span>
-              <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${isRx?'#001a33':'#1a1000'};color:${isRx?'#00d4ff':'#e8a000'};border:1px solid ${isRx?'#00d4ff':'#e8a000'};font-weight:bold;">${radioTypeLabel}</span>
+              <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${isRx ? '#001a33' : '#1a1000'};color:${isRx ? '#00d4ff' : '#e8a000'};border:1px solid ${isRx ? '#00d4ff' : '#e8a000'};font-weight:bold;">${radioTypeLabel}</span>
               <span class="source-status-pill ${statusClass}">${status}</span>
             </div>
             <div class="source-header-time">${loggedAt}</div>
@@ -1179,21 +1221,21 @@ window.viewEquipmentDetail = async function (id) {
                 ${radioEntries.map(([name, data]) => renderMarcRadioCard(name, data)).join('')}
               </div>
               ${mySources.map(src => {
-                const marcPorts = src.marc_ports || [];
-                return `
+            const marcPorts = src.marc_ports || [];
+            return `
                   <div style="margin-top:12px;padding:8px 10px;background:#0a1628;border-radius:6px;border:1px solid #1a3a5c;">
                     <div style="font-size:10px;color:#3a6a8a;letter-spacing:1px;margin-bottom:4px;">⚙ SOURCE CONFIG</div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                       <span style="font-size:11px;font-family:monospace;color:#00d4ff;">${src.name}</span>
                       <span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#001a33;color:#00d4ff;border:1px solid #00d4ff;">
-                        <i class="fas fa-network-wired"></i> ${src.ip_address}:${src.tcp_port || 950}
+                        <i class="fas fa-database"></i> ${src.ip_address}:${src.tcp_port || 950}
                       </span>
                       <span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#0d1a2d;color:#5a8aaa;">
                         Ports: ${marcPorts.length > 0 ? marcPorts.join(', ') : '-'}
                       </span>
                     </div>
                   </div>`;
-              }).join('')}
+          }).join('')}
             </div>`;
         }
       }
@@ -1217,8 +1259,8 @@ window.viewEquipmentDetail = async function (id) {
                 </thead>
                 <tbody>
                   ${nonMarcSources.map(source => {
-                    const template = (parsings || []).find(p => String(p.id) === String(source.parsing_id));
-                    return `
+          const template = (parsings || []).find(p => String(p.id) === String(source.parsing_id));
+          return `
                       <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 10px;">${source.name}</td>
                         <td style="padding: 10px; font-family: monospace;">${source.ip_address}</td>
@@ -1227,7 +1269,7 @@ window.viewEquipmentDetail = async function (id) {
                           <span class="badge badge-outline">${template ? template.name : 'Unknown'}</span>
                         </td>
                       </tr>`;
-                  }).join('')}
+        }).join('')}
                 </tbody>
               </table>
             </div>
@@ -1331,7 +1373,11 @@ window.viewEquipmentDetail = async function (id) {
         </div>
       </div>
     `;
-  }
+    }
+  };
+
+  await loadAndRender();
+  window.activeDetailInterval = setInterval(loadAndRender, 10000); // Poll every 10 seconds
 };
 
 window.deleteEquipment = async function (id) {
@@ -1504,19 +1550,19 @@ function updateAuthUI() {
     });
 
     document.querySelectorAll('.hidden-initial').forEach(el => {
-       if (!el.classList.contains('nav-item')) el.classList.remove('hidden-initial');
+      if (!el.classList.contains('nav-item')) el.classList.remove('hidden-initial');
     });
   } else {
     if (sidebarLoginBtn) sidebarLoginBtn.classList.remove('hidden');
     if (sidebarPanel) sidebarPanel.classList.add('hidden');
     if (logoutBtn) logoutBtn.classList.add('hidden');
-    
+
     document.querySelectorAll('.nav-item[data-section]').forEach(item => {
       const section = item.getAttribute('data-section');
       if (section === 'dashboard' || section === 'cabang') {
-          item.classList.remove('hidden');
+        item.classList.remove('hidden');
       } else {
-          item.classList.add('hidden');
+        item.classList.add('hidden');
       }
     });
 
@@ -1592,7 +1638,7 @@ function initNavigation() {
     };
 
     const userRole = currentUser ? currentUser.role : null;
-    
+
     if (!userRole) {
       // Guest access
       if (sectionId !== 'dashboard' && sectionId !== 'cabang') {
@@ -1676,28 +1722,28 @@ function initNavigation() {
  */
 function initDashboardInteractivity() {
   const statCards = document.querySelectorAll('#dashboardSection .stat-card');
-  
+
   statCards.forEach(card => {
     card.addEventListener('click', () => {
       const h3 = card.querySelector('h3');
       if (!h3) return;
-      
+
       const label = h3.textContent.trim();
       let targetStatus = '';
-      
+
       if (label === 'Normal') targetStatus = 'Normal';
       else if (label === 'Warning') targetStatus = 'Warning';
       else if (label === 'Alert') targetStatus = 'Alert';
       else if (label === 'Disconnect') targetStatus = 'Disconnect';
       // 'Total' means empty targetStatus (All)
-      
+
       console.log(`[Dashboard] Stat clicked: ${label} -> Switching to Cabang with filter: ${targetStatus}`);
-      
+
       // 1. Navigate to Cabang
       if (typeof window.switchSection === 'function') {
         window.switchSection('cabang');
       }
-      
+
       // 2. Apply Filter in Cabang Module
       if (window.cabangModule && typeof window.cabangModule.setFilters === 'function') {
         // We use undefined for category to keep current or reset to all depending on setFilters implementation
@@ -1726,6 +1772,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadAuthentications();
     loadEquipment();
   }
+
+  // Polling for real-time updates
+  setInterval(() => {
+    loadStats();
+    loadEquipmentMarkers();
+    if (authToken) {
+      loadEquipment();
+    }
+  }, 10000); // Every 10 seconds
 
   const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
   if (sidebarLoginBtn) {
@@ -1833,13 +1888,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     sidebarToggle.addEventListener('click', () => {
       const sidebar = document.getElementById('sidebar');
       sidebar.classList.toggle('minimized');
-
-      const icon = sidebarToggle.querySelector('i');
-      if (sidebar.classList.contains('minimized')) {
-        icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
-      } else {
-        icon.classList.replace('fa-chevron-right', 'fa-chevron-left');
-      }
     });
   }
 
@@ -1918,6 +1966,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (closeEquipmentDetailModal) {
     closeEquipmentDetailModal.addEventListener('click', () => {
       document.getElementById('equipmentDetailModal').classList.add('hidden');
+      if (window.activeDetailInterval) {
+        clearInterval(window.activeDetailInterval);
+        window.activeDetailInterval = null;
+      }
     });
   }
 

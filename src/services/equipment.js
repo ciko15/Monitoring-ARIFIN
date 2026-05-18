@@ -44,12 +44,28 @@ class EquipmentService {
             }
 
             // Fetch latest data logs - NEW
-            const logsResult = await this.db.getEquipmentLogs({ equipmentId, limit: 10 });
+            const logsResult = await this.db.getEquipmentLogs({ equipmentId, limit: 20 });
             if (logsResult && logsResult.data && logsResult.data.length > 0) {
-                // Find latest log
-                const latest = logsResult.data[0];
-                equipment.lastData = latest.data;
-                equipment.lastUpdate = latest.logged_at;
+                // Build lastData as { [source_name]: data } — satu entry per source, ambil yang terbaru
+                // Frontend (enhancements.js) mengakses eq.lastData[src.name]
+                const lastDataMap = {};
+                let latestUpdate = null;
+                for (const log of logsResult.data) {
+                    const srcName = log.source || 'default';
+                    if (!lastDataMap[srcName]) {
+                        lastDataMap[srcName] = {
+                            ...log.data,
+                            _logged_at:  log.logged_at,
+                            _status:     log.status,
+                            _parsing_id: log.connection_type,
+                        };
+                        if (!latestUpdate || log.logged_at > latestUpdate) {
+                            latestUpdate = log.logged_at;
+                        }
+                    }
+                }
+                equipment.lastData  = lastDataMap;
+                equipment.lastUpdate = latestUpdate;
             }
 
             // Legacy field mapping for compatibility
@@ -204,12 +220,31 @@ class EquipmentService {
     }
 
     /**
-     * Update equipment status
+     * Update equipment status and publish to EMS
      */
     async updateEquipmentStatus(equipmentId, status, error = null, connectionStatus = 'Disconnect') {
         try {
             await this.db.updateEquipmentStatus(equipmentId, status);
-            // We could also log status changes here if needed
+            
+            // Beritahu EMS agar UI terupdate meskipun alat sedang mati
+            const equipment = await this.db.getEquipmentById(equipmentId);
+            if (equipment) {
+                const { publishByCategory } = require('../connection/ems');
+                const category = equipment.category || 'Support';
+                
+                await publishByCategory(
+                    category,
+                    {
+                        equipmentId,
+                        equipment_name: equipment.name,
+                        status: status,
+                        message: error || (status === 'Normal' ? 'Connection healthy' : 'Device unreachable'),
+                        logged_at: new Date().toISOString(),
+                        source: 'WATCHDOG'
+                    },
+                    { requestType: 'STATUS_UPDATE' }
+                ).catch(e => console.warn('[EMS] Failed to publish status update:', e.message));
+            }
         } catch (error) {
             console.error('[EquipmentService] Error updating status:', error);
         }
@@ -218,7 +253,7 @@ class EquipmentService {
     /**
      * Save parsed data to logs
      */
-    async saveToLogs(equipmentId, parsedData, connectionType = 'snmp', status = 'Normal') {
+    async saveToLogs(equipmentId, parsedData, connectionType = 'system', status = 'Normal') {
         try {
             const equipment = await this.db.getEquipmentById(equipmentId);
             const airport = equipment ? await this.db.getAirportById(equipment.airportId) : null;
@@ -243,7 +278,7 @@ class EquipmentService {
                 equipment_name: equipName,
                 status,
                 data: parsedData.data || {},
-                source: parsedData.source || 'snmp',
+                source: parsedData.source || (parsedData._sources && parsedData._sources.length > 0 ? parsedData._sources[0].name : 'default'),
                 connection_type: connectionType,
                 airport_name: airport ? airport.name : 'Unknown',
                 airport_city: airport ? airport.city : 'Unknown',
@@ -251,13 +286,67 @@ class EquipmentService {
             };
             await this.db.createEquipmentLog(datalog);
 
-            await produceInternalMessage(
-                AirNavServiceQueue.TEST,
-                { REQUEST_TYPE: 'SERVICE_LOG' },
-                datalog
-            );
+            const { publishByCategory } = require('../connection/ems');
+            const category = equipment ? equipment.category : 'Support';
+
+            await publishByCategory(
+                category,
+                datalog,
+                { requestType: 'SERVICE_LOG' }
+            ).catch(e => console.warn('[EMS] Failed to publish log to category queue:', e.message));
         } catch (error) {
             console.error('[EquipmentService] Error saving to logs:', error);
+        }
+    }
+
+    /**
+     * Send all equipment grouped by category to EMS
+     */
+    async sendEquipmentListToEms() {
+        try {
+            const equipmentResult = await this.db.getAllEquipment();
+            const equipmentList = equipmentResult.data || (Array.isArray(equipmentResult) ? equipmentResult : []);
+            
+            const grouped = {
+                Communication: [],
+                Navigation: [],
+                Surveillance: [],
+                'Data Processing': [],
+                Support: []
+            };
+
+            for (const item of equipmentList) {
+                const cat = item.category || 'Support';
+                const dataToPush = {
+                    id: item.id,
+                    name: item.name,
+                    status: item.status,
+                    airportId: item.airportId,
+                    isActive: item.isActive
+                };
+
+                if (grouped[cat]) {
+                    grouped[cat].push(dataToPush);
+                } else {
+                    if (!grouped['Support']) grouped['Support'] = [];
+                    grouped['Support'].push(dataToPush);
+                }
+            }
+
+            const { produceInternalMessage, AirNavServiceQueue } = require('../connection/ems');
+            
+            // Send to TOC queue as requested/default
+            await produceInternalMessage(
+                AirNavServiceQueue.TOC,
+                { REQUEST_TYPE: 'EQUIPMENT_LIST' },
+                grouped
+            );
+            
+            console.log('[EquipmentService] Sent grouped equipment list to EMS');
+            return { success: true, data: grouped };
+        } catch (error) {
+            console.error('[EquipmentService] Error sending equipment list to EMS:', error);
+            return { success: false, error: error.message };
         }
     }
 

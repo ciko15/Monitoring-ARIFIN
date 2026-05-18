@@ -96,20 +96,26 @@ export async function snmpGet(oid: string, host: string, port: number | string =
         const portNum = typeof port === 'string' ? parseInt(port) : port;
         const safeHost = host.replace(/[^a-zA-Z0-9.-]/g, '');
         const safeCommunity = community.replace(/[^a-zA-Z0-9_]/g, '');
-        const safeOid = oid.replace(/[^0-9.]/g, '');
-
-        const cmd = `snmpget -v2c -c ${safeCommunity} ${safeHost}:${portNum} ${safeOid}`;
         
-        exec(cmd, { timeout: 5000 }, (error, stdout, stderr) => {
-            if (error) {
-                return reject(error);
-            }
+        // Remove leading dot if present for snmp-native
+        const cleanOid = oid.startsWith('.') ? oid.substring(1) : oid;
+        const targetOid = cleanOid.split('.').map(Number);
 
-            const match = stdout.match(/=\s*(\w+):\s*(.*)/);
-            if (match) {
-                let value = match[2].trim();
-                if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-                resolve({ value, type: match[1], oid: safeOid });
+        const snmp = require('snmp-native');
+        const session = new snmp.Session({ host: safeHost, port: portNum, community: safeCommunity, timeouts: [5000] });
+
+        session.get({ oid: targetOid }, (err: any, vbs: any[]) => {
+            session.close();
+            if (err) {
+                return reject(err);
+            }
+            if (vbs && vbs[0]) {
+                const vb = vbs[0];
+                resolve({ 
+                    value: String(vb.value), 
+                    type: String(vb.type), 
+                    oid: cleanOid 
+                });
             } else {
                 resolve(null);
             }
@@ -130,38 +136,28 @@ export async function snmpGetBulk(oids: string[], host: string, port: number | s
     const safeHost = host.replace(/[^a-zA-Z0-9.-]/g, '');
     const safeCommunity = community.replace(/[^a-zA-Z0-9_]/g, '');
     
-    // For bulk/walk, we often use the base OID
     const firstOid = oids[0];
-    const parts = firstOid.split('.');
-    
-    // Logic to determine base OID (similar to server.js)
-    let baseOid = firstOid;
-    if (parts.length > 5) {
-        baseOid = parts.slice(0, 8).join('.'); 
-    }
-    
-    const cmd = `snmpwalk -v2c -c ${safeCommunity} ${safeHost}:${portNum} ${baseOid}`;
-    
-    exec(cmd, { timeout: 15000 }, (error, stdout, stderr) => {
-      if (error) {
-        return reject(error);
+    const cleanOid = firstOid.startsWith('.') ? firstOid.substring(1) : firstOid;
+    const targetOid = cleanOid.split('.').map(Number);
+
+    const snmp = require('snmp-native');
+    const session = new snmp.Session({ host: safeHost, port: portNum, community: safeCommunity, timeouts: [15000] });
+
+    session.getSubtree({ oid: targetOid }, (err: any, vbs: any[]) => {
+      session.close();
+      if (err) {
+        return reject(err);
       }
       
       const results: any[] = [];
-      const lines = stdout.split('\n').filter(line => line.trim() && !line.includes('No more variables'));
-      
-      for (const line of lines) {
-        // More robust parsing for different snmpwalk output formats
-        const match = line.match(/::([\w.-]+)\s*=\s*(\w+):\s*(.*)/) || line.match(/iso\.([\w.-]+)\s*=\s*(\w+):\s*(.*)/);
-        if (match) {
-          let value = match[3].trim();
-          if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-          
+      if (vbs) {
+        for (const vb of vbs) {
+          const oidStr = vb.oid.join('.');
           results.push({ 
-              oid: match[1], 
-              fullOid: match[0].split('=')[0].trim(), 
-              value, 
-              type: match[2] 
+              oid: oidStr, 
+              fullOid: `.${oidStr}`, 
+              value: String(vb.value), 
+              type: String(vb.type) 
           });
         }
       }
@@ -244,7 +240,7 @@ export async function fetchAndParseData(equipment: any) {
     if (config?.enabled && mainAlive) {
         // Here we would normally perform SNMP Get/Bulk
         // Using existing determineStatus helper to check thresholds
-        const evalResult = await determineStatus(rawData, templateId || 'generic_snmp');
+        const evalResult = await determineStatus(rawData, templateId || 'generic_snmp', equipment.id);
         
         // Status Priority: Disconnect (0) > Alert (3) > Warning (2) > Normal (1)
         // We use a custom priority check to ensure Alert overrides Warning
@@ -257,7 +253,14 @@ export async function fetchAndParseData(equipment: any) {
     }
 
     return { 
-        parsedData: { ...rawData, status }, 
+        parsedData: { 
+            ...rawData, 
+            data: {
+                ...rawData,
+                reachability: sourceResults
+            },
+            status 
+        }, 
         status: status, 
         triggeredParameters: triggeredParameters,
         isProcessed: true
@@ -269,7 +272,7 @@ export async function fetchAndParseData(equipment: any) {
 /**
  * Determine status based on thresholds
  */
-export async function determineStatus(data: any, templateId: string) {
+export async function determineStatus(data: any, templateId: string, equipmentId?: any) {
     const thresholdEvaluator = require('./thresholdEvaluator');
     
     let template;
@@ -281,10 +284,10 @@ export async function determineStatus(data: any, templateId: string) {
 
     let overallStatus = 'Normal';
     let triggeredParameters: string[] = [];
+    const statusPriority: Record<string, number> = { 'Alert': 3, 'Warning': 2, 'Normal': 1, 'Disconnect': 0 };
 
+    // 1. Check against SNMP Template if available
     if (template && template.parameters && template.parameters.length > 0) {
-        const statusPriority: Record<string, number> = { 'Alert': 3, 'Warning': 2, 'Normal': 1, 'Disconnect': 0 };
-
         for (const param of template.parameters) {
             const valueObj = data[param.source] || data[param.label];
             if (!valueObj || valueObj.value === undefined) continue;
@@ -304,17 +307,60 @@ export async function determineStatus(data: any, templateId: string) {
                 overallStatus = status;
             }
         }
-        return { status: overallStatus, triggeredParameters };
     }
 
-    const defaultThresholds: Record<string, any> = {
-        temperature: { warning: 35, critical: 45 },
-        humidity: { warningLow: 30, warningHigh: 80, criticalLow: 20, criticalHigh: 90 },
-        alarmStatus: { warning: 1, critical: 2 }
-    };
+    // 2. Check against Category-based Limitations (limitation_config.json)
+    if (equipmentId) {
+        try {
+            const limitations = await db.getLimitationsByEquipment(equipmentId);
+            if (limitations && Array.isArray(limitations) && limitations.length > 0) {
+                for (const [key, valObj] of Object.entries(data) as any) {
+                    if (!valObj || (valObj.value === undefined && typeof valObj !== 'number' && typeof valObj !== 'string')) continue;
+                    
+                    const value = valObj.value !== undefined ? valObj.value : valObj;
+                    const cleanKey = key.split('_').pop()?.toLowerCase() || key.toLowerCase();
+                    
+                    // Find matching limitation for this parameter key
+                    const limit = limitations.find((l: any) => {
+                        const limitName = l.name.toLowerCase();
+                        return limitName === cleanKey || 
+                               limitName.includes(cleanKey) || 
+                               cleanKey.includes(limitName) ||
+                               key.toLowerCase().includes(limitName);
+                    });
 
-    let thresholds = defaultThresholds;
-    if (template && (template.oidMappings || template.oid_mappings)) {
+                    if (limit) {
+                        const config = {
+                            warning_min: limit.min_warning_limit || limit.wlv,
+                            warning_max: limit.max_warning_limit || limit.whv,
+                            alarm_min: limit.min_alarm_limit || limit.alv,
+                            alarm_max: limit.max_alarm_limit || limit.ahv
+                        };
+
+                        const status = thresholdEvaluator.checkThreshold(value, config);
+                        if (status === 'Warning' || status === 'Alert') {
+                            if (!triggeredParameters.includes(key)) triggeredParameters.push(key);
+                        }
+                        if (statusPriority[status] > statusPriority[overallStatus]) {
+                            overallStatus = status;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(`[LIMITATION-EVAL-ERROR] ${equipmentId}:`, e);
+        }
+    }
+
+    // 3. Fallback to default OID mappings if status still Normal and template exists
+    if (overallStatus === 'Normal' && template && (template.oidMappings || template.oid_mappings)) {
+        const defaultThresholds: Record<string, any> = {
+            temperature: { warning: 35, critical: 45 },
+            humidity: { warningLow: 30, warningHigh: 80, criticalLow: 20, criticalHigh: 90 },
+            alarmStatus: { warning: 1, critical: 2 }
+        };
+
+        let thresholds = defaultThresholds;
         const oidMappings = template.oidMappings || template.oid_mappings;
         let pMappings = typeof oidMappings === 'string' ? JSON.parse(oidMappings) : oidMappings;
         thresholds = {};
@@ -326,33 +372,34 @@ export async function determineStatus(data: any, templateId: string) {
                 thresholds[key] = { ...thresholds[key], warningLow: mapping.warningLow, warningHigh: mapping.warningHigh, criticalLow: mapping.criticalLow, criticalHigh: mapping.criticalHigh };
             }
         }
-    }
 
-    for (const [key, valueObj] of Object.entries(data) as any) {
-        if (!valueObj || valueObj.value === undefined) continue;
-        const value = parseFloat(valueObj.value);
-        if (isNaN(value)) continue;
-        const threshold = thresholds[key];
-        if (!threshold) continue;
-        
-        if (threshold.warningLow !== undefined && threshold.warningHigh !== undefined) {
-            if (value <= threshold.criticalLow || value >= threshold.criticalHigh) {
-                overallStatus = 'Alert';
-                triggeredParameters.push(key);
-            } else if (value <= threshold.warningLow || value >= threshold.warningHigh) {
-                if (overallStatus !== 'Alert') overallStatus = 'Warning';
-                triggeredParameters.push(key);
-            }
-        } else if (threshold.criticalThreshold !== undefined) {
-            if (value >= threshold.criticalThreshold) {
-                overallStatus = 'Alert';
-                triggeredParameters.push(key);
-            } else if (threshold.warningThreshold !== undefined && value >= threshold.warningThreshold) {
-                if (overallStatus !== 'Alert') overallStatus = 'Warning';
-                triggeredParameters.push(key);
+        for (const [key, valueObj] of Object.entries(data) as any) {
+            if (!valueObj || valueObj.value === undefined) continue;
+            const value = parseFloat(valueObj.value);
+            if (isNaN(value)) continue;
+            const threshold = thresholds[key];
+            if (!threshold) continue;
+            
+            if (threshold.warningLow !== undefined && threshold.warningHigh !== undefined) {
+                if (value <= threshold.criticalLow || value >= threshold.criticalHigh) {
+                    overallStatus = 'Alert';
+                    triggeredParameters.push(key);
+                } else if (value <= threshold.warningLow || value >= threshold.warningHigh) {
+                    if (overallStatus !== 'Alert') overallStatus = 'Warning';
+                    triggeredParameters.push(key);
+                }
+            } else if (threshold.criticalThreshold !== undefined) {
+                if (value >= threshold.criticalThreshold) {
+                    overallStatus = 'Alert';
+                    triggeredParameters.push(key);
+                } else if (threshold.warningThreshold !== undefined && value >= threshold.warningThreshold) {
+                    if (overallStatus !== 'Alert') overallStatus = 'Warning';
+                    triggeredParameters.push(key);
+                }
             }
         }
     }
+
     return { status: overallStatus, triggeredParameters };
 }
 

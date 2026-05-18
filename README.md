@@ -29,6 +29,34 @@ npm run pm2:start
 npm run pm2:save
 ```
 
+### Jalankan di Produksi (Windows)
+Gunakan konfigurasi khusus Windows agar PM2 memanggil Bun dengan benar.
+```bash
+npm run pm2:start:windows
+npm run pm2:save
+```
+
+#### Setup Auto-Start di Windows
+Untuk membuat aplikasi otomatis start saat Windows boot/login:
+
+1. **Jalankan sebagai Administrator**:
+   - Klik kanan `setup_task_scheduler.bat`
+   - Pilih "Run as administrator"
+
+2. **Atau manual dengan PowerShell (as Admin)**:
+   ```powershell
+   # Buat scheduled task
+   $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c cd /d "C:\Users\CNSA SENTANI\Downloads\Monitoring-ARIFIN-main" && npx pm2 resurrect'
+   $trigger = New-ScheduledTaskTrigger -AtLogOn
+   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+   Register-ScheduledTask -TaskName 'MonitoringARIFIN_PM2' -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest -Force
+   ```
+
+3. **Verifikasi**:
+   - Buka Task Scheduler (search "Task Scheduler")
+   - Cari task "MonitoringARIFIN_PM2"
+   - Task akan berjalan saat user login dan restore PM2 processes
+
 ---
 
 ## 🔒 Sistem Keamanan & User Management

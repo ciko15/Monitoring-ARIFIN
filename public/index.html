@@ -174,11 +174,13 @@
                 </button>
               </div>
             </div>
-            <div class="form-group" style="display: none;">
-              <label for="equipmentAirport">Airport</label>
-              <select id="equipmentAirport" name="equipmentAirport" required>
-                <option value="">Select Airport</option>
-              </select>
+            <div class="form-group">
+              <label for="equipmentAirport">Airport / Location</label>
+              <div class="custom-select-wrapper">
+                <select id="equipmentAirport" name="equipmentAirport" required>
+                  <option value="">Select Airport</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="form-row">
@@ -627,7 +629,7 @@
               <label for="snmpTemplateProtocol">Protocol Type</label>
               <div class="custom-select-wrapper">
                 <select id="snmpTemplateProtocol" name="snmpTemplateProtocol" required>
-                  <option value="snmp">SNMP</option>
+                  <option value="snmp">System</option>
                   <option value="asterix">ASTERIX (RADAR)</option>
                   <option value="mqtt">MQTT</option>
                   <option value="modbus">Modbus</option>
@@ -740,7 +742,7 @@
               <label for="templateProtocol">Protocol</label>
               <div class="custom-select-wrapper">
                 <select id="templateProtocol" name="templateProtocol" required>
-                  <option value="snmp">SNMP</option>
+                  <option value="snmp">System</option>
                   <option value="modbus">Modbus</option>
                   <option value="json">JSON/API</option>
                   <option value="tcp">TCP Raw</option>
@@ -1198,7 +1200,7 @@
                       <th style="text-align: center;">Status Aktif</th>
                       <th style="text-align: center;">Name</th>
                       <th style="text-align: center;">Category</th>
-                      <th style="text-align: center; display: none;">Airport</th>
+                      <th style="text-align: center;">Airport</th>
                       <th style="text-align: center;">Merk/Type</th>
                       <th style="text-align: center;">Coordinates</th>
                       <th style="text-align: center;">Actions</th>
@@ -1774,7 +1776,7 @@
                 </select>
                 <select id="filterLogSource" class="filter-select">
                   <option value="">All Sources</option>
-                  <option value="snmp">SNMP</option>
+                  <option value="snmp">System</option>
                   <option value="json">JSON</option>
                   <option value="mqtt">MQTT</option>
                   <option value="modbus">Modbus</option>
@@ -1898,7 +1900,7 @@
                     <option value="TCP">TCP</option>
                     <option value="UDP">UDP</option>
                     <option value="ICMP">ICMP</option>
-                    <option value="SNMP">SNMP</option>
+                    <option value="SNMP">System</option>
                     <option value="HTTP">HTTP</option>
                     <option value="Modbus">Modbus</option>
                     <option value="DNS">DNS</option>
@@ -2058,6 +2060,94 @@
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SNMP Terminal (Interactive snmpwalk) -->
+          <div class="card" style="margin-top: 20px;">
+            <div class="card-header">
+              <h3><i class="fas fa-terminal"></i> SNMP Terminal</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="snmpTermIp">Device IP <span class="required-indicator">*</span></label>
+                  <input type="text" id="snmpTermIp" placeholder="e.g. 192.168.1.1">
+                </div>
+                <div class="form-group">
+                  <label for="snmpTermCommunity">Community</label>
+                  <input type="text" id="snmpTermCommunity" placeholder="default: public" value="public">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="snmpTermVersion">Version</label>
+                  <select id="snmpTermVersion">
+                    <option value="2c">v2c</option>
+                    <option value="1">v1</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="snmpTermOid">OID (Optional)</label>
+                  <input type="text" id="snmpTermOid" placeholder="e.g. 1.3.6.1.2.1.1.1.0 (Leave empty for Walk)">
+                </div>
+              </div>
+              <div class="form-actions" style="margin-top: 15px;">
+                <button class="btn btn-primary" id="btnRunSnmpWalk" onclick="runSnmpWalk()">
+                  <i class="fas fa-running"></i> Run SNMP Walk
+                </button>
+                <button class="btn btn-secondary" onclick="clearSnmpTerminal()">
+                  <i class="fas fa-trash"></i> Clear Terminal
+                </button>
+              </div>
+
+              <!-- Terminal Output -->
+              <div style="margin-top: 20px;">
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Terminal Output:</label>
+                <div id="snmpTerminalOutput" style="background: #1e1e1e; color: #00ff00; font-family: monospace; font-size: 13px; padding: 12px; border-radius: 6px; min-height: 200px; max-height: 400px; overflow-y: auto; word-break: break-all; border: 1px solid #333; white-space: pre-wrap;">
+                  $ Waiting for command...
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SNMP Scanner (NEW) -->
+          <div class="card" style="margin-top: 20px;">
+            <div class="card-header">
+              <h3><i class="fas fa-search"></i> SNMP Device Scanner</h3>
+              <div class="header-actions">
+                <button class="btn btn-primary" id="scanSnmpBtn" onclick="scanSnmpDevices()">
+                  <i class="fas fa-search"></i> Scan Network
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="snmpScanCommunity">Community String</label>
+                  <input type="text" id="snmpScanCommunity" value="public" placeholder="e.g. public">
+                </div>
+              </div>
+              <div style="margin-top: 10px;">
+                <span class="device-count">Devices Found: <strong id="snmpDeviceCount">0</strong></span>
+              </div>
+              <div class="table-responsive" style="margin-top: 15px; max-height: 300px; overflow-y: auto;">
+                <table class="monitor-table">
+                  <thead>
+                    <tr>
+                      <th>IP Address</th>
+                      <th>System Description</th>
+                      <th>Interface</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="snmpScanResultBody">
+                    <tr>
+                      <td colspan="4" class="empty-state">Click "Scan Network" to discover SNMP devices.</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

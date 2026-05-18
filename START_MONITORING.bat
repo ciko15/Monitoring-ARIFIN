@@ -18,9 +18,17 @@ cd /d "%~dp0"
 :: Buka browser otomatis setelah 3 detik
 start /min "" timeout /t 3 /nobreak >nul & start http://localhost:3100
 
-:: Jalankan server
+:: Jalankan server dengan PM2 jika tersedia.
+where pm2 >nul 2>nul
+if %errorlevel%==0 (
+    pm2 start ecosystem.windows.config.js --env production
+    goto end
+)
+
+echo PM2 tidak ditemukan, menjalankan langsung dengan Bun (tidak stabil jika jendela ditutup)...
 bun src/server.ts
 
-echo.
+:end
+ echo.
 echo  Server berhenti. Tekan tombol apapun untuk keluar...
 pause >nul

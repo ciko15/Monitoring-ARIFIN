@@ -87,22 +87,30 @@ const cabangModule = (function () {
 
   async function loadAirports() {
     try {
+      const cachedAirports = localStorage.getItem('cabang_airports_cache');
+      if (cachedAirports) {
+        airportsData = JSON.parse(cachedAirports);
+        renderAirportDropdown();
+      }
+
       const response = await fetch('/api/airports');
       airportsData = await response.json();
-
-      // Populate airport dropdown
-      if (filterAirport) {
-        // Keep "All Airports"
-        filterAirport.innerHTML = '<option value="">All Airports</option>';
-        airportsData.forEach(airport => {
-          const option = document.createElement('option');
-          option.value = airport.id;
-          option.textContent = airport.name;
-          filterAirport.appendChild(option);
-        });
-      }
+      localStorage.setItem('cabang_airports_cache', JSON.stringify(airportsData));
+      renderAirportDropdown();
     } catch (error) {
       console.error('[Cabang] Error loading airports:', error);
+    }
+  }
+
+  function renderAirportDropdown() {
+    if (filterAirport) {
+      filterAirport.innerHTML = '<option value="">All Airports</option>';
+      airportsData.forEach(airport => {
+        const option = document.createElement('option');
+        option.value = airport.id;
+        option.textContent = airport.name;
+        filterAirport.appendChild(option);
+      });
     }
   }
 

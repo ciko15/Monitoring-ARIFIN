@@ -24,7 +24,8 @@ class PacketSniffer {
   async isTcpdumpAvailable() {
     if (this.tcpdumpAvailable !== null) return this.tcpdumpAvailable;
     try {
-      const { stdout } = await execPromise('command -v tcpdump');
+      const cmd = process.platform === 'win32' ? 'where tcpdump' : 'command -v tcpdump';
+      const { stdout } = await execPromise(cmd);
       this.tcpdumpAvailable = !!stdout.trim();
     } catch (error) {
       this.tcpdumpAvailable = false;
@@ -35,7 +36,8 @@ class PacketSniffer {
   async isTsharkAvailable() {
     if (this.tsharkAvailable !== null) return this.tsharkAvailable;
     try {
-      const { stdout } = await execPromise('command -v tshark');
+      const cmd = process.platform === 'win32' ? 'where tshark' : 'command -v tshark';
+      const { stdout } = await execPromise(cmd);
       this.tsharkAvailable = !!stdout.trim();
     } catch (error) {
       this.tsharkAvailable = false;

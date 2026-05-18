@@ -299,7 +299,7 @@ async function getAllEquipment(filters = {}) {
         for (const log of latestLogs) {
           const sourceName = log.source || 'default';
           const logTime = new Date(log.logged_at).getTime();
-          const isTimedOut = (now - logTime) > (30 * 60 * 1000); // 30 minutes
+          const isTimedOut = (now - logTime) > (4 * 60 * 1000); // 4 minutes (consistent with watchdog)
 
           if (isTimedOut) {
             // Keep data but set status to Disconnect
@@ -325,6 +325,10 @@ async function getAllEquipment(filters = {}) {
         }
       }
 
+      // Only keep sources that are explicitly configured
+      const finalMergedData = {};
+      const configSourceNames = configSources.map(s => s.name);
+      
       for (const src of configSources) {
         // Ambil data yang sudah ada (mungkin isi placeholder '-')
         const sourceLog = mergedData[src.name] || {};
@@ -334,19 +338,19 @@ async function getAllEquipment(filters = {}) {
           sourceLog._logged_at = latestTimeFromFile;
         }
 
-        mergedData[src.name] = {
+        finalMergedData[src.name] = {
           ...sourceLog,
           _status: sourceLog._status || 'Disconnect'
         };
       }
 
-      item.lastData = mergedData;
+      item.lastData = finalMergedData;
       // Gunakan waktu dari file jika lebih baru atau jika data log memori kosong
       item.lastUpdate = latestTime || latestTimeFromFile;
       item.UTC_Time = item.lastUpdate ? new Date(item.lastUpdate).toISOString() : null;
 
       // Real-time Status Aggregation (Refined logic for issue requirements)
-      const sourceStatuses = Object.values(mergedData).map((src) => src._status);
+      const sourceStatuses = Object.values(finalMergedData).map((src) => src._status);
       if (sourceStatuses.length > 0) {
         if (sourceStatuses.length > 1) {
           // MULTI-SOURCE LOGIC
@@ -429,8 +433,40 @@ async function getEquipmentStatsSummary() {
 }
 
 async function getEquipmentById(id) {
-  const equipmentList = await readJson(EQUIPMENT_CONFIG_PATH);
-  return equipmentList.find(e => e.id == id) || null;
+  const list = await readJson(EQUIPMENT_CONFIG_PATH);
+  const item = list.find(e => String(e.id) === String(id));
+  if (!item) return null;
+
+  const allSources = await readJson(AUTH_CONFIG_PATH);
+  const configSources = allSources.filter(s => String(s.equipt_id) === String(id));
+
+  const latestLogs = getLatestLogsBySource(id);
+  const mergedData = {};
+  
+  // Fill with configured sources first
+  for (const src of configSources) {
+    const template = PARSER_TEMPLATES[src.parsing_id] || PARSER_TEMPLATES['default'];
+    const placeholder = {};
+    template.forEach(k => { placeholder[k] = '-'; });
+    mergedData[src.name] = { ...placeholder, _status: 'Disconnect', _logged_at: null, _parsing_id: src.parsing_id };
+  }
+
+  // Overlay with real logs
+  for (const log of latestLogs) {
+    const sourceName = log.source || 'default';
+    if (mergedData[sourceName]) {
+      mergedData[sourceName] = { ...mergedData[sourceName], ...log.data, _status: log.status, _logged_at: log.logged_at, _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id };
+    }
+  }
+
+  // Only keep sources that are explicitly configured
+  const finalMergedData = {};
+  for (const src of configSources) {
+    finalMergedData[src.name] = mergedData[src.name];
+  }
+
+  item.lastData = finalMergedData;
+  return item;
 }
 
 async function createEquipment(data) {
@@ -673,11 +709,11 @@ async function getAllLimitations() {
 
 async function getLimitationsByEquipment(equipmentId) {
   const equipment = await getEquipmentById(equipmentId);
-  if (!equipment || !equipment.sup_category) return {};
+  if (!equipment || !equipment.sup_category) return [];
 
   const data = await readJson(LIMITATION_CONFIG_PATH);
-  // Find limitation by sup_category instead of equipt_id
-  return data.find(l => l.sup_category === equipment.sup_category) || {};
+  // Return all limitations matching the equipment's sup_category
+  return data.filter(l => l.sup_category === equipment.sup_category);
 }
 
 async function createLimitation(data) {
@@ -841,10 +877,40 @@ async function createEquipmentLog(data) {
     if (idx >= 0) equipmentLogsDB.splice(idx, 1);
   }
   // Hard cap total agar memory tidak habis
-  if (equipmentLogsDB.length > 5000) equipmentLogsDB.shift();
+  if (equipmentLogsDB.length > 5000) {
+    // Pastikan kita tidak menghapus log TERAKHIR dari suatu source
+    const latestIndices = new Set();
+    const sourceSeen = new Set();
+    
+    // Scan dari belakang untuk mencari index terakhir tiap source
+    for (let i = equipmentLogsDB.length - 1; i >= 0; i--) {
+      const l = equipmentLogsDB[i];
+      const key = `${l.equipmentId}::${l.source || 'default'}`;
+      if (!sourceSeen.has(key)) {
+        sourceSeen.add(key);
+        latestIndices.add(i);
+      }
+    }
+
+    // Cari index tertua yang bukan index terakhir
+    let indexToRemove = -1;
+    for (let i = 0; i < equipmentLogsDB.length; i++) {
+      if (!latestIndices.has(i)) {
+        indexToRemove = i;
+        break;
+      }
+    }
+
+    if (indexToRemove !== -1) {
+      equipmentLogsDB.splice(indexToRemove, 1);
+    } else {
+      equipmentLogsDB.shift(); // Fallback
+    }
+  }
   
-  // Persist to file
-  await writeJson(LOGS_DATA_PATH, equipmentLogsDB);
+  // Persist to file dinonaktifkan — write terlalu sering block event loop
+  // Data tetap ada di memory. Uncomment kalau butuh persist antar restart.
+  // await writeJson(LOGS_DATA_PATH, equipmentLogsDB);
   
   return log;
 }

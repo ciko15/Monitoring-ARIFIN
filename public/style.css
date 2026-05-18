@@ -725,6 +725,10 @@ body {
   flex-direction: column;
 }
 
+.sidebar.minimized ~ .main-content {
+  margin-left: 80px;
+}
+
 /* Divider between sidebar and main content */
 .main-content::before {
   content: '';

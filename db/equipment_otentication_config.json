@@ -28,77 +28,108 @@
     "name": "TX 1 APP",
     "equipt_id": "1775111531489",
     "ip_address": "192.168.210.130",
-    "tcp_port": "80",
+    "tcp_port": "8010",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
-    "extra_config": "{\"ws_path\":\"/ws\",\"interval\":60,\"username\":\"admin\",\"password\":\"admin\"}",
+    "extra_config": {
+      "ws_path": "/ws",
+      "interval": 30,
+      "username": "admin",
+      "password": "admin"
+    },
     "sup_category": "VHF A/G",
-    "latitude": -2.572069,
-    "longitude": 140.514756
+    "latitude": "-2.572069",
+    "longitude": "140.514756"
   },
   {
     "id": 1776722121472,
     "name": "TX 2 APP",
     "equipt_id": "1775111531489",
     "ip_address": "192.168.210.131",
-    "tcp_port": "80",
+    "tcp_port": "8010",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
-    "extra_config": "{\"ws_path\":\"/ws\",\"interval\":60,\"username\":\"admin\",\"password\":\"admin\"}",
+    "extra_config": {
+      "ws_path": "/ws",
+      "interval": 30,
+      "username": "admin",
+      "password": "admin"
+    },
     "sup_category": "VHF A/G",
-    "latitude": -2.572069,
-    "longitude": 140.514756
+    "latitude": "-2.572069",
+    "longitude": "140.514756"
   },
   {
     "id": 1776723145907,
     "name": "TX SEC APP",
     "equipt_id": "1776723070329",
     "ip_address": "192.168.210.132",
-    "tcp_port": "80",
+    "tcp_port": "8010",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "sup_category": "VHF A/G",
-    "latitude": -2.572243,
-    "longitude": 140.51488
+    "latitude": "-2.572243",
+    "longitude": "140.51488",
+    "extra_config": {
+      "ws_path": "/ws",
+      "interval": 30,
+      "username": "admin",
+      "password": "admin"
+    }
   },
   {
     "id": 1776995982654,
     "name": "RX SEC APP",
     "equipt_id": "1776723070329",
     "ip_address": "192.168.210.135",
-    "tcp_port": "80",
+    "tcp_port": "8010",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
-    "extra_config": "{\"ws_path\": \"/ws\", \"interval\": 60, \"username\": \"admin\", \"password\": \"admin\"}",
+    "extra_config": {
+      "ws_path": "/ws",
+      "interval": 30,
+      "username": "admin",
+      "password": "admin"
+    },
     "sup_category": "VHF A/G",
-    "latitude": -2.572243,
-    "longitude": 140.51488
+    "latitude": "-2.572243",
+    "longitude": "140.51488"
   },
   {
     "id": 1776996021969,
     "name": "RX 1 APP",
     "equipt_id": "1775111531489",
     "ip_address": "192.168.210.133",
-    "tcp_port": "80",
+    "tcp_port": "8010",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
-    "extra_config": "{\"ws_path\": \"/ws\", \"interval\": 60, \"username\": \"admin\", \"password\": \"admin\"}",
+    "extra_config": {
+      "ws_path": "/ws",
+      "interval": 30,
+      "username": "admin",
+      "password": "admin"
+    },
     "sup_category": "VHF A/G",
-    "latitude": -2.572069,
-    "longitude": 140.514756
+    "latitude": "-2.572069",
+    "longitude": "140.514756"
   },
   {
     "id": 1776996045848,
     "name": "RX 2 APP",
     "equipt_id": "1775111531489",
     "ip_address": "192.168.210.134",
-    "tcp_port": "80",
+    "tcp_port": "8010",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
-    "extra_config": "{\"ws_path\": \"/ws\", \"interval\": 60, \"username\": \"admin\", \"password\": \"admin\"}",
+    "extra_config": {
+      "ws_path": "/ws",
+      "interval": 30,
+      "username": "admin",
+      "password": "admin"
+    },
     "sup_category": "VHF A/G",
-    "latitude": -2.572069,
-    "longitude": 140.514756
+    "latitude": "-2.572069",
+    "longitude": "140.514756"
   },
   {
     "id": 1777100000000,
@@ -164,14 +195,15 @@
   {
     "id": 1777100000005,
     "name": "PM MDP Utama",
-    "equipt_id": "1777000000100",
+    "equipt_id": "1778589960622",
     "ip_address": "192.168.26.103",
     "tcp_port": "502",
     "udp_port": null,
     "parsing_id": "pm5560_modbus",
     "sup_category": "Power Meter",
-    "latitude": -2.57835,
-    "longitude": 140.516483
+    "latitude": "-2.57835",
+    "longitude": "140.516483",
+    "extra_config": null
   },
   {
     "id": 1777100000006,
@@ -1000,7 +1032,7 @@
     "snmp_version": "2c",
     "location": "FDPS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1017,7 +1049,7 @@
     "snmp_version": "2c",
     "location": "FDPS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1034,7 +1066,7 @@
     "snmp_version": "2c",
     "location": "FDPS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1051,7 +1083,7 @@
     "snmp_version": "2c",
     "location": "SDPS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1068,7 +1100,7 @@
     "snmp_version": "2c",
     "location": "SDPS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1085,7 +1117,7 @@
     "snmp_version": "2c",
     "location": "SDPS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1102,7 +1134,7 @@
     "snmp_version": "2c",
     "location": "SNET",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1119,7 +1151,7 @@
     "snmp_version": "2c",
     "location": "SNET",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1136,7 +1168,7 @@
     "snmp_version": "2c",
     "location": "DREC",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1153,7 +1185,7 @@
     "snmp_version": "2c",
     "location": "DREC",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1170,7 +1202,7 @@
     "snmp_version": "2c",
     "location": "CMS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1187,7 +1219,7 @@
     "snmp_version": "2c",
     "location": "CMS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1204,7 +1236,7 @@
     "snmp_version": "2c",
     "location": "TMSS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1221,7 +1253,7 @@
     "snmp_version": "2c",
     "location": "TMSS",
     "poll_interval": 60,
-    "sup_category": "Server",
+    "sup_category": "ATCAS",
     "latitude": -2.572069,
     "longitude": 140.514756
   },
@@ -1234,8 +1266,12 @@
     "udp_port": null,
     "parsing_id": "snmp_system",
     "extra_config": null,
-    "sup_category": "Workstation",
-    "latitude": -2.572069,
-    "longitude": 140.514756
+    "sup_category": "ATCAS",
+    "latitude": "-2.572069",
+    "longitude": "140.514756",
+    "protocol": "snmp",
+    "community": "public",
+    "snmp_version": "2c",
+    "poll_interval": 60
   }
 ]

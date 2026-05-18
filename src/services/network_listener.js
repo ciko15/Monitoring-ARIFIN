@@ -26,12 +26,13 @@ class NetworkListenerService {
             console.log(`[NetworkListener] Found ${sources.length} total sources`);
 
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal)
-            const PORTLESS_PARSERS = ['snmp_system'];
+            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01'];
 
             for (const source of sources) {
                 // Start jika punya port ATAU parsing_id yang tidak butuh port
                 if (source.udp_port || source.tcp_port || PORTLESS_PARSERS.includes(source.parsing_id)) {
-                    await this.startListener(source);
+                    console.log(`[NetworkListener] Starting listener for ${source.name} (${source.parsing_id})`);
+                    this.startListener(source); // Tidak di-await agar berjalan paralel dan tidak memblock loop
                 }
             }
 
@@ -347,7 +348,8 @@ class NetworkListenerService {
         const pollSec = parseInt(poll_interval) || 60;
         const comm    = community || 'public';
 
-        const { pollSNMP } = require('../parsers/snmp_system');
+        const parserFile = 'snmp_system';
+        const { pollSNMP } = require(`../parsers/${parserFile}`);
 
         this.activeListeners.add(id);
         console.log(`[SNMP System] Listener started: ${name} (${ip_address})`);
@@ -360,7 +362,7 @@ class NetworkListenerService {
                 await this.equipmentService.saveToLogs(
                     equipt_id,
                     { data: result.data, source: name, _ip: ip_address },
-                    'snmp_system',
+                    source.parsing_id || 'snmp_system',
                     result.status || 'Disconnect'
                 );
             } catch (err) {
@@ -576,7 +578,7 @@ class NetworkListenerService {
         }
 
         // SNMP System Monitor (Server/Workstation/Switch)
-        if (parsing_id === 'snmp_system') {
+        if (parsing_id === 'snmp_system' || parsing_id === 'snmp_host_resources_01') {
             this.startSnmpSystemListener(source);
             return;
         }

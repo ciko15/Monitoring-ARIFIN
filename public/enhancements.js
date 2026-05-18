@@ -10,7 +10,86 @@
 
     // ── State ────────────────────────────────────────────────────────────────
     let _selectedEqId  = null;
-    let _sourcesCache  = {};   // equipmentId → [{...source}]
+    let _sourcesCache  = {};
+    window.templatesCache = [];
+    window.limitationsCache = [];
+
+    const PREVIEW_SCHEMAS = {
+        'dvor_maru_220': ['mon1_azimuth', 'mon1_carrier_power', 'mon2_azimuth', 'mon2_carrier_power', 'tx_active', 'lcu_dc_28v'],
+        'dme_maru_310_320': ['txp_active', 'txp1_m1_fwd_power', 'txp1_m1_reply_eff', 'txp2_m1_fwd_power', 'txp2_m1_reply_eff', 'ident'],
+        'vhf_t6tv': ['overall_status', 'ac_power', 'dc_power', 'dc_supply_v', 'rf_power_w', 'vswr'],
+        'snmp_host_resources_01': ['cpu_usage', 'ram_usage_pct', 'disk_usage_pct', 'sys_uptime'],
+        'asterix_radar': ['connectivity', 'radar_name', 'last_cat034', 'data_source'],
+        'asterix_adsb': ['connectivity', 'station', 'last_cat021', 'data_source'],
+        'temp_humidity_modbus': ['temperature_c', 'humidity_pct', 'status_text', 'location'],
+        'snmp_system': ['connectivity', 'sys_name', 'cpu_usage', 'ram_usage_pct', 'disk_usage_pct', 'sys_uptime'],
+        'pm5560_modbus': ['VLN_avg', 'VLL_avg', 'HZ', 'PF', 'KW', 'KWH'],
+        'ils_gp_thales421': ['GP_ANGLE', 'RF_POWER', 'DDM_COURSE', 'CARRIER_PWR', 'RF_OUT', 'MON_POWER'],
+        'ils_llz_thales421': ['CRS_RF', 'WIDTH_RF', 'NF_RF', 'CRS_SDM', 'IDENT_AM', 'FREQ_DEV']
+    };
+
+    async function loadTemplates() {
+        try {
+            const token = localStorage.getItem('authToken');
+            const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+            const res = await fetch('/api/templates', { headers });
+            const data = await res.json();
+            window.templatesCache = Array.isArray(data) ? data : [];
+        } catch(e) {
+            console.warn('[Enhancements] Failed to load templates:', e);
+        }
+    }
+
+    async function loadLimitations() {
+        try {
+            const token = localStorage.getItem('authToken');
+            const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+            const res = await fetch('/api/config/limitations', { headers });
+            const data = await res.json();
+            window.limitationsCache = Array.isArray(data) ? data : [];
+        } catch(e) {
+            console.warn('[Enhancements] Failed to load limitations:', e);
+        }
+    }
+
+    // Centralized color/threshold logic using limitation_config.json
+    function getLimitColor(supCategory, label, value) {
+        if (value === null || value === undefined || value === '—' || value === '-') return '#4a7a9a';
+        if (!window.limitationsCache || window.limitationsCache.length === 0) return '#e8f4ff';
+
+        // Clean label: "Carrier Power (W)" -> "Carrier Power"
+        // Also remove typical units like (%) or (MHz)
+        const cleanLabel = label.split('(')[0].trim().toLowerCase();
+        const numVal = parseFloat(value);
+        if (isNaN(numVal)) return '#e8f4ff';
+
+        // Find limit matching supCategory AND parameter name
+        const limit = window.limitationsCache.find(l => {
+            const limitSup = l.sup_category?.toLowerCase();
+            const targetSup = supCategory?.toLowerCase();
+            const limitName = l.name?.toLowerCase();
+            
+            // Match sup_category (if specified) and name
+            const supMatch = !targetSup || limitSup === targetSup;
+            const nameMatch = limitName === cleanLabel || 
+                             cleanLabel.includes(limitName) || 
+                             limitName.includes(cleanLabel) ||
+                             label.toLowerCase().includes(limitName);
+            
+            return supMatch && nameMatch;
+        });
+
+        if (!limit) return '#e8f4ff';
+
+        const minAlarm = limit.min_alarm_limit ? parseFloat(limit.min_alarm_limit) : -Infinity;
+        const maxAlarm = limit.max_alarm_limit ? parseFloat(limit.max_alarm_limit) : Infinity;
+        const minWarn = limit.min_warning_limit ? parseFloat(limit.min_warning_limit) : minAlarm;
+        const maxWarn = limit.max_warning_limit ? parseFloat(limit.max_warning_limit) : maxAlarm;
+
+        if (numVal < minAlarm || numVal > maxAlarm) return '#ff3355'; // Alarm
+        if (numVal < minWarn || numVal > maxWarn) return '#ffcc00';   // Warning
+        return '#00ff88'; // Normal
+    }   // equipmentId → [{...source}]
 
     // ── Wait until cabang-app renders ────────────────────────────────────────
     function waitForGrid(cb) {
@@ -92,25 +171,50 @@
 
         // Open panel
         const panel = document.getElementById('equipmentDetailPanel');
+        const overlay = document.getElementById('detailPanelOverlay');
         const body  = document.getElementById('detailPanelBody');
         if (!panel || !body) return;
 
-        body.innerHTML = `<div style="padding:20px;text-align:center;color:#4a7a9a">
-            <i class="fas fa-spinner fa-spin"></i><p style="margin-top:8px">Loading sources...</p>
-        </div>`;
+        // Show cached data immediately if available
+        if (_sourcesCache[equipmentId]) {
+            renderSourcePanel(_sourcesCache[equipmentId], body, equipmentId);
+        } else {
+            body.innerHTML = `<div style="padding:20px;text-align:center;color:#4a7a9a">
+                <i class="fas fa-spinner fa-spin"></i><p style="margin-top:8px">Loading sources...</p>
+            </div>`;
+        }
+
         panel.classList.add('open');
+        if (overlay) overlay.classList.add('open');
 
         // Update panel header
         const header = panel.querySelector('.detail-panel-header h3');
         if (header) header.innerHTML = `<i class="fas fa-satellite-dish"></i> ${eqName}`;
 
-        // Fetch sources
+        // Fetch sources + lastData terbaru secara paralel
         try {
-            const res = await fetch(`/api/otentication/${equipmentId}`);
-            const data = await res.json();
-            const sources = Array.isArray(data) ? data : [];
-            _sourcesCache[equipmentId] = sources;
-            renderSourcePanel(sources, body, equipmentId);
+            const [srcJson, dataRes] = await Promise.all([
+                fetch(`/api/otentication/${equipmentId}`).then(r => r.json()),
+                fetch(`/api/equipment/${equipmentId}`, { headers: window.getAuthHeaders ? window.getAuthHeaders() : {} })
+            ]);
+
+            // Update equipmentDataCache dengan lastData terbaru
+            if (dataRes.ok) {
+                const eqData = await dataRes.json();
+                if (eqData && eqData.lastData) {
+                    if (!window.equipmentDataCache) window.equipmentDataCache = [];
+                    const idx = window.equipmentDataCache.findIndex(e => String(e.id) === String(equipmentId));
+                    if (idx !== -1) {
+                        window.equipmentDataCache[idx].lastData = eqData.lastData;
+                    } else {
+                        window.equipmentDataCache.push(eqData);
+                    }
+                }
+            }
+
+            const finalSources = Array.isArray(srcJson) ? srcJson : [];
+            _sourcesCache[equipmentId] = finalSources;
+            renderSourcePanel(finalSources, body, equipmentId);
         } catch(e) {
             body.innerHTML = `<div style="padding:20px;color:#ff3355">Gagal memuat sources: ${e.message}</div>`;
         }
@@ -129,44 +233,64 @@
         }
 
         const cards = sources.map(src => {
-            const status    = getSourceStatus(src);
-            const statusCls = status.toLowerCase();
+            const srcStatus = getSourceStatus(src);
             const ip        = src.ip_address || '—';
             const port      = src.tcp_port || src.udp_port || '—';
-            const parserName = src.parsing_id || '—';
+            const tmpl      = window.templatesCache?.find(t => t.id === src.parsing_id);
+            const parserName = tmpl ? tmpl.name : (src.parsing_id || '—');
 
-            // Get live data preview for this source from equipment cache
+            // Get live data preview for this source based on schema or template
             let previewHtml = '';
             let lastTime = '—';
+            
             if (window.equipmentDataCache) {
                 const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
-                if (eq && eq.lastData) {
-                    const srcData = eq.lastData[src.name];
-                    if (srcData) {
-                        // Timestamp
-                        if (srcData._logged_at) {
-                            lastTime = new Date(srcData._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                        }
-                        // Preview: up to 6 first non-underscore params
-                        const previewKeys = Object.keys(srcData)
-                            .filter(k => !k.startsWith('_') && k !== 'error' && k !== 'cached')
-                            .slice(0, 6);
-                        if (previewKeys.length > 0) {
-                            previewHtml = `<div class="sp-card-preview-grid">
-                                ${previewKeys.map(k => {
-                                    const valObj = srcData[k];
-                                    const isObj  = valObj !== null && typeof valObj === 'object';
-                                    const label  = isObj && valObj.label ? valObj.label : k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                                    const val    = isObj ? (valObj.value ?? '—') : (valObj ?? '—');
-                                    const unit   = isObj && valObj.unit ? valObj.unit : '';
-                                    return `<div class="sp-card-preview-point">
-                                        <span class="sp-preview-label">${label}</span>
-                                        <span class="sp-preview-value">${val}${unit}</span>
-                                    </div>`;
-                                }).join('')}
+                const srcData = (eq && eq.lastData) ? eq.lastData[src.name] : null;
+                
+                if (srcData && srcData._logged_at) {
+                    lastTime = new Date(srcData._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                }
+
+                // Determine what keys to show
+                let keysToShow = PREVIEW_SCHEMAS[src.parsing_id] || [];
+                
+                // If no hardcoded schema, try template parameters
+                if (keysToShow.length === 0 && tmpl && tmpl.parameters) {
+                    keysToShow = tmpl.parameters.slice(0, 6).map(p => p.name || p.label);
+                }
+
+                // Fallback to first 6 keys if still empty and we have data
+                if (keysToShow.length === 0 && srcData) {
+                    keysToShow = Object.keys(srcData)
+                        .filter(k => !k.startsWith('_') && k !== 'error' && k !== 'cached')
+                        .slice(0, 6);
+                }
+
+                if (keysToShow.length > 0) {
+                    previewHtml = `<div class="sp-card-preview-grid">
+                        ${keysToShow.map(k => {
+                            const valObj = srcData ? srcData[k] : null;
+                            const isObj  = valObj !== null && typeof valObj === 'object';
+                            
+                            // Try to get label from template if available
+                            let label = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            if (tmpl && tmpl.parameters) {
+                                const param = tmpl.parameters.find(p => p.name === k || p.label === k);
+                                if (param) label = param.label || param.name;
+                            }
+                            if (isObj && valObj.label) label = valObj.label;
+
+                            const val    = isObj ? (valObj.value ?? '—') : (valObj ?? '—');
+                            const unit   = isObj && valObj.unit ? valObj.unit : '';
+                            const eqSup  = eq ? eq.sup_category : '';
+                            const valColor = getLimitColor(eqSup, label, val);
+
+                            return `<div class="sp-card-preview-point">
+                                <span class="sp-preview-label" title="${label}">${label}</span>
+                                <span class="sp-preview-value" style="color:${valColor}">${val}${unit}</span>
                             </div>`;
-                        }
-                    }
+                        }).join('')}
+                    </div>`;
                 }
             }
 
@@ -178,46 +302,39 @@
             }
 
             return `
-                <div class="sp-source-card ${statusCls}" data-src-id="${src.id}" onclick="window.openSourceDetail('${src.id}')">
-                    <!-- Card Header -->
-                    <div class="sp-card-header">
-                        <div class="sp-card-header-left">
-                            <i class="fas fa-microchip sp-card-icon"></i>
-                            <span class="sp-card-name">${src.name}</span>
-                        </div>
-                        <div class="sp-card-header-right">
-                            <span class="source-status-pill ${statusCls}">${status}</span>
-                            <div class="sp-card-actions" onclick="event.stopPropagation()">
+                <div class="sp-source-card ${srcStatus.toLowerCase()}" onclick="window.openSourceDetail('${src.id}')">
+                    <div class="sp-card-main">
+                        <div class="sp-card-header">
+                            <div class="sp-card-title">
+                                <span class="sp-status-dot ${srcStatus.toLowerCase()}"></span>
+                                <span class="sp-source-name">${src.name}</span>
                             </div>
+                            <span class="sp-status-pill ${srcStatus.toLowerCase()}">${srcStatus}</span>
+                        </div>
+                        
+                        <div class="sp-card-body">
+                            ${previewHtml}
+                        </div>
+
+                        <div class="sp-card-meta">
+                            <span class="sp-conn-badge"><i class="fas fa-database"></i> ${ip}:${port}</span>
+                            <span class="sp-conn-badge sp-parser-badge" title="${parserName}"><i class="fas fa-code"></i> ${parserName}</span>
                         </div>
                     </div>
-
-                    <!-- Connection Info -->
-                    <div class="sp-card-conn-info">
-                        <span class="sp-conn-badge"><i class="fas fa-network-wired"></i> ${ip}:${port}</span>
-                        <span class="sp-conn-badge sp-parser-badge"><i class="fas fa-code"></i> ${parserName}</span>
-                    </div>
-
-                    <!-- Live Data Preview -->
-                    ${previewHtml}
-
-                    <!-- Card Footer -->
-                    <div class="sp-card-footer">
-                        <span><i class="fas fa-clock"></i> ${lastTime}</span>
-                        <span class="sp-card-detail-hint"><i class="fas fa-expand-alt"></i> Klik untuk detail</span>
-                    </div>
-                </div>`;
+                </div>
+            `;
         }).join('');
 
         body.innerHTML = `
-            <div class="sp-panel-wrapper">
+            <div class="sp-panel-content">
                 <div class="sp-panel-toolbar">
                     <span class="sp-panel-count"><i class="fas fa-database"></i> DATA SOURCES (${sources.length})</span>
                 </div>
                 <div class="sp-sources-grid">
                     ${cards}
                 </div>
-            </div>`;
+            </div>
+        `;
 
         // Update equipment card color berdasarkan status terburuk dari semua source
         const statuses = sources.map(s => getSourceStatus(s).toLowerCase());
@@ -267,8 +384,10 @@
 
         // Get latest data from equipment cache (lastData keyed by source name)
         let latestData = null;
+        let eqSup = '';
         if (window.equipmentDataCache) {
             const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
+            eqSup = eq ? eq.sup_category : '';
             if (eq && eq.lastData) {
                 if (src.parsing_id === 'vhf_marc_rse') {
                     // 1 source = 1 radio — key di lastData = src.name
@@ -283,7 +402,7 @@
         // Build modal
         const modal   = document.getElementById('dataSourceDetailModal');
         if (!modal) { createDetailModal(); }
-        showDetailModal(src, latestData);
+        showDetailModal(src, latestData, eqSup);
     };
 
     function createDetailModal() {
@@ -304,7 +423,7 @@
         document.body.appendChild(div);
     }
 
-    function showDetailModal(src, data) {
+    function showDetailModal(src, data, eqSup) {
         let modal = document.getElementById('dataSourceDetailModal');
         if (!modal) { createDetailModal(); modal = document.getElementById('dataSourceDetailModal'); }
 
@@ -324,20 +443,20 @@
             </div>`;
         } else if (data._isMarcMulti) {
             // MARC RSE: render radio detail (1 radio per source)
-            body.innerHTML = renderMarcMultiRadioDetail(data.radios);
+            body.innerHTML = renderMarcMultiRadioDetail(data.radios, eqSup);
         } else if (data._parsing_id === 'vhf_marc_rse') {
             // MARC RSE single radio (direct lastData entry)
             const radioName = src ? src.name : 'Radio';
-            body.innerHTML = renderMarcMultiRadioDetail({ [radioName]: data });
+            body.innerHTML = renderMarcMultiRadioDetail({ [radioName]: data }, eqSup);
         } else {
-            body.innerHTML = renderDetailData(src.parsing_id, data);
+            body.innerHTML = renderDetailData(src.parsing_id, data, eqSup);
         }
 
         modal.style.display = 'flex';
     }
 
 
-    function renderMarcMultiRadioDetail(radios) {
+    function renderMarcMultiRadioDetail(radios, supCategory) {
         if (!radios || Object.keys(radios).length === 0) {
             return `<div style="text-align:center;padding:40px;color:#4a7a9a">
                 <i class="fas fa-satellite-dish fa-2x"></i>
@@ -387,7 +506,7 @@
                         const val = rd[key];
                         const display = (val === null || val === undefined || val === '-' || val === '—') ? '—' : val;
                         const isStale = status === 'Disconnect';
-                        const valColor = isStale ? '#3a5a7a' : '#e8f4ff';
+                        const valColor = isStale ? '#3a5a7a' : getLimitColor(supCategory || 'VHF A/G', label, val);
                         return `<div style="background:#0f1e35;border:1px solid #0d2a45;border-radius:5px;padding:8px 10px;">
                             <div style="font-size:9px;color:#4a7a9a;letter-spacing:1px;margin-bottom:3px;">${label}</div>
                             <div style="font-size:13px;font-weight:bold;color:${valColor};">${display}</div>
@@ -398,9 +517,9 @@
         }).join('');
     }
 
-    function renderDetailData(parserId, data) {
+    function renderDetailData(parserId, data, supCategory) {
         // Group by section based on parser
-        const sections = getDetailSections(parserId, data);
+        const sections = getDetailSections(parserId, data, supCategory);
         return sections.map(sec => `
             <div style="margin-bottom:16px">
                 <div style="font-size:10px;color:#007a9e;letter-spacing:2px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #0d2a45">${sec.title}</div>
@@ -414,8 +533,15 @@
             </div>`).join('');
     }
 
-    function getDetailSections(parserId, data) {
+    function getDetailSections(parserId, data, supCategory) {
         const sections = [];
+
+        // Helper: value color berdasarkan range min-max
+        const vc = (v, min, max) => {
+            const n = parseFloat(v);
+            if (isNaN(n)) return '#4a7a9a';
+            return (n >= min && n <= max) ? '#00ff88' : (n >= min * 0.9 && n <= max * 1.1) ? '#ffcc00' : '#ff3355';
+        };
 
         // Helper function to unflatten DVOR data
         function unflattenDvorData(flatData) {
@@ -445,110 +571,102 @@
         if (parserId === 'dvor_maru_220') {
             // Unflatten the data first
             const unflattenedData = unflattenDvorData(data);
-
-            const LIMITS = { carrier_power:[80,120], rf_input:[-25,0], azimuth:[116.2,118.2], fm_index:[15,17], am_30hz:[28,32], am_9960hz:[25,32.5], am_1020hz:[6,8] };
-            const colorVal = (key, v) => {
-                if (v === null || v === undefined || v === '-' || v === '—') return '#4a7a9a';
-                const l = LIMITS[key]; if (!l) return '#e8f4ff';
-                return (v >= l[0] && v <= l[1]) ? '#00ff88' : '#ff3355';
-            };
-            if (unflattenedData.mon1) {
-                sections.push({ title: 'MONITOR 1', params: [
-                    ['Carrier Power (W)', unflattenedData.mon1.carrier_power, colorVal('carrier_power', unflattenedData.mon1.carrier_power)],
-                    ['RF Input (dBm)',    unflattenedData.mon1.rf_input,      colorVal('rf_input',      unflattenedData.mon1.rf_input)],
-                    ['Azimuth (°)',       unflattenedData.mon1.azimuth,       colorVal('azimuth',       unflattenedData.mon1.azimuth)],
-                    ['FM Index',         unflattenedData.mon1.fm_index,      colorVal('fm_index',      unflattenedData.mon1.fm_index)],
-                    ['30Hz AM (%)',       unflattenedData.mon1.am_30hz,       colorVal('am_30hz',       unflattenedData.mon1.am_30hz)],
-                    ['9960Hz AM (%)',     unflattenedData.mon1.am_9960hz,     colorVal('am_9960hz',     unflattenedData.mon1.am_9960hz)],
-                    ['1020Hz AM (%)',     unflattenedData.mon1.am_1020hz,     colorVal('am_1020hz',     unflattenedData.mon1.am_1020hz)],
-                    ['Carrier Freq (MHz)', unflattenedData.mon1.carrier_freq, '#e8f4ff'],
-                    ['USB Freq (MHz)',    unflattenedData.mon1.usb_freq,      '#e8f4ff'],
-                    ['LSB Freq (MHz)',    unflattenedData.mon1.lsb_freq,      '#e8f4ff'],
-                    ['Ident',            unflattenedData.mon1.ident,         '#00d4ff'],
-                    ['TSG 30Hz',         unflattenedData.mon1.tsg_30hz,      '#e8f4ff'],
-                    ['TSG Azimuth',      unflattenedData.mon1.tsg_azimuth,   '#e8f4ff'],
-                ]});
-            }
-            if (unflattenedData.mon2) {
-                sections.push({ title: 'MONITOR 2', params: [
-                    ['Carrier Power (W)', unflattenedData.mon2.carrier_power, colorVal('carrier_power', unflattenedData.mon2.carrier_power)],
-                    ['RF Input (dBm)',    unflattenedData.mon2.rf_input,      colorVal('rf_input',      unflattenedData.mon2.rf_input)],
-                    ['Azimuth (°)',       unflattenedData.mon2.azimuth,       colorVal('azimuth',       unflattenedData.mon2.azimuth)],
-                    ['FM Index',         unflattenedData.mon2.fm_index,      colorVal('fm_index',      unflattenedData.mon2.fm_index)],
-                    ['30Hz AM (%)',       unflattenedData.mon2.am_30hz,       colorVal('am_30hz',       unflattenedData.mon2.am_30hz)],
-                    ['9960Hz AM (%)',     unflattenedData.mon2.am_9960hz,     colorVal('am_9960hz',     unflattenedData.mon2.am_9960hz)],
-                    ['1020Hz AM (%)',     unflattenedData.mon2.am_1020hz,     colorVal('am_1020hz',     unflattenedData.mon2.am_1020hz)],
-                    ['Carrier Freq (MHz)', unflattenedData.mon2.carrier_freq, '#e8f4ff'],
-                    ['USB Freq (MHz)',    unflattenedData.mon2.usb_freq,      '#e8f4ff'],
-                    ['LSB Freq (MHz)',    unflattenedData.mon2.lsb_freq,      '#e8f4ff'],
-                    ['Ident',            unflattenedData.mon2.ident,         '#00d4ff'],
-                ]});
-            }
-            if (unflattenedData.tx1 || unflattenedData.tx2) {
-                sections.push({ title: 'TRANSMITTER', params: [
-                    ['TX Active',        unflattenedData.tx_active ? 'TX'+unflattenedData.tx_active : '—', '#00ffcc'],
-                    ['TX1 Carrier (W)',  unflattenedData.tx1?.carrier_power, '#e8f4ff'],
-                    ['TX1 USB Sin',      unflattenedData.tx1?.usb_sin,       '#e8f4ff'],
-                    ['TX1 USB Cos',      unflattenedData.tx1?.usb_cos,       '#e8f4ff'],
-                    ['TX1 LSB Sin',      unflattenedData.tx1?.lsb_sin,       '#e8f4ff'],
-                    ['TX1 LSB Cos',      unflattenedData.tx1?.lsb_cos,       '#e8f4ff'],
-                    ['TX1 Az Offset',    unflattenedData.tx1?.az_offset,     '#e8f4ff'],
-                    ['TX1 AM 30Hz',      unflattenedData.tx1?.am_30hz,       '#e8f4ff'],
-                    ['TX1 AM 1020Hz',    unflattenedData.tx1?.am_1020hz,     '#e8f4ff'],
-                    ['TX1 Phase Offset', unflattenedData.tx1?.phase_offset,  '#e8f4ff'],
-                    ['TX1 CPA Temp (°C)', unflattenedData.tx1?.cpa_temp,     '#e8f4ff'],
-                    ['TX1 MSG Temp (°C)', unflattenedData.tx1?.msg_temp,     '#e8f4ff'],
-                    ['TX1 Ident',        unflattenedData.tx1?.ident,         '#00d4ff'],
-                    ['TX2 Carrier (W)',  unflattenedData.tx2?.carrier_power, '#e8f4ff'],
-                    ['TX2 USB Sin',      unflattenedData.tx2?.usb_sin,       '#e8f4ff'],
-                    ['TX2 USB Cos',      unflattenedData.tx2?.usb_cos,       '#e8f4ff'],
-                    ['TX2 LSB Sin',      unflattenedData.tx2?.lsb_sin,       '#e8f4ff'],
-                    ['TX2 LSB Cos',      unflattenedData.tx2?.lsb_cos,       '#e8f4ff'],
-                    ['TX2 Az Offset',    unflattenedData.tx2?.az_offset,     '#e8f4ff'],
-                    ['TX2 AM 30Hz',      unflattenedData.tx2?.am_30hz,       '#e8f4ff'],
-                    ['TX2 AM 1020Hz',    unflattenedData.tx2?.am_1020hz,     '#e8f4ff'],
-                    ['TX2 Phase Offset', unflattenedData.tx2?.phase_offset,  '#e8f4ff'],
-                    ['TX2 CPA Temp (°C)', unflattenedData.tx2?.cpa_temp,     '#e8f4ff'],
-                    ['TX2 MSG Temp (°C)', unflattenedData.tx2?.msg_temp,     '#e8f4ff'],
-                    ['TX2 Ident',        unflattenedData.tx2?.ident,         '#00d4ff'],
-                ]});
-            }
-            if (unflattenedData.lcu) {
-                const vc = (v, lo, hi) => v !== null && v !== undefined ? ((v>=lo&&v<=hi)?'#00ff88':'#ff3355') : '#4a7a9a';
-                sections.push({ title: 'LCU — POWER SUPPLY', params: [
-                    ['DC +5V',  unflattenedData.lcu.dc_5v,  vc(unflattenedData.lcu.dc_5v,  4.5, 5.5)],
-                    ['DC +7V',  unflattenedData.lcu.dc_7v,  vc(unflattenedData.lcu.dc_7v,  6.0, 8.0)],
-                    ['DC +15V', unflattenedData.lcu.dc_15v, vc(unflattenedData.lcu.dc_15v, 13.5,16.0)],
-                    ['DC +28V', unflattenedData.lcu.dc_28v, vc(unflattenedData.lcu.dc_28v, 24.0,30.0)],
-                    ['AC +28V', unflattenedData.lcu.ac_28v, '#e8f4ff'],
-                    ['MSG1 Comm', unflattenedData.lcu.msg1_comm, '#00d4ff'],
-                    ['MSG2 Comm', unflattenedData.lcu.msg2_comm, '#00d4ff'],
-                    ['MON1 Comm', unflattenedData.lcu.mon1_comm, '#00d4ff'],
-                    ['MON2 Comm', unflattenedData.lcu.mon2_comm, '#00d4ff'],
-                    ['Battery 1', unflattenedData.lcu.battery1,  '#e8f4ff'],
-                    ['Battery 2', unflattenedData.lcu.battery2,  '#e8f4ff'],
-                    ['ACDC 1',    unflattenedData.lcu.acdc1,     '#e8f4ff'],
-                    ['ACDC 2',    unflattenedData.lcu.acdc2,     '#e8f4ff'],
-                ]});
-            }
+            const sup = 'DVOR';
+            
+            // Monitor 1
+            sections.push({ title: 'MONITOR 1', params: [
+                ['Carrier Power (W)', unflattenedData.mon1?.carrier_power, getLimitColor(sup, 'Carrier Power', unflattenedData.mon1?.carrier_power)],
+                ['RF Input (dBm)',    unflattenedData.mon1?.rf_input,      getLimitColor(sup, 'RF Input',      unflattenedData.mon1?.rf_input)],
+                ['Azimuth (°)',       unflattenedData.mon1?.azimuth,       getLimitColor(sup, 'Azimuth',       unflattenedData.mon1?.azimuth)],
+                ['FM Index',         unflattenedData.mon1?.fm_index,      getLimitColor(sup, 'FM Index',      unflattenedData.mon1?.fm_index)],
+                ['30Hz AM (%)',       unflattenedData.mon1?.am_30hz,       getLimitColor(sup, 'AM 30Hz',       unflattenedData.mon1?.am_30hz)],
+                ['9960Hz AM (%)',     unflattenedData.mon1?.am_9960hz,     getLimitColor(sup, 'AM 9960Hz',     unflattenedData.mon1?.am_9960hz)],
+                ['1020Hz AM (%)',     unflattenedData.mon1?.am_1020hz,     getLimitColor(sup, 'AM 1020Hz',     unflattenedData.mon1?.am_1020hz)],
+                ['Carrier Freq (MHz)', unflattenedData.mon1?.carrier_freq, '#e8f4ff'],
+                ['USB Freq (MHz)',    unflattenedData.mon1?.usb_freq,      '#e8f4ff'],
+                ['LSB Freq (MHz)',    unflattenedData.mon1?.lsb_freq,      '#e8f4ff'],
+                ['Ident',            unflattenedData.mon1?.ident,         '#00d4ff'],
+                ['TSG 30Hz',         unflattenedData.mon1?.tsg_30hz,      '#e8f4ff'],
+                ['TSG Azimuth',      unflattenedData.mon1?.tsg_azimuth,   '#e8f4ff'],
+            ]});
+            
+            // Monitor 2
+            sections.push({ title: 'MONITOR 2', params: [
+                ['Carrier Power (W)', unflattenedData.mon2?.carrier_power, getLimitColor(supCategory || 'DVOR', 'Carrier Power', unflattenedData.mon2?.carrier_power)],
+                ['RF Input (dBm)',    unflattenedData.mon2?.rf_input,      getLimitColor(supCategory || 'DVOR', 'RF Input',      unflattenedData.mon2?.rf_input)],
+                ['Azimuth (°)',       unflattenedData.mon2?.azimuth,       getLimitColor(supCategory || 'DVOR', 'Azimuth',       unflattenedData.mon2?.azimuth)],
+                ['FM Index',         unflattenedData.mon2?.fm_index,      getLimitColor(supCategory || 'DVOR', 'FM Index',      unflattenedData.mon2?.fm_index)],
+                ['30Hz AM (%)',       unflattenedData.mon2?.am_30hz,       getLimitColor(supCategory || 'DVOR', 'AM 30Hz',       unflattenedData.mon2?.am_30hz)],
+                ['9960Hz AM (%)',     unflattenedData.mon2?.am_9960hz,     getLimitColor(supCategory || 'DVOR', 'AM 9960Hz',     unflattenedData.mon2?.am_9960hz)],
+                ['1020Hz AM (%)',     unflattenedData.mon2?.am_1020hz,     getLimitColor(supCategory || 'DVOR', 'AM 1020Hz',     unflattenedData.mon2?.am_1020hz)],
+                ['Carrier Freq (MHz)', unflattenedData.mon2?.carrier_freq, '#e8f4ff'],
+                ['USB Freq (MHz)',    unflattenedData.mon2?.usb_freq,      '#e8f4ff'],
+                ['LSB Freq (MHz)',    unflattenedData.mon2?.lsb_freq,      '#e8f4ff'],
+                ['Ident',            unflattenedData.mon2?.ident,         '#00d4ff'],
+            ]});
+            // Transmitter
+            sections.push({ title: 'TRANSMITTER', params: [
+                ['TX Active',        unflattenedData.tx_active ? 'TX'+unflattenedData.tx_active : '—', '#00ffcc'],
+                ['TX1 Carrier (W)',  unflattenedData.tx1?.carrier_power, '#e8f4ff'],
+                ['TX1 USB Sin',      unflattenedData.tx1?.usb_sin,       '#e8f4ff'],
+                ['TX1 USB Cos',      unflattenedData.tx1?.usb_cos,       '#e8f4ff'],
+                ['TX1 LSB Sin',      unflattenedData.tx1?.lsb_sin,       '#e8f4ff'],
+                ['TX1 LSB Cos',      unflattenedData.tx1?.lsb_cos,       '#e8f4ff'],
+                ['TX1 Az Offset',    unflattenedData.tx1?.az_offset,     '#e8f4ff'],
+                ['TX1 AM 30Hz',      unflattenedData.tx1?.am_30hz,       '#e8f4ff'],
+                ['TX1 AM 1020Hz',    unflattenedData.tx1?.am_1020hz,     '#e8f4ff'],
+                ['TX1 Phase Offset', unflattenedData.tx1?.phase_offset,  '#e8f4ff'],
+                ['TX1 CPA Temp (°C)', unflattenedData.tx1?.cpa_temp,     '#e8f4ff'],
+                ['TX1 MSG Temp (°C)', unflattenedData.tx1?.msg_temp,     '#e8f4ff'],
+                ['TX1 Ident',        unflattenedData.tx1?.ident,         '#00d4ff'],
+                ['TX2 Carrier (W)',  unflattenedData.tx2?.carrier_power, '#e8f4ff'],
+                ['TX2 USB Sin',      unflattenedData.tx2?.usb_sin,       '#e8f4ff'],
+                ['TX2 USB Cos',      unflattenedData.tx2?.usb_cos,       '#e8f4ff'],
+                ['TX2 LSB Sin',      unflattenedData.tx2?.lsb_sin,       '#e8f4ff'],
+                ['TX2 LSB Cos',      unflattenedData.tx2?.lsb_cos,       '#e8f4ff'],
+                ['TX2 Az Offset',    unflattenedData.tx2?.az_offset,     '#e8f4ff'],
+                ['TX2 AM 30Hz',      unflattenedData.tx2?.am_30hz,       '#e8f4ff'],
+                ['TX2 AM 1020Hz',    unflattenedData.tx2?.am_1020hz,     '#e8f4ff'],
+                ['TX2 Phase Offset', unflattenedData.tx2?.phase_offset,  '#e8f4ff'],
+                ['TX2 CPA Temp (°C)', unflattenedData.tx2?.cpa_temp,     '#e8f4ff'],
+                ['TX2 MSG Temp (°C)', unflattenedData.tx2?.msg_temp,     '#e8f4ff'],
+                ['TX2 Ident',        unflattenedData.tx2?.ident,         '#00d4ff'],
+            ]});
+            
+            // LCU
+            sections.push({ title: 'LCU — POWER SUPPLY', params: [
+                ['DC +5V',  unflattenedData.lcu?.dc_5v,  '#e8f4ff'],
+                ['DC +7V',  unflattenedData.lcu?.dc_7v,  '#e8f4ff'],
+                ['DC +15V', unflattenedData.lcu?.dc_15v, '#e8f4ff'],
+                ['DC +28V', unflattenedData.lcu?.dc_28v, '#e8f4ff'],
+                ['AC +28V', unflattenedData.lcu?.ac_28v, '#e8f4ff'],
+                ['MSG1 Comm', unflattenedData.lcu?.msg1_comm, '#00d4ff'],
+                ['MSG2 Comm', unflattenedData.lcu?.msg2_comm, '#00d4ff'],
+                ['MON1 Comm', unflattenedData.lcu?.mon1_comm, '#00d4ff'],
+                ['MON2 Comm', unflattenedData.lcu?.mon2_comm, '#00d4ff'],
+                ['Battery 1', unflattenedData.lcu?.battery1,  '#e8f4ff'],
+                ['Battery 2', unflattenedData.lcu?.battery2,  '#e8f4ff'],
+                ['ACDC 1',    unflattenedData.lcu?.acdc1,     '#e8f4ff'],
+                ['ACDC 2',    unflattenedData.lcu?.acdc2,     '#e8f4ff'],
+            ]});
         } else if (parserId === 'dme_maru_310_320') {
-            const vc = (v, lo, hi) => v !== null && v !== undefined ? ((v>=lo&&v<=hi)?'#00ff88':'#ff3355') : '#4a7a9a';
+            const sup = 'DME';
             sections.push({ title: 'STATUS', params: [
                 ['TXP Active', data.txp_active || '—', '#00ffcc'],
                 ['Ident',      data.ident || '—',      '#00d4ff'],
             ]});
             sections.push({ title: 'TXP1 — MON1', params: [
-                ['Sys Delay',   data.txp1_m1_sys_delay,  vc(data.txp1_m1_sys_delay, 49.5, 50.5)],
-                ['Reply Eff (%)', data.txp1_m1_reply_eff, vc(data.txp1_m1_reply_eff, 70, 100)],
+                ['Sys Delay',   data.txp1_m1_sys_delay,  getLimitColor(sup, 'System Delay',   data.txp1_m1_sys_delay)],
+                ['Reply Eff (%)', data.txp1_m1_reply_eff, getLimitColor(sup, 'Reply Efficiency', data.txp1_m1_reply_eff)],
                 ['Pair Rate',   data.txp1_m1_pair_rate,  '#e8f4ff'],
-                ['Fwd Power (W)', data.txp1_m1_fwd_power, vc(data.txp1_m1_fwd_power, 800, 1200)],
-                ['Dur A',       data.txp1_m1_dur_a,      vc(data.txp1_m1_dur_a, 3.0, 3.8)],
-                ['Dur B',       data.txp1_m1_dur_b,      vc(data.txp1_m1_dur_b, 3.0, 3.8)],
-                ['Rise A',      data.txp1_m1_rise_a,     vc(data.txp1_m1_rise_a, 1.5, 2.5)],
-                ['Rise B',      data.txp1_m1_rise_b,     vc(data.txp1_m1_rise_b, 1.5, 2.5)],
-                ['Decay A',     data.txp1_m1_decay_a,    vc(data.txp1_m1_decay_a, 1.5, 2.5)],
-                ['Decay B',     data.txp1_m1_decay_b,    vc(data.txp1_m1_decay_b, 1.5, 2.5)],
-                ['Spacing',     data.txp1_m1_spacing,    vc(data.txp1_m1_spacing, 11.5, 12.5)],
+                ['Fwd Power (W)', data.txp1_m1_fwd_power, getLimitColor(sup, 'Forward Power',  data.txp1_m1_fwd_power)],
+                ['Dur A',       data.txp1_m1_dur_a,      '#e8f4ff'],
+                ['Dur B',       data.txp1_m1_dur_b,      '#e8f4ff'],
+                ['Rise A',      data.txp1_m1_rise_a,     '#e8f4ff'],
+                ['Rise B',      data.txp1_m1_rise_b,     '#e8f4ff'],
+                ['Decay A',     data.txp1_m1_decay_a,    '#e8f4ff'],
+                ['Decay B',     data.txp1_m1_decay_b,    '#e8f4ff'],
+                ['Spacing',     data.txp1_m1_spacing,    getLimitColor(sup, 'Pulse Spacing',   data.txp1_m1_spacing)],
             ]});
             sections.push({ title: 'TXP1 — MON2', params: [
                 ['Sys Delay',   data.txp1_m2_sys_delay,  vc(data.txp1_m2_sys_delay, 49.5, 50.5)],
@@ -666,7 +784,7 @@
             }
 
             sections.push({ title: 'SYSTEM INFO', params: [
-                ['SNMP Name',      data.snmp_name,      accent],
+                ['System Name',      data.snmp_name,      accent],
                 ['Model',          data.model,          info],
                 ['Equipment',      data.equipment,      info],
                 ['Serial Number',  data.serial_number,  info],
@@ -674,19 +792,15 @@
                 ['Boot Installed', data.boot_installed, info],
             ]});
         } else if (parserId === 'pm5560_modbus') {
-            const vc = (v, lo, hi) => {
-                if (v === null || v === undefined || isNaN(parseFloat(v))) return '#4a7a9a';
-                const val = parseFloat(v);
-                return (val >= lo && val <= hi) ? '#00ff88' : '#ff3355';
-            };
+            const sup = 'Power Meter';
             const fn = (v, d) => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(d) : '—';
             const vn = (v) => (v != null && !isNaN(parseFloat(v))) ? '#e8f4ff' : '#4a7a9a';
 
             sections.push({ title: 'STATUS', params: [
-                ['Tegangan VLN Avg (V)',  fn(data.VLN_avg, 1), vc(data.VLN_avg, 200, 240)],
-                ['Tegangan VLL Avg (V)',  fn(data.VLL_avg, 1), vc(data.VLL_avg, 340, 430)],
-                ['Frekuensi (Hz)',        fn(data.HZ, 2),      vc(data.HZ, 49.5, 50.5)],
-                ['Power Factor',         fn(data.PF, 3),      vc(Math.abs(data.PF||0), 0.8, 1.05)],
+                ['Tegangan VLN Avg (V)',  fn(data.VLN_avg, 1), getLimitColor(sup, 'Van Voltage', data.VLN_avg)],
+                ['Tegangan VLL Avg (V)',  fn(data.VLL_avg, 1), '#e8f4ff'],
+                ['Frekuensi (Hz)',        fn(data.HZ, 2),      getLimitColor(sup, 'Frequency',   data.HZ)],
+                ['Power Factor',         fn(data.PF, 3),      getLimitColor(sup, 'Power Factor', Math.abs(data.PF||0))],
                 ['Alarm',                (data.alarmDetail && data.alarmDetail.length > 0) ? data.alarmDetail.join(' | ') : 'Tidak Ada', data.alarmDetail && data.alarmDetail.length > 0 ? '#ff3355' : '#00ff88'],
             ]});
 
@@ -717,12 +831,10 @@
                 ['Energi (kWh)',   data.KWH  != null ? (+data.KWH).toLocaleString('id-ID', {minimumFractionDigits:1}) : '—', '#00d4ff'],
             ]});
         } else if (parserId === 'snmp_system') {
+            const sup = 'RADAR'; // Assuming standard limits for servers/radar
             const isConn = data.connectivity === 'Connected';
             const cc = isConn ? '#00ff88' : '#ff3355';
-            const pctColor = v => {
-                const n = parseFloat(v);
-                return isNaN(n) ? '#4a7a9a' : n >= 95 ? '#ff3355' : n >= 80 ? '#ffcc00' : '#00ff88';
-            };
+            
             sections.push({ title: 'SISTEM', params: [
                 ['Konektivitas', data.connectivity || '—', cc],
                 ['Hostname',     data.sys_name     || '—', '#00d4ff'],
@@ -730,18 +842,27 @@
                 ['Uptime',       data.sys_uptime   || '—', '#5a8aaa'],
             ]});
             sections.push({ title: 'CPU', params: [
-                ['CPU Usage (%)', data.cpu_usage !== '—' ? `${data.cpu_usage} %` : '—', pctColor(data.cpu_usage)],
+                ['CPU Usage (%)', data.cpu_usage !== '—' ? `${data.cpu_usage} %` : '—', getLimitColor(sup, 'CPU Usage', data.cpu_usage)],
             ]});
             sections.push({ title: 'MEMORY (RAM)', params: [
                 ['RAM Total (MB)', data.ram_total_mb  || '—', '#e8f4ff'],
                 ['RAM Used (MB)',  data.ram_used_mb   || '—', '#e8f4ff'],
-                ['RAM Usage (%)',  data.ram_usage_pct !== '—' ? `${data.ram_usage_pct} %` : '—', pctColor(data.ram_usage_pct)],
+                ['RAM Usage (%)',  data.ram_usage_pct !== '—' ? `${data.ram_usage_pct} %` : '—', getLimitColor('UPS', 'RAM Usage', data.ram_usage_pct)],
             ]});
-            sections.push({ title: 'DISK', params: [
-                ['Disk Total (GB)', data.disk_total_gb  || '—', '#e8f4ff'],
-                ['Disk Used (GB)',  data.disk_used_gb   || '—', '#e8f4ff'],
-                ['Disk Usage (%)',  data.disk_usage_pct !== '—' ? `${data.disk_usage_pct} %` : '—', pctColor(data.disk_usage_pct)],
-            ]});
+            if (data.mount_points && data.mount_points.length > 0) {
+                const diskParams = data.mount_points.map(mp => [
+                    mp.mount,
+                    mp.used_str + ' / ' + mp.total_str,
+                    mp.state === 'Alarm' ? '#ff3355' : mp.state === 'Warning' ? '#ffcc00' : '#e8f4ff'
+                ]);
+                sections.push({ title: 'DISK', params: diskParams });
+            } else {
+                sections.push({ title: 'DISK', params: [
+                    ['Disk Total (GB)', data.disk_total_gb  || '—', '#e8f4ff'],
+                    ['Disk Used (GB)',  data.disk_used_gb   || '—', '#e8f4ff'],
+                    ['Disk Usage (%)',  data.disk_usage_pct !== '—' ? `${data.disk_usage_pct} %` : '—', '#e8f4ff'],
+                ]});
+            }
 
         } else if (parserId === 'asterix_radar') {
             const isConn = data.connectivity === 'Connected';
@@ -774,13 +895,12 @@
             ]});
 
         } else if (parserId === 'temp_humidity_modbus') {
+            const sup = 'SHELTER';
             const temp = parseFloat(data.temperature_c);
             const humi = parseFloat(data.humidity_pct);
-            const tempColor = isNaN(temp) ? '#4a7a9a' : temp >= 35 ? '#ff3355' : temp >= 30 ? '#ffcc00' : '#00ff88';
-            const humiColor = isNaN(humi) ? '#4a7a9a' : humi > 80 ? '#ffcc00' : '#00d4ff';
             sections.push({ title: 'SENSOR SUHU & KELEMBABAN', params: [
-                ['Suhu (°C)',       isNaN(temp) ? '—' : `${temp.toFixed(1)} °C`, tempColor],
-                ['Kelembaban (%)',  isNaN(humi) ? '—' : `${humi.toFixed(1)} %`,  humiColor],
+                ['Suhu (°C)',       isNaN(temp) ? '—' : `${temp.toFixed(1)} °C`, getLimitColor(sup, 'Temperature', temp)],
+                ['Kelembaban (%)',  isNaN(humi) ? '—' : `${humi.toFixed(1)} %`,  '#00d4ff'],
                 ['Lokasi',         data.location  || '—', '#00d4ff'],
                 ['Status',         data.status_text || '—',
                     data.status_text === 'Alarm' ? '#ff3355' : data.status_text === 'Warning' ? '#ffcc00' : '#00ff88'],
@@ -789,11 +909,71 @@
                 ['Warning threshold', '≥ 30.0 °C', '#ffcc00'],
                 ['Alarm threshold',   '≥ 35.0 °C', '#ff3355'],
             ]});
+        } else if (parserId === 'ils_gp_thales421') {
+            const sup = 'ILS-GP';
+            sections.push({ title: 'SYSTEM STATUS', params: [
+                ['TX MAIN',      data.tx_main_label || '—', '#00ffcc'],
+                ['TX STANDBY',   data.tx_stby_label || '—', '#5a8aaa'],
+                ['MODE',         data.status_label  || '—', data.is_remote ? '#ffcc00' : '#00d4ff'],
+                ['DATA SOURCE',  data.tx_data       || '—', '#3a6a8a'],
+            ]});
+            
+            const paramLabels = {
+                RF_POWER: 'CRS Pos. RF Level', DDM_COURSE: 'CRS Pos. DDM', CARRIER_PWR: 'CRS Pos. SDM',
+                CSB_POWER: 'CRS Width RF Level', DDM_CLR: 'CRS Width DDM', SBO_POWER: 'CRS Width SDM',
+                CLR_POWER: 'CLR Width RF Level', CLR_DDM: 'CLR Width DDM', CLR_SDM: 'CLR Width SDM',
+                RF_OUT: 'Nearfield Pos. RF', DDM_MON: 'Nearfield Pos. DDM', MON_POWER: 'Monitor Power',
+                GP_ANGLE: 'GP Angle'
+            };
+            
+            sections.push({ title: 'MONITORING PARAMETERS', params: Object.entries(paramLabels).map(([key, label]) => {
+                const val = data[key];
+                const unit = (key === 'GP_ANGLE') ? '°' : '%';
+                return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
+            })});
+
+        } else if (parserId === 'ils_llz_thales421') {
+            const sup = 'ILS-LLZ';
+            sections.push({ title: 'SYSTEM STATUS', params: [
+                ['TX MAIN',      data.tx_main_label || '—', '#00ffcc'],
+                ['TX STANDBY',   data.tx_stby_label || '—', '#5a8aaa'],
+            ]});
+            
+            const paramLabels = {
+                CRS_RF: 'CRS RF Level', CRS_DDM: 'CRS DDM', CRS_SDM: 'CRS SDM',
+                IDENT_AM: 'Ident AM', WIDTH_RF: 'Width RF Level', WIDTH_DDM: 'Width DDM',
+                WIDTH_SDM: 'Width SDM', CLR_RF: 'CLR RF Level', CLR_DDM: 'CLR DDM',
+                CLR_SDM: 'CLR SDM', NF_RF: 'NF RF Level', NF_DDM: 'NF DDM',
+                NF_SDM: 'NF SDM', FREQ_DEV: 'Freq Deviation'
+            };
+            
+            sections.push({ title: 'MONITORING PARAMETERS', params: Object.entries(paramLabels).map(([key, label]) => {
+                const val = data[key];
+                const unit = (key === 'FREQ_DEV') ? 'kHz' : (key.includes('DDM') ? '' : '%');
+                return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
+            })});
         } else {
-            const params = Object.entries(data)
-                .filter(([k]) => !k.startsWith('_'))
-                .map(([k, v]) => [k.replace(/_/g,' ').toUpperCase(), v, '#e8f4ff']);
-            sections.push({ title: 'DATA', params });
+            // Check if we have a template for this parser
+            const tmpl = window.templatesCache?.find(t => t.id === parserId);
+            if (tmpl && tmpl.parameters && tmpl.parameters.length > 0) {
+                const params = tmpl.parameters.map(p => {
+                    const key = p.name || p.label;
+                    const val = data[key] !== undefined ? data[key] : '—';
+                    const unit = p.unit ? ` (${p.unit})` : '';
+                    const label = p.label || p.name;
+                    return [`${label}${unit}`, val, getLimitColor(supCategory, label, val)];
+                });
+                sections.push({ title: tmpl.name || 'DATA', params });
+            } else {
+                // Fallback to existing logic: show keys present in data
+                const params = Object.entries(data)
+                    .filter(([k]) => !k.startsWith('_'))
+                    .map(([k, v]) => {
+                        const label = k.replace(/_/g,' ').toUpperCase();
+                        return [label, v, getLimitColor(supCategory, label, v)];
+                    });
+                sections.push({ title: 'DATA', params: params.length > 0 ? params : [['No data available', '—', '#4a7a9a']] });
+            }
         }
 
         return sections;
@@ -836,13 +1016,22 @@
     // ── Close panel ───────────────────────────────────────────────────────────
     function initClosePanel() {
         const closeBtn = document.getElementById('closeDetailPanel');
+        const overlay  = document.getElementById('detailPanelOverlay');
+        
+        const closeAction = () => {
+            const panel = document.getElementById('equipmentDetailPanel');
+            const overlay = document.getElementById('detailPanelOverlay');
+            if (panel) panel.classList.remove('open');
+            if (overlay) overlay.classList.remove('open');
+            document.querySelectorAll('.cabang-card').forEach(c => c.classList.remove('card-selected'));
+            _selectedEqId = null;
+        };
+
         if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                const panel = document.getElementById('equipmentDetailPanel');
-                if (panel) panel.classList.remove('open');
-                document.querySelectorAll('.cabang-card').forEach(c => c.classList.remove('card-selected'));
-                _selectedEqId = null;
-            });
+            closeBtn.addEventListener('click', closeAction);
+        }
+        if (overlay) {
+            overlay.addEventListener('click', closeAction);
         }
     }
 
@@ -978,6 +1167,57 @@
             .cabang-card.has-warning {
                 border-color: #ffcc00 !important;
             }
+
+            .sp-panel-content { padding: 14px; }
+            .sp-panel-toolbar { 
+                margin-bottom: 14px; 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center;
+                border-bottom: 1px solid #1a3a5c;
+                padding-bottom: 10px;
+            }
+            .sp-panel-count { font-size: 10px; color: #5a8aaa; letter-spacing: 1px; font-weight: bold; }
+            .sp-sources-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            @media (min-width: 1200px) {
+                .sp-sources-grid { grid-template-columns: 1fr 1fr; }
+            }
+
+            .sp-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+            .sp-card-title { display: flex; align-items: center; gap: 8px; }
+            .sp-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4a7a9a; }
+            .sp-status-dot.normal { background: #00ff88; box-shadow: 0 0 8px #00ff8844; }
+            .sp-status-dot.alarm { background: #ff3355; box-shadow: 0 0 8px #ff335544; }
+            .sp-status-dot.warning { background: #ffcc00; box-shadow: 0 0 8px #ffcc0044; }
+            .sp-source-name { font-size: 13px; font-weight: 600; color: #e8f4ff; }
+            .sp-status-pill { font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+            .sp-status-pill.normal { background: #005533; color: #00ff88; }
+            .sp-status-pill.alarm { background: #660022; color: #ff3355; }
+            .sp-status-pill.warning { background: #332200; color: #ffcc00; }
+
+            .sp-card-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+            .sp-card-preview-point { display: flex; flex-direction: column; gap: 2px; }
+            .sp-preview-label { font-size: 9px; color: #5a8aaa; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .sp-preview-value { font-size: 11px; color: #e8f4ff; font-family: monospace; font-weight: bold; }
+
+            .sp-card-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+            .sp-conn-badge { 
+                font-size: 9px; 
+                background: #0d2a45; 
+                color: #5a8aaa; 
+                padding: 2px 6px; 
+                border-radius: 4px; 
+                display: flex; 
+                align-items: center; 
+                gap: 4px;
+                border: 1px solid #1a3a5c;
+            }
+            .sp-parser-badge { background: #1a3a5c; color: #a0c8e8; }
+            .sp-card-no-data { padding: 20px; text-align: center; color: #3a5a7a; font-size: 11px; display: flex; flex-direction: column; gap: 8px; }
         `;
         document.head.appendChild(style);
     }
@@ -986,6 +1226,8 @@
     function init() {
         addStyles();
         initClosePanel();
+        loadTemplates();   // Load templates for schemas
+        loadLimitations(); // Load dynamic limits
         waitForGrid(() => {
             observeGrid();
         });

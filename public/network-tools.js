@@ -865,6 +865,129 @@ async function scanTcpPorts() {
   }
 }
 
+// === SNMP TERMINAL (NEW) ===
+async function runSnmpWalk() {
+  const btn = document.getElementById('btnRunSnmpWalk');
+  const termOutput = document.getElementById('snmpTerminalOutput');
+  
+  const ip = document.getElementById('snmpTermIp')?.value;
+  const community = document.getElementById('snmpTermCommunity')?.value || 'public';
+  const version = document.getElementById('snmpTermVersion')?.value || '2c';
+  const oid = document.getElementById('snmpTermOid')?.value;
+
+  if (!ip) {
+    alert('Device IP is required!');
+    return;
+  }
+
+  if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+  }
+  
+  if (termOutput) {
+    termOutput.innerHTML = `$ snmpwalk -v ${version} -c ${community} ${ip} ${oid || ''}\n<span style="color: #888;">Running SNMP Walk... (This may take a while)</span>\n`;
+  }
+
+  addLogEntry('SNMP Terminal', `Running SNMP Walk on ${ip}...`, 'info');
+
+  try {
+    const response = await fetch('/api/network/snmp-walk', {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, community, version, oid })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      if (termOutput) {
+        termOutput.innerHTML += `<pre style="color: #00ff00; margin: 0; white-space: pre-wrap;">${result.data.output}</pre>`;
+        termOutput.scrollTop = termOutput.scrollHeight;
+      }
+      addLogEntry('SNMP Terminal', 'SNMP Walk complete', 'success');
+    } else {
+      throw new Error(result.error || result.message || 'Failed to run SNMP Walk');
+    }
+  } catch (err) {
+    if (termOutput) {
+      termOutput.innerHTML += `<span style="color: #ef4444;">\nError: ${err.message}</span>`;
+      termOutput.scrollTop = termOutput.scrollHeight;
+    }
+    addLogEntry('SNMP Terminal Error', err.message, 'error');
+  } finally {
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-running"></i> Run SNMP Walk';
+    }
+  }
+}
+
+function clearSnmpTerminal() {
+    const termOutput = document.getElementById('snmpTerminalOutput');
+    if (termOutput) termOutput.innerHTML = '$ Waiting for command...';
+}
+
+// === SNMP SCANNER (NEW) ===
+async function scanSnmpDevices() {
+  const btn = document.getElementById('scanSnmpBtn');
+  const tbody = document.getElementById('snmpScanResultBody');
+  const countEl = document.getElementById('snmpDeviceCount');
+  const community = document.getElementById('snmpScanCommunity')?.value || 'public';
+
+  if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
+  }
+
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="spinner-inline"></div> Scanning network for SNMP devices... (This may take a while)</td></tr>';
+  }
+
+  addLogEntry('SNMP Scanner', 'Scanning network for SNMP devices...', 'info');
+
+  try {
+    const response = await fetch(`/api/network/discover-snmp?community=${encodeURIComponent(community)}`, {
+      headers: getAuthHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      const devices = result.data.devices || [];
+      
+      if (countEl) countEl.textContent = devices.length;
+      
+      if (devices.length === 0) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No SNMP devices found on the scanned subnets.</td></tr>';
+        addLogEntry('SNMP Scanner', 'No SNMP devices found', 'warning');
+      } else {
+        if (tbody) {
+          tbody.innerHTML = devices.map(device => `
+            <tr>
+              <td style="font-family: monospace;">${device.ip}</td>
+              <td title="${device.sysDescr}">${device.sysDescr || '-'}</td>
+              <td>${device.interface || '-'}</td>
+              <td><span class="status-up">✅ Active</span></td>
+            </tr>
+          `).join('');
+        }
+        addLogEntry('SNMP Scanner', `Found ${devices.length} SNMP devices`, 'success');
+      }
+    } else {
+      throw new Error(result.error || result.message || 'Failed to scan for SNMP devices');
+    }
+  } catch (err) {
+    if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="empty-state"><span style="color: #ef4444;">Error: ${err.message}</span></td></tr>`;
+    addLogEntry('SNMP Scanner Error', err.message, 'error');
+  } finally {
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search"></i> Scan Network';
+    }
+  }
+}
+
 // Global Exports
 window.initNetworkTools = initNetworkTools;
 window.startCapture = startCapture;
@@ -875,3 +998,6 @@ window.filterPackets = filterPackets;
 window.displayPacketDetails = displayPacketDetails;
 window.clearLog = clearLog;
 window.scanConnectedDevices = scanConnectedDevices;
+window.runSnmpWalk = runSnmpWalk;
+window.clearSnmpTerminal = clearSnmpTerminal;
+window.scanSnmpDevices = scanSnmpDevices;

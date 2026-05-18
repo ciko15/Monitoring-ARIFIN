@@ -562,6 +562,77 @@ class NetworkMonitor {
   }
 
   /**
+   * Discover active SNMP devices on the network
+   */
+  async discoverSnmpDevices(community = 'public') {
+    try {
+      const snmp = require('snmp-native');
+      const interfaces = await this.getNetworkInterfaces();
+      const activeDevices = [];
+      const scannedSubnets = new Set();
+      
+      const validInterfaces = interfaces.filter(i => 
+        i.ip4 && 
+        i.ip4 !== '127.0.0.1' && 
+        (i.operstate === 'UP' || i.operstate === 'up' || i.operstate === 'unknown')
+      );
+
+      if (validInterfaces.length === 0) {
+        return { interfaces: [], devices: [], message: 'No active network interfaces found' };
+      }
+
+      const commonIps = [
+        1, 2, 3, 4, 5, 8, 10, 11, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 
+        100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 120, 130, 140, 150, 
+        200, 210, 220, 230, 240, 250, 254
+      ];
+      const allPromises = [];
+
+      for (const iface of validInterfaces) {
+        const ip = iface.ip4;
+        const parts = ip.split('.');
+        const networkPrefix = parts.slice(0, 3).join('.');
+        
+        if (scannedSubnets.has(networkPrefix)) continue;
+        scannedSubnets.add(networkPrefix);
+
+        for (const suffix of commonIps) {
+          const testIp = `${networkPrefix}.${suffix}`;
+          
+          allPromises.push(new Promise(resolve => {
+            const session = new snmp.Session({ host: testIp, community: community, timeouts: [1000] });
+            session.get({ oid: [1, 3, 6, 1, 2, 1, 1, 1, 0] }, (err, vbs) => {
+              session.close();
+              if (!err && vbs && vbs[0]) {
+                resolve({
+                  ip: testIp,
+                  reachable: true,
+                  sysDescr: String(vbs[0].value),
+                  interface: iface.name
+                });
+              } else {
+                resolve({ ip: testIp, reachable: false });
+              }
+            });
+          }));
+        }
+      }
+
+      const results = await Promise.all(allPromises);
+      const reachableResults = results.filter(r => r.reachable);
+
+      return {
+        scannedInterfaces: validInterfaces.map(i => i.name),
+        networkPrefixes: Array.from(scannedSubnets),
+        devices: reachableResults
+      };
+    } catch (error) {
+      console.error('[Network Monitor] Error discovering SNMP devices:', error.message);
+      return { devices: [], error: error.message };
+    }
+  }
+
+  /**
    * Get traffic by device/IP
    */
   async getDeviceTraffic() {

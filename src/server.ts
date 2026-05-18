@@ -2,11 +2,32 @@ import { Elysia, t } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { staticPlugin } from '@elysiajs/static';
 import { serverTiming } from '@elysiajs/server-timing';
-import { createRequire } from 'module';
+// Bun supports both import and require natively in .ts files
+// const require = createRequire(import.meta.url);
 
-const require = createRequire(import.meta.url);
 
 import ping from 'ping';
+
+// Global error handlers for better stability
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ [FATAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('❌ [FATAL] Uncaught Exception:', err);
+    // Kita tidak keluar (process.exit) agar PM2 tidak masuk ke restart loop yang terlalu cepat jika memungkinkan
+    // Namun biasanya uncaughtException sebaiknya exit. Kita biarkan PM2 yang menangani restart.
+});
+
+process.on('SIGINT', () => {
+    console.warn('⚠️ [SYSTEM] Received SIGINT. Graceful shutdown...');
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    console.warn('⚠️ [SYSTEM] Received SIGTERM. Graceful shutdown...');
+    process.exit(0);
+});
 
 // Authorization middleware
 function authorize(allowedRoles: string[]) {
@@ -23,7 +44,7 @@ function authenticate(app: any) {
     return app.derive(({ set, request, query }: any) => {
         let token = '';
         const auth = request.headers.get('authorization');
-        
+
         if (auth && auth.startsWith('Bearer ')) {
             token = auth.substring(7);
         } else if (query && query.token) {
@@ -44,7 +65,7 @@ function authenticate(app: any) {
             const username = parts[2];
             return { user: { role, username } };
         }
-        
+
         console.warn(`[AUTH-GATE] Denied access to ${request.url} - Invalid Token`);
         set.status = 401;
         return { user: null, error: 'Invalid or expired token', success: false };
@@ -62,6 +83,7 @@ const thresholdEvaluator = require('./utils/thresholdEvaluator');
 
 // const websocketServer = require('./websocket/server'); // We'll handle WS separately in Elysia
 const templateService = require('./services/template');
+const { pushSyncToTOC } = require('./utils/syncTOC');
 
 
 
@@ -103,18 +125,18 @@ async function collectEquipmentData() {
             if (!isActive) continue;
 
             const config = item.snmpConfig || item.snmp_config;
-            
+
             try {
                 const { parsedData, status, triggeredParameters, isProcessed } = await fetchAndParseData(item);
-                
+
                 // Only update status and logs if we actually had sources to monitor
                 if (isProcessed) {
                     // Status is now handled by the watchdog consolidation
                     // await equipmentService.updateEquipmentStatus(item.id, status);
                     await equipmentService.saveToLogs(
                         item.id,
-                        { 
-                            ...parsedData, 
+                        {
+                            ...parsedData,
                             triggeredParameters: triggeredParameters || [],
                             _ip: parsedData._ip || (parsedData._sources && parsedData._sources[0]?.ip)
                         },
@@ -302,7 +324,7 @@ const app = new Elysia()
 
     .post('/api/register', async ({ body, set }) => {
         const { username, password, name } = body as any;
-        
+
         // Check if user already exists
         const existingUser = await db.getUserByUsername(username);
         if (existingUser) {
@@ -324,7 +346,7 @@ const app = new Elysia()
             user: { username: newUser.username, role: newUser.role }
         };
     })
-    
+
     // --- HISTORY LOGS ROUTES (File-based) ---
     .group('/api/history-logs', app => app
         .use(authenticate)
@@ -335,7 +357,7 @@ const app = new Elysia()
             const search = (query.search as string) || '';
             const startDate = (query.startDate as string) || null;
             const endDate = (query.endDate as string) || null;
-            
+
             return await fileLogger.getHistoryLogs({ page, limit, search, startDate, endDate });
         })
     )
@@ -419,12 +441,12 @@ const app = new Elysia()
 
         return (airports || []).map((airport: any) => {
             const airportId = airport.id;
-            const airportEquipment = (equipmentData || []).filter((e: any) => 
+            const airportEquipment = (equipmentData || []).filter((e: any) =>
                 e.airport_id === airportId || e.branch_id === airportId || e.airportId === airportId || e.branchId === airportId
             );
-            
+
             // Only consider equipment that is active for calculations
-            const activeEquipment = (airportEquipment || []).filter((e: any) => 
+            const activeEquipment = (airportEquipment || []).filter((e: any) =>
                 e.isActive === true || e.isActive === 'true' || e.is_active === 1 || e.is_active === '1' || e.is_active === true
             );
 
@@ -628,6 +650,7 @@ const app = new Elysia()
                         ipAddress
                     });
                     set.status = 201;
+                    pushSyncToTOC();
                     return newEquipment;
                 } catch (error: any) {
                     set.status = 500;
@@ -652,6 +675,7 @@ const app = new Elysia()
                         set.status = 404;
                         return { message: 'Equipment not found' };
                     }
+                    pushSyncToTOC();
                     return updated;
                 } catch (error: any) {
                     set.status = 500;
@@ -662,6 +686,7 @@ const app = new Elysia()
             .delete('/remove/:id', async ({ params, set }) => {
                 try {
                     await db.deleteEquipment(params.id);
+                    pushSyncToTOC();
                     return { message: 'Equipment deleted' };
                 } catch (error: any) {
                     set.status = 500;
@@ -734,14 +759,26 @@ const app = new Elysia()
     // --- EQUIPMENT OTENTICATION ROUTES ---
     .group('/api/otentication', (app) =>
         app.get('/:equipmentId', async ({ params }) => await db.getOtenticationByEquipment(params.equipmentId))
-            .post('/', async ({ body }) => await db.createOtentication(body as any))
-            .delete('/:equipmentId', async ({ params }) => await db.deleteOtenticationByEquipment(params.equipmentId))
+            .post('/', async ({ body }) => {
+                const result = await db.createOtentication(body as any);
+                pushSyncToTOC();
+                return result;
+            })
+            .delete('/:equipmentId', async ({ params }) => {
+                const result = await db.deleteOtenticationByEquipment(params.equipmentId);
+                pushSyncToTOC();
+                return result;
+            })
     )
 
     // --- LIMITATION CONFIG ROUTES ---
     .group('/api/limitations', (app) =>
         app.get('/:equipmentId', async ({ params }) => await db.getLimitationsByEquipment(params.equipmentId))
-            .put('/', async ({ body }) => await db.updateLimitation(body as any))
+            .put('/', async ({ body }) => {
+                const result = await db.updateLimitation(body as any);
+                pushSyncToTOC();
+                return result;
+            })
     )
 
     // --- AIRPORT ROUTES ---
@@ -994,6 +1031,7 @@ const app = new Elysia()
         .get('/system-info', async () => ({ success: true, data: await require('./network/monitor').getSystemNetworkInfo() }))
         .get('/arp-table', async () => ({ success: true, data: await require('./network/monitor').getArpTable() }))
         .get('/discover-devices', async () => ({ success: true, data: await require('./network/monitor').discoverNetworkDevices() }))
+        .get('/discover-snmp', async ({ query }) => ({ success: true, data: await require('./network/monitor').discoverSnmpDevices((query.community as string) || 'public') }))
         .post('/tcp-test', async ({ body }) => {
             const { testTcpConnection } = require('./network/tcp-tester');
             const { gatewayIp, deviceIp, port, syncMarker } = body as any;
@@ -1006,6 +1044,58 @@ const app = new Elysia()
             const openPorts = await scanPorts(deviceIp, parseInt(startPort), parseInt(endPort));
             return { success: true, data: { openPorts } };
         })
+        .post('/snmp-walk', async ({ body }) => {
+            const { ip, community, version, oid } = body as any;
+            const snmp = require('snmp-native');
+
+            try {
+                // Security: sanitize inputs
+                const safeIp = ip.replace(/[^a-zA-Z0-9.:]/g, '');
+                const safeCommunity = community ? community.replace(/[^a-zA-Z0-9_-]/g, '') : 'public';
+                const safeOid = oid ? oid.replace(/[^0-9.]/g, '') : '';
+
+                console.log(`[SNMP Terminal] Walking ${safeIp} with community ${safeCommunity} and OID ${safeOid}`);
+
+                const session = new snmp.Session({ host: safeIp, community: safeCommunity, timeouts: [4000, 4000] });
+
+                const cleanOid = safeOid.startsWith('.') ? safeOid.substring(1) : safeOid;
+                const targetOid = cleanOid ? cleanOid.split('.').map(Number) : [1, 3, 6, 1];
+
+                const vbs = await new Promise<any[]>((resolve, reject) => {
+                    session.getSubtree({ oid: targetOid, combinedTimeout: 15000 }, (err: any, bindings: any[]) => {
+                        if (err) reject(err);
+                        else resolve(bindings || []);
+                    });
+                });
+
+                session.close();
+
+                let output = '';
+                if (vbs.length === 0) {
+                    output = 'No data returned or error.';
+                } else {
+                    output = vbs.map((vb: any) => {
+                        const oidStr = vb.oid.join('.');
+                        return `.${oidStr} = ${vb.value}`;
+                    }).join('\n');
+                }
+
+                return {
+                    success: true,
+                    data: {
+                        output: output
+                    }
+                };
+            } catch (error: any) {
+                console.error('[SNMP Terminal] Error:', error);
+                return {
+                    success: true,
+                    data: {
+                        output: `Error: ${error.message}`
+                    }
+                };
+            }
+        })
     )
 
     // --- PACKET EXPORT ROUTE ---
@@ -1015,7 +1105,7 @@ const app = new Elysia()
             const sniffer = require('./network/sniffer');
             const format = (query.format as string) || 'json';
             const data = sniffer.export(format);
-            
+
             if (format === 'csv') {
                 set.headers['Content-Type'] = 'text/csv';
                 set.headers['Content-Disposition'] = `attachment; filename=packets_${Date.now()}.csv`;
@@ -1095,7 +1185,7 @@ const app = new Elysia()
                 return { message: 'Deleted' };
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
     )
-    
+
     // --- UTILS ROUTES ---
 
     .group('/api/utils', (app) => {
@@ -1108,11 +1198,11 @@ const app = new Elysia()
                 try {
                     const requestedPath = (query.path as string) || '.';
                     const rootDir = process.cwd();
-                    
+
                     // Normalize requested path to remove .. etc
                     let safePath = normalize(requestedPath).replace(/^(\.\.(\/|\\|$))+/, '');
                     if (safePath === '.' || safePath === './' || safePath === '/') safePath = '';
-                    
+
                     const targetDir = resolve(rootDir, safePath);
 
                     // Security: ensure targetDir is within rootDir
@@ -1125,7 +1215,7 @@ const app = new Elysia()
                     const contents = entries.map((entry: any) => {
                         const relativeEntryPath = join(safePath, entry.name);
                         const webPath = '/' + relativeEntryPath.split(sep).join('/');
-                        
+
                         return {
                             name: entry.name,
                             isDir: entry.isDirectory(),
@@ -1134,8 +1224,8 @@ const app = new Elysia()
                     });
 
                     // Filtering for security and relevance
-                    const filteredContents = contents.filter((c: any) => 
-                        !c.name.startsWith('.') && 
+                    const filteredContents = contents.filter((c: any) =>
+                        !c.name.startsWith('.') &&
                         !c.name.includes('node_modules')
                     );
 
@@ -1168,70 +1258,116 @@ const app = new Elysia()
 console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
 
 // Initialize Services (similar to server.js)
+let isInitializing = false;
 async function startServices() {
+    if (isInitializing) return;
+    isInitializing = true;
+
     try {
         console.log('[SYSTEM] Initializing core services...');
 
         // 1. Sync Data Sources with Equipment Categories (NEW)
-        await db.syncOtenticationSupCategory();
+        try {
+            await db.syncOtenticationSupCategory();
+        } catch (e) {
+            console.error('[SYSTEM] Error syncing categories:', e);
+        }
 
         // 2. Load SNMP Templates into cache
-        state.snmpTemplatesCache = await templateService.getAllTemplates();
-        console.log(`[SNMP] ${state.snmpTemplatesCache.length} templates loaded from JSON`);
+        try {
+            state.snmpTemplatesCache = await templateService.getAllTemplates();
+            console.log(`[SNMP] ${state.snmpTemplatesCache?.length || 0} templates loaded from JSON`);
+        } catch (e) {
+            console.error('[SYSTEM] Error loading templates:', e);
+        }
 
         // 3. Start Background Schedulers
         const collector = new DataCollectorScheduler(new EquipmentService(db));
-        // Run testing every 1 minute as requested
-        setInterval(() => collector.collectAll(), 60000);
-        
+
+        // Run testing every 60 seconds as requested
+        setInterval(async () => {
+            try {
+                await collectEquipmentData();
+            } catch (e) {
+                console.error('[SCHEDULER] collectEquipmentData error:', e);
+            }
+        }, 60000);
+
         // Initial run after a short delay
-        setTimeout(() => collector.collectAll(), 5000);
+        setTimeout(async () => {
+            try {
+                await collectEquipmentData();
+            } catch (e) {
+                console.error('[SCHEDULER] Initial collectEquipmentData error:', e);
+            }
+        }, 5000);
 
         // 3.1 Start Watchdog (Check every 1 minute for 4-minute timeout)
-        setInterval(() => checkEquipmentWatchdog(), 60000);
-
-        // 4. Initialize Surveillance Receivers if available (DISABLED)
-        /*
-                }
-            });
-
-            if (radarReceiver.startAll) radarReceiver.startAll();
-            if (adsbReceiver.start) adsbReceiver.start();
-            
-            console.log('[SURVEILLANCE] Receivers started');
-        }
-        */
+        setInterval(async () => {
+            try {
+                await checkEquipmentWatchdog();
+            } catch (e) {
+                console.error('[WATCHDOG] Error:', e);
+            }
+        }, 60000);
 
         // 5. Start History Log Cleanup (Scheduled at 00:00 UTC)
         const fileLogger = require('./utils/fileLogger');
-        
+
         const scheduleCleanup = () => {
-            const now = new Date();
-            const nextRun = new Date(now);
-            nextRun.setUTCHours(24, 0, 0, 0); // Next day 00:00 UTC
-            
-            const delay = nextRun.getTime() - now.getTime();
-            console.log(`[SYSTEM] Next log cleanup scheduled in ${Math.round(delay/3600000)} hours (at 00:00 UTC)`);
-            
-            setTimeout(async () => {
-                await fileLogger.cleanupOldLogs();
-                scheduleCleanup(); // Schedule for next day
-            }, delay);
+            try {
+                const now = new Date();
+                const nextRun = new Date(now);
+                nextRun.setUTCHours(24, 0, 0, 0); // Next day 00:00 UTC
+
+                const delay = nextRun.getTime() - now.getTime();
+                if (delay < 0) return; // Prevent negative delay
+
+                console.log(`[SYSTEM] Next log cleanup scheduled in ${Math.round(delay / 3600000)} hours (at 00:00 UTC)`);
+
+                setTimeout(async () => {
+                    try {
+                        await fileLogger.cleanupOldLogs();
+                    } catch (e) {
+                        console.error('[CLEANUP] Error:', e);
+                    }
+                    scheduleCleanup(); // Schedule for next day
+                }, delay);
+            } catch (e) {
+                console.error('[SYSTEM] scheduleCleanup setup error:', e);
+            }
         };
 
         // Initial check on startup
-        setTimeout(() => fileLogger.cleanupOldLogs(), 5000);
+        setTimeout(async () => {
+            try {
+                await fileLogger.cleanupOldLogs();
+            } catch (e) {
+                console.error('[CLEANUP] Initial cleanup error:', e);
+            }
+        }, 5000);
+
         // Start scheduler
         scheduleCleanup();
 
         // 6. Start Network Listener for modular parsers (UDP/TCP)
-        const networkListener = require('./services/network_listener');
-        networkListener.initialize();
+        try {
+            const networkListener = require('./services/network_listener');
+            networkListener.initialize();
+        } catch (e) {
+            console.error('[SYSTEM] networkListener init error:', e);
+        }
 
-        console.log('[SYSTEM] Core services initialized (1min polling & 4min watchdog active)');
+        console.log('[SYSTEM] Core services initialized (30s polling & 4min watchdog active)');
     } catch (err) {
-        console.error('[SYSTEM] Error during service initialization:', err);
+        console.error('[SYSTEM] Critical error during service initialization:', err);
+    } finally {
+        isInitializing = false;
     }
 }
 
-startServices();
+try {
+    startServices();
+} catch (e) {
+    console.error('[SYSTEM] Failed to invoke startServices:', e);
+}
