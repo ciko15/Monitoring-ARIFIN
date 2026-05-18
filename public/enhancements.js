@@ -161,6 +161,7 @@
     // ── Source Panel ──────────────────────────────────────────────────────────
     window.openSourcePanel = async function openSourcePanel(equipmentId, cardEl) {
         _selectedEqId = equipmentId;
+        window.selectedEquipmentId = equipmentId;
 
         // Highlight selected card
         document.querySelectorAll('.cabang-card').forEach(c => c.classList.remove('card-selected'));

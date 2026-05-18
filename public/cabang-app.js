@@ -19,6 +19,8 @@ const cabangModule = (function () {
   let currentStatusFilter = '';
   let searchQuery = '';
   let autoRefreshInterval = null;
+  let isLoadingEquipment = false;
+  let lastRenderSignature = '';
 
   // DOM Elements
   const cabangGrid = document.getElementById('cabangGrid');
@@ -79,7 +81,7 @@ const cabangModule = (function () {
     autoRefreshInterval = setInterval(() => {
       // Only refresh if the section is visible
       const section = document.getElementById('cabangSection');
-      if (section && !section.classList.contains('hidden')) {
+      if (section && !section.classList.contains('hidden') && document.visibilityState !== 'hidden') {
         loadEquipment(true); // silent refresh
       }
     }, 20000);
@@ -115,6 +117,9 @@ const cabangModule = (function () {
   }
 
   async function loadEquipment(silent = false) {
+    if (isLoadingEquipment) return;
+    isLoadingEquipment = true;
+
     // 1. Try to load from local cache first for instant UI response
     const cachedData = localStorage.getItem('cabang_equipment_cache');
     if (cachedData && !equipmentData.length) {
@@ -162,7 +167,21 @@ const cabangModule = (function () {
       if (cabangGrid && equipmentData.length === 0) {
         cabangGrid.innerHTML = `<div class="empty-state" style="color: var(--accent-danger);"><i class="fas fa-exclamation-triangle"></i> Error loading data</div>`;
       }
+    } finally {
+      isLoadingEquipment = false;
     }
+  }
+
+  function buildRenderSignature(items) {
+    return JSON.stringify(items.map(item => ({
+      id: item.id,
+      status: item.status,
+      lastUpdate: item.lastUpdate,
+      lastDataKeys: item.lastData ? Object.keys(item.lastData) : [],
+      lastDataTimes: item.lastData
+        ? Object.values(item.lastData).map(src => src && src._logged_at ? src._logged_at : null)
+        : []
+    })));
   }
 
   function renderCabangGrid() {
@@ -203,10 +222,18 @@ const cabangModule = (function () {
       );
     }
 
+    const renderSignature = buildRenderSignature(filtered);
+
     if (filtered.length === 0) {
+      lastRenderSignature = 'empty';
       cabangGrid.innerHTML = '<div class="empty-state">No equipment found matching the filters.</div>';
       return;
     }
+
+    if (renderSignature === lastRenderSignature) {
+      return;
+    }
+    lastRenderSignature = renderSignature;
 
     cabangGrid.innerHTML = filtered.map(item => {
       const status = (item.status || 'Offline').toLowerCase();
@@ -316,6 +343,11 @@ const cabangModule = (function () {
         </div>
       `;
     }).join('');
+
+    if (window.openSourcePanel && document.getElementById('equipmentDetailPanel')?.classList.contains('open')) {
+      const selectedCard = cabangGrid.querySelector(`.cabang-card[data-id="${window.selectedEquipmentId || ''}"]`);
+      if (selectedCard) selectedCard.classList.add('card-selected');
+    }
   }
 
   // Public API to support Map Dashboard interaction

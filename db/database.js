@@ -11,6 +11,11 @@ const AUTH_CONFIG_PATH = path.join(__dirname, 'equipment_otentication_config.jso
 const LIMITATION_CONFIG_PATH = path.join(__dirname, 'limitation_config.json');
 const TEMPLATE_CONFIG_PATH = path.join(__dirname, 'templates_config.json');
 const LOGS_DATA_PATH = path.join(__dirname, 'equipment_logs.json');
+const writeLocks = new Map();
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // --- PARSER PARAMETER TEMPLATES ---
 // Used to show placeholders (-) when data is missing
@@ -47,40 +52,70 @@ const PARSER_TEMPLATES = {
 
 // --- GENERIC JSON HELPERS ---
 async function readJson(filePath, defaultValue = []) {
-  try {
-    const file = globalThis.Bun ? globalThis.Bun.file(filePath) : null;
-    if (file) {
-      if (!(await file.exists())) {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const file = globalThis.Bun ? globalThis.Bun.file(filePath) : null;
+      if (file) {
+        if (!(await file.exists())) {
+          if (defaultValue !== null) await writeJson(filePath, defaultValue);
+          return defaultValue;
+        }
+        const text = await file.text();
+        return JSON.parse(text);
+      }
+      // Fallback to Node fs for environments without Bun (though this is a Bun app)
+      if (!fs.existsSync(filePath)) {
         if (defaultValue !== null) await writeJson(filePath, defaultValue);
         return defaultValue;
       }
-      return await file.json();
-    }
-    // Fallback to Node fs for environments without Bun (though this is a Bun app)
-    if (!fs.existsSync(filePath)) {
-      if (defaultValue !== null) await writeJson(filePath, defaultValue);
+      const data = await fs.promises.readFile(filePath, 'utf8');
+      return JSON.parse(data);
+    } catch (err) {
+      const isTruncatedJson = err instanceof SyntaxError && /Unexpected end of JSON input/.test(err.message);
+      if (isTruncatedJson && attempt < maxAttempts) {
+        await sleep(25 * attempt);
+        continue;
+      }
+
+      console.error(`Error reading JSON from ${filePath}:`, err);
       return defaultValue;
     }
-    const data = await fs.promises.readFile(filePath, 'utf8');
-    return JSON.parse(data);
-  } catch (err) {
-    console.error(`Error reading JSON from ${filePath}:`, err);
-    return defaultValue;
   }
+
+  return defaultValue;
 }
 
 async function writeJson(filePath, data) {
-  try {
-    const content = JSON.stringify(data, null, 2);
-    if (globalThis.Bun) {
-      await globalThis.Bun.write(filePath, content);
-    } else {
-      await fs.promises.writeFile(filePath, content, 'utf8');
+  const previousWrite = writeLocks.get(filePath) || Promise.resolve();
+  const currentWrite = previousWrite.then(async () => {
+    try {
+      const content = JSON.stringify(data, null, 2);
+      const tempPath = `${filePath}.tmp`;
+
+      if (globalThis.Bun) {
+        await globalThis.Bun.write(tempPath, content);
+      } else {
+        await fs.promises.writeFile(tempPath, content, 'utf8');
+      }
+
+      await fs.promises.rename(tempPath, filePath);
+      return true;
+    } catch (err) {
+      console.error(`Error writing JSON to ${filePath}:`, err);
+      return false;
     }
-    return true;
-  } catch (err) {
-    console.error(`Error writing JSON to ${filePath}:`, err);
-    return false;
+  });
+  const trackedWrite = currentWrite.catch(() => false);
+  writeLocks.set(filePath, trackedWrite);
+
+  try {
+    return await currentWrite;
+  } finally {
+    if (writeLocks.get(filePath) === trackedWrite) {
+      writeLocks.delete(filePath);
+    }
   }
 }
 

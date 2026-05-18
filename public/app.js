@@ -14,6 +14,28 @@ let configAuthenticationCache = [];
 let pickerMap = null;
 let pickerMarker = null;
 window.activeMapPicker = null;
+window.equipmentMarkersLayer = null;
+window.mapViewportInitialized = false;
+
+const pollState = {
+  stats: false,
+  equipment: false,
+  airports: false,
+  markers: false
+};
+
+function getCurrentSection() {
+  return localStorage.getItem('currentSection') || 'dashboard';
+}
+
+function isSectionVisible(sectionId) {
+  const section = document.getElementById(`${sectionId}Section`);
+  return !!section && !section.classList.contains('hidden');
+}
+
+function isPageActive() {
+  return document.visibilityState !== 'hidden';
+}
 
 // Global configuration helper
 const pluralMap = {
@@ -808,13 +830,12 @@ window.addIpComponentRow = function (data = { name: '', ip_address: '' }) {
 
 async function loadEquipmentMarkers() {
   if (!window.map) return;
+  if (pollState.markers) return;
 
-  // Clear existing markers (except pickMarker)
-  window.map.eachLayer(layer => {
-    if (layer instanceof L.Marker && layer !== window.pickMarker) {
-      window.map.removeLayer(layer);
-    }
-  });
+  pollState.markers = true;
+  if (!window.equipmentMarkersLayer) {
+    window.equipmentMarkersLayer = L.layerGroup().addTo(window.map);
+  }
 
   try {
     const res = await fetch(`${API_URL}/equipment?isActive=true`, {
@@ -826,6 +847,7 @@ async function loadEquipmentMarkers() {
     const equipment = result.data || result;
 
     console.log(`[MAP] Received ${Array.isArray(equipment) ? equipment.length : 0} equipment items for map`);
+    window.equipmentMarkersLayer.clearLayers();
 
     // Create bounds to auto-fit
     const bounds = L.latLngBounds();
@@ -846,7 +868,7 @@ async function loadEquipmentMarkers() {
           const markerHtml = `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 0 8px rgba(0,0,0,0.4); cursor: pointer;"></div>`;
           const icon = L.divIcon({ html: markerHtml, className: 'custom-equipment-icon', iconSize: [14, 14], iconAnchor: [7, 7] });
 
-          const marker = L.marker([lat, lng], { icon }).addTo(window.map);
+          const marker = L.marker([lat, lng], { icon }).addTo(window.equipmentMarkersLayer);
           marker.bindPopup(`
             <div class="map-popup" style="padding: 5px;">
               <strong style="display: block; margin-bottom: 5px; color: var(--text-main); font-size: 0.9rem;">${item.name}</strong>
@@ -866,18 +888,23 @@ async function loadEquipmentMarkers() {
         }
       });
 
-      // Auto-fit bounds if we have valid coordinates
-      if (hasCoords) {
+      // Auto-fit only once so background sync does not reset the user's current map view.
+      if (hasCoords && !window.mapViewportInitialized) {
         window.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 18 });
+        window.mapViewportInitialized = true;
       }
     }
   } catch (err) {
     console.error('[MAP] Error loading equipment markers:', err);
+  } finally {
+    pollState.markers = false;
   }
 }
 
 // Stats loading
 async function loadStats() {
+  if (pollState.stats) return;
+  pollState.stats = true;
   try {
     const res = await fetch(`${API_URL}/equipment/stats`);
     const stats = await res.json();
@@ -897,10 +924,13 @@ async function loadStats() {
       if (document.getElementById('supportCount')) document.getElementById('supportCount').textContent = c.Support || 0;
     }
   } catch (err) { console.error('Stats error:', err); }
+  finally { pollState.stats = false; }
 }
 
 // Equipment CRUD
 async function loadEquipment() {
+  if (pollState.equipment) return;
+  pollState.equipment = true;
   try {
     const res = await fetch(`${API_URL}/equipment?isActive=all`, { headers: getAuthHeaders() });
     const result = await res.json();
@@ -908,6 +938,7 @@ async function loadEquipment() {
     renderEquipmentTable(equipmentData);
     updateLogEquipmentFilterOptions();
   } catch (err) { console.error('Equipment load error:', err); }
+  finally { pollState.equipment = false; }
 }
 
 function renderEquipmentTable(data) {
@@ -1434,6 +1465,8 @@ window.deleteEquipment = async function (id) {
 
 // Airport management
 async function loadAirports() {
+  if (pollState.airports) return;
+  pollState.airports = true;
   try {
     const res = await fetch(`${API_URL}/airports`, {
       headers: getAuthHeaders()
@@ -1467,6 +1500,7 @@ async function loadAirports() {
       }
     }
   } catch (err) { console.error('Airports load error:', err); }
+  finally { pollState.airports = false; }
 }
 
 async function handleAirportSubmit(e) {
@@ -1775,9 +1809,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Polling for real-time updates
   setInterval(() => {
-    loadStats();
-    loadEquipmentMarkers();
-    if (authToken) {
+    if (!isPageActive()) return;
+
+    if (isSectionVisible('dashboard')) {
+      loadStats();
+      loadEquipmentMarkers();
+    }
+
+    const currentSection = getCurrentSection();
+    if (authToken && (currentSection === 'equipment' || currentSection === 'equipment-logs')) {
       loadEquipment();
     }
   }, 10000); // Every 10 seconds
