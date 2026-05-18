@@ -7,12 +7,16 @@ const ParserFactory = require('../parsers/factory');
 const connectionManager = require('../connection/manager');
 const db = require('../../db/database');
 const EquipmentService = require('./equipment');
+const RawEventQueue = require('./raw_event_queue');
 
 class NetworkListenerService {
     constructor() {
         this.equipmentService = new EquipmentService(db);
         this.activeListeners = new Set(); // source_id -> true
         this._parseWarningTimestamps = new Map();
+        this.pipelineMode = process.env.PIPELINE_MODE || 'inline';
+        this.serviceRole = process.env.SERVICE_ROLE || 'all';
+        this.rawEventQueue = this.pipelineMode === 'split' ? new RawEventQueue() : null;
     }
 
     _shouldLogParseWarning(sourceId, errorKey, throttleMs = 15000) {
@@ -26,6 +30,55 @@ class NetworkListenerService {
 
         this._parseWarningTimestamps.set(key, now);
         return true;
+    }
+
+    _isSplitCollectorMode() {
+        return this.pipelineMode === 'split' && (this.serviceRole === 'collector' || this.serviceRole === 'all');
+    }
+
+    async _handleLogOutput(source, parsedData, connectionType, status) {
+        if (this._isSplitCollectorMode()) {
+            await this.rawEventQueue.enqueue({
+                type: 'parsed',
+                timestamp: new Date().toISOString(),
+                source: {
+                    id: source.id,
+                    equipt_id: source.equipt_id,
+                    name: source.name,
+                    ip_address: source.ip_address,
+                    parsing_id: source.parsing_id
+                },
+                parsedData,
+                connectionType,
+                status
+            });
+            return;
+        }
+
+        await this.equipmentService.saveToLogs(
+            source.equipt_id,
+            parsedData,
+            connectionType,
+            status
+        );
+    }
+
+    async _enqueueRawEvent(source, rawData) {
+        if (!this._isSplitCollectorMode()) return;
+
+        const rawBuffer = Buffer.isBuffer(rawData) ? rawData : Buffer.from(String(rawData));
+        await this.rawEventQueue.enqueue({
+            type: 'raw',
+            timestamp: new Date().toISOString(),
+            source: {
+                id: source.id,
+                equipt_id: source.equipt_id,
+                name: source.name,
+                ip_address: source.ip_address,
+                parsing_id: source.parsing_id
+            },
+            rawBase64: rawBuffer.toString('base64')
+        });
     }
 
     /**
@@ -299,12 +352,11 @@ class NetworkListenerService {
                 const result = parser.parse(chunk);
                 if (!result) return;
                 const logStatus = result.status || 'Normal';
-                await this.equipmentService.saveToLogs(
-                    equipt_id,
+                await this._handleLogOutput(
+                    source,
                     {
                         data: {
                             ...result.data,
-                            // Tambah location info di data
                             location: location || name,
                         },
                         source: name,
@@ -373,8 +425,8 @@ class NetworkListenerService {
             try {
                 const result = await pollSNMP(ip_address, comm);
                 console.log(`[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error||'none'}`);
-                await this.equipmentService.saveToLogs(
-                    equipt_id,
+                await this._handleLogOutput(
+                    source,
                     { data: result.data, source: name, _ip: ip_address },
                     source.parsing_id || 'snmp_system',
                     result.status || 'Disconnect'
@@ -434,8 +486,8 @@ class NetworkListenerService {
                     const result = entry.parser.parse(msg);
                     if (!result) continue;
                     try {
-                        await this.equipmentService.saveToLogs(
-                            entry.source.equipt_id,
+                        await this._handleLogOutput(
+                            entry.source,
                             { data: result.data, source: entry.source.name, _ip: rinfo.address },
                             entry.parserId,
                             result.status || 'Disconnect'
@@ -466,8 +518,8 @@ class NetworkListenerService {
             const result = parser.checkTimeout();
             if (result) {
                 try {
-                    await this.equipmentService.saveToLogs(
-                        equipt_id,
+                    await this._handleLogOutput(
+                        source,
                         { data: result.data, source: name, _ip: ip_address },
                         parserId,
                         'Disconnect'
@@ -537,8 +589,8 @@ class NetworkListenerService {
 
                     // source = name (nama source config = nama radio)
                     // ini yang jadi key di lastData frontend
-                    await this.equipmentService.saveToLogs(
-                        equipt_id,
+                    await this._handleLogOutput(
+                        source,
                         { data: radioData, source: name, _ip: ip_address },
                         'vhf_marc_rse',
                         radioStatus
@@ -737,6 +789,17 @@ class NetworkListenerService {
                 parsedResult = parser.parse(rawData);
             }
 
+            if (this._isSplitCollectorMode()) {
+                await this._enqueueRawEvent(source, rawData);
+
+                if (!parsedResult.success) {
+                    if (parsedResult.error && this._shouldLogParseWarning(id, parsedResult.error)) {
+                        console.log(`[NetworkListener] Collector queued partial frame from ${name}: ${parsedResult.error}`);
+                    }
+                }
+                return;
+            }
+
             // Jangan overwrite log sukses dengan log gagal (misal buffer belum penuh / junk chunk)
             // Untuk binary streaming parsers (GP/LLZ/PM5560): hanya save jika parse sukses
             const hasExistingData = parser && typeof parser.getLastData === 'function'
@@ -766,8 +829,8 @@ class NetworkListenerService {
                 _ip: source.ip_address || 'unknown' // For FileLogger
             };
             
-            await this.equipmentService.saveToLogs(
-                equipt_id, 
+            await this._handleLogOutput(
+                source,
                 logData, 
                 source.parsing_id || 'raw', 
                 parsedResult.status || 'Normal'

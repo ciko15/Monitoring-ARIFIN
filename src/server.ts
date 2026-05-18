@@ -88,6 +88,11 @@ const { pushSyncToTOC } = require('./utils/syncTOC');
 
 
 const PORT = process.env.PORT || 3100;
+const SERVICE_ROLE = process.env.SERVICE_ROLE || 'all';
+const PIPELINE_MODE = process.env.PIPELINE_MODE || 'inline';
+const SHOULD_START_WEB = SERVICE_ROLE === 'all' || SERVICE_ROLE === 'web';
+const SHOULD_START_COLLECTOR = SERVICE_ROLE === 'all' || SERVICE_ROLE === 'collector';
+const SHOULD_START_PROCESSOR = SERVICE_ROLE === 'all' || SERVICE_ROLE === 'processor';
 
 // Global State
 export const state = {
@@ -1250,12 +1255,14 @@ const app = new Elysia()
     .get('/api/test-chain', () => {
         console.log('[DEBUG-ROUTER] Hit /api/test-chain');
         return { chain: 'complete', timestamp: new Date().toISOString() };
-    })
+    });
 
-    // Final Static Files Fallback
-    .listen(PORT);
-
-console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
+if (SHOULD_START_WEB) {
+    app.listen(PORT);
+    console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
+} else {
+    console.log(`[SYSTEM] SERVICE_ROLE=${SERVICE_ROLE} running without web server`);
+}
 
 // Initialize Services (similar to server.js)
 let isInitializing = false;
@@ -1264,7 +1271,7 @@ async function startServices() {
     isInitializing = true;
 
     try {
-        console.log('[SYSTEM] Initializing core services...');
+        console.log(`[SYSTEM] Initializing core services... role=${SERVICE_ROLE} pipeline=${PIPELINE_MODE}`);
 
         // 1. Sync Data Sources with Equipment Categories (NEW)
         try {
@@ -1282,34 +1289,37 @@ async function startServices() {
         }
 
         // 3. Start Background Schedulers
-        const collector = new DataCollectorScheduler(new EquipmentService(db));
+        if (PIPELINE_MODE === 'inline' && SHOULD_START_PROCESSOR) {
+            const collector = new DataCollectorScheduler(new EquipmentService(db));
 
-        // Run testing every 60 seconds as requested
-        setInterval(async () => {
-            try {
-                await collectEquipmentData();
-            } catch (e) {
-                console.error('[SCHEDULER] collectEquipmentData error:', e);
-            }
-        }, 60000);
+            // Run testing every 60 seconds as requested
+            setInterval(async () => {
+                try {
+                    await collectEquipmentData();
+                } catch (e) {
+                    console.error('[SCHEDULER] collectEquipmentData error:', e);
+                }
+            }, 60000);
 
-        // Initial run after a short delay
-        setTimeout(async () => {
-            try {
-                await collectEquipmentData();
-            } catch (e) {
-                console.error('[SCHEDULER] Initial collectEquipmentData error:', e);
-            }
-        }, 5000);
+            // Initial run after a short delay
+            setTimeout(async () => {
+                try {
+                    await collectEquipmentData();
+                } catch (e) {
+                    console.error('[SCHEDULER] Initial collectEquipmentData error:', e);
+                }
+            }, 5000);
+        }
 
-        // 3.1 Start Watchdog (Check every 1 minute for 4-minute timeout)
-        setInterval(async () => {
-            try {
-                await checkEquipmentWatchdog();
-            } catch (e) {
-                console.error('[WATCHDOG] Error:', e);
-            }
-        }, 60000);
+        if (SHOULD_START_PROCESSOR) {
+            setInterval(async () => {
+                try {
+                    await checkEquipmentWatchdog();
+                } catch (e) {
+                    console.error('[WATCHDOG] Error:', e);
+                }
+            }, 60000);
+        }
 
         // 5. Start History Log Cleanup (Scheduled at 00:00 UTC)
         const fileLogger = require('./utils/fileLogger');
@@ -1348,14 +1358,28 @@ async function startServices() {
         }, 5000);
 
         // Start scheduler
-        scheduleCleanup();
+        if (SHOULD_START_PROCESSOR) {
+            scheduleCleanup();
+        }
+
+        if (PIPELINE_MODE === 'split' && SHOULD_START_PROCESSOR) {
+            try {
+                const QueuedDataProcessor = require('./services/queued_data_processor');
+                const queuedProcessor = new QueuedDataProcessor();
+                queuedProcessor.start();
+            } catch (e) {
+                console.error('[SYSTEM] queued processor init error:', e);
+            }
+        }
 
         // 6. Start Network Listener for modular parsers (UDP/TCP)
-        try {
-            const networkListener = require('./services/network_listener');
-            networkListener.initialize();
-        } catch (e) {
-            console.error('[SYSTEM] networkListener init error:', e);
+        if (SHOULD_START_COLLECTOR) {
+            try {
+                const networkListener = require('./services/network_listener');
+                networkListener.initialize();
+            } catch (e) {
+                console.error('[SYSTEM] networkListener init error:', e);
+            }
         }
 
         console.log('[SYSTEM] Core services initialized (30s polling & 4min watchdog active)');

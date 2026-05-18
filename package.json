@@ -6,6 +6,9 @@
   "scripts": {
     "start": "bun src/server.ts",
     "dev": "bun --watch src/server.ts",
+    "start:web": "bun src/web.ts",
+    "start:collector": "bun src/collector.ts",
+    "start:processor": "bun src/processor.ts",
     "init-db": "bun db/init.js",
     "pm2:start": "pm2 start ecosystem.config.js --env production",
     "pm2:start:windows": "pm2 start ecosystem.windows.config.js --env production",
