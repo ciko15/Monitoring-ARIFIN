@@ -445,8 +445,13 @@ function getLatestLogsBySource(equipmentId) {
 }
 
 async function getEquipmentStatsSummary() {
-  const allEquipment = await readJson(EQUIPMENT_CONFIG_PATH);
-  const equipmentList = allEquipment.filter(e => e.isActive === true || e.isActive === 'true');
+  const result = await getAllEquipment({
+    isActive: true,
+    includeData: true,
+    page: 1,
+    limit: 10000
+  });
+  const equipmentList = result.data || [];
 
   const stats = {
     total: equipmentList.length,

@@ -251,16 +251,16 @@
               </table>
             </div>
           </div>
+          <div class="form-actions equipment-form-actions">
+            <button type="button" class="btn btn-danger" id="cancelEquipmentEdit">
+              <i class="fas fa-times"></i> Cancel
+            </button>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save"></i> Save Equipment
+            </button>
+          </div>
+        </form>
       </div>
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">
-          <i class="fas fa-save"></i> Save Equipment
-        </button>
-        <button type="button" class="btn btn-danger" id="cancelEquipmentEdit">
-          <i class="fas fa-times"></i> Cancel
-        </button>
-      </div>
-      </form>
     </div>
   </div>
   </div>
@@ -383,7 +383,7 @@
               <label for="dataSourceLongitude">Longitude</label>
               <div style="display: flex; gap: 8px;">
                 <input type="text" id="dataSourceLongitude" placeholder="e.g. 106.8272" style="flex: 1;">
-                <button type="button" class="btn btn-secondary" onclick="openMapPicker('dataSource')" title="Pick from map">
+                <button type="button" class="btn btn-secondary" onclick="enableMapPick('dataSource')" title="Pick from map">
                   <i class="fas fa-map-marker-alt"></i>
                 </button>
               </div>

@@ -838,7 +838,7 @@ async function loadEquipmentMarkers() {
   }
 
   try {
-    const res = await fetch(`${API_URL}/equipment?isActive=true`, {
+    const res = await fetch(`${API_URL}/equipment?isActive=true&includeData=true`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);

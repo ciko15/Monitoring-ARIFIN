@@ -687,7 +687,7 @@
     "lat": -2.599,
     "lon": 140.528,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR",
+    "sup_category": "RADAR",
     "latitude": -2.599,
     "longitude": 140.528
   },
@@ -704,7 +704,7 @@
     "lat": -1.187,
     "lon": 136.112,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR",
+    "sup_category": "RADAR",
     "latitude": -2.599,
     "longitude": 140.528
   },
@@ -721,7 +721,7 @@
     "lat": -8.513,
     "lon": 140.411,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR",
+    "sup_category": "RADAR",
     "latitude": -2.599,
     "longitude": 140.528
   },
@@ -738,7 +738,7 @@
     "lat": -0.891,
     "lon": 131.288,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR",
+    "sup_category": "RADAR",
     "latitude": -2.599,
     "longitude": 140.528
   },
@@ -755,7 +755,7 @@
     "lat": -4.528,
     "lon": 136.887,
     "timeout_ms": 5000,
-    "sup_category": "Radar/MSSR",
+    "sup_category": "RADAR",
     "latitude": -2.599,
     "longitude": 140.528
   },
