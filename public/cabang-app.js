@@ -21,6 +21,8 @@ const cabangModule = (function () {
   let autoRefreshInterval = null;
   let isLoadingEquipment = false;
   let lastRenderSignature = '';
+  let lastEquipmentFetchAt = 0;
+  const MIN_FETCH_INTERVAL_MS = 7000;
 
   // DOM Elements
   const cabangGrid = document.getElementById('cabangGrid');
@@ -70,7 +72,7 @@ const cabangModule = (function () {
 
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => {
-        loadEquipment();
+        loadEquipment(true);
       });
     }
   }
@@ -117,6 +119,11 @@ const cabangModule = (function () {
   }
 
   async function loadEquipment(silent = false) {
+    const now = Date.now();
+    if (now - lastEquipmentFetchAt < MIN_FETCH_INTERVAL_MS) {
+      return;
+    }
+
     if (isLoadingEquipment) return;
     isLoadingEquipment = true;
 
@@ -132,6 +139,11 @@ const cabangModule = (function () {
       } catch (e) {
         console.warn('[Cabang] Failed to parse equipment cache:', e);
       }
+    }
+
+    // If data is already visible, never replace whole grid with loading spinner.
+    if (equipmentData.length > 0) {
+      silent = true;
     }
 
     if (!silent && cabangGrid) {
@@ -159,6 +171,7 @@ const cabangModule = (function () {
 
       // Save to cache for next visit
       localStorage.setItem('cabang_equipment_cache', JSON.stringify(equipmentData));
+      lastEquipmentFetchAt = Date.now();
 
       renderCabangGrid();
     } catch (error) {

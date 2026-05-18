@@ -758,7 +758,11 @@ const app = new Elysia()
     .group('/api/sup-categories', (app) =>
         app.get('/', async () => await db.getAllSupCategories())
             .get('/:category', async ({ params }) => await db.getSupCategoriesByCategory(params.category))
-            .put('/:category', async ({ params, body }) => await db.updateSupCategory(params.category, (body as any).sub_categories))
+            .put('/:category', async ({ params, body }) => {
+                const result = await db.updateSupCategory(params.category, (body as any).sub_categories);
+                pushSyncToTOC();
+                return result;
+            })
     )
 
     // --- EQUIPMENT OTENTICATION ROUTES ---
@@ -800,6 +804,7 @@ const app = new Elysia()
             .post('/', async ({ body, set }) => {
                 const item = await db.createAirport(body);
                 set.status = 201;
+                pushSyncToTOC();
                 return item;
             }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
             .put('/:id', async ({ params, body, set }) => {
@@ -808,10 +813,12 @@ const app = new Elysia()
                     set.status = 404;
                     return { success: false, message: 'Airport not found' };
                 }
+                pushSyncToTOC();
                 return updated;
             }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
             .delete('/:id', async ({ params }) => {
                 await db.deleteAirport(params.id);
+                pushSyncToTOC();
                 return { success: true, message: 'Airport deleted' };
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .get('/gateway-status', async ({ query: { airportId }, set }) => {
@@ -1135,15 +1142,18 @@ const app = new Elysia()
             .post('/limitations', async ({ body, set }) => {
                 const item = await db.createLimitation(body as any);
                 set.status = 201;
+                pushSyncToTOC();
                 return item;
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .put('/limitations/:id', async ({ params, body, set }) => {
                 const updated = await db.updateLimitation(params.id, body);
                 if (!updated) { set.status = 404; return { message: 'Not found' }; }
+                pushSyncToTOC();
                 return updated;
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .delete('/limitations/:id', async ({ params }) => {
                 await db.deleteLimitation(params.id);
+                pushSyncToTOC();
                 return { message: 'Deleted' };
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
 
@@ -1151,15 +1161,18 @@ const app = new Elysia()
             .post('/authentications', async ({ body, set }) => {
                 const item = await db.createOtentication(body as any);
                 set.status = 201;
+                pushSyncToTOC();
                 return item;
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .put('/authentications/:id', async ({ params, body, set }) => {
                 const updated = await db.updateOtentication(params.id, body);
                 if (!updated) { set.status = 404; return { message: 'Not found' }; }
+                pushSyncToTOC();
                 return updated;
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .delete('/authentications/:id', async ({ params }) => {
                 await db.deleteOtentication(params.id);
+                pushSyncToTOC();
                 return { message: 'Deleted' };
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
 
@@ -1167,15 +1180,18 @@ const app = new Elysia()
             .post('/parsings', async ({ body, set }) => {
                 const item = await db.createParsingConfig(body as any);
                 set.status = 201;
+                pushSyncToTOC();
                 return item;
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .put('/parsings/:id', async ({ params, body, set }) => {
                 const updated = await db.updateParsingConfig(params.id, body);
                 if (!updated) { set.status = 404; return { message: 'Not found' }; }
+                pushSyncToTOC();
                 return updated;
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .delete('/parsings/:id', async ({ params }) => {
                 await db.deleteParsingConfig(params.id);
+                pushSyncToTOC();
                 return { message: 'Deleted' };
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
 

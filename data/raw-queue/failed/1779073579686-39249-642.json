@@ -1,0 +1,30 @@
+{
+  "type": "parsed",
+  "timestamp": "2026-05-18T03:06:19.686Z",
+  "source": {
+    "id": 1777800010041,
+    "equipt_id": "1777800000001",
+    "name": "CMS 2",
+    "ip_address": "192.168.64.41",
+    "parsing_id": "snmp_system"
+  },
+  "parsedData": {
+    "data": {
+      "connectivity": "Disconnected",
+      "sys_name": "—",
+      "sys_descr": "—",
+      "sys_uptime": "—",
+      "cpu_usage": "—",
+      "ram_total_mb": "—",
+      "ram_used_mb": "—",
+      "ram_usage_pct": "—",
+      "disk_total_gb": "—",
+      "disk_used_gb": "—",
+      "disk_usage_pct": "—"
+    },
+    "source": "CMS 2",
+    "_ip": "192.168.64.41"
+  },
+  "connectionType": "snmp_system",
+  "status": "Disconnect"
+}
