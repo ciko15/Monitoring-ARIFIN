@@ -138,6 +138,17 @@ function parseFrames(buf) {
     return results;
 }
 
+function hasPartialFrame(buf) {
+    const sohPos = buf.lastIndexOf(0x01);
+    if (sohPos < 0) return false;
+
+    const stxPos = buf.indexOf(0x02, sohPos + 1);
+    if (stxPos < 0) return true;
+
+    const etxPos = buf.indexOf(0x03, stxPos + 1);
+    return etxPos < 0;
+}
+
 // ── checkAlarms ──────────────────────────────────────────────────────────────
 function checkAlarms(d, isActive) {
     const alarms = [];
@@ -190,7 +201,12 @@ class DmeMaru310320Parser extends BaseParser {
             const frames = parseFrames(this._buf);
 
             if (frames.length === 0) {
-                return { success: false, error: 'No valid DME frames', status: 'Waiting', _mode: this._mode };
+                return {
+                    success: false,
+                    error: hasPartialFrame(this._buf) ? 'Menunggu data' : 'No valid DME frames',
+                    status: 'Waiting',
+                    _mode: this._mode
+                };
             }
 
             // Update last data per unit

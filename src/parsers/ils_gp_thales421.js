@@ -134,6 +134,15 @@ function extractFrames(buf) {
     return results;
 }
 
+function hasPartialFrame(buf) {
+    for (let i = 0; i < buf.length; i++) {
+        if (isPktCSync(buf, i)) {
+            return i + PKT_C_SIZE > buf.length;
+        }
+    }
+    return buf.length > 0 && buf.length < PKT_C_SIZE;
+}
+
 function checkAlarms(params) {
     const alarms = [];
     for (const [key, lim] of Object.entries(LIMITS)) {
@@ -176,7 +185,8 @@ class IlsGpThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
-                return { success: false, error: 'No valid GP frames', status: 'Waiting',
+                const waitingError = hasPartialFrame(this._buf) ? 'Menunggu data' : 'No valid GP frames';
+                return { success: false, error: waitingError, status: 'Waiting',
                          _mode: this._mode,
                          data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
             }

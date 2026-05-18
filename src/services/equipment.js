@@ -256,8 +256,13 @@ class EquipmentService {
     async saveToLogs(equipmentId, parsedData, connectionType = 'system', status = 'Normal') {
         try {
             const equipment = await this.db.getEquipmentById(equipmentId);
+            if (!equipment) {
+                console.warn(`[EquipmentService] Skipping log save: equipment ${equipmentId} not found`);
+                return;
+            }
+
             const airport = equipment ? await this.db.getAirportById(equipment.airportId) : null;
-            const equipName = equipment ? equipment.name : 'Unknown';
+            const equipName = equipment.name;
 
             // 1. JSON-line file logging (data/YYYY-MM/DD/...)
             try {
@@ -266,7 +271,7 @@ class EquipmentService {
                     ...parsedData,
                     source: connectionType,
                     status,
-                    _ip: parsedData._ip || (equipment ? equipment.ip || equipment.host : 'unknown')
+                    _ip: parsedData._ip || equipment.ip || equipment.host || 'unknown'
                 });
             } catch (err) {
                 console.error('[EquipmentService] File logging error:', err);

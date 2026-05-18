@@ -12,6 +12,20 @@ class NetworkListenerService {
     constructor() {
         this.equipmentService = new EquipmentService(db);
         this.activeListeners = new Set(); // source_id -> true
+        this._parseWarningTimestamps = new Map();
+    }
+
+    _shouldLogParseWarning(sourceId, errorKey, throttleMs = 15000) {
+        const key = `${sourceId}:${errorKey}`;
+        const now = Date.now();
+        const lastLoggedAt = this._parseWarningTimestamps.get(key) || 0;
+
+        if (now - lastLoggedAt < throttleMs) {
+            return false;
+        }
+
+        this._parseWarningTimestamps.set(key, now);
+        return true;
     }
 
     /**
@@ -728,11 +742,19 @@ class NetworkListenerService {
             const hasExistingData = parser && typeof parser.getLastData === 'function'
                 ? Object.keys(parser.getLastData()).length > 0
                 : false;
+            const transientParseErrors = new Set([
+                'No valid GP frames',
+                'No valid DME frames',
+                'No valid LLZ frames',
+                'Menunggu data'
+            ]);
 
             if (!parsedResult.success) {
                 // Parse gagal — skip log agar tidak menimpa data valid
-                if (parsedResult.error && parsedResult.error !== 'Menunggu data') {
+                if (parsedResult.error && !transientParseErrors.has(parsedResult.error)) {
                     console.warn(`[NetworkListener] Skipping failed parse log for ${name}: ${parsedResult.error}`);
+                } else if (parsedResult.error && this._shouldLogParseWarning(id, parsedResult.error)) {
+                    console.log(`[NetworkListener] Waiting for complete frame from ${name}: ${parsedResult.error}`);
                 }
                 return;
             }
