@@ -935,10 +935,47 @@ async function loadEquipment() {
     const res = await fetch(`${API_URL}/equipment?isActive=all`, { headers: getAuthHeaders() });
     const result = await res.json();
     equipmentData = result.data || result;
-    renderEquipmentTable(equipmentData);
+    applyEquipmentFilters();
     updateLogEquipmentFilterOptions();
   } catch (err) { console.error('Equipment load error:', err); }
   finally { pollState.equipment = false; }
+}
+
+function normalizeEquipmentSearchValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getFilteredEquipmentData() {
+  const searchInput = document.getElementById('searchEquipment');
+  const categorySelect = document.getElementById('filterCategory');
+
+  const searchTerm = normalizeEquipmentSearchValue(searchInput?.value);
+  const selectedCategory = normalizeEquipmentSearchValue(categorySelect?.value);
+
+  return (Array.isArray(equipmentData) ? equipmentData : []).filter(item => {
+    const airport = (window.airportsData || []).find(a => String(a.id) === String(item.airportId || item.branch_id));
+    const airportName = airport ? airport.name : '';
+    const searchableText = [
+      item.name,
+      item.category,
+      item.sup_category,
+      item.merk,
+      item.type,
+      airportName,
+      item.description
+    ]
+      .map(normalizeEquipmentSearchValue)
+      .join(' ');
+
+    const matchesSearch = !searchTerm || searchableText.includes(searchTerm);
+    const matchesCategory = !selectedCategory || normalizeEquipmentSearchValue(item.category) === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+}
+
+function applyEquipmentFilters() {
+  renderEquipmentTable(getFilteredEquipmentData());
 }
 
 function renderEquipmentTable(data) {
@@ -946,7 +983,11 @@ function renderEquipmentTable(data) {
   if (!tbody) return;
 
   if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No equipment available</td></tr>';
+    const hasActiveFilters = Boolean(
+      normalizeEquipmentSearchValue(document.getElementById('searchEquipment')?.value) ||
+      normalizeEquipmentSearchValue(document.getElementById('filterCategory')?.value)
+    );
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${hasActiveFilters ? 'No equipment match the current search/filter' : 'No equipment available'}</td></tr>`;
     return;
   }
 
@@ -1499,6 +1540,10 @@ async function loadAirports() {
         airportSelect.value = airportsData[0].id;
       }
     }
+
+    if (equipmentData.length > 0) {
+      applyEquipmentFilters();
+    }
   } catch (err) { console.error('Airports load error:', err); }
   finally { pollState.airports = false; }
 }
@@ -1831,6 +1876,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const loginForm = document.getElementById('loginForm');
   if (loginForm) loginForm.addEventListener('submit', handleLogin);
+
+  const searchEquipmentInput = document.getElementById('searchEquipment');
+  if (searchEquipmentInput) {
+    searchEquipmentInput.addEventListener('input', applyEquipmentFilters);
+  }
+
+  const filterCategorySelect = document.getElementById('filterCategory');
+  if (filterCategorySelect) {
+    filterCategorySelect.addEventListener('change', applyEquipmentFilters);
+  }
 
   // Registration Logic
   const registerForm = document.getElementById('registerForm');

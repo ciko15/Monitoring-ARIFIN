@@ -215,8 +215,10 @@ const cabangModule = (function () {
 
     // Apply Category Filter
     if (currentCategoryFilter) {
-      filtered = filtered.filter(e => e.category === currentCategoryFilter);
+      const cat = String(currentCategoryFilter).trim().toLowerCase();
+      filtered = filtered.filter(e => String(e.category || '').trim().toLowerCase() === cat);
     }
+
 
     // Apply Status Filter
     if (currentStatusFilter) {
