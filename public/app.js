@@ -376,9 +376,22 @@ async function loadAuthentications() {
     const res = await fetch(`${API_URL}/config/authentications`, { headers: getAuthHeaders() });
     const data = await res.json();
     authenticationsData = Array.isArray(data) ? data : (data.data || []);
+    window.authenticationsDataCache = authenticationsData;
+    localStorage.setItem('authentications_cache', JSON.stringify(authenticationsData));
   } catch (err) {
     console.error('Error loading authentications:', err);
+    const cached = localStorage.getItem('authentications_cache');
+    if (cached) {
+      try {
+        authenticationsData = JSON.parse(cached);
+        window.authenticationsDataCache = authenticationsData;
+        return;
+      } catch (parseErr) {
+        console.warn('Failed to parse authentications cache:', parseErr);
+      }
+    }
     authenticationsData = [];
+    window.authenticationsDataCache = [];
   }
 }
 
@@ -387,9 +400,22 @@ async function loadAuthenticationsFromConfig() {
     const res = await fetch('/db/equipment_otentication_config.json');
     const data = await res.json();
     authenticationsData = Array.isArray(data) ? data : [];
+    window.authenticationsDataCache = authenticationsData;
+    localStorage.setItem('authentications_cache', JSON.stringify(authenticationsData));
   } catch (err) {
     console.error('Error loading authentications from config:', err);
+    const cached = localStorage.getItem('authentications_cache');
+    if (cached) {
+      try {
+        authenticationsData = JSON.parse(cached);
+        window.authenticationsDataCache = authenticationsData;
+        return;
+      } catch (parseErr) {
+        console.warn('Failed to parse authentications cache:', parseErr);
+      }
+    }
     authenticationsData = [];
+    window.authenticationsDataCache = [];
   }
 }
 

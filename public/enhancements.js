@@ -11,8 +11,10 @@
     // ── State ────────────────────────────────────────────────────────────────
     let _selectedEqId  = null;
     let _sourcesCache  = {};
+    let _sourceFetchMeta = {};
     window.templatesCache = [];
     window.limitationsCache = [];
+    const SOURCE_FETCH_TTL_MS = 15000;
 
     const PREVIEW_SCHEMAS = {
         'dvor_maru_220': ['mon1_azimuth', 'mon1_carrier_power', 'mon2_azimuth', 'mon2_carrier_power', 'tx_active', 'lcu_dc_28v'],
@@ -158,6 +160,58 @@
         patchCards();
     }
 
+    function getCachedEquipmentById(equipmentId) {
+        if (Array.isArray(window.equipmentDataCache)) {
+            const found = window.equipmentDataCache.find(e => String(e.id) === String(equipmentId));
+            if (found) return found;
+        }
+
+        const raw = localStorage.getItem('cabang_equipment_cache');
+        if (!raw) return null;
+
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed.find(e => String(e.id) === String(equipmentId)) || null : null;
+        } catch (e) {
+            console.warn('[Enhancements] Failed to parse equipment cache:', e);
+            return null;
+        }
+    }
+
+    function getCachedAuthSources(equipmentId) {
+        const allSources = Array.isArray(window.authenticationsDataCache) ? window.authenticationsDataCache : [];
+        return allSources.filter(src => String(src.equipt_id) === String(equipmentId));
+    }
+
+    function buildSourcesFromLastData(equipmentId) {
+        const eq = getCachedEquipmentById(equipmentId);
+        const lastData = eq && eq.lastData ? eq.lastData : null;
+        if (!lastData) return [];
+
+        return Object.entries(lastData).map(([sourceName, sourceData]) => ({
+            id: `cached-${equipmentId}-${sourceName}`,
+            equipt_id: equipmentId,
+            name: sourceName,
+            ip_address: sourceData?._ip || '—',
+            parsing_id: sourceData?._parsing_id || ''
+        }));
+    }
+
+    function getBestAvailableSources(equipmentId) {
+        const cachedSources = _sourcesCache[equipmentId];
+        if (Array.isArray(cachedSources) && cachedSources.length > 0) return cachedSources;
+
+        const authSources = getCachedAuthSources(equipmentId);
+        if (authSources.length > 0) return authSources;
+
+        return buildSourcesFromLastData(equipmentId);
+    }
+
+    function shouldRefreshSources(equipmentId) {
+        const lastFetchedAt = _sourceFetchMeta[equipmentId] || 0;
+        return (Date.now() - lastFetchedAt) > SOURCE_FETCH_TTL_MS;
+    }
+
     // ── Source Panel ──────────────────────────────────────────────────────────
     window.openSourcePanel = async function openSourcePanel(equipmentId, cardEl) {
         _selectedEqId = equipmentId;
@@ -177,8 +231,9 @@
         if (!panel || !body) return;
 
         // Show cached data immediately if available
-        if (_sourcesCache[equipmentId]) {
-            renderSourcePanel(_sourcesCache[equipmentId], body, equipmentId);
+        const immediateSources = getBestAvailableSources(equipmentId);
+        if (immediateSources.length > 0) {
+            renderSourcePanel(immediateSources, body, equipmentId);
         } else {
             body.innerHTML = `<div style="padding:20px;text-align:center;color:#4a7a9a">
                 <i class="fas fa-spinner fa-spin"></i><p style="margin-top:8px">Loading sources...</p>
@@ -191,6 +246,11 @@
         // Update panel header
         const header = panel.querySelector('.detail-panel-header h3');
         if (header) header.innerHTML = `<i class="fas fa-satellite-dish"></i> ${eqName}`;
+
+        // Avoid forcing a network round-trip on every click if cached data is still fresh.
+        if (!shouldRefreshSources(equipmentId)) {
+            return;
+        }
 
         // Fetch sources + lastData terbaru secara paralel
         try {
@@ -206,18 +266,32 @@
                     if (!window.equipmentDataCache) window.equipmentDataCache = [];
                     const idx = window.equipmentDataCache.findIndex(e => String(e.id) === String(equipmentId));
                     if (idx !== -1) {
-                        window.equipmentDataCache[idx].lastData = eqData.lastData;
+                        window.equipmentDataCache[idx] = { ...window.equipmentDataCache[idx], ...eqData, lastData: eqData.lastData };
                     } else {
                         window.equipmentDataCache.push(eqData);
                     }
+                    localStorage.setItem('cabang_equipment_cache', JSON.stringify(window.equipmentDataCache));
                 }
             }
 
             const finalSources = Array.isArray(srcJson) ? srcJson : [];
-            _sourcesCache[equipmentId] = finalSources;
-            renderSourcePanel(finalSources, body, equipmentId);
+            _sourceFetchMeta[equipmentId] = Date.now();
+            if (finalSources.length > 0) {
+                _sourcesCache[equipmentId] = finalSources;
+                const mergedAuthCache = Array.isArray(window.authenticationsDataCache) ? [...window.authenticationsDataCache] : [];
+                const preserved = mergedAuthCache.filter(src => String(src.equipt_id) !== String(equipmentId));
+                window.authenticationsDataCache = preserved.concat(finalSources);
+                localStorage.setItem('authentications_cache', JSON.stringify(window.authenticationsDataCache));
+                renderSourcePanel(finalSources, body, equipmentId);
+            } else if (immediateSources.length === 0) {
+                _sourcesCache[equipmentId] = finalSources;
+                renderSourcePanel(finalSources, body, equipmentId);
+            }
         } catch(e) {
-            body.innerHTML = `<div style="padding:20px;color:#ff3355">Gagal memuat sources: ${e.message}</div>`;
+            _sourceFetchMeta[equipmentId] = 0;
+            if (immediateSources.length === 0) {
+                body.innerHTML = `<div style="padding:20px;color:#ff3355">Gagal memuat sources: ${e.message}</div>`;
+            }
         }
     }
 
