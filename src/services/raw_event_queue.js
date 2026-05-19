@@ -9,11 +9,21 @@ class RawEventQueue {
         this.failedDir = path.join(baseDir, 'failed');
         this._sequence = 0;
 
+        // Cleanup TTL (ms). Default: 30 minutes as requested.
+        this.ttlMs = parseInt(process.env.RAW_EVENT_QUEUE_TTL_MS || '') || 30 * 60 * 1000;
+        // How often to run cleanup (ms)
+        this.cleanupIntervalMs = parseInt(process.env.RAW_EVENT_QUEUE_CLEANUP_INTERVAL_MS || '') || 60 * 1000;
+
+        this._cleanupTimer = null;
+
         this._ensureDir(this.baseDir);
         this._ensureDir(this.pendingDir);
         this._ensureDir(this.processingDir);
         this._ensureDir(this.failedDir);
+
+        this.startCleanup();
     }
+
 
     _ensureDir(targetDir) {
         if (!fs.existsSync(targetDir)) {
@@ -36,6 +46,45 @@ class RawEventQueue {
         await fs.promises.rename(tempPath, finalPath);
         return finalPath;
     }
+
+    startCleanup() {
+        if (this._cleanupTimer) return;
+        console.log(`[RawEventQueue] cleanup enabled ttlMs=${this.ttlMs} cleanupIntervalMs=${this.cleanupIntervalMs}`);
+        this._cleanupTimer = setInterval(() => {
+            this.cleanupExpired().catch(err => {
+                console.error('[RawEventQueue] cleanupExpired error:', err?.message || err);
+            });
+        }, this.cleanupIntervalMs);
+    }
+
+
+    async cleanupExpired() {
+        const now = Date.now();
+        const cutoff = now - this.ttlMs;
+
+        const dirs = [this.pendingDir, this.processingDir, this.failedDir];
+        for (const dir of dirs) {
+            if (!fs.existsSync(dir)) continue;
+
+            const entries = await fs.promises.readdir(dir);
+            for (const fileName of entries) {
+                if (!fileName.endsWith('.json')) continue;
+
+                const filePath = path.join(dir, fileName);
+                try {
+                    const stat = await fs.promises.stat(filePath);
+                    // Use mtime as “read/exists” age proxy
+                    const mtime = new Date(stat.mtime).getTime();
+                    if (mtime < cutoff) {
+                        await fs.promises.unlink(filePath).catch(() => {});
+                    }
+                } catch (_) {
+                    // ignore
+                }
+            }
+        }
+    }
+
 
     async claimBatch(limit = 20) {
         const entries = await fs.promises.readdir(this.pendingDir);
