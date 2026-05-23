@@ -12,6 +12,8 @@ const VhfT6tvParser = require('./vhf_t6tv');
 const Pm5560ModbusParser = require('./pm5560_modbus');
 const VhfMarcRseParser = require('./vhf_marc_rse');
 const TempHumidityParser = require('./temp_humidity_modbus');
+const IlsGpThales421Parser = require('./ils_gp_thales421');
+const IlsLlzThales421Parser = require('./ils_llz_thales421');
 
 class ParserFactory {
     /**
@@ -85,6 +87,12 @@ class ParserFactory {
             case 'pm5560_modbus':
                 return new Pm5560ModbusParser(config);
 
+            case 'ils_gp_thales421':
+                return new IlsGpThales421Parser(config);
+
+            case 'ils_llz_thales421':
+                return new IlsLlzThales421Parser(config);
+
             case 'json':
                 return new JsonParser(config);
             
@@ -103,7 +111,22 @@ class ParserFactory {
      * @returns {Array} List of supported parser types
      */
     static getSupportedTypes() {
-        return ['rcms', 'asterix', 'snmp', 'json', 'tcp', 'udp', 'dvor_maru_220', 'dme_maru_310_320'];
+        return [
+            'rcms',
+            'asterix',
+            'snmp',
+            'json',
+            'tcp',
+            'udp',
+            'dvor_maru_220',
+            'dme_maru_310_320',
+            'pm5560_modbus',
+            'temp_humidity_modbus',
+            'ils_gp_thales421',
+            'ils_llz_thales421',
+            'vhf_t6tv',
+            'vhf_marc_rse'
+        ];
     }
 }
 
