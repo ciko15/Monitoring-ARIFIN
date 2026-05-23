@@ -203,9 +203,10 @@ async function startCapture() {
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ interface: selectedInterface })
     });
-    
-    if (!response.ok) {
-      throw new Error('Failed to start packet capture');
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.error || 'Failed to start packet capture');
     }
     
     updateCaptureStatus();

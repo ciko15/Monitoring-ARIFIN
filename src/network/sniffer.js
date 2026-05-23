@@ -2,6 +2,7 @@
 // Captures and processes real network packets
 
 const { spawn, exec } = require('child_process');
+const fs = require('fs');
 const util = require('util');
 const execPromise = util.promisify(exec);
 const networkMonitor = require('./monitor');
@@ -16,6 +17,8 @@ class PacketSniffer {
     this.tcpdumpAvailable = null;
     this.tsharkProcess = null;
     this.tsharkAvailable = null;
+    this.tcpdumpPath = null;
+    this.tsharkPath = null;
     this.packetCounter = 0;
     this.currentInterface = null;
     this.lastError = null;
@@ -26,9 +29,11 @@ class PacketSniffer {
     try {
       const cmd = process.platform === 'win32' ? 'where tcpdump' : 'command -v tcpdump';
       const { stdout } = await execPromise(cmd);
-      this.tcpdumpAvailable = !!stdout.trim();
+      this.tcpdumpPath = this.extractBinaryPath(stdout) || this.findCommonBinaryPath('tcpdump');
+      this.tcpdumpAvailable = !!this.tcpdumpPath;
     } catch (error) {
-      this.tcpdumpAvailable = false;
+      this.tcpdumpPath = this.findCommonBinaryPath('tcpdump');
+      this.tcpdumpAvailable = !!this.tcpdumpPath;
     }
     return this.tcpdumpAvailable;
   }
@@ -38,11 +43,45 @@ class PacketSniffer {
     try {
       const cmd = process.platform === 'win32' ? 'where tshark' : 'command -v tshark';
       const { stdout } = await execPromise(cmd);
-      this.tsharkAvailable = !!stdout.trim();
+      this.tsharkPath = this.extractBinaryPath(stdout) || this.findCommonBinaryPath('tshark');
+      this.tsharkAvailable = !!this.tsharkPath;
     } catch (error) {
-      this.tsharkAvailable = false;
+      this.tsharkPath = this.findCommonBinaryPath('tshark');
+      this.tsharkAvailable = !!this.tsharkPath;
     }
     return this.tsharkAvailable;
+  }
+
+  extractBinaryPath(stdout) {
+    if (!stdout) return null;
+    const firstLine = String(stdout)
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .find(Boolean);
+    return firstLine || null;
+  }
+
+  findCommonBinaryPath(binaryName) {
+    const candidates = {
+      tcpdump: process.platform === 'win32'
+        ? [
+            'C:\\Program Files\\WinDump\\WinDump.exe',
+            'C:\\Program Files (x86)\\WinDump\\WinDump.exe',
+            'C:\\Windows\\System32\\tcpdump.exe'
+          ]
+        : ['/usr/sbin/tcpdump', '/usr/bin/tcpdump', '/opt/homebrew/bin/tcpdump'],
+      tshark: process.platform === 'win32'
+        ? [
+            'C:\\Program Files\\Wireshark\\tshark.exe',
+            'C:\\Program Files (x86)\\Wireshark\\tshark.exe'
+          ]
+        : ['/opt/homebrew/bin/tshark', '/usr/local/bin/tshark', '/usr/bin/tshark']
+    };
+
+    for (const candidate of candidates[binaryName] || []) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
   }
 
   async start(interfaceName = null) {
@@ -82,7 +121,7 @@ class PacketSniffer {
       this.captureMode = 'tcpdump';
       this.startTcpdumpCapture(this.currentInterface);
     } else {
-      const msg = `No capture tools found (tshark/tcpdump). Please install Wireshark or tcpdump.`;
+      const msg = `No capture tools found (tshark/tcpdump). Please install Wireshark/Npcap or tcpdump and ensure the service can access the binary path.`;
       console.error(`[Packet Sniffer] ${msg}`);
       this.lastError = msg;
       this.captureMode = 'none';
@@ -95,7 +134,7 @@ class PacketSniffer {
       // -x for hex, -s 96 for a small slice of data (enough for headers + some payload)
       // -l for line-buffered, -n for no DNS lookups, -U for unbuffered
       const args = ['-U', '-l', '-n', '-i', interfaceName, '-x', '-s', '256'];
-      const tcpdumpPath = process.platform === 'darwin' ? '/usr/sbin/tcpdump' : 'tcpdump';
+      const tcpdumpPath = this.tcpdumpPath || (process.platform === 'darwin' ? '/usr/sbin/tcpdump' : 'tcpdump');
       console.log(`[Packet Sniffer] Spawning: ${tcpdumpPath} ${args.join(' ')}`);
       this.tcpdumpProcess = spawn(tcpdumpPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -377,8 +416,9 @@ class PacketSniffer {
                     '-e', 'frame.number', '-e', 'frame.time_relative', 
                     '-e', '_ws.col.Protocol', '-e', 'ip.src', '-e', 'ip.dst', 
                     '-e', 'frame.len', '-e', 'frame.info'];
-      console.log(`[Packet Sniffer] Spawning Tshark: tshark ${args.join(' ')}`);
-      this.tsharkProcess = spawn('tshark', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      const tsharkPath = this.tsharkPath || 'tshark';
+      console.log(`[Packet Sniffer] Spawning Tshark: ${tsharkPath} ${args.join(' ')}`);
+      this.tsharkProcess = spawn(tsharkPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
       let buffer = '';
       this.tsharkProcess.stdout.setEncoding('utf8');

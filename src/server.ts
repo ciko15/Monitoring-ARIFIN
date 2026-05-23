@@ -1023,10 +1023,14 @@ const app = new Elysia()
             const sniffer = require('./network/sniffer');
             return { success: true, data: sniffer.getStatistics() };
         })
-        .post('/sniffer/start', async ({ body }) => {
+        .post('/sniffer/start', async ({ body, set }) => {
             const sniffer = require('./network/sniffer');
             const { interface: iface } = body as any;
             await sniffer.start(iface);
+            if (sniffer.captureMode === 'none') {
+                set.status = 400;
+                return { success: false, mode: sniffer.captureMode, error: sniffer.lastError || 'Capture failed to start' };
+            }
             return { success: true, mode: sniffer.captureMode };
         })
         .post('/sniffer/stop', () => {
