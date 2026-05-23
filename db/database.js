@@ -12,6 +12,11 @@ const LIMITATION_CONFIG_PATH = path.join(__dirname, 'limitation_config.json');
 const TEMPLATE_CONFIG_PATH = path.join(__dirname, 'templates_config.json');
 const LOGS_DATA_PATH = path.join(__dirname, 'equipment_logs.json');
 const writeLocks = new Map();
+let logsPersistTimer = null;
+let logsPersistPromise = null;
+let logsFileMtimeMs = 0;
+let logsDiskSyncAt = 0;
+const LOGS_SYNC_INTERVAL_MS = 2000;
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -196,12 +201,69 @@ let equipmentLogsDB = [];
     if (fs.existsSync(LOGS_DATA_PATH)) {
       const data = fs.readFileSync(LOGS_DATA_PATH, 'utf8');
       equipmentLogsDB = JSON.parse(data);
+      const stats = fs.statSync(LOGS_DATA_PATH);
+      logsFileMtimeMs = stats.mtimeMs || 0;
+      logsDiskSyncAt = Date.now();
       console.log(`[DB] Persistent logs loaded: ${equipmentLogsDB.length} records`);
     }
   } catch (err) {
     console.error('[DB] Failed to load persistent logs:', err);
   }
 })();
+
+async function syncEquipmentLogsFromDisk(force = false) {
+  try {
+    const now = Date.now();
+    if (!force && now - logsDiskSyncAt < LOGS_SYNC_INTERVAL_MS) {
+      return;
+    }
+
+    logsDiskSyncAt = now;
+    const stats = await fs.promises.stat(LOGS_DATA_PATH).catch(() => null);
+    if (!stats) return;
+
+    const mtimeMs = stats.mtimeMs || 0;
+    if (!force && mtimeMs <= logsFileMtimeMs) {
+      return;
+    }
+
+    const data = await fs.promises.readFile(LOGS_DATA_PATH, 'utf8');
+    equipmentLogsDB = JSON.parse(data);
+    logsFileMtimeMs = mtimeMs;
+  } catch (err) {
+    console.error('[DB] Failed syncing logs from disk:', err);
+  }
+}
+
+function scheduleEquipmentLogsPersist() {
+  if (logsPersistTimer) return;
+
+  logsPersistTimer = setTimeout(async () => {
+    logsPersistTimer = null;
+
+    try {
+      if (logsPersistPromise) {
+        await logsPersistPromise;
+      }
+
+      logsPersistPromise = writeJson(LOGS_DATA_PATH, equipmentLogsDB)
+        .then(async () => {
+          const stats = await fs.promises.stat(LOGS_DATA_PATH).catch(() => null);
+          if (stats) {
+            logsFileMtimeMs = stats.mtimeMs || logsFileMtimeMs;
+          }
+          logsDiskSyncAt = Date.now();
+        })
+        .finally(() => {
+          logsPersistPromise = null;
+        });
+
+      await logsPersistPromise;
+    } catch (err) {
+      console.error('[DB] Failed persisting equipment logs:', err);
+    }
+  }, 500);
+}
 
 let surveillanceStationsDB = [];
 let radarTargetsDB = [];
@@ -254,6 +316,10 @@ async function deleteAirport(id) {
 
 // --- EQUIPMENT ---
 async function getAllEquipment(filters = {}) {
+  if (filters.includeData) {
+    await syncEquipmentLogsFromDisk();
+  }
+
   const equipmentList = await readJson(EQUIPMENT_CONFIG_PATH);
   let filtered = [...equipmentList];
 
@@ -473,6 +539,8 @@ async function getEquipmentStatsSummary() {
 }
 
 async function getEquipmentById(id) {
+  await syncEquipmentLogsFromDisk();
+
   const list = await readJson(EQUIPMENT_CONFIG_PATH);
   const item = list.find(e => String(e.id) === String(id));
   if (!item) return null;
@@ -903,7 +971,7 @@ async function getAllCategories() {
 
 // --- EQUIPMENT LOGS ---
 async function createEquipmentLog(data) {
-  const log = { ...data, id: Date.now(), logged_at: new Date().toISOString() };
+  const log = { ...data, id: Date.now(), logged_at: data.logged_at || new Date().toISOString() };
   equipmentLogsDB.push(log);
   // Simpan max 50 log per source (bukan global shift yang bisa evict source lain)
   const sourceKey = `${data.equipmentId}::${data.source || 'default'}`;
@@ -948,16 +1016,20 @@ async function createEquipmentLog(data) {
     }
   }
   
-  // Persist to file dinonaktifkan — write terlalu sering block event loop
-  // Data tetap ada di memory. Uncomment kalau butuh persist antar restart.
-  // await writeJson(LOGS_DATA_PATH, equipmentLogsDB);
+  scheduleEquipmentLogsPersist();
   
   return log;
 }
 
 async function getEquipmentLogs(filters = {}) {
+  await syncEquipmentLogsFromDisk();
   let filtered = [...equipmentLogsDB];
   if (filters.equipmentId) filtered = filtered.filter(l => l.equipmentId == filters.equipmentId);
+  if (filters.source) filtered = filtered.filter(l => (l.source || 'default') === filters.source);
+  if (filters.from) filtered = filtered.filter(l => new Date(l.logged_at) >= new Date(filters.from));
+  if (filters.to) filtered = filtered.filter(l => new Date(l.logged_at) <= new Date(filters.to));
+
+  filtered.sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at));
 
   const page = filters.page || 1;
   const limit = filters.limit || 100;
@@ -970,6 +1042,7 @@ async function getEquipmentLogs(filters = {}) {
 }
 
 async function getLatestEquipmentLog(equipmentId) {
+  await syncEquipmentLogsFromDisk();
   const filtered = equipmentLogsDB.filter(l => l.equipmentId == equipmentId);
   return filtered[filtered.length - 1] || null;
 }
