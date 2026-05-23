@@ -14,6 +14,24 @@ class EquipmentService {
         this.parsers = new Map(); // equipment_id -> parser instance
     }
 
+    buildParsingHeader(equipment, airport, loggedAt) {
+        const airportName = airport?.name || 'Unknown';
+
+        return {
+            lokasi_bandara: airportName,
+            tanggal_jam_utc: loggedAt,
+            category: equipment?.category || 'Support'
+        };
+    }
+
+    attachParsingHeader(data = {}, header = {}) {
+        const cleanData = data && typeof data === 'object' ? data : {};
+        return {
+            ...header,
+            ...cleanData
+        };
+    }
+
     /**
      * Get equipment with connection config and resolved template
      * @param {number} equipmentId - Equipment ID
@@ -53,8 +71,9 @@ class EquipmentService {
                 for (const log of logsResult.data) {
                     const srcName = log.source || 'default';
                     if (!lastDataMap[srcName]) {
+                        const header = this.buildParsingHeader(equipment, airport, log.logged_at);
                         lastDataMap[srcName] = {
-                            ...log.data,
+                            ...this.attachParsingHeader(log.data, header),
                             _logged_at:  log.logged_at,
                             _status:     log.status,
                             _parsing_id: log.connection_type,
@@ -263,12 +282,18 @@ class EquipmentService {
 
             const airport = equipment ? await this.db.getAirportById(equipment.airportId) : null;
             const equipName = equipment.name;
+            const loggedAt = new Date().toISOString();
+            const parsingHeader = this.buildParsingHeader(equipment, airport, loggedAt);
+            const enrichedParsedData = {
+                ...parsedData,
+                data: this.attachParsingHeader(parsedData?.data, parsingHeader)
+            };
 
             // 1. JSON-line file logging (data/YYYY-MM/DD/...)
             try {
                 const fileLogger = require('../utils/fileLogger');
                 await fileLogger.log(equipName, equipmentId, {
-                    ...parsedData,
+                    ...enrichedParsedData,
                     source: connectionType,
                     status,
                     _ip: parsedData._ip || equipment.ip || equipment.host || 'unknown'
@@ -282,22 +307,42 @@ class EquipmentService {
                 equipmentId,
                 equipment_name: equipName,
                 status,
-                data: parsedData.data || {},
+                lokasi_bandara: parsingHeader.lokasi_bandara,
+                tanggal_jam_utc: parsingHeader.tanggal_jam_utc,
+                data: enrichedParsedData.data || {},
                 source: parsedData.source || (parsedData._sources && parsedData._sources.length > 0 ? parsedData._sources[0].name : 'default'),
                 connection_type: connectionType,
                 airport_name: airport ? airport.name : 'Unknown',
                 airport_city: airport ? airport.city : 'Unknown',
-                logged_at: new Date().toISOString()
+                logged_at: loggedAt
             };
             await this.db.createEquipmentLog(datalog);
 
             const { publishByCategory } = require('../connection/ems');
             const category = equipment ? equipment.category : 'Support';
+            const emsPayload = {
+                ...datalog,
+                data: {
+                    ...(datalog.data || {})
+                }
+            };
+
+            delete emsPayload.lokasi_bandara;
+            delete emsPayload.tanggal_jam_utc;
+            delete emsPayload.data.lokasi_bandara;
+            delete emsPayload.data.tanggal_jam_utc;
+            delete emsPayload.data.category;
 
             await publishByCategory(
                 category,
-                datalog,
-                { requestType: 'SERVICE_LOG' }
+                emsPayload,
+                {
+                    requestType: 'SERVICE_LOG',
+                    metadata: {
+                        LOKASI_BANDARA: parsingHeader.lokasi_bandara,
+                        TANGGAL_JAM_UTC: parsingHeader.tanggal_jam_utc
+                    }
+                }
             ).catch(e => console.warn('[EMS] Failed to publish log to category queue:', e.message));
         } catch (error) {
             console.error('[EquipmentService] Error saving to logs:', error);

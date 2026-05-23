@@ -864,7 +864,7 @@ async function loadEquipmentMarkers() {
   }
 
   try {
-    const res = await fetch(`${API_URL}/equipment?isActive=true&includeData=true`, {
+    const res = await fetch(`${API_URL}/equipment?isActive=true`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -1223,15 +1223,13 @@ window.viewEquipmentDetail = async function (id) {
     // Filter sources for this equipment (using loose equality for string/number id)
     const mySources = (authenticationsData || []).filter(auth => String(auth.equipt_id) === String(item.id));
 
-    // 3. Fetch live lastData (dengan includeData=true) — diperlukan untuk render per-radio MARC
+    // 3. Fetch live lastData khusus equipment ini agar tidak menarik seluruh daftar equipment
     let itemWithData = item;
     try {
-      const dataRes = await fetch(`${API_URL}/equipment?includeData=true&limit=1000`, { headers: getAuthHeaders() });
+      const dataRes = await fetch(`${API_URL}/equipment/${item.id}`, { headers: getAuthHeaders() });
       if (dataRes.ok) {
         const dataResult = await dataRes.json();
-        const dataList = dataResult.data || dataResult;
-        const found = Array.isArray(dataList) ? dataList.find(e => String(e.id) === String(item.id)) : null;
-        if (found) itemWithData = found;
+        if (dataResult && dataResult.id !== undefined) itemWithData = dataResult;
       }
     } catch (e) { /* gunakan item tanpa lastData jika fetch gagal */ }
 

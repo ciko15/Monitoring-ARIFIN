@@ -193,22 +193,38 @@ export async function fetchAndParseData(equipment: any) {
     let aliveCount = 0;
     let totalSourcesToCheck = 0;
 
+    const pingChecks: Promise<any>[] = [];
+
     // Check main IP if configured
     if (ipAddress && isValidIP(ipAddress)) {
         totalSourcesToCheck++;
-        const result = await pingHost(ipAddress, 2);
-        if (result.alive) aliveCount++;
-        sourceResults.push({ name: 'Primary', ip: ipAddress, alive: result.alive });
+        pingChecks.push(
+            pingHost(ipAddress, 2).then(result => ({
+                name: 'Primary',
+                ip: ipAddress,
+                alive: result.alive
+            }))
+        );
     }
 
     // Check all sub-sources from authentication config
     for (const src of subSources) {
         if (src.ip_address && isValidIP(src.ip_address)) {
             totalSourcesToCheck++;
-            const result = await pingHost(src.ip_address, 2);
-            if (result.alive) aliveCount++;
-            sourceResults.push({ name: src.name || 'Sub-Source', ip: src.ip_address, alive: result.alive });
+            pingChecks.push(
+                pingHost(src.ip_address, 2).then(result => ({
+                    name: src.name || 'Sub-Source',
+                    ip: src.ip_address,
+                    alive: result.alive
+                }))
+            );
         }
+    }
+
+    const pingResults = await Promise.all(pingChecks);
+    for (const result of pingResults) {
+        if (result.alive) aliveCount++;
+        sourceResults.push(result);
     }
 
     // Handle case where no IP is configured at all

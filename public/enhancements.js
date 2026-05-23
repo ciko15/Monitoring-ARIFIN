@@ -611,6 +611,19 @@
     function getDetailSections(parserId, data, supCategory) {
         const sections = [];
 
+        const headerUtc = data.tanggal_jam_utc
+            ? new Date(data.tanggal_jam_utc).toISOString()
+            : (data._logged_at ? new Date(data._logged_at).toISOString() : '—');
+
+        sections.push({
+            title: 'HEADER',
+            params: [
+                ['Lokasi Bandara', data.lokasi_bandara || '—', '#00d4ff'],
+                ['Tanggal Jam UTC', headerUtc, '#e8f4ff'],
+                ['Category', data.category || supCategory || 'Support', '#00ffcc']
+            ]
+        });
+
         // Helper: value color berdasarkan range min-max
         const vc = (v, min, max) => {
             const n = parseFloat(v);

@@ -12,9 +12,21 @@ const LIMITATION_CONFIG_PATH = path.join(__dirname, 'limitation_config.json');
 const TEMPLATE_CONFIG_PATH = path.join(__dirname, 'templates_config.json');
 const LOGS_DATA_PATH = path.join(__dirname, 'equipment_logs.json');
 const writeLocks = new Map();
+const jsonCache = new Map();
+const historyTimestampCache = new Map();
+const JSON_CACHE_TTL_MS = 5000;
+const HISTORY_CACHE_REFRESH_MS = 5 * 60 * 1000;
+let historyCacheLoadedAt = 0;
+let historyCacheRefreshPromise = null;
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function cloneValue(value) {
+  if (value === null || value === undefined) return value;
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
 }
 
 // --- PARSER PARAMETER TEMPLATES ---
@@ -53,6 +65,10 @@ const PARSER_TEMPLATES = {
 // --- GENERIC JSON HELPERS ---
 async function readJson(filePath, defaultValue = []) {
   const maxAttempts = 3;
+  const cached = jsonCache.get(filePath);
+  if (cached && (Date.now() - cached.loadedAt) < JSON_CACHE_TTL_MS) {
+    return cloneValue(cached.value);
+  }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -63,7 +79,9 @@ async function readJson(filePath, defaultValue = []) {
           return defaultValue;
         }
         const text = await file.text();
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        jsonCache.set(filePath, { value: parsed, loadedAt: Date.now() });
+        return cloneValue(parsed);
       }
       // Fallback to Node fs for environments without Bun (though this is a Bun app)
       if (!fs.existsSync(filePath)) {
@@ -71,7 +89,9 @@ async function readJson(filePath, defaultValue = []) {
         return defaultValue;
       }
       const data = await fs.promises.readFile(filePath, 'utf8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      jsonCache.set(filePath, { value: parsed, loadedAt: Date.now() });
+      return cloneValue(parsed);
     } catch (err) {
       const isTruncatedJson = err instanceof SyntaxError && /Unexpected end of JSON input/.test(err.message);
       if (isTruncatedJson && attempt < maxAttempts) {
@@ -101,6 +121,7 @@ async function writeJson(filePath, data) {
       }
 
       await fs.promises.rename(tempPath, filePath);
+      jsonCache.set(filePath, { value: cloneValue(data), loadedAt: Date.now() });
       return true;
     } catch (err) {
       console.error(`Error writing JSON to ${filePath}:`, err);
@@ -138,52 +159,108 @@ async function writeAirportConfig(data) {
   return await writeJson(AIRPORT_CONFIG_PATH, data);
 }
 
+function buildParsingHeader(equipment = {}, airport = null, loggedAt = null) {
+  const airportName = airport?.name || 'Unknown';
+
+  return {
+    lokasi_bandara: airportName,
+    tanggal_jam_utc: loggedAt || null,
+    category: equipment?.category || 'Support'
+  };
+}
+
+function attachParsingHeader(data = {}, equipment = {}, airport = null, loggedAt = null) {
+  const cleanData = data && typeof data === 'object' ? data : {};
+  return {
+    ...buildParsingHeader(equipment, airport, loggedAt),
+    ...cleanData
+  };
+}
+
 /**
- * Mencari file log terbaru dengan memindai folder tanggal secara mundur
+ * Membangun cache timestamp log terbaru per equipment dari folder histori.
  */
-function getLatestTimestampFromHistory(equipmentName) {
-  try {
-    const baseDir = path.resolve(__dirname, '../data');
-    if (!fs.existsSync(baseDir)) return null;
+async function refreshHistoryTimestampCache() {
+  if (historyCacheRefreshPromise) return historyCacheRefreshPromise;
 
-    // Sanitize name sama dengan fileLogger.js
-    const safeName = equipmentName.toLowerCase().replace(/[^a-z0-9\s_-]/gi, '_').replace(/\s+/g, '_').substring(0, 50);
-    const fileName = `${safeName}.log`;
+  historyCacheRefreshPromise = (async () => {
+    const nextCache = new Map();
+    try {
+      const baseDir = path.resolve(__dirname, '../data');
+      const stat = await fs.promises.stat(baseDir).catch(() => null);
+      if (!stat || !stat.isDirectory()) {
+        historyTimestampCache.clear();
+        historyCacheLoadedAt = Date.now();
+        return;
+      }
 
-    // Ambil semua folder bulan (YYYY-MM), urutkan terbaru di atas
-    const months = fs.readdirSync(baseDir)
-      .filter(f => /^\d{4}-\d{2}$/.test(f))
-      .sort((a, b) => b.localeCompare(a));
-
-    for (const month of months) {
-      const monthPath = path.join(baseDir, month);
-      // Ambil semua folder hari (DD), urutkan terbaru di atas
-      const days = fs.readdirSync(monthPath)
-        .filter(f => /^\d{2}$/.test(f))
+      const months = (await fs.promises.readdir(baseDir))
+        .filter(f => /^\d{4}-\d{2}$/.test(f))
         .sort((a, b) => b.localeCompare(a));
 
-      for (const day of days) {
-        const filePath = path.join(monthPath, day, fileName);
-        if (fs.existsSync(filePath)) {
-          // Ketemu! Ambil mtime file atau baca baris terakhir
-          const stats = fs.statSync(filePath);
-          
-          // Lebih akurat: baca baris terakhir untuk ambil field "timestamp"
-          const content = fs.readFileSync(filePath, 'utf8').trim().split('\n');
-          if (content.length > 0) {
+      for (const month of months) {
+        const monthPath = path.join(baseDir, month);
+        const days = (await fs.promises.readdir(monthPath))
+          .filter(f => /^\d{2}$/.test(f))
+          .sort((a, b) => b.localeCompare(a));
+
+        for (const day of days) {
+          const dayPath = path.join(monthPath, day);
+          const entries = (await fs.promises.readdir(dayPath))
+            .filter(fileName => fileName.endsWith('.log'))
+            .sort((a, b) => a.localeCompare(b));
+
+          for (const fileName of entries) {
+            if (nextCache.has(fileName)) continue;
+
+            const filePath = path.join(dayPath, fileName);
+            const stats = await fs.promises.stat(filePath).catch(() => null);
+            if (!stats) continue;
+
+            let timestamp = stats.mtime.toISOString();
             try {
-              const lastLine = JSON.parse(content[content.length - 1]);
-              return lastLine.timestamp;
-            } catch (e) {
-              return stats.mtime.toISOString();
+              const content = await fs.promises.readFile(filePath, 'utf8');
+              const lines = content.trim().split('\n');
+              if (lines.length > 0) {
+                const lastLine = JSON.parse(lines[lines.length - 1]);
+                timestamp = lastLine.timestamp || timestamp;
+              }
+            } catch (_) {
+              // fallback ke mtime
             }
+
+            nextCache.set(fileName, timestamp);
           }
-          return stats.mtime.toISOString();
         }
       }
+
+      historyTimestampCache.clear();
+      for (const [fileName, timestamp] of nextCache.entries()) {
+        historyTimestampCache.set(fileName, timestamp);
+      }
+      historyCacheLoadedAt = Date.now();
+    } catch (err) {
+      console.error('[DB] Error refreshing history cache:', err);
+    } finally {
+      historyCacheRefreshPromise = null;
     }
+  })();
+
+  return historyCacheRefreshPromise;
+}
+
+function getLatestTimestampFromHistoryCached(equipmentName) {
+  try {
+    const safeName = equipmentName.toLowerCase().replace(/[^a-z0-9\s_-]/gi, '_').replace(/\s+/g, '_').substring(0, 50);
+    const fileName = `${safeName}.log`;
+    if ((Date.now() - historyCacheLoadedAt) > HISTORY_CACHE_REFRESH_MS && !historyCacheRefreshPromise) {
+      refreshHistoryTimestampCache().catch(err => {
+        console.error('[DB] Background history cache refresh failed:', err);
+      });
+    }
+    return historyTimestampCache.get(fileName) || null;
   } catch (err) {
-    console.error('[DB] Error scanning history:', err);
+    console.error('[DB] Error reading history cache:', err);
   }
   return null;
 }
@@ -279,18 +356,23 @@ async function getAllEquipment(filters = {}) {
   // Enrich with latest data if requested
   if (filters.includeData) {
     const allSources = await readJson(AUTH_CONFIG_PATH);
-    const fileLogger = require('../src/utils/fileLogger'); // Import fileLogger helper
+    const airport = await readAirportConfig();
+    const equipmentIds = resultData.map(item => item.id);
+    const authByEquipment = buildAuthSourcesByEquipment(allSources);
+    const latestLogsIndex = buildLatestLogsIndex(equipmentIds);
 
     for (const item of resultData) {
       // 1. Dapatkan log terakhir dari memori (untuk kecepatan)
-      const latestLogs = getLatestLogsBySource(item.id);
+      const latestLogs = Array.from((latestLogsIndex.get(String(item.id)) || new Map()).values());
       
       // 2. Jika log memori kosong, scan folder /data/ secara mundur
-      let latestTimeFromFile = getLatestTimestampFromHistory(item.name);
+      const latestTimeFromFile = latestLogs.length === 0
+        ? getLatestTimestampFromHistoryCached(item.name)
+        : null;
 
       // Initialize with ALL configured sources for this equipment
       const mergedData = {};
-      const configSources = allSources.filter(s => String(s.equipt_id) === String(item.id));
+      const configSources = authByEquipment.get(String(item.id)) || [];
 
       for (const src of configSources) {
         if (src.parsing_id === 'vhf_marc_rse') {
@@ -306,7 +388,7 @@ async function getAllEquipment(filters = {}) {
           template.forEach(key => { placeholderData[key] = '-'; });
           // Key = src.name (nama source = nama radio)
           mergedData[src.name] = {
-            ...placeholderData,
+            ...attachParsingHeader(placeholderData, item, airport, null),
             radio_type: radioInfo ? radioInfo.radio_type : '—',
             is_rx: isRx,
             _status: 'Disconnect',
@@ -320,7 +402,7 @@ async function getAllEquipment(filters = {}) {
             placeholderData[key] = '-';
           });
           mergedData[src.name] = {
-            ...placeholderData,
+            ...attachParsingHeader(placeholderData, item, airport, null),
             _status: 'Disconnect', // Default until data arrives
             _logged_at: null,
             _parsing_id: src.parsing_id || null
@@ -340,7 +422,7 @@ async function getAllEquipment(filters = {}) {
             // Keep data but set status to Disconnect
             mergedData[sourceName] = {
               ...mergedData[sourceName],
-              ...(log.data || {}),
+              ...attachParsingHeader(log.data || {}, item, airport, log.logged_at),
               _status: 'Disconnect',
               _logged_at: log.logged_at
             };
@@ -348,7 +430,7 @@ async function getAllEquipment(filters = {}) {
             // Valid fresh data
             mergedData[sourceName] = {
               ...mergedData[sourceName],
-              ...(log.data || {}),
+              ...attachParsingHeader(log.data || {}, item, airport, log.logged_at),
               _status: log.status || 'Normal',
               _logged_at: log.logged_at
             };
@@ -362,8 +444,7 @@ async function getAllEquipment(filters = {}) {
 
       // Only keep sources that are explicitly configured
       const finalMergedData = {};
-      const configSourceNames = configSources.map(s => s.name);
-      
+
       for (const src of configSources) {
         // Ambil data yang sudah ada (mungkin isi placeholder '-')
         const sourceLog = mergedData[src.name] || {};
@@ -374,7 +455,7 @@ async function getAllEquipment(filters = {}) {
         }
 
         finalMergedData[src.name] = {
-          ...sourceLog,
+          ...attachParsingHeader(sourceLog, item, airport, sourceLog._logged_at || latestTimeFromFile || null),
           _status: sourceLog._status || 'Disconnect'
         };
       }
@@ -444,6 +525,42 @@ function getLatestLogsBySource(equipmentId) {
   return Array.from(latestBySource.values());
 }
 
+function buildAuthSourcesByEquipment(allSources = []) {
+  const grouped = new Map();
+
+  for (const src of allSources) {
+    const key = String(src.equipt_id);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(src);
+  }
+
+  return grouped;
+}
+
+function buildLatestLogsIndex(equipmentIds = []) {
+  const targetIds = new Set(equipmentIds.map(id => String(id)));
+  const latestByEquipment = new Map();
+
+  for (const log of equipmentLogsDB) {
+    const equipmentKey = String(log.equipmentId);
+    if (!targetIds.has(equipmentKey)) continue;
+
+    if (!latestByEquipment.has(equipmentKey)) {
+      latestByEquipment.set(equipmentKey, new Map());
+    }
+
+    const bySource = latestByEquipment.get(equipmentKey);
+    const sourceKey = log.source || 'default';
+    const existing = bySource.get(sourceKey);
+
+    if (!existing || new Date(log.logged_at) > new Date(existing.logged_at)) {
+      bySource.set(sourceKey, log);
+    }
+  }
+
+  return latestByEquipment;
+}
+
 async function getEquipmentStatsSummary() {
   const result = await getAllEquipment({
     isActive: true,
@@ -476,6 +593,8 @@ async function getEquipmentById(id) {
   const list = await readJson(EQUIPMENT_CONFIG_PATH);
   const item = list.find(e => String(e.id) === String(id));
   if (!item) return null;
+  const airport = await readAirportConfig();
+  const latestTimeFromFile = getLatestTimestampFromHistoryCached(item.name);
 
   const allSources = await readJson(AUTH_CONFIG_PATH);
   const configSources = allSources.filter(s => String(s.equipt_id) === String(id));
@@ -488,21 +607,36 @@ async function getEquipmentById(id) {
     const template = PARSER_TEMPLATES[src.parsing_id] || PARSER_TEMPLATES['default'];
     const placeholder = {};
     template.forEach(k => { placeholder[k] = '-'; });
-    mergedData[src.name] = { ...placeholder, _status: 'Disconnect', _logged_at: null, _parsing_id: src.parsing_id };
+    mergedData[src.name] = {
+      ...attachParsingHeader(placeholder, item, airport, null),
+      _status: 'Disconnect',
+      _logged_at: null,
+      _parsing_id: src.parsing_id
+    };
   }
 
   // Overlay with real logs
   for (const log of latestLogs) {
     const sourceName = log.source || 'default';
     if (mergedData[sourceName]) {
-      mergedData[sourceName] = { ...mergedData[sourceName], ...log.data, _status: log.status, _logged_at: log.logged_at, _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id };
+      mergedData[sourceName] = {
+        ...mergedData[sourceName],
+        ...attachParsingHeader(log.data || {}, item, airport, log.logged_at),
+        _status: log.status,
+        _logged_at: log.logged_at,
+        _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id
+      };
     }
   }
 
   // Only keep sources that are explicitly configured
   const finalMergedData = {};
   for (const src of configSources) {
-    finalMergedData[src.name] = mergedData[src.name];
+    const sourceLog = mergedData[src.name] || {};
+    if (!sourceLog._logged_at) {
+      sourceLog._logged_at = latestTimeFromFile;
+    }
+    finalMergedData[src.name] = sourceLog;
   }
 
   item.lastData = finalMergedData;
@@ -692,7 +826,8 @@ async function getAllOtentication() {
 
 async function getOtenticationByEquipment(equipmentId) {
   const data = await readJson(AUTH_CONFIG_PATH);
-  return data.filter(a => a.equipt_id == equipmentId);
+  const grouped = buildAuthSourcesByEquipment(data);
+  return cloneValue(grouped.get(String(equipmentId)) || []);
 }
 
 async function createOtentication(data) {
@@ -903,7 +1038,7 @@ async function getAllCategories() {
 
 // --- EQUIPMENT LOGS ---
 async function createEquipmentLog(data) {
-  const log = { ...data, id: Date.now(), logged_at: new Date().toISOString() };
+  const log = { ...data, id: Date.now(), logged_at: data.logged_at || new Date().toISOString() };
   equipmentLogsDB.push(log);
   // Simpan max 50 log per source (bukan global shift yang bisa evict source lain)
   const sourceKey = `${data.equipmentId}::${data.source || 'default'}`;
@@ -958,6 +1093,11 @@ async function createEquipmentLog(data) {
 async function getEquipmentLogs(filters = {}) {
   let filtered = [...equipmentLogsDB];
   if (filters.equipmentId) filtered = filtered.filter(l => l.equipmentId == filters.equipmentId);
+  if (filters.source) filtered = filtered.filter(l => (l.source || 'default') === filters.source);
+  if (filters.from) filtered = filtered.filter(l => new Date(l.logged_at) >= new Date(filters.from));
+  if (filters.to) filtered = filtered.filter(l => new Date(l.logged_at) <= new Date(filters.to));
+
+  filtered.sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at));
 
   const page = filters.page || 1;
   const limit = filters.limit || 100;
@@ -1059,6 +1199,18 @@ async function syncAllOtenticationLocations() {
   }
 }
 
+setTimeout(() => {
+  refreshHistoryTimestampCache().catch(err => {
+    console.error('[DB] Initial history cache refresh failed:', err);
+  });
+}, 1000);
+
+setInterval(() => {
+  refreshHistoryTimestampCache().catch(err => {
+    console.error('[DB] Scheduled history cache refresh failed:', err);
+  });
+}, HISTORY_CACHE_REFRESH_MS);
+
 // Initial sync call
 setTimeout(syncAllOtenticationLocations, 1000);
 
@@ -1070,7 +1222,7 @@ module.exports = {
   writeJson,
   
   // Analytics/History scan
-  getLatestTimestampFromHistory,
+  getLatestTimestampFromHistoryCached,
   query,
 
   // Airports
