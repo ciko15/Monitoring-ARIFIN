@@ -175,12 +175,117 @@ class PacketSniffer {
 
   finalizePacket(packet) {
       if (packet) {
+          packet = this.enrichPacket(packet);
           this.packets.push(packet);
           if (this.packets.length > 2500) {
               this.packets.shift();
           }
       }
       this.pendingPacket = null;
+  }
+
+  enrichPacket(packet) {
+    if (!packet) return packet;
+
+    const modbus = this.decodeModbusTcp(packet.rawData);
+    if (modbus) {
+      packet.decoded = {
+        ...(packet.decoded || {}),
+        modbus
+      };
+      packet.protocol = 'MODBUS';
+      packet.info = modbus.summary || packet.info;
+    }
+
+    return packet;
+  }
+
+  decodeModbusTcp(rawHex) {
+    if (!rawHex || rawHex.length < 16) return null;
+
+    const hex = rawHex.replace(/\s+/g, '').toLowerCase();
+    if (hex.length < 16) return null;
+
+    let buf = null;
+    try {
+      buf = Buffer.from(hex, 'hex');
+    } catch (_) {
+      return null;
+    }
+
+    const supportedFunctionCodes = new Set([1, 2, 3, 4, 5, 6, 15, 16]);
+
+    for (let i = 0; i <= buf.length - 8; i++) {
+      const protocolId = buf.readUInt16BE(i + 2);
+      if (protocolId !== 0) continue;
+
+      const length = buf.readUInt16BE(i + 4);
+      if (length < 2 || length > 253) continue;
+
+      const frameEnd = i + 6 + length;
+      if (frameEnd > buf.length) continue;
+
+      const unitId = buf[i + 6];
+      const functionCode = buf[i + 7];
+      if (!supportedFunctionCodes.has(functionCode)) continue;
+
+      const pdu = buf.slice(i + 7, frameEnd);
+      const decoded = {
+        transactionId: buf.readUInt16BE(i),
+        protocolId,
+        length,
+        unitId,
+        functionCode,
+        functionName: this.getModbusFunctionName(functionCode),
+        offset: i,
+        isException: (functionCode & 0x80) !== 0
+      };
+
+      if (pdu.length >= 5 && (functionCode === 3 || functionCode === 4 || functionCode === 1 || functionCode === 2)) {
+        decoded.startAddress = pdu.readUInt16BE(1);
+        decoded.quantity = pdu.readUInt16BE(3);
+      } else if (pdu.length >= 5 && (functionCode === 6 || functionCode === 5)) {
+        decoded.address = pdu.readUInt16BE(1);
+        decoded.value = pdu.readUInt16BE(3);
+      } else if (pdu.length >= 6 && (functionCode === 16 || functionCode === 15)) {
+        decoded.startAddress = pdu.readUInt16BE(1);
+        decoded.quantity = pdu.readUInt16BE(3);
+        decoded.byteCount = pdu[5];
+      }
+
+      decoded.summary = this.buildModbusSummary(decoded);
+      return decoded;
+    }
+
+    return null;
+  }
+
+  getModbusFunctionName(functionCode) {
+    const map = {
+      1: 'Read Coils',
+      2: 'Read Discrete Inputs',
+      3: 'Read Holding Registers',
+      4: 'Read Input Registers',
+      5: 'Write Single Coil',
+      6: 'Write Single Register',
+      15: 'Write Multiple Coils',
+      16: 'Write Multiple Registers'
+    };
+    return map[functionCode] || `Function ${functionCode}`;
+  }
+
+  buildModbusSummary(decoded) {
+    if (!decoded) return 'Modbus packet';
+
+    if (decoded.startAddress !== undefined && decoded.quantity !== undefined) {
+      return `Modbus ${decoded.functionCode} ${decoded.functionName} addr=${decoded.startAddress} qty=${decoded.quantity} unit=${decoded.unitId}`;
+    }
+
+    if (decoded.address !== undefined && decoded.value !== undefined) {
+      return `Modbus ${decoded.functionCode} ${decoded.functionName} addr=${decoded.address} value=${decoded.value} unit=${decoded.unitId}`;
+    }
+
+    return `Modbus ${decoded.functionCode} ${decoded.functionName} unit=${decoded.unitId}`;
   }
 
   parseTcpdumpLine(line, interfaceName) {
@@ -376,7 +481,8 @@ class PacketSniffer {
     let result = [...this.packets];
 
     if (filter.protocol) {
-      result = result.filter(p => p.protocol === filter.protocol);
+      const wanted = String(filter.protocol).toUpperCase();
+      result = result.filter(p => String(p.protocol || '').toUpperCase() === wanted);
     }
 
     if (filter.source) {

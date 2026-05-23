@@ -344,7 +344,7 @@ function displayPackets() {
         <td>${packet.interface || '-'}</td>
         <td class="addr-cell">${packet.source}</td>
         <td class="addr-cell">${packet.destination}</td>
-        <td><span class="protocol-badge protocol-${packet.protocol.toLowerCase()}">${packet.protocol}</span></td>
+        <td><span class="protocol-badge protocol-${String(packet.protocol || 'unknown').toLowerCase()}">${packet.protocol}</span></td>
         <td>${packet.length}</td>
         <td class="info-cell" title="${packet.info}">${packet.info}</td>
       </tr>
@@ -406,6 +406,20 @@ function displayPacketDetails(packetNumber) {
           <h4>Packet Info</h4>
           <div class="detail-item"><span class="value">${packet.info}</span></div>
         </div>
+        ${packet.decoded?.modbus ? `
+        <div class="detail-section">
+          <h4>Modbus Decode</h4>
+          <div class="detail-item"><span class="label">Function Code:</span><span class="value">${packet.decoded.modbus.functionCode}</span></div>
+          <div class="detail-item"><span class="label">Function Name:</span><span class="value">${packet.decoded.modbus.functionName}</span></div>
+          <div class="detail-item"><span class="label">Unit ID:</span><span class="value">${packet.decoded.modbus.unitId}</span></div>
+          <div class="detail-item"><span class="label">Transaction ID:</span><span class="value">${packet.decoded.modbus.transactionId}</span></div>
+          <div class="detail-item"><span class="label">Start Address:</span><span class="value">${packet.decoded.modbus.startAddress ?? '-'}</span></div>
+          <div class="detail-item"><span class="label">Quantity:</span><span class="value">${packet.decoded.modbus.quantity ?? '-'}</span></div>
+          <div class="detail-item"><span class="label">Address:</span><span class="value">${packet.decoded.modbus.address ?? '-'}</span></div>
+          <div class="detail-item"><span class="label">Value:</span><span class="value">${packet.decoded.modbus.value ?? '-'}</span></div>
+          <div class="detail-item"><span class="label">Byte Count:</span><span class="value">${packet.decoded.modbus.byteCount ?? '-'}</span></div>
+          <div class="detail-item"><span class="label">Summary:</span><span class="value">${packet.decoded.modbus.summary || '-'}</span></div>
+        </div>` : ''}
       </div>
     `;
     
