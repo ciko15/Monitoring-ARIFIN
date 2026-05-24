@@ -242,6 +242,28 @@
         return (Date.now() - lastFetchedAt) > SOURCE_FETCH_TTL_MS;
     }
 
+    function mergeLastDataMaps(existingLastData, incomingLastData) {
+        const existing = existingLastData && typeof existingLastData === 'object' ? existingLastData : {};
+        const incoming = incomingLastData && typeof incomingLastData === 'object' ? incomingLastData : {};
+        return Object.keys(incoming).length > 0 ? { ...existing, ...incoming } : existing;
+    }
+
+    function resolveSourceData(eq, src) {
+        if (!eq || !eq.lastData || !src) return null;
+
+        if (eq.lastData[src.name]) return eq.lastData[src.name];
+
+        const normalizedName = String(src.name || '').trim().toLowerCase();
+        const exactKey = Object.keys(eq.lastData).find(key => String(key).trim().toLowerCase() === normalizedName);
+        if (exactKey) return eq.lastData[exactKey];
+
+        const byIp = Object.values(eq.lastData).find(entry => entry && entry._ip && src.ip_address && String(entry._ip) === String(src.ip_address));
+        if (byIp) return byIp;
+
+        const entries = Object.values(eq.lastData);
+        return entries.length === 1 ? entries[0] : null;
+    }
+
     function updateEquipmentCacheEntry(eqData) {
         if (!eqData || !eqData.id) return;
 
@@ -251,7 +273,13 @@
 
         const idx = window.equipmentDataCache.findIndex(e => String(e.id) === String(eqData.id));
         if (idx !== -1) {
-            window.equipmentDataCache[idx] = { ...window.equipmentDataCache[idx], ...eqData };
+            const existing = window.equipmentDataCache[idx];
+            window.equipmentDataCache[idx] = {
+                ...existing,
+                ...eqData,
+                lastData: mergeLastDataMaps(existing.lastData, eqData.lastData),
+                lastUpdate: eqData.lastUpdate || existing.lastUpdate
+            };
         } else {
             window.equipmentDataCache.push(eqData);
         }
@@ -269,10 +297,10 @@
 
             if (eq && eq.lastData) {
                 if (src.parsing_id === 'vhf_marc_rse') {
-                    const radioData = eq.lastData[src.name] || null;
+                    const radioData = resolveSourceData(eq, src);
                     latestData = radioData ? { _isMarcMulti: true, radios: { [src.name]: radioData } } : null;
                 } else {
-                    latestData = eq.lastData[src.name] || null;
+                    latestData = resolveSourceData(eq, src);
                 }
             }
         }
@@ -369,6 +397,7 @@
         // Show cached data immediately if available
         const immediateSources = getBestAvailableSources(equipmentId);
         if (immediateSources.length > 0) {
+            _sourcesCache[equipmentId] = immediateSources;
             renderSourcePanel(immediateSources, body, equipmentId);
         } else {
             body.innerHTML = `<div style="padding:20px;text-align:center;color:#4a7a9a">
@@ -398,16 +427,7 @@
             // Update equipmentDataCache dengan lastData terbaru
             if (dataRes.ok) {
                 const eqData = await dataRes.json();
-                if (eqData && eqData.lastData) {
-                    if (!window.equipmentDataCache) window.equipmentDataCache = [];
-                    const idx = window.equipmentDataCache.findIndex(e => String(e.id) === String(equipmentId));
-                    if (idx !== -1) {
-                        window.equipmentDataCache[idx] = { ...window.equipmentDataCache[idx], ...eqData, lastData: eqData.lastData };
-                    } else {
-                        window.equipmentDataCache.push(eqData);
-                    }
-                    localStorage.setItem('cabang_equipment_cache', JSON.stringify(window.equipmentDataCache));
-                }
+                updateEquipmentCacheEntry(eqData);
             }
 
             const finalSources = Array.isArray(srcJson) ? srcJson : [];
@@ -422,6 +442,9 @@
             } else if (immediateSources.length === 0) {
                 _sourcesCache[equipmentId] = finalSources;
                 renderSourcePanel(finalSources, body, equipmentId);
+            } else {
+                _sourcesCache[equipmentId] = immediateSources;
+                renderSourcePanel(immediateSources, body, equipmentId);
             }
         } catch(e) {
             _sourceFetchMeta[equipmentId] = 0;
@@ -456,7 +479,7 @@
             
             if (window.equipmentDataCache) {
                 const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
-                const srcData = (eq && eq.lastData) ? eq.lastData[src.name] : null;
+                const srcData = resolveSourceData(eq, src);
                 
                 if (srcData && srcData._logged_at) {
                     lastTime = new Date(srcData._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -562,8 +585,7 @@
         if (window.equipmentDataCache) {
             const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
             if (eq && eq.lastData) {
-                // lastData keyed by source name
-                const srcData = eq.lastData[src.name];
+                const srcData = resolveSourceData(eq, src);
                 if (srcData) return srcData._status || 'Normal';
                 // Fallback: try first available
                 const first = Object.values(eq.lastData)[0];
@@ -588,7 +610,12 @@
 
         // Find source from cache
         let src = null;
-        for (const sources of Object.values(_sourcesCache)) {
+        const sourcePools = [
+            ...Object.values(_sourcesCache),
+            _selectedEqId ? getBestAvailableSources(_selectedEqId) : []
+        ];
+        for (const sources of sourcePools) {
+            if (!Array.isArray(sources)) continue;
             src = sources.find(s => String(s.id) === String(sourceId));
             if (src) break;
         }
