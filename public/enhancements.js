@@ -30,6 +30,32 @@
         'ils_llz_thales421': ['CRS_RF', 'WIDTH_RF', 'NF_RF', 'CRS_SDM', 'IDENT_AM', 'FREQ_DEV']
     };
 
+    function calcAverage(values) {
+        const nums = values
+            .map(v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v) : null)
+            .filter(v => v != null);
+        if (nums.length === 0) return null;
+        return +(nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1);
+    }
+
+    function resolvePreviewValue(srcData, parserId, key) {
+        if (!srcData) return null;
+        if (srcData[key] !== undefined && srcData[key] !== null && srcData[key] !== '-') {
+            return srcData[key];
+        }
+
+        if (parserId === 'pm5560_modbus') {
+            if (key === 'VLN_avg') {
+                return calcAverage([srcData.VL1N, srcData.VL2N, srcData.VL3N]);
+            }
+            if (key === 'VLL_avg') {
+                return calcAverage([srcData.VL12, srcData.VL23, srcData.VL31]);
+            }
+        }
+
+        return srcData[key] ?? null;
+    }
+
     async function loadTemplates() {
         try {
             const token = localStorage.getItem('authToken');
@@ -344,7 +370,8 @@
                 if (keysToShow.length > 0) {
                     previewHtml = `<div class="sp-card-preview-grid">
                         ${keysToShow.map(k => {
-                            const valObj = srcData ? srcData[k] : null;
+                            const resolvedVal = resolvePreviewValue(srcData, src.parsing_id, k);
+                            const valObj = resolvedVal;
                             const isObj  = valObj !== null && typeof valObj === 'object';
                             
                             // Try to get label from template if available
