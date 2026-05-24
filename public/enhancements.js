@@ -1061,6 +1061,25 @@
             const sup = 'RADAR'; // Assuming standard limits for servers/radar
             const isConn = data.connectivity === 'Connected';
             const cc = isConn ? '#00ff88' : '#ff3355';
+            const toNum = (v) => {
+                const n = parseFloat(v);
+                return Number.isFinite(n) ? n : null;
+            };
+            const ramTotalNum = toNum(data.ram_total_mb);
+            const ramUsedNum = toNum(data.ram_used_mb);
+            const ramUsedPctNum = toNum(data.ram_usage_pct);
+            const ramAvailMbNum = toNum(data.ram_available_mb);
+            const ramAvailPctNum = toNum(data.ram_available_pct);
+
+            const effectiveRamUsedPct = ramUsedPctNum !== null
+                ? ramUsedPctNum
+                : (ramTotalNum && ramUsedNum !== null ? (ramUsedNum / ramTotalNum) * 100 : null);
+            const effectiveRamAvailMb = ramAvailMbNum !== null
+                ? ramAvailMbNum
+                : (ramTotalNum !== null && ramUsedNum !== null ? Math.max(0, ramTotalNum - ramUsedNum) : null);
+            const effectiveRamAvailPct = ramAvailPctNum !== null
+                ? ramAvailPctNum
+                : (ramTotalNum && effectiveRamAvailMb !== null ? (effectiveRamAvailMb / ramTotalNum) * 100 : null);
             
             sections.push({ title: 'SISTEM', params: [
                 ['Konektivitas', data.connectivity || '—', cc],
@@ -1074,9 +1093,9 @@
             sections.push({ title: 'MEMORY (RAM)', params: [
                 ['RAM Total (MB)', data.ram_total_mb  || '—', '#e8f4ff'],
                 ['RAM Used (MB) [SNMP]',  data.ram_used_mb   || '—', '#e8f4ff'],
-                ['RAM Used (%) [SNMP]',   data.ram_usage_pct !== '—' ? `${data.ram_usage_pct} %` : '—', '#5a8aaa'],
-                ['RAM Available (MB)',    data.ram_available_mb || '—', '#e8f4ff'],
-                ['RAM Available (%)',     data.ram_available_pct !== '—' ? `${data.ram_available_pct} %` : '—', getLimitColor('UPS', 'RAM Available', data.ram_available_pct)],
+                ['RAM Used (%) [SNMP]',   effectiveRamUsedPct !== null ? `${effectiveRamUsedPct.toFixed(1)} %` : '—', '#5a8aaa'],
+                ['RAM Available (MB)',    effectiveRamAvailMb !== null ? `${Math.round(effectiveRamAvailMb)}` : '—', '#e8f4ff'],
+                ['RAM Available (%)',     effectiveRamAvailPct !== null ? `${effectiveRamAvailPct.toFixed(1)} %` : '—', getLimitColor('UPS', 'RAM Available', effectiveRamAvailPct)],
             ]});
             if (data.mount_points && data.mount_points.length > 0) {
                 const diskParams = data.mount_points.map(mp => [
