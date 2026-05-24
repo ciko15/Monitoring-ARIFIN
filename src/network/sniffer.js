@@ -226,6 +226,8 @@ class PacketSniffer {
   enrichPacket(packet) {
     if (!packet) return packet;
 
+    packet.endpoints = this.extractEndpoints(packet);
+
     const modbus = this.decodeModbusTcp(packet.rawData);
     if (modbus) {
       packet.decoded = {
@@ -236,7 +238,44 @@ class PacketSniffer {
       packet.info = modbus.summary || packet.info;
     }
 
+    packet.analysis = this.classifyPacket(packet);
+    packet.direction = packet.analysis?.direction || packet.direction || 'unknown';
+
     return packet;
+  }
+
+  extractEndpoints(packet) {
+    const src = this.splitAddressPort(packet?.source);
+    const dst = this.splitAddressPort(packet?.destination);
+    return {
+      sourceHost: src.host,
+      sourcePort: src.port,
+      destinationHost: dst.host,
+      destinationPort: dst.port
+    };
+  }
+
+  splitAddressPort(address) {
+    const raw = String(address || '').trim();
+    if (!raw) return { host: '', port: null };
+
+    if (raw.includes(':')) {
+      const idx = raw.lastIndexOf(':');
+      const host = raw.slice(0, idx);
+      const portRaw = raw.slice(idx + 1);
+      return { host, port: /^\d+$/.test(portRaw) ? parseInt(portRaw, 10) : null };
+    }
+
+    const parts = raw.split('.');
+    if (parts.length > 4) {
+      const portRaw = parts.pop();
+      return {
+        host: parts.join('.'),
+        port: /^\d+$/.test(portRaw || '') ? parseInt(portRaw, 10) : null
+      };
+    }
+
+    return { host: raw, port: null };
   }
 
   decodeModbusTcp(rawHex) {
@@ -280,16 +319,26 @@ class PacketSniffer {
         isException: (functionCode & 0x80) !== 0
       };
 
-      if (pdu.length >= 5 && (functionCode === 3 || functionCode === 4 || functionCode === 1 || functionCode === 2)) {
+      if ((functionCode === 3 || functionCode === 4 || functionCode === 1 || functionCode === 2) && pdu.length === 5) {
+        decoded.kind = 'request';
         decoded.startAddress = pdu.readUInt16BE(1);
         decoded.quantity = pdu.readUInt16BE(3);
+      } else if ((functionCode === 3 || functionCode === 4 || functionCode === 1 || functionCode === 2) && pdu.length >= 2) {
+        decoded.kind = 'response';
+        decoded.byteCount = pdu[1];
       } else if (pdu.length >= 5 && (functionCode === 6 || functionCode === 5)) {
+        decoded.kind = 'request_or_response';
         decoded.address = pdu.readUInt16BE(1);
         decoded.value = pdu.readUInt16BE(3);
-      } else if (pdu.length >= 6 && (functionCode === 16 || functionCode === 15)) {
+      } else if ((functionCode === 16 || functionCode === 15) && pdu.length > 5) {
+        decoded.kind = 'request';
         decoded.startAddress = pdu.readUInt16BE(1);
         decoded.quantity = pdu.readUInt16BE(3);
         decoded.byteCount = pdu[5];
+      } else if ((functionCode === 16 || functionCode === 15) && pdu.length === 5) {
+        decoded.kind = 'response';
+        decoded.startAddress = pdu.readUInt16BE(1);
+        decoded.quantity = pdu.readUInt16BE(3);
       }
 
       decoded.summary = this.buildModbusSummary(decoded);
@@ -316,15 +365,102 @@ class PacketSniffer {
   buildModbusSummary(decoded) {
     if (!decoded) return 'Modbus packet';
 
+    const prefix =
+      decoded.kind === 'request' ? 'Modbus Request' :
+      decoded.kind === 'response' ? 'Modbus Response' :
+      'Modbus';
+
     if (decoded.startAddress !== undefined && decoded.quantity !== undefined) {
-      return `Modbus ${decoded.functionCode} ${decoded.functionName} addr=${decoded.startAddress} qty=${decoded.quantity} unit=${decoded.unitId}`;
+      return `${prefix} ${decoded.functionCode} ${decoded.functionName} addr=${decoded.startAddress} qty=${decoded.quantity} unit=${decoded.unitId}`;
     }
 
     if (decoded.address !== undefined && decoded.value !== undefined) {
-      return `Modbus ${decoded.functionCode} ${decoded.functionName} addr=${decoded.address} value=${decoded.value} unit=${decoded.unitId}`;
+      return `${prefix} ${decoded.functionCode} ${decoded.functionName} addr=${decoded.address} value=${decoded.value} unit=${decoded.unitId}`;
     }
 
-    return `Modbus ${decoded.functionCode} ${decoded.functionName} unit=${decoded.unitId}`;
+    return `${prefix} ${decoded.functionCode} ${decoded.functionName} unit=${decoded.unitId}`;
+  }
+
+  classifyPacket(packet) {
+    const proto = String(packet?.protocol || '').toUpperCase();
+    const decodedModbus = packet?.decoded?.modbus || null;
+    const endpoints = packet?.endpoints || this.extractEndpoints(packet);
+    const srcPort = endpoints.sourcePort;
+    const dstPort = endpoints.destinationPort;
+    const info = String(packet?.info || '').toUpperCase();
+
+    if (decodedModbus) {
+      if (decodedModbus.kind === 'request') {
+        return { role: 'request', direction: 'out', confidence: 'high', reason: 'Decoded Modbus polling/request frame' };
+      }
+      if (decodedModbus.kind === 'response') {
+        return { role: 'response', direction: 'in', confidence: 'high', reason: 'Decoded Modbus response frame' };
+      }
+      if (decodedModbus.kind === 'request_or_response') {
+        const inferred = this.inferByPorts(srcPort, dstPort);
+        return {
+          role: inferred.role,
+          direction: inferred.direction,
+          confidence: inferred.confidence,
+          reason: `Decoded Modbus ${decodedModbus.functionName} frame`
+        };
+      }
+    }
+
+    if (info.includes('#+GET+#') || info.includes('HTTP GET') || info.includes('HTTP POST')) {
+      return { role: 'request', direction: 'out', confidence: 'medium', reason: 'Recognized command/query pattern' };
+    }
+
+    if (proto === 'ARP') {
+      return info.includes('REQUEST')
+        ? { role: 'request', direction: 'out', confidence: 'medium', reason: 'ARP who-has request' }
+        : { role: 'response', direction: 'in', confidence: 'medium', reason: 'ARP reply' };
+    }
+
+    if (proto === 'ICMP') {
+      return info.includes('ECHO REQUEST')
+        ? { role: 'request', direction: 'out', confidence: 'medium', reason: 'ICMP echo request' }
+        : info.includes('ECHO REPLY')
+          ? { role: 'response', direction: 'in', confidence: 'medium', reason: 'ICMP echo reply' }
+          : { role: 'stream', direction: 'unknown', confidence: 'low', reason: 'ICMP traffic' };
+    }
+
+    if (proto === 'TCP' || proto === 'UDP' || proto === 'HTTP' || proto === 'HTTPS' || proto === 'DNS' || proto === 'SNMP') {
+      const inferred = this.inferByPorts(srcPort, dstPort);
+      return {
+        role: inferred.role,
+        direction: inferred.direction,
+        confidence: inferred.confidence,
+        reason: inferred.reason
+      };
+    }
+
+    return { role: 'stream', direction: 'unknown', confidence: 'low', reason: 'Unable to infer packet role' };
+  }
+
+  inferByPorts(srcPort, dstPort) {
+    const knownServicePorts = new Set([80, 443, 161, 162, 502, 950, 3000, 8000, 8080]);
+    const srcKnown = srcPort != null && knownServicePorts.has(srcPort);
+    const dstKnown = dstPort != null && knownServicePorts.has(dstPort);
+
+    if (dstKnown && !srcKnown) {
+      return { role: 'request', direction: 'out', confidence: 'medium', reason: `Destination service port ${dstPort}` };
+    }
+
+    if (srcKnown && !dstKnown) {
+      return { role: 'response', direction: 'in', confidence: 'medium', reason: `Source service port ${srcPort}` };
+    }
+
+    if (srcPort != null && dstPort != null) {
+      if (srcPort > dstPort) {
+        return { role: 'request', direction: 'out', confidence: 'low', reason: 'Ephemeral source port to lower destination port' };
+      }
+      if (srcPort < dstPort) {
+        return { role: 'response', direction: 'in', confidence: 'low', reason: 'Lower source port to higher destination port' };
+      }
+    }
+
+    return { role: 'stream', direction: 'unknown', confidence: 'low', reason: 'No clear request/response pattern' };
   }
 
   parseTcpdumpLine(line, interfaceName) {
@@ -416,6 +552,7 @@ class PacketSniffer {
       const args = ['-l', '-n', '-i', captureInterface, '-T', 'fields', 
                     '-e', 'frame.number', '-e', 'frame.time_relative', 
                     '-e', '_ws.col.Protocol', '-e', 'ip.src', '-e', 'ip.dst', 
+                    '-e', 'tcp.srcport', '-e', 'tcp.dstport', '-e', 'udp.srcport', '-e', 'udp.dstport',
                     '-e', 'frame.len', '-e', '_ws.col.Info'];
       const tsharkPath = this.tsharkPath || 'tshark';
       console.log(`[Packet Sniffer] Spawning Tshark: ${tsharkPath} ${args.join(' ')}`);
@@ -433,7 +570,7 @@ class PacketSniffer {
           if (!line.trim()) continue;
           const packet = this.parseTsharkLine(line, interfaceName);
           if (packet) {
-            this.packets.push(packet);
+            this.packets.push(this.enrichPacket(packet));
             if (this.packets.length > 1000) this.packets.shift();
           }
         }
@@ -523,17 +660,24 @@ class PacketSniffer {
 
   parseTsharkLine(line, interfaceName) {
     const fields = line.split('\t');
-    if (fields.length < 5) return null;
+    if (fields.length < 9) return null;
+
+    const sourceIp = fields[3] || 'unknown';
+    const destIp = fields[4] || 'unknown';
+    const sourcePort = fields[5] || fields[7] || '';
+    const destPort = fields[6] || fields[8] || '';
+    const source = sourcePort ? `${sourceIp}:${sourcePort}` : sourceIp;
+    const destination = destPort ? `${destIp}:${destPort}` : destIp;
 
     const packet = {
       number: parseInt(fields[0], 10) || ++this.packetCounter,
       time: parseFloat(fields[1]) || Date.now() / 1000,
       interface: interfaceName || 'any',
       protocol: (fields[2] || 'UNKNOWN').toUpperCase(),
-      source: fields[3] || 'unknown',
-      destination: fields[4] || 'unknown',
-      length: parseInt(fields[5], 10) || 0,
-      info: fields[6] || line,
+      source,
+      destination,
+      length: parseInt(fields[9], 10) || 0,
+      info: fields[10] || line,
       direction: 'in'
     };
 

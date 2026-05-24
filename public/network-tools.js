@@ -262,16 +262,18 @@ async function stopCapture() {
     
     captureUpdateInterval = null;
     captureModeInterval = null;
-    
-    addLogEntry('System', 'Packet capture stopped', 'info');
-    updateCaptureStatus();
-    startInterfacePolling();
-    
+
     // Stop capture on backend
-    await fetch('/api/network/sniffer/stop', { 
+    await fetch('/api/network/sniffer/stop', {
       method: 'POST',
       headers: getAuthHeaders()
     });
+
+    // Freeze the latest packet snapshot in UI for inspection after capture stops.
+    applyFilters();
+    addLogEntry('System', `Packet capture stopped. Snapshot frozen with ${window.capturedPackets.length} packets.`, 'info');
+    updateCaptureStatus();
+    startInterfacePolling();
   } catch (error) {
     console.error('[Network Tools] Stop capture error:', error);
   }
@@ -282,16 +284,19 @@ function applyFilters() {
   try {
     const packetFilter = (document.getElementById('packetFilter')?.value || '').trim().toLowerCase();
     const protocolFilter = (document.getElementById('protocolFilter')?.value || '').trim();
+    const roleFilter = (document.getElementById('roleFilter')?.value || '').trim().toLowerCase();
     const interfaceFilter = (document.getElementById('interfaceSelect')?.value || '').trim();
 
     window.filteredPackets = window.capturedPackets.filter(packet => {
       const proto = (packet.protocol || '').toString();
+      const role = (packet.analysis?.role || '').toString().toLowerCase();
       const iface = (packet.interface || '').toString();
       const src = (packet.source || '').toString().toLowerCase();
       const dst = (packet.destination || '').toString().toLowerCase();
       const info = (packet.info || '').toString().toLowerCase();
 
       const matchesProtocol = !protocolFilter || proto === protocolFilter;
+      const matchesRole = !roleFilter || role === roleFilter;
       const matchesInterface = !interfaceFilter || iface === interfaceFilter;
       const matchesFilter = !packetFilter || 
         src.includes(packetFilter) ||
@@ -300,7 +305,7 @@ function applyFilters() {
         proto.toLowerCase().includes(packetFilter) ||
         iface.toLowerCase().includes(packetFilter);
 
-      return matchesProtocol && matchesInterface && matchesFilter;
+      return matchesProtocol && matchesRole && matchesInterface && matchesFilter;
     });
 
     displayPackets();
@@ -329,12 +334,12 @@ function displayPackets() {
       if (window.lastCaptureError) {
         message = `<span class="error-text"><i class="fas fa-exclamation-triangle"></i> Capture Error: ${window.lastCaptureError}</span>`;
       }
-      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-state">${message}</td></tr>`;
       return;
     }
     
     if (window.filteredPackets.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-filter"></i> No packets match your filter criteria.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fas fa-filter"></i> No packets match your filter criteria.</td></tr>';
       return;
     }
     
@@ -346,6 +351,7 @@ function displayPackets() {
         <td class="addr-cell">${packet.source}</td>
         <td class="addr-cell">${packet.destination}</td>
         <td><span class="protocol-badge protocol-${String(packet.protocol || 'unknown').toLowerCase()}">${packet.protocol}</span></td>
+        <td><span class="traffic-badge traffic-${packet.analysis?.role || 'stream'}">${formatTrafficRole(packet.analysis?.role)}</span></td>
         <td>${packet.length}</td>
         <td class="info-cell" title="${packet.info}">${packet.info}</td>
       </tr>
@@ -402,14 +408,19 @@ function displayPacketDetails(packetNumber) {
           <div class="detail-item"><span class="label">Source:</span><span class="value">${packet.source}</span></div>
           <div class="detail-item"><span class="label">Destination:</span><span class="value">${packet.destination}</span></div>
           <div class="detail-item"><span class="label">Protocol:</span><span class="value">${packet.protocol}</span></div>
+          <div class="detail-item"><span class="label">Traffic Role:</span><span class="value"><span class="traffic-badge traffic-${packet.analysis?.role || 'stream'}">${formatTrafficRole(packet.analysis?.role)}</span></span></div>
+          <div class="detail-item"><span class="label">Direction:</span><span class="value">${packet.analysis?.direction || packet.direction || 'unknown'}</span></div>
+          <div class="detail-item"><span class="label">Confidence:</span><span class="value">${packet.analysis?.confidence || 'low'}</span></div>
         </div>
         <div class="detail-section">
           <h4>Packet Info</h4>
           <div class="detail-item"><span class="value">${packet.info}</span></div>
+          ${packet.analysis?.reason ? `<div class="detail-item"><span class="label">Heuristic:</span><span class="value">${packet.analysis.reason}</span></div>` : ''}
         </div>
         ${packet.decoded?.modbus ? `
         <div class="detail-section">
           <h4>Modbus Decode</h4>
+          <div class="detail-item"><span class="label">Frame Kind:</span><span class="value">${packet.decoded.modbus.kind || '-'}</span></div>
           <div class="detail-item"><span class="label">Function Code:</span><span class="value">${packet.decoded.modbus.functionCode}</span></div>
           <div class="detail-item"><span class="label">Function Name:</span><span class="value">${packet.decoded.modbus.functionName}</span></div>
           <div class="detail-item"><span class="label">Unit ID:</span><span class="value">${packet.decoded.modbus.unitId}</span></div>
@@ -429,6 +440,33 @@ function displayPacketDetails(packetNumber) {
   } catch (error) {
     console.error('[Network Tools] Display details error:', error);
   }
+}
+
+function formatTrafficRole(role) {
+  const normalized = String(role || 'stream').toLowerCase();
+  if (normalized === 'request') return 'Request';
+  if (normalized === 'response') return 'Response';
+  return 'Stream';
+}
+
+function focusModbusTraffic() {
+  const protocolFilter = document.getElementById('protocolFilter');
+  const roleFilter = document.getElementById('roleFilter');
+  if (protocolFilter) protocolFilter.value = 'MODBUS';
+  if (roleFilter) roleFilter.value = '';
+  applyFilters();
+  addLogEntry('Filter', 'Focused on Modbus traffic', 'info');
+}
+
+function resetPacketFilters() {
+  const packetFilter = document.getElementById('packetFilter');
+  const protocolFilter = document.getElementById('protocolFilter');
+  const roleFilter = document.getElementById('roleFilter');
+  if (packetFilter) packetFilter.value = '';
+  if (protocolFilter) protocolFilter.value = '';
+  if (roleFilter) roleFilter.value = '';
+  applyFilters();
+  addLogEntry('Filter', 'Packet filters reset', 'info');
 }
 
 function displayHexViewer(packet) {
