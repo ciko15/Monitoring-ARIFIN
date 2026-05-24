@@ -1,11 +1,22 @@
+const os = require('os');
+const path = require('path');
+
+let bunPath = 'bun';
+if (os.platform() === 'win32') {
+  const userHome = process.env.USERPROFILE || process.env.HOME;
+  bunPath = path.join(userHome, '.bun', 'bin', 'bun.exe');
+} else if (os.platform() === 'darwin') {
+  const userHome = process.env.HOME;
+  bunPath = path.join(userHome, '.bun', 'bin', 'bun');
+}
+
 module.exports = {
   apps: [
     {
       name: 'monitoring-web',
-      script: 'bun',
-      args: ['src/web.ts'],
+      script: 'src/web.ts',
       cwd: './',
-      interpreter: 'none',
+      interpreter: bunPath,
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
@@ -22,10 +33,9 @@ module.exports = {
     },
     {
       name: 'monitoring-collector',
-      script: 'bun',
-      args: ['src/collector.ts'],
+      script: 'src/collector.ts',
       cwd: './',
-      interpreter: 'none',
+      interpreter: bunPath,
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
@@ -41,10 +51,9 @@ module.exports = {
     },
     {
       name: 'monitoring-processor',
-      script: 'bun',
-      args: ['src/processor.ts'],
+      script: 'src/processor.ts',
       cwd: './',
-      interpreter: 'none',
+      interpreter: bunPath,
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
