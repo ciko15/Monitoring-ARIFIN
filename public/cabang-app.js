@@ -200,6 +200,29 @@ const cabangModule = (function () {
   function renderCabangGrid() {
     if (!cabangGrid) return;
 
+    function normalizeSourceStatus(rawStatus) {
+      const s = String(rawStatus || '').toLowerCase();
+      if (s === 'alarm' || s === 'fail' || s === 'critical') return 'alarm';
+      if (s === 'warning') return 'warning';
+      if (s === 'disconnect' || s === 'offline') return 'offline';
+      return 'normal';
+    }
+
+    function deriveEquipmentStatus(item) {
+      if (item && item.lastData && Object.keys(item.lastData).length > 0) {
+        const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status));
+        if (sourceStatuses.includes('alarm')) return 'alarm';
+        if (sourceStatuses.includes('warning')) return 'warning';
+        if (sourceStatuses.every(st => st === 'offline')) return 'offline';
+        if (sourceStatuses.includes('normal')) return 'normal';
+      }
+
+      const fallback = String(item?.status || 'offline').toLowerCase();
+      return ['normal', 'alarm', 'warning', 'offline', 'disconnect'].includes(fallback)
+        ? (fallback === 'disconnect' ? 'offline' : fallback)
+        : 'offline';
+    }
+
     let filtered = equipmentData;
 
     // Apply Airport Filter - Robust check for both airportId and branchId
@@ -223,7 +246,9 @@ const cabangModule = (function () {
     // Apply Status Filter
     if (currentStatusFilter) {
       filtered = filtered.filter(e => {
-        const normalized = window.normalizeStatus ? window.normalizeStatus(e.status) : e.status;
+        const normalized = window.normalizeStatus
+          ? window.normalizeStatus(deriveEquipmentStatus(e))
+          : deriveEquipmentStatus(e);
         return normalized === currentStatusFilter;
       });
     }
@@ -251,7 +276,7 @@ const cabangModule = (function () {
     lastRenderSignature = renderSignature;
 
     cabangGrid.innerHTML = filtered.map(item => {
-      const status = (item.status || 'Offline').toLowerCase();
+      const status = deriveEquipmentStatus(item);
       const statusClass = ['normal', 'alarm', 'warning'].includes(status) ? status : 'offline';
 
       // Action Data
@@ -277,16 +302,13 @@ const cabangModule = (function () {
               : '-';
             // Map status to color
             let dotColor = '#10b981'; // normal
-            let statusClass = srcStatus.toLowerCase();
-            if (statusClass === 'alarm' || statusClass === 'fail' || statusClass === 'critical') {
+            let statusClass = normalizeSourceStatus(srcStatus);
+            if (statusClass === 'alarm') {
               dotColor = '#ef4444';
-              statusClass = 'alarm';
             } else if (statusClass === 'warning') {
               dotColor = '#f59e0b';
-              statusClass = 'warning';
-            } else if (statusClass === 'disconnect' || statusClass === 'offline') {
+            } else if (statusClass === 'offline') {
               dotColor = '#94a3b8';
-              statusClass = 'offline';
             } else {
               statusClass = 'normal';
             }
