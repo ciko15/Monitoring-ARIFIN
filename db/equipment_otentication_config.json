@@ -1261,7 +1261,7 @@
     "id": 1777599057496,
     "name": "EC 1",
     "equipt_id": "1777800000002",
-    "ip_address": "192.168.64.3",
+    "ip_address": "192.168.64.32",
     "tcp_port": null,
     "udp_port": null,
     "parsing_id": "snmp_system",

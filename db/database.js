@@ -51,7 +51,15 @@ const PARSER_TEMPLATES = {
   'temp_humidity_modbus': ['temperature_c', 'humidity_pct', 'location'],
   'asterix_radar': ['connectivity', 'radar_name', 'sac', 'sic', 'radar_id', 'last_cat034'],
   'asterix_adsb': ['connectivity', 'station', 'sac', 'sic', 'radar_id', 'multicast_ip', 'last_cat021'],
-  'snmp_system': ['connectivity', 'sys_name', 'cpu_usage', 'ram_usage_pct', 'disk_usage_pct'],
+  'snmp_system': [
+    'connectivity',
+    'sys_name',
+    'cpu_usage',
+    'ram_usage_pct',
+    'ram_available_mb',
+    'ram_available_pct',
+    'disk_usage_pct'
+  ],
   'default': ['Status']
 };
 
@@ -105,7 +113,18 @@ async function writeJson(filePath, data) {
         await fs.promises.writeFile(tempPath, content, 'utf8');
       }
 
-      await fs.promises.rename(tempPath, filePath);
+      try {
+        await fs.promises.rename(tempPath, filePath);
+      } catch (renameErr) {
+        // Windows can throw EPERM/EBUSY when target is briefly locked by AV/indexer.
+        // Fallback to copy+unlink so writes still succeed.
+        if (renameErr && (renameErr.code === 'EPERM' || renameErr.code === 'EBUSY')) {
+          await fs.promises.copyFile(tempPath, filePath);
+          await fs.promises.unlink(tempPath).catch(() => {});
+        } else {
+          throw renameErr;
+        }
+      }
       return true;
     } catch (err) {
       console.error(`Error writing JSON to ${filePath}:`, err);
