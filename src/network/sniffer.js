@@ -115,7 +115,7 @@ class PacketSniffer {
     } else if (tsharkAvailable) {
       console.log(`[Packet Sniffer] Starting real capture using Tshark on ${this.currentInterface}`);
       this.captureMode = 'tshark';
-      this.startTsharkCapture(this.currentInterface);
+      await this.startTsharkCapture(this.currentInterface);
     } else if (tcpdumpAvailable) {
       console.log(`[Packet Sniffer] Starting real capture using Tcpdump on ${this.currentInterface}`);
       this.captureMode = 'tcpdump';
@@ -409,10 +409,11 @@ class PacketSniffer {
     }
   }
 
-  startTsharkCapture(interfaceName) {
+  async startTsharkCapture(interfaceName) {
     try {
+      const captureInterface = await this.resolveTsharkInterface(interfaceName);
       // Reverting to Tab-separated fields for Tshark as it's more lightweight if working
-      const args = ['-l', '-n', '-i', interfaceName, '-T', 'fields', 
+      const args = ['-l', '-n', '-i', captureInterface, '-T', 'fields', 
                     '-e', 'frame.number', '-e', 'frame.time_relative', 
                     '-e', '_ws.col.Protocol', '-e', 'ip.src', '-e', 'ip.dst', 
                     '-e', 'frame.len', '-e', '_ws.col.Info'];
@@ -472,6 +473,45 @@ class PacketSniffer {
       console.error('[Packet Sniffer] Failed to start tshark:', error);
       this.isActive = false;
     }
+  }
+
+  async resolveTsharkInterface(interfaceName) {
+    if (!interfaceName || process.platform !== 'win32') {
+      return interfaceName;
+    }
+
+    if (/^\d+$/.test(String(interfaceName).trim())) {
+      return String(interfaceName).trim();
+    }
+
+    const tsharkPath = this.tsharkPath || 'tshark';
+    try {
+      const { stdout } = await execPromise(`"${tsharkPath}" -D`);
+      const lines = String(stdout).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const normalizedWanted = String(interfaceName).trim().toLowerCase();
+
+      for (const line of lines) {
+        const match = line.match(/^(\d+)\.\s+(.*)$/);
+        if (!match) continue;
+        const index = match[1];
+        const descriptor = match[2];
+        const displayMatch = descriptor.match(/\((.*)\)$/);
+        const displayName = (displayMatch ? displayMatch[1] : descriptor).trim().toLowerCase();
+        const rawDescriptor = descriptor.trim().toLowerCase();
+
+        if (
+          displayName === normalizedWanted ||
+          rawDescriptor.includes(normalizedWanted) ||
+          normalizedWanted.includes(displayName)
+        ) {
+          return index;
+        }
+      }
+    } catch (error) {
+      console.warn('[Packet Sniffer] Failed to resolve Tshark interface list:', error.message);
+    }
+
+    return interfaceName;
   }
 
   stopTshark() {
