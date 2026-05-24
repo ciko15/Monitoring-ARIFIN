@@ -603,9 +603,18 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const portField = document.getElementById('dataSourceUdpPort');
       if (extra) extra.style.display = templateSelect.value === 'vhf_t6tv' ? 'block' : 'none';
       if (marcExtra) marcExtra.style.display = templateSelect.value === 'vhf_marc_rse' ? 'block' : 'none';
-      if (portField) portField.required = templateSelect.value !== 'vhf_t6tv';
-      if (portField && templateSelect.value === 'vhf_t6tv' && !portField.value) portField.value = '80';
-      if (portField && templateSelect.value === 'vhf_marc_rse' && !portField.value) portField.value = '950';
+      if (portField) {
+        const isSnmp = templateSelect.value === 'snmp_system' || templateSelect.value === 'snmp_host_resources_01';
+        portField.required = templateSelect.value !== 'vhf_t6tv' && !isSnmp;
+        if (templateSelect.value === 'vhf_t6tv' && !portField.value) portField.value = '80';
+        if (templateSelect.value === 'vhf_marc_rse' && !portField.value) portField.value = '950';
+        if (isSnmp) {
+          portField.value = '';
+          portField.placeholder = 'Tidak diperlukan untuk SNMP';
+        } else if (portField.placeholder === 'Tidak diperlukan untuk SNMP') {
+          portField.placeholder = 'Masukkan Port';
+        }
+      }
       if (templateSelect.value !== 'vhf_marc_rse') clearMarcPortsCheckboxes();
     });
   }
@@ -619,6 +628,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
 
     templateSelect.innerHTML = '<option value="">Pilih Template</option>' + options.join('');
     console.log(`[UI] Populated ${options.length} options into template selector`);
+    // Ensure initial UI state follows current template selection (important for edit mode)
+    templateSelect.dispatchEvent(new Event('change'));
   }
 
   // Show modal
@@ -640,13 +651,16 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   form.onsubmit = async (event) => {
     event.preventDefault();
 
+    const isSnmpTemplate = templateSelect.value === 'snmp_system' || templateSelect.value === 'snmp_host_resources_01';
+    const normalizedPort = isSnmpTemplate ? null : (portInput.value ? portInput.value : null);
+
     const payload = {
       name: nameInput.value,
       ip_address: ipInput.value,
       equipt_id: equipmentSelect ? equipmentSelect.value : equipmentId,
       sup_category: supCategorySelect ? supCategorySelect.value : null,
       parsing_id: templateSelect.value,
-      tcp_port: portInput.value,
+      tcp_port: normalizedPort,
       latitude: latInput.value,
       longitude: lngInput.value,
       extra_config: templateSelect.value === 'vhf_t6tv' ? JSON.stringify({

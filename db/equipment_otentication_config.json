@@ -1262,7 +1262,7 @@
     "name": "EC 1",
     "equipt_id": "1777800000002",
     "ip_address": "192.168.64.3",
-    "tcp_port": "950",
+    "tcp_port": null,
     "udp_port": null,
     "parsing_id": "snmp_system",
     "extra_config": null,
