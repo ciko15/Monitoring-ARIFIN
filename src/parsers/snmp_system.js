@@ -12,7 +12,9 @@
  *   1.3.6.1.2.1.25.2.1.3 = hrStorageVirtualMemory
  *   1.3.6.1.2.1.25.2.1.4 = hrStorageFixedDisk  ← Disk
  *
- * Threshold: WARNING >= 80%, ALARM >= 95%
+ * Threshold:
+ * - CPU/DISK use used% (WARNING >= 80%, ALARM >= 95%)
+ * - RAM use available% for health (WARNING <= 20%, ALARM <= 5%)
  */
 
 'use strict';
@@ -37,10 +39,17 @@ const TYPE_DISK = '1.3.6.1.2.1.25.2.1.4';  // Fixed disk / filesystem
 
 const WARN_PCT  = 80;
 const ALARM_PCT = 95;
+const RAM_AVAIL_WARN_PCT  = 20;
+const RAM_AVAIL_ALARM_PCT = 5;
 
 function statusFromPct(pct) {
     if (pct >= ALARM_PCT) return 'Alarm';
     if (pct >= WARN_PCT)  return 'Warning';
+    return 'Normal';
+}
+function statusFromAvailablePct(pct) {
+    if (pct <= RAM_AVAIL_ALARM_PCT) return 'Alarm';
+    if (pct <= RAM_AVAIL_WARN_PCT)  return 'Warning';
     return 'Normal';
 }
 function worstStatus(...s) {
@@ -149,11 +158,15 @@ async function pollSNMP(host, community = 'public') {
 
         const ram_pct  = (ram_total_final && ram_total_final > 0)
             ? (ram_used_final / ram_total_final * 100) : null;
+        const ram_available_mb = (ram_total_final !== null && ram_used_final !== null)
+            ? Math.max(0, ram_total_final - ram_used_final) : null;
+        const ram_available_pct = (ram_total_final && ram_total_final > 0 && ram_available_mb !== null)
+            ? (ram_available_mb / ram_total_final * 100) : null;
         const disk_pct = (disk_total_gb && disk_total_gb > 0)
             ? (disk_used_gb / disk_total_gb * 100) : null;
 
         const s_cpu  = cpu_pct  !== null ? statusFromPct(cpu_pct)  : 'Normal';
-        const s_ram  = ram_pct  !== null ? statusFromPct(ram_pct)  : 'Normal';
+        const s_ram  = ram_available_pct !== null ? statusFromAvailablePct(ram_available_pct) : 'Normal';
         const s_disk = disk_pct !== null ? statusFromPct(disk_pct) : 'Normal';
         const status = worstStatus(s_cpu, s_ram, s_disk);
 
@@ -170,6 +183,8 @@ async function pollSNMP(host, community = 'public') {
                 ram_total_mb:   ram_total_final  !== null ? ram_total_final.toFixed(0)  : '—',
                 ram_used_mb:    ram_used_final   !== null ? ram_used_final.toFixed(0)   : '—',
                 ram_usage_pct:  ram_pct          !== null ? ram_pct.toFixed(1)          : '—',
+                ram_available_mb:  ram_available_mb  !== null ? ram_available_mb.toFixed(0)  : '—',
+                ram_available_pct: ram_available_pct !== null ? ram_available_pct.toFixed(1) : '—',
                 disk_total_gb:  disk_total_gb    !== null ? disk_total_gb.toFixed(1)    : '—',
                 disk_used_gb:   disk_used_gb     !== null ? disk_used_gb.toFixed(1)     : '—',
                 disk_usage_pct: disk_pct         !== null ? disk_pct.toFixed(1)         : '—',
@@ -191,6 +206,7 @@ async function pollSNMP(host, community = 'public') {
                 sys_name: '—', sys_descr: '—', sys_uptime: '—',
                 cpu_usage: '—',
                 ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+                ram_available_mb: '—', ram_available_pct: '—',
                 disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
             },
             timestamp: new Date().toISOString(),
@@ -211,6 +227,7 @@ async function pollSNMPWithTimeout(host, community = 'public', timeoutMs = 20000
                     sys_name: '—', sys_descr: '—', sys_uptime: '—',
                     cpu_usage: '—',
                     ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+                    ram_available_mb: '—', ram_available_pct: '—',
                     disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
                 },
                 timestamp: new Date().toISOString(),
@@ -231,6 +248,7 @@ async function pollSNMPWithTimeout(host, community = 'public', timeoutMs = 20000
                     sys_name: '—', sys_descr: '—', sys_uptime: '—',
                     cpu_usage: '—',
                     ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+                    ram_available_mb: '—', ram_available_pct: '—',
                     disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
                 },
                 timestamp: new Date().toISOString(),

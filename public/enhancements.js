@@ -1073,8 +1073,10 @@
             ]});
             sections.push({ title: 'MEMORY (RAM)', params: [
                 ['RAM Total (MB)', data.ram_total_mb  || '—', '#e8f4ff'],
-                ['RAM Used (MB)',  data.ram_used_mb   || '—', '#e8f4ff'],
-                ['RAM Usage (%)',  data.ram_usage_pct !== '—' ? `${data.ram_usage_pct} %` : '—', getLimitColor('UPS', 'RAM Usage', data.ram_usage_pct)],
+                ['RAM Used (MB) [SNMP]',  data.ram_used_mb   || '—', '#e8f4ff'],
+                ['RAM Used (%) [SNMP]',   data.ram_usage_pct !== '—' ? `${data.ram_usage_pct} %` : '—', '#5a8aaa'],
+                ['RAM Available (MB)',    data.ram_available_mb || '—', '#e8f4ff'],
+                ['RAM Available (%)',     data.ram_available_pct !== '—' ? `${data.ram_available_pct} %` : '—', getLimitColor('UPS', 'RAM Available', data.ram_available_pct)],
             ]});
             if (data.mount_points && data.mount_points.length > 0) {
                 const diskParams = data.mount_points.map(mp => [
