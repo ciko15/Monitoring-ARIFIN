@@ -12,9 +12,13 @@
     let _selectedEqId  = null;
     let _sourcesCache  = {};
     let _sourceFetchMeta = {};
+    let _activeSourceDetail = null;
+    let _sourceDetailTimer = null;
+    let _sourceDetailSignature = '';
     window.templatesCache = [];
     window.limitationsCache = [];
     const SOURCE_FETCH_TTL_MS = 15000;
+    const SOURCE_DETAIL_REFRESH_MS = 5000;
 
     const PREVIEW_SCHEMAS = {
         'dvor_maru_220': ['mon1_azimuth', 'mon1_carrier_power', 'mon2_azimuth', 'mon2_carrier_power', 'tx_active', 'lcu_dc_28v'],
@@ -236,6 +240,112 @@
     function shouldRefreshSources(equipmentId) {
         const lastFetchedAt = _sourceFetchMeta[equipmentId] || 0;
         return (Date.now() - lastFetchedAt) > SOURCE_FETCH_TTL_MS;
+    }
+
+    function updateEquipmentCacheEntry(eqData) {
+        if (!eqData || !eqData.id) return;
+
+        if (!Array.isArray(window.equipmentDataCache)) {
+            window.equipmentDataCache = [];
+        }
+
+        const idx = window.equipmentDataCache.findIndex(e => String(e.id) === String(eqData.id));
+        if (idx !== -1) {
+            window.equipmentDataCache[idx] = { ...window.equipmentDataCache[idx], ...eqData };
+        } else {
+            window.equipmentDataCache.push(eqData);
+        }
+
+        localStorage.setItem('cabang_equipment_cache', JSON.stringify(window.equipmentDataCache));
+    }
+
+    function getSourceDetailPayload(src) {
+        let latestData = null;
+        let eqSup = '';
+
+        if (window.equipmentDataCache) {
+            const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
+            eqSup = eq ? eq.sup_category : '';
+
+            if (eq && eq.lastData) {
+                if (src.parsing_id === 'vhf_marc_rse') {
+                    const radioData = eq.lastData[src.name] || null;
+                    latestData = radioData ? { _isMarcMulti: true, radios: { [src.name]: radioData } } : null;
+                } else {
+                    latestData = eq.lastData[src.name] || null;
+                }
+            }
+        }
+
+        return { latestData, eqSup };
+    }
+
+    function buildSourceDetailSignature(src, data, eqSup) {
+        return JSON.stringify({
+            sourceId: src?.id || '',
+            parserId: src?.parsing_id || '',
+            eqSup: eqSup || '',
+            data: data || null
+        });
+    }
+
+    function stopSourceDetailLiveUpdates() {
+        if (_sourceDetailTimer) {
+            clearInterval(_sourceDetailTimer);
+            _sourceDetailTimer = null;
+        }
+        _activeSourceDetail = null;
+        _sourceDetailSignature = '';
+    }
+
+    function closeDetailModal() {
+        const modal = document.getElementById('dataSourceDetailModal');
+        if (modal) modal.style.display = 'none';
+        stopSourceDetailLiveUpdates();
+    }
+
+    async function refreshSourceDetailModal(src, forceRender = false) {
+        if (!src) return;
+
+        try {
+            const res = await fetch(`/api/equipment/${src.equipt_id}`, {
+                headers: window.getAuthHeaders ? window.getAuthHeaders() : {}
+            });
+
+            if (res.ok) {
+                const eqData = await res.json();
+                updateEquipmentCacheEntry(eqData);
+            }
+        } catch (e) {
+            console.warn('[Enhancements] Failed to refresh source detail:', e);
+        }
+
+        const { latestData, eqSup } = getSourceDetailPayload(src);
+        const nextSignature = buildSourceDetailSignature(src, latestData, eqSup);
+        if (!forceRender && nextSignature === _sourceDetailSignature) return;
+
+        const body = document.getElementById('srcDetailBody');
+        const scrollTop = body ? body.scrollTop : 0;
+
+        showDetailModal(src, latestData, eqSup);
+        _sourceDetailSignature = nextSignature;
+
+        if (body) body.scrollTop = scrollTop;
+    }
+
+    function startSourceDetailLiveUpdates(src) {
+        stopSourceDetailLiveUpdates();
+        _activeSourceDetail = src;
+        refreshSourceDetailModal(src, true);
+
+        _sourceDetailTimer = setInterval(() => {
+            const modal = document.getElementById('dataSourceDetailModal');
+            if (!modal || modal.style.display === 'none' || !_activeSourceDetail) {
+                stopSourceDetailLiveUpdates();
+                return;
+            }
+            refreshSourceDetailModal(_activeSourceDetail);
+        }, SOURCE_DETAIL_REFRESH_MS);
     }
 
     // ── Source Panel ──────────────────────────────────────────────────────────
@@ -484,27 +594,13 @@
         }
         if (!src) return;
 
-        // Get latest data from equipment cache (lastData keyed by source name)
-        let latestData = null;
-        let eqSup = '';
-        if (window.equipmentDataCache) {
-            const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
-            eqSup = eq ? eq.sup_category : '';
-            if (eq && eq.lastData) {
-                if (src.parsing_id === 'vhf_marc_rse') {
-                    // 1 source = 1 radio — key di lastData = src.name
-                    const radioData = eq.lastData[src.name] || null;
-                    latestData = radioData ? { _isMarcMulti: true, radios: { [src.name]: radioData } } : null;
-                } else {
-                    latestData = eq.lastData[src.name] || null;
-                }
-            }
-        }
-
         // Build modal
         const modal   = document.getElementById('dataSourceDetailModal');
         if (!modal) { createDetailModal(); }
+        const { latestData, eqSup } = getSourceDetailPayload(src);
         showDetailModal(src, latestData, eqSup);
+        _sourceDetailSignature = buildSourceDetailSignature(src, latestData, eqSup);
+        startSourceDetailLiveUpdates(src);
     };
 
     function createDetailModal() {
@@ -516,13 +612,15 @@
                 <div style="display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid #1a3a5c;gap:12px">
                     <span id="srcDetailTitle" style="font-size:14px;font-weight:bold;color:#00d4ff;flex:1"></span>
                     <span id="srcDetailStatus"></span>
-                    <button onclick="document.getElementById('dataSourceDetailModal').style.display='none'"
+                    <button id="srcDetailCloseBtn"
                         style="background:none;border:none;color:#4a7a9a;font-size:18px;cursor:pointer">✕</button>
                 </div>
                 <div id="srcDetailBody" style="flex:1;overflow-y:auto;padding:16px"></div>
             </div>`;
-        div.addEventListener('click', e => { if (e.target === div) div.style.display = 'none'; });
+        div.addEventListener('click', e => { if (e.target === div) closeDetailModal(); });
         document.body.appendChild(div);
+        const closeBtn = document.getElementById('srcDetailCloseBtn');
+        if (closeBtn) closeBtn.addEventListener('click', closeDetailModal);
     }
 
     function showDetailModal(src, data, eqSup) {
