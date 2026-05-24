@@ -91,11 +91,11 @@ class PacketSniffer {
     this.packets = [];
     this.packetCounter = 0;
     
-    // Choose a better default than 'any' for macOS
-    if ((!interfaceName || interfaceName === 'any' || interfaceName === '') && process.platform === 'darwin') {
-      this.currentInterface = 'en0'; // Primary choice for Mac
+    // Choose a safer default per platform.
+    if (!interfaceName || interfaceName === 'any' || interfaceName === '') {
+      this.currentInterface = process.platform === 'darwin' ? 'en0' : '1';
     } else {
-      this.currentInterface = interfaceName || 'en0'; // Fallback to en0 if nothing provided
+      this.currentInterface = interfaceName;
     }
     
     console.log(`[Packet Sniffer] Using interface: ${this.currentInterface}`);
@@ -415,7 +415,7 @@ class PacketSniffer {
       const args = ['-l', '-n', '-i', interfaceName, '-T', 'fields', 
                     '-e', 'frame.number', '-e', 'frame.time_relative', 
                     '-e', '_ws.col.Protocol', '-e', 'ip.src', '-e', 'ip.dst', 
-                    '-e', 'frame.len', '-e', 'frame.info'];
+                    '-e', 'frame.len', '-e', '_ws.col.Info'];
       const tsharkPath = this.tsharkPath || 'tshark';
       console.log(`[Packet Sniffer] Spawning Tshark: ${tsharkPath} ${args.join(' ')}`);
       this.tsharkProcess = spawn(tsharkPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
