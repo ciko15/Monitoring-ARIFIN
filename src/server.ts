@@ -2,9 +2,11 @@ import { Elysia, t } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { staticPlugin } from '@elysiajs/static';
 import { serverTiming } from '@elysiajs/server-timing';
+import dotenv from 'dotenv';
 // Bun supports both import and require natively in .ts files
 // const require = createRequire(import.meta.url);
 
+dotenv.config();
 
 import ping from 'ping';
 
@@ -80,6 +82,14 @@ const equipmentService = new EquipmentService(db);
 const DataCollectorScheduler = require('./scheduler/collector');
 const connectionManager = require('./connection/manager');
 const thresholdEvaluator = require('./utils/thresholdEvaluator');
+const {
+    getLocalSiteId,
+    publishThresholdApplyCommand,
+    publishThresholdResult,
+    publishEquipmentSnapshotRequested,
+    publishEquipmentSnapshotResponded,
+    buildEquipmentSnapshot
+} = require('./services/message_bus');
 
 // const websocketServer = require('./websocket/server'); // We'll handle WS separately in Elysia
 const templateService = require('./services/template');
@@ -967,24 +977,164 @@ const app = new Elysia()
     .group('/api/equipment/:id/thresholds', (app) =>
         app
             .get('/', async ({ params }) => await db.getThresholdsByEquipment(params.id))
-            .post('/', async ({ params, body, set }) => {
-                const threshold = await db.createThreshold({ ...(body as any), equipment_id: parseInt(params.id) });
-                set.status = 201;
-                return threshold;
-            }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
-            .put('/:thresholdId', async ({ params, body, set }) => {
-                const updated = await db.updateThreshold(params.thresholdId, body);
-                if (!updated) {
-                    set.status = 404;
-                    return { message: 'Threshold not found' };
+            .post('/', async ({ params, body, set, request }) => {
+                const correlationId = request.headers.get('x-correlation-id') || undefined;
+                try {
+                    const threshold = await db.createThreshold({ ...(body as any), equipment_id: parseInt(params.id) });
+                    await publishThresholdResult('configuration.threshold.applied', {
+                        equipmentId: parseInt(params.id),
+                        thresholdId: threshold.id,
+                        threshold,
+                        result: 'created',
+                        correlationId
+                    }).catch((e: any) => console.warn('[EMS] Failed to publish threshold.applied:', e.message));
+                    set.status = 201;
+                    return threshold;
+                } catch (error: any) {
+                    await publishThresholdResult('configuration.threshold.failed', {
+                        equipmentId: parseInt(params.id),
+                        threshold: body,
+                        result: 'create_failed',
+                        reason: error.message,
+                        correlationId
+                    }).catch((e: any) => console.warn('[EMS] Failed to publish threshold.failed:', e.message));
+                    set.status = 500;
+                    return { message: 'Failed to create threshold', error: error.message };
                 }
-                return updated;
+            }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
+            .put('/:thresholdId', async ({ params, body, set, request }) => {
+                const correlationId = request.headers.get('x-correlation-id') || undefined;
+                try {
+                    const updated = await db.updateThreshold(params.thresholdId, body);
+                    if (!updated) {
+                        set.status = 404;
+                        return { message: 'Threshold not found' };
+                    }
+
+                    await publishThresholdResult('configuration.threshold.applied', {
+                        equipmentId: parseInt(params.id),
+                        thresholdId: updated.id || params.thresholdId,
+                        threshold: updated,
+                        result: 'updated',
+                        correlationId
+                    }).catch((e: any) => console.warn('[EMS] Failed to publish threshold.applied:', e.message));
+
+                    return updated;
+                } catch (error: any) {
+                    await publishThresholdResult('configuration.threshold.failed', {
+                        equipmentId: parseInt(params.id),
+                        thresholdId: params.thresholdId,
+                        threshold: body,
+                        result: 'update_failed',
+                        reason: error.message,
+                        correlationId
+                    }).catch((e: any) => console.warn('[EMS] Failed to publish threshold.failed:', e.message));
+                    set.status = 500;
+                    return { message: 'Failed to update threshold', error: error.message };
+                }
             }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
             .delete('/:thresholdId', async ({ params }) => {
                 await db.deleteThreshold(params.thresholdId);
                 return { message: 'Threshold deleted' };
             }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
     )
+
+    .post('/api/messaging/threshold/apply', async ({ body, set, request }) => {
+        try {
+            const payload = body as any;
+            const correlationId = payload.correlationId || request.headers.get('x-correlation-id') || undefined;
+            const targetSiteId = payload.targetSiteId || getLocalSiteId();
+
+            const command = await publishThresholdApplyCommand({
+                equipmentId: payload.equipmentId,
+                threshold: payload.threshold,
+                requestedBy: payload.requestedBy || 'api',
+                targetSiteId,
+                correlationId
+            });
+
+            if (payload.applyLocally) {
+                let thresholdResult;
+                if (payload.threshold?.id) {
+                    thresholdResult = await db.updateThreshold(payload.threshold.id, payload.threshold);
+                } else {
+                    thresholdResult = await db.createThreshold({
+                        ...(payload.threshold || {}),
+                        equipment_id: parseInt(payload.equipmentId)
+                    });
+                }
+
+                await publishThresholdResult('configuration.threshold.applied', {
+                    equipmentId: parseInt(payload.equipmentId),
+                    thresholdId: thresholdResult?.id,
+                    threshold: thresholdResult,
+                    result: payload.threshold?.id ? 'updated' : 'created',
+                    correlationId
+                }).catch((e: any) => console.warn('[EMS] Failed to publish threshold.applied:', e.message));
+
+                return {
+                    success: true,
+                    command_queue: command.queue,
+                    applied_locally: true,
+                    threshold: thresholdResult,
+                    correlation_id: correlationId
+                };
+            }
+
+            return {
+                success: true,
+                command_queue: command.queue,
+                applied_locally: false,
+                correlation_id: correlationId
+            };
+        } catch (error: any) {
+            set.status = 500;
+            return { success: false, message: 'Failed to publish threshold apply command', error: error.message };
+        }
+    }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
+
+    .post('/api/messaging/equipment-snapshot/request', async ({ body, set, request }) => {
+        try {
+            const payload = body as any;
+            const equipmentId = parseInt(payload.equipmentId);
+            const correlationId = payload.correlationId || request.headers.get('x-correlation-id') || undefined;
+            const targetSiteId = payload.targetSiteId || getLocalSiteId();
+
+            const requestResult = await publishEquipmentSnapshotRequested({
+                equipmentId,
+                sourceName: payload.sourceName,
+                requestedBy: payload.requestedBy || 'api',
+                targetSiteId,
+                correlationId
+            });
+
+            let snapshot = null;
+            if (payload.respondInline !== false) {
+                snapshot = await buildEquipmentSnapshot(equipmentId);
+                if (!snapshot) {
+                    set.status = 404;
+                    return { success: false, message: 'Equipment not found' };
+                }
+
+                await publishEquipmentSnapshotResponded({
+                    equipmentId,
+                    snapshot,
+                    targetSiteId: payload.responseTargetSiteId || 'PUSAT',
+                    correlationId
+                }).catch((e: any) => console.warn('[EMS] Failed to publish snapshot response:', e.message));
+            }
+
+            return {
+                success: true,
+                request_queue: requestResult.queue,
+                correlation_id: correlationId,
+                snapshot
+            };
+        } catch (error: any) {
+            set.status = 500;
+            return { success: false, message: 'Failed to process equipment snapshot request', error: error.message };
+        }
+    }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
 
     // --- PARSER ROUTES ---
     .post('/api/parser/test', async ({ body, set }) => {

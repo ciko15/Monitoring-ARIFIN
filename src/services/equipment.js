@@ -6,6 +6,10 @@
 const ParserFactory = require('../parsers/factory');
 const connectionManager = require('../connection/manager');
 const { produceInternalMessage, AirNavServiceQueue } = require('../connection/ems');
+const {
+    publishEquipmentTelemetry,
+    publishEquipmentStatusChanged
+} = require('./message_bus');
 
 class EquipmentService {
     constructor(db) {
@@ -226,24 +230,14 @@ class EquipmentService {
         try {
             await this.db.updateEquipmentStatus(equipmentId, status);
             
-            // Beritahu EMS agar UI terupdate meskipun alat sedang mati
             const equipment = await this.db.getEquipmentById(equipmentId);
             if (equipment) {
-                const { publishByCategory } = require('../connection/ems');
-                const category = equipment.category || 'Support';
-                
-                await publishByCategory(
-                    category,
-                    {
-                        equipmentId,
-                        equipment_name: equipment.name,
-                        status: status,
-                        message: error || (status === 'Normal' ? 'Connection healthy' : 'Device unreachable'),
-                        logged_at: new Date().toISOString(),
-                        source: 'WATCHDOG'
-                    },
-                    { requestType: 'STATUS_UPDATE' }
-                ).catch(e => console.warn('[EMS] Failed to publish status update:', e.message));
+                await publishEquipmentStatusChanged(
+                    equipment,
+                    status,
+                    error,
+                    { changedAt: new Date().toISOString() }
+                ).catch(e => console.warn('[EMS] Failed to publish status.changed event:', e.message));
             }
         } catch (error) {
             console.error('[EquipmentService] Error updating status:', error);
@@ -291,14 +285,8 @@ class EquipmentService {
             };
             await this.db.createEquipmentLog(datalog);
 
-            const { publishByCategory } = require('../connection/ems');
-            const category = equipment ? equipment.category : 'Support';
-
-            await publishByCategory(
-                category,
-                datalog,
-                { requestType: 'SERVICE_LOG' }
-            ).catch(e => console.warn('[EMS] Failed to publish log to category queue:', e.message));
+            await publishEquipmentTelemetry(datalog, equipment)
+                .catch(e => console.warn('[EMS] Failed to publish equipment.telemetry.received:', e.message));
         } catch (error) {
             console.error('[EquipmentService] Error saving to logs:', error);
         }

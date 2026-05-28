@@ -3,6 +3,7 @@ const path = require('path');
 
 // --- JSON CONFIG PATHS ---
 const AIRPORT_CONFIG_PATH = path.join(__dirname, 'airport_config.json');
+const BRANCH_PROFILE_PATH = path.join(__dirname, 'branch_profile.json');
 const EQUIPMENT_CONFIG_PATH = path.join(__dirname, 'equipment_config.json');
 const USERS_CONFIG_PATH = path.join(__dirname, 'users_config.json');
 const PARSING_CONFIG_PATH = path.join(__dirname, 'equipment_parsing_config.json');
@@ -160,6 +161,45 @@ async function readAirportConfig() {
 
 async function writeAirportConfig(data) {
   return await writeJson(AIRPORT_CONFIG_PATH, data);
+}
+
+async function readBranchProfile() {
+  const fallbackAirport = await readAirportConfig();
+  const fallback = {
+    siteId: fallbackAirport.siteId || fallbackAirport.code || 'WAJJ',
+    airportCode: fallbackAirport.code || fallbackAirport.siteId || 'WAJJ',
+    airportName: fallbackAirport.name || 'Bandara Sentani',
+    city: fallbackAirport.city || 'Jayapura',
+    lat: fallbackAirport.lat,
+    lng: fallbackAirport.lng,
+    ipBranch: fallbackAirport.ipBranch,
+    rabbitmq: {
+      protocol: 'amqp',
+      host: '172.20.17.104',
+      port: 5672,
+      username: 'smart-toc-hq',
+      password: 'smarthq123!',
+      vhost: 'dev-smart'
+    },
+    services: {
+      producer: 'MONITORING_ARIFIN_BRANCH',
+      target: 'EMS'
+    }
+  };
+
+  const data = await readJson(BRANCH_PROFILE_PATH, null);
+  return {
+    ...fallback,
+    ...(data || {}),
+    rabbitmq: {
+      ...fallback.rabbitmq,
+      ...((data && data.rabbitmq) || {})
+    },
+    services: {
+      ...fallback.services,
+      ...((data && data.services) || {})
+    }
+  };
 }
 
 /**
@@ -1068,11 +1108,17 @@ async function getLatestEquipmentLog(equipmentId) {
 
 // --- THRESHOLD SETTINGS ---
 async function getThresholdsByEquipment(equipmentId) {
-  return thresholdSettingsDB.filter(t => t.equipmentId == equipmentId);
+  return thresholdSettingsDB.filter(t => t.equipmentId == equipmentId || t.equipment_id == equipmentId);
 }
 
 async function createThreshold(data) {
-  const t = { ...data, id: Date.now() };
+  const normalizedEquipmentId = data.equipmentId || data.equipment_id || null;
+  const t = {
+    ...data,
+    id: Date.now(),
+    equipmentId: normalizedEquipmentId,
+    equipment_id: normalizedEquipmentId
+  };
   thresholdSettingsDB.push(t);
   return t;
 }
@@ -1157,6 +1203,7 @@ setTimeout(syncAllOtenticationLocations, 1000);
 module.exports = {
   // Config helpers
   readAirportConfig,
+  readBranchProfile,
   writeAirportConfig,
   readJson,
   writeJson,
