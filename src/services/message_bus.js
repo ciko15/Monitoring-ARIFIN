@@ -187,6 +187,27 @@ async function buildEquipmentSnapshot(equipmentId) {
     };
 }
 
+async function buildConfigurationSnapshot() {
+    const [branchProfile, airport, equipmentResult, sources, parsers, limitations] = await Promise.all([
+        db.readBranchProfile(),
+        db.readAirportConfig(),
+        db.getAllEquipment({ limit: 10000, isActive: 'all' }),
+        db.getAllOtentication(),
+        db.getAllParsingConfigs(),
+        db.getAllLimitations()
+    ]);
+
+    return {
+        snapshot_at: new Date().toISOString(),
+        branch_profile: branchProfile,
+        airport,
+        equipment: equipmentResult.data || equipmentResult || [],
+        sources,
+        parsers,
+        limitations
+    };
+}
+
 async function publishEquipmentSnapshotResponded(response = {}) {
     return publishMessage(
         'RESPONSE',
@@ -206,6 +227,65 @@ async function publishEquipmentSnapshotResponded(response = {}) {
     );
 }
 
+async function publishConfigurationSnapshotResponded(response = {}) {
+    return publishMessage(
+        'RESPONSE',
+        'configuration.snapshot.responded',
+        {
+            snapshot: response.snapshot
+        },
+        {
+            producerService: response.producerService || await getBranchServiceName(),
+            producerSiteId: response.producerSiteId || await getLocalSiteId(),
+            targetService: response.targetService || await getCentralServiceName(),
+            targetSiteId: response.targetSiteId || 'PUSAT',
+            occurredAt: response.snapshot?.snapshot_at,
+            correlationId: response.correlationId
+        }
+    );
+}
+
+async function publishBranchHealthResponded(response = {}) {
+    return publishMessage(
+        'RESPONSE',
+        'branch.health.responded',
+        {
+            health: response.health
+        },
+        {
+            producerService: response.producerService || await getBranchServiceName(),
+            producerSiteId: response.producerSiteId || await getLocalSiteId(),
+            targetService: response.targetService || await getCentralServiceName(),
+            targetSiteId: response.targetSiteId || 'PUSAT',
+            occurredAt: response.health?.responded_at,
+            correlationId: response.correlationId
+        }
+    );
+}
+
+async function publishCollectorRefreshResult(success, result = {}) {
+    return publishMessage(
+        'EVENT',
+        success ? 'collector.refresh.completed' : 'collector.refresh.failed',
+        {
+            equipment_id: result.equipmentId || null,
+            source_id: result.sourceId || null,
+            source_name: result.sourceName || null,
+            result: result.result || (success ? 'completed' : 'failed'),
+            reason: result.reason || null,
+            processed_at: result.processedAt || new Date().toISOString()
+        },
+        {
+            producerService: result.producerService || await getBranchServiceName(),
+            producerSiteId: result.producerSiteId || await getLocalSiteId(),
+            targetService: result.targetService || await getCentralServiceName(),
+            targetSiteId: result.targetSiteId || 'PUSAT',
+            occurredAt: result.processedAt,
+            correlationId: result.correlationId
+        }
+    );
+}
+
 module.exports = {
     getLocalSiteId,
     publishEquipmentTelemetry,
@@ -214,5 +294,9 @@ module.exports = {
     publishThresholdResult,
     publishEquipmentSnapshotRequested,
     publishEquipmentSnapshotResponded,
-    buildEquipmentSnapshot
+    publishConfigurationSnapshotResponded,
+    publishBranchHealthResponded,
+    publishCollectorRefreshResult,
+    buildEquipmentSnapshot,
+    buildConfigurationSnapshot
 };

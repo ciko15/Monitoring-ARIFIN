@@ -1552,6 +1552,22 @@ async function startServices() {
             }
         }
 
+        if (SHOULD_START_WEB) {
+            try {
+                const CommandConsumer = require('./services/command_consumer');
+                const commandConsumer = new CommandConsumer({
+                    equipmentService,
+                    templateService,
+                    state,
+                    serviceRole: SERVICE_ROLE,
+                    pipelineMode: PIPELINE_MODE
+                });
+                await commandConsumer.start();
+            } catch (e) {
+                console.error('[SYSTEM] commandConsumer init error:', e);
+            }
+        }
+
         console.log('[SYSTEM] Core services initialized (30s polling & 4min watchdog active)');
     } catch (err) {
         console.error('[SYSTEM] Critical error during service initialization:', err);

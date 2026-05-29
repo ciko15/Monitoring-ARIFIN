@@ -92,6 +92,37 @@ Semua message envelope baru memakai struktur:
 - Result dan response tetap memakai queue pusat:
   `EVT.CONFIG.RESULT`, `RSP.EQUIPMENT`
 
+## Inbound Queue Yang Sudah Didukung Cabang
+
+Consumer cabang sekarang listen ke queue berikut untuk site lokal:
+
+- `CMD.CONFIG.<SITE_ID>`
+- `CMD.COLLECTOR.<SITE_ID>`
+- `CMD.SYSTEM.<SITE_ID>`
+- `REQ.EQUIPMENT.<SITE_ID>`
+- `REQ.CONFIG.<SITE_ID>`
+- `REQ.BRANCH.<SITE_ID>`
+
+Alias sederhana juga didukung:
+
+- `Q.CMD.<SITE_ID>`
+- `Q.REQ.<SITE_ID>`
+
+## Inbound Message Yang Sudah Didukung
+
+- `configuration.threshold.apply`
+- `collector.refresh_source`
+- `collector.reload_config`
+- `equipment.snapshot.requested`
+- `configuration.snapshot.requested`
+- `branch.health.requested`
+- `system.sync_clock_check`
+
+Catatan:
+
+- command berisiko tinggi seperti restart PM2 belum dibuka otomatis
+- jika pusat ingin command seperti restart service, sebaiknya dibuat message khusus dan allowlist yang ketat
+
 ## Endpoint Uji Cepat
 
 Endpoint berikut ditambahkan untuk tahap awal:
