@@ -196,12 +196,21 @@ async function sendToQueue(queue, message) {
     const ch = await connect();
     await assertQueue(queue);
 
+    const requestType = message?.header?.REQUEST_TYPE || message?.header?.message_name || 'UNKNOWN';
+    const sourceService = process.env.SOURCE_SERVICE || 'WAJJ';
+    const timestamp = message?.header?.TIMESTAMP || message?.header?.sent_at || new Date().toISOString();
+
     ch.sendToQueue(
         queue,
         Buffer.from(JSON.stringify(message)),
         {
             persistent: true,
-            contentType: 'application/json'
+            contentType: 'application/json',
+            headers: {
+                REQUEST_TYPE: requestType,
+                SOURCE_SERVICE: sourceService,
+                TIMESTAMP: timestamp
+            }
         }
     );
 
