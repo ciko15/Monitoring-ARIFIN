@@ -14,6 +14,15 @@ async function getLocalSiteId() {
     return normalizeSiteId(process.env.SITE_ID || process.env.AIRPORT_SITE_ID || profile.siteId || profile.airportCode || 'UNKNOWN');
 }
 
+async function getAirportCode() {
+    try {
+        const airport = await db.readAirportConfig();
+        return airport?.code || await getLocalSiteId();
+    } catch (_) {
+        return await getLocalSiteId();
+    }
+}
+
 async function getBranchServiceName() {
     const profile = await getBranchProfile();
     return process.env.MESSAGE_SERVICE_NAME || profile.services?.producer || 'MONITORING_ARIFIN_BRANCH';
@@ -25,11 +34,13 @@ async function getCentralServiceName() {
 }
 
 async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) {
+    const airportCode = await getAirportCode();
+    
     const payload = {
         equipment_id: datalog.equipmentId,
         equipment_name: datalog.equipment_name,
         category: equipment.category || null,
-        airport_id: equipment.airportId || null,
+        airport_code: airportCode,
         airport_name: datalog.airport_name || null,
         source: datalog.source,
         connection_type: datalog.connection_type,
@@ -59,6 +70,8 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
 }
 
 async function publishEquipmentStatusChanged(equipment = {}, status, error = null, options = {}) {
+    const airportCode = await getAirportCode();
+    
     return publishCategorizedEvent(
         equipment.category || 'Support',
         'equipment.status.changed',
@@ -66,7 +79,7 @@ async function publishEquipmentStatusChanged(equipment = {}, status, error = nul
             equipment_id: equipment.id,
             equipment_name: equipment.name,
             category: equipment.category || null,
-            airport_id: equipment.airportId || null,
+            airport_code: airportCode,
             status,
             message: error || null,
             changed_at: options.changedAt || new Date().toISOString()
@@ -286,6 +299,57 @@ async function publishCollectorRefreshResult(success, result = {}) {
     );
 }
 
+async function publishEquipmentConfigurationChanged(action, equipment = {}) {
+    const airportCode = await getAirportCode();
+    
+    return publishCategorizedEvent(
+        equipment.category || 'Support',
+        'equipment.configuration.changed',
+        {
+            action, // 'add', 'update', 'delete'
+            equipment_id: equipment.id,
+            airport_code: airportCode,
+            equipment_data: action === 'delete' ? null : equipment,
+            changed_at: new Date().toISOString()
+        },
+        {
+            producerService: await getBranchServiceName(),
+            producerSiteId: await getLocalSiteId(),
+            targetService: await getCentralServiceName(),
+            targetSiteId: 'PUSAT',
+            occurredAt: new Date().toISOString(),
+            eventType: 'configuration',
+            domain: 'equipment',
+            equipmentId: equipment.id,
+        }
+    );
+}
+
+async function publishDataSourceConfigurationChanged(action, datasource = {}) {
+    const airportCode = await getAirportCode();
+    
+    return publishCategorizedEvent(
+        'Support',
+        'datasource.configuration.changed',
+        {
+            action, // 'add', 'update', 'delete'
+            equipment_id: datasource.equipt_id || datasource.equipmentId || null,
+            airport_code: airportCode,
+            datasource_data: action === 'delete' ? null : datasource,
+            changed_at: new Date().toISOString()
+        },
+        {
+            producerService: await getBranchServiceName(),
+            producerSiteId: await getLocalSiteId(),
+            targetService: await getCentralServiceName(),
+            targetSiteId: 'PUSAT',
+            occurredAt: new Date().toISOString(),
+            eventType: 'configuration',
+            domain: 'datasource'
+        }
+    );
+}
+
 module.exports = {
     getLocalSiteId,
     publishEquipmentTelemetry,
@@ -297,6 +361,8 @@ module.exports = {
     publishConfigurationSnapshotResponded,
     publishBranchHealthResponded,
     publishCollectorRefreshResult,
+    publishEquipmentConfigurationChanged,
+    publishDataSourceConfigurationChanged,
     buildEquipmentSnapshot,
     buildConfigurationSnapshot
 };

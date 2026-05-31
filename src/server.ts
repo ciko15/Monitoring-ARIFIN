@@ -88,6 +88,8 @@ const {
     publishThresholdResult,
     publishEquipmentSnapshotRequested,
     publishEquipmentSnapshotResponded,
+    publishEquipmentConfigurationChanged,
+    publishDataSourceConfigurationChanged,
     buildEquipmentSnapshot
 } = require('./services/message_bus');
 
@@ -666,6 +668,7 @@ const app = new Elysia()
                     });
                     set.status = 201;
                     pushSyncToTOC();
+                    publishEquipmentConfigurationChanged('add', newEquipment).catch((e: any) => console.error('[EMS] Failed to publish config change:', e.message));
                     return newEquipment;
                 } catch (error: any) {
                     set.status = 500;
@@ -691,6 +694,7 @@ const app = new Elysia()
                         return { message: 'Equipment not found' };
                     }
                     pushSyncToTOC();
+                    publishEquipmentConfigurationChanged('update', updated).catch((e: any) => console.error('[EMS] Failed to publish config change:', e.message));
                     return updated;
                 } catch (error: any) {
                     set.status = 500;
@@ -700,8 +704,10 @@ const app = new Elysia()
             // Delete Equipment
             .delete('/remove/:id', async ({ params, set }) => {
                 try {
+                    const eqId = parseInt(params.id.toString());
                     await db.deleteEquipment(params.id);
                     pushSyncToTOC();
+                    publishEquipmentConfigurationChanged('delete', { id: eqId }).catch((e: any) => console.error('[EMS] Failed to publish config change:', e.message));
                     return { message: 'Equipment deleted' };
                 } catch (error: any) {
                     set.status = 500;
@@ -779,13 +785,16 @@ const app = new Elysia()
     .group('/api/otentication', (app) =>
         app.get('/:equipmentId', async ({ params }) => await db.getOtenticationByEquipment(params.equipmentId))
             .post('/', async ({ body }) => {
-                const result = await db.createOtentication(body as any);
+                const b = body as any;
+                const result = await db.createOtentication(b);
                 pushSyncToTOC();
+                publishDataSourceConfigurationChanged('add', b).catch((e: any) => console.error('[EMS] Failed to publish datasource update:', e.message));
                 return result;
             })
             .delete('/:equipmentId', async ({ params }) => {
                 const result = await db.deleteOtenticationByEquipment(params.equipmentId);
                 pushSyncToTOC();
+                publishDataSourceConfigurationChanged('delete', { equipmentId: params.equipmentId }).catch((e: any) => console.error('[EMS] Failed to publish datasource delete:', e.message));
                 return result;
             })
     )
@@ -1327,6 +1336,8 @@ const app = new Elysia()
             .delete('/authentications/:id', async ({ params }) => {
                 await db.deleteOtentication(params.id);
                 pushSyncToTOC();
+                // We use 'delete' and pass equipmentId as null because we only have authentication id here. The payload processor should handle it or it's just a purge event.
+                publishDataSourceConfigurationChanged('delete', { equipt_id: null, id: params.id }).catch((e: any) => console.error('[EMS] Failed to publish datasource delete:', e.message));
                 return { message: 'Deleted' };
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
 

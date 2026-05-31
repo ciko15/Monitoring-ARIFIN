@@ -18,7 +18,21 @@ function readBranchProfileSync() {
     }
 }
 
+function readAirportConfigSync() {
+    try {
+        const configPath = path.resolve(process.cwd(), 'db', 'airport_config.json');
+        if (!fs.existsSync(configPath)) return {};
+        return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    } catch (error) {
+        console.warn('[EMS] Failed to read airport_config.json:', error.message);
+        return {};
+    }
+}
+
 const branchProfile = readBranchProfileSync();
+const airportConfig = readAirportConfigSync();
+const DEFAULT_SOURCE_SERVICE = airportConfig.siteId || airportConfig.code || 'UNKNOWN';
+
 const branchRabbit = branchProfile.rabbitmq || {};
 const branchServices = branchProfile.services || {};
 
@@ -151,26 +165,11 @@ function normalizeSiteId(siteId) {
 }
 
 function buildMessageEnvelope(messagePattern, messageName, payload = {}, options = {}) {
-    const targetSiteId = normalizeSiteId(options.targetSiteId);
-    const producerSiteId = normalizeSiteId(options.producerSiteId);
-    const targetService = options.targetService || process.env.TARGET_SERVICE_NAME || process.env.CENTRAL_SERVICE_NAME || branchServices.target || 'EMS';
-    const producerService = options.producerService || process.env.MESSAGE_SERVICE_NAME || branchServices.producer || 'MONITORING_ARIFIN_BRANCH';
-    const occurredAt = options.occurredAt || new Date().toISOString();
-    const sentAt = new Date().toISOString();
-
     return {
         header: {
-            message_id: options.messageId || randomUUID(),
-            message_pattern: messagePattern,
-            message_name: messageName,
-            producer_service: producerService,
-            producer_site_id: producerSiteId,
-            target_service: targetService,
-            target_site_id: targetSiteId,
-            occurred_at: occurredAt,
-            sent_at: sentAt,
-            correlation_id: options.correlationId || randomUUID(),
-            ...options.header
+            REQUEST_TYPE: options.requestType || messageName,
+            SOURCE_SERVICE: process.env.SOURCE_SERVICE || DEFAULT_SOURCE_SERVICE,
+            TIMESTAMP: new Date().toISOString()
         },
         body: payload
     };
@@ -197,7 +196,7 @@ async function sendToQueue(queue, message) {
     await assertQueue(queue);
 
     const requestType = message?.header?.REQUEST_TYPE || message?.header?.message_name || 'UNKNOWN';
-    const sourceService = process.env.SOURCE_SERVICE || 'WAJJ';
+    const sourceService = process.env.SOURCE_SERVICE || DEFAULT_SOURCE_SERVICE;
     const timestamp = message?.header?.TIMESTAMP || message?.header?.sent_at || new Date().toISOString();
 
     ch.sendToQueue(
@@ -240,25 +239,8 @@ async function publishCategorizedEvent(category, messageName, payload = {}, opti
     try {
         const normalizedCategory = EquipmentCategoryQueue[category] ? category : 'Support';
         const queue = getQueueByCategory(normalizedCategory);
-        const categoryCode = getCategoryCode(normalizedCategory);
-        const envelope = buildMessageEnvelope(
-            'EVENT',
-            messageName,
-            payload,
-            {
-                ...options,
-                header: {
-                    event_type: options.eventType || 'telemetry',
-                    domain: options.domain || 'equipment',
-                    category: normalizedCategory,
-                    category_code: categoryCode,
-                    equipment_id: options.equipmentId || payload.equipment_id || null,
-                    equipment_name: options.equipmentName || payload.equipment_name || null,
-                    source_name: options.sourceName || payload.source || payload.source_name || null,
-                    ...options.header
-                }
-            }
-        );
+        
+        const envelope = buildMessageEnvelope('EVENT', messageName, payload, options);
 
         const result = await sendToQueue(queue, envelope);
         console.log(`[EMS-DEBUG] Publish categorized event to ${queue} (${messageName})`);
@@ -274,15 +256,12 @@ async function publishCategorizedEvent(category, messageName, payload = {}, opti
 async function publishByCategory(category, payload = {}, options = {}, callback) {
     try {
         const queue = getQueueByCategory(category);
-        const metadata = {
-            REQUEST_TYPE: options.requestType || 'EQUIPMENT_MONITORING',
-            CATEGORY: category,
-            SOURCE_SERVICE: 'MONITORING_ARIFIN',
-            ...options.metadata,
-        };
-
         const message = {
-            header: metadata,
+            header: {
+                REQUEST_TYPE: options.requestType || 'EQUIPMENT_MONITORING',
+                SOURCE_SERVICE: process.env.SOURCE_SERVICE || DEFAULT_SOURCE_SERVICE,
+                TIMESTAMP: new Date().toISOString()
+            },
             body: payload
         };
 
@@ -300,7 +279,11 @@ async function publishByCategory(category, payload = {}, options = {}, callback)
 async function produceInternalMessage(queue, metadata = {}, payload = {}, callback) {
     try {
         const message = {
-            header: metadata,
+            header: {
+                REQUEST_TYPE: metadata.REQUEST_TYPE || metadata.message_name || 'UNKNOWN',
+                SOURCE_SERVICE: process.env.SOURCE_SERVICE || DEFAULT_SOURCE_SERVICE,
+                TIMESTAMP: new Date().toISOString()
+            },
             body: payload
         };
 
