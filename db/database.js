@@ -87,7 +87,7 @@ async function readJson(filePath, defaultValue = []) {
       const data = await fs.promises.readFile(filePath, 'utf8');
       return JSON.parse(data);
     } catch (err) {
-      const isTruncatedJson = err instanceof SyntaxError && /Unexpected end of JSON input/.test(err.message);
+      const isTruncatedJson = err instanceof SyntaxError && (/Unexpected end of JSON input/.test(err.message) || /JSON Parse error/.test(err.message));
       if (isTruncatedJson && attempt < maxAttempts) {
         await sleep(25 * attempt);
         continue;
