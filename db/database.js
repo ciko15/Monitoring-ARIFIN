@@ -108,11 +108,7 @@ async function writeJson(filePath, data) {
       const content = JSON.stringify(data, null, 2);
       const tempPath = `${filePath}.tmp`;
 
-      if (globalThis.Bun) {
-        await globalThis.Bun.write(tempPath, content);
-      } else {
-        await fs.promises.writeFile(tempPath, content, 'utf8');
-      }
+      await fs.promises.writeFile(tempPath, content, 'utf8');
 
       try {
         await fs.promises.rename(tempPath, filePath);
