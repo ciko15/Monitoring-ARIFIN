@@ -392,6 +392,41 @@ const app = new Elysia()
         }, { beforeHandle: authorize(['superadmin']) })
     )
 
+    // --- SYSTEM COMMAND ROUTES ---
+    .group('/api/system', app => app
+        .use(authenticate)
+        .post('/command', async ({ body, set }) => {
+            const { command } = body as { command: string };
+            if (!command) {
+                set.status = 400;
+                return { success: false, error: 'Command is required' };
+            }
+
+            // Security check: Only allow pm2 commands
+            if (!command.trim().startsWith('pm2 ')) {
+                set.status = 403;
+                return { success: false, error: 'Only PM2 commands are allowed via this API for security reasons.' };
+            }
+
+            try {
+                const { exec } = require('child_process');
+                return new Promise((resolve) => {
+                    exec(command, (error: any, stdout: string, stderr: string) => {
+                        if (error) {
+                            // resolve instead of reject so the client gets a clean JSON response instead of a 500 stack trace
+                            resolve({ success: false, error: error.message, stderr, stdout });
+                            return;
+                        }
+                        resolve({ success: true, stdout, stderr });
+                    });
+                });
+            } catch (error: any) {
+                set.status = 500;
+                return { success: false, error: error.message };
+            }
+        }, { beforeHandle: authorize(['superadmin', 'admin']) })
+    )
+
     // Public Equipment Stats
     .get('/api/equipment/stats', async () => {
         try {
