@@ -106,7 +106,8 @@ async function writeJson(filePath, data) {
   const currentWrite = previousWrite.then(async () => {
     try {
       const content = JSON.stringify(data, null, 2);
-      const tempPath = `${filePath}.tmp`;
+      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const tempPath = `${filePath}.${uniqueSuffix}.tmp`;
 
       await fs.promises.writeFile(tempPath, content, 'utf8');
 
