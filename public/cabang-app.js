@@ -202,7 +202,7 @@ const cabangModule = (function () {
 
     function normalizeSourceStatus(rawStatus) {
       const s = String(rawStatus || '').toLowerCase();
-      if (s === 'alarm' || s === 'fail' || s === 'critical') return 'alarm';
+      if (s === 'alarm' || s === 'alert' || s === 'fail' || s === 'critical') return 'alarm';
       if (s === 'warning') return 'warning';
       if (s === 'disconnect' || s === 'offline') return 'offline';
       return 'normal';
@@ -218,8 +218,8 @@ const cabangModule = (function () {
       }
 
       const fallback = String(item?.status || 'offline').toLowerCase();
-      return ['normal', 'alarm', 'warning', 'offline', 'disconnect'].includes(fallback)
-        ? (fallback === 'disconnect' ? 'offline' : fallback)
+      return ['normal', 'alarm', 'alert', 'warning', 'offline', 'disconnect'].includes(fallback)
+        ? (fallback === 'disconnect' ? 'offline' : (fallback === 'alert' ? 'alarm' : fallback))
         : 'offline';
     }
 

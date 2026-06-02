@@ -510,32 +510,16 @@ async function getAllEquipment(filters = {}) {
       item.UTC_Time = item.lastUpdate ? new Date(item.lastUpdate).toISOString() : null;
 
       // Real-time Status Aggregation (Refined logic for issue requirements)
-      const sourceStatuses = Object.values(finalMergedData).map((src) => src._status);
+      const sourceStatuses = Object.values(finalMergedData).map((src) => String(src._status).toLowerCase());
       if (sourceStatuses.length > 0) {
-        if (sourceStatuses.length > 1) {
-          // MULTI-SOURCE LOGIC
-          if (sourceStatuses.every(s => s === 'Alarm' || s === 'Fail')) {
-            item.status = 'Alarm';
-          } else if (sourceStatuses.every(s => s === 'Disconnect')) {
-            item.status = 'Disconnect';
-          } else if (sourceStatuses.some(s => s === 'Alarm' || s === 'Fail' || s === 'Warning' || s === 'Disconnect')) {
-            // If any source is failing but not all are Alarm/Disconnect, it's a Warning
-            item.status = 'Warning';
-          } else {
-            item.status = 'Normal';
-          }
+        if (sourceStatuses.some(s => s === 'alert' || s === 'alarm' || s === 'fail' || s === 'critical')) {
+          item.status = 'Alert';
+        } else if (sourceStatuses.some(s => s === 'warning')) {
+          item.status = 'Warning';
+        } else if (sourceStatuses.every(s => s === 'disconnect' || s === 'offline')) {
+          item.status = 'Disconnect';
         } else {
-          // SINGLE SOURCE LOGIC
-          const s = sourceStatuses[0];
-          if (s === 'Disconnect') {
-            item.status = 'Disconnect';
-          } else if (s === 'Alarm' || s === 'Fail') {
-            item.status = 'Alarm';
-          } else if (s === 'Warning') {
-            item.status = 'Warning';
-          } else {
-            item.status = 'Normal';
-          }
+          item.status = 'Normal';
         }
       }
     }
