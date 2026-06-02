@@ -515,6 +515,8 @@ async function getAllEquipment(filters = {}) {
           item.status = 'Warning';
         } else if (sourceStatuses.every(s => s === 'disconnect' || s === 'offline')) {
           item.status = 'Disconnect';
+        } else if (sourceStatuses.some(s => s === 'disconnect' || s === 'offline')) {
+          item.status = 'Warning';
         } else {
           item.status = 'Normal';
         }

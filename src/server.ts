@@ -224,6 +224,8 @@ async function checkEquipmentWatchdog() {
                         finalStatus = 'Warning';
                     } else if (lowerStatuses.every(s => s === 'disconnect' || s === 'offline')) {
                         finalStatus = 'Disconnect';
+                    } else if (lowerStatuses.some(s => s === 'disconnect' || s === 'offline')) {
+                        finalStatus = 'Warning';
                     } else {
                         finalStatus = 'Normal';
                     }

@@ -214,6 +214,7 @@ const cabangModule = (function () {
         if (sourceStatuses.includes('alarm')) return 'alarm';
         if (sourceStatuses.includes('warning')) return 'warning';
         if (sourceStatuses.every(st => st === 'offline')) return 'offline';
+        if (sourceStatuses.includes('offline')) return 'warning';
         if (sourceStatuses.includes('normal')) return 'normal';
       }
 
