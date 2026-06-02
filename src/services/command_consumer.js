@@ -61,14 +61,11 @@ class CommandConsumer {
 
     _getQueues() {
         return [
-            `CMD.CONFIG.${this.siteId}`,
-            `CMD.COLLECTOR.${this.siteId}`,
-            `CMD.SYSTEM.${this.siteId}`,
-            `Q.CMD.${this.siteId}`,
-            `REQ.EQUIPMENT.${this.siteId}`,
-            `REQ.CONFIG.${this.siteId}`,
-            `REQ.BRANCH.${this.siteId}`,
-            `Q.REQ.${this.siteId}`
+            'Q.COM',
+            'Q.NAV',
+            'Q.SUR',
+            'Q.DAT',
+            'Q.SUP'
         ];
     }
 
