@@ -245,11 +245,12 @@ const cabangModule = (function () {
 
     // Apply Status Filter
     if (currentStatusFilter) {
+      const filterVal = String(currentStatusFilter).toLowerCase() === 'alert' ? 'alarm' : String(currentStatusFilter).toLowerCase();
       filtered = filtered.filter(e => {
         const normalized = window.normalizeStatus
-          ? window.normalizeStatus(deriveEquipmentStatus(e))
-          : deriveEquipmentStatus(e);
-        return normalized === currentStatusFilter;
+          ? String(window.normalizeStatus(deriveEquipmentStatus(e))).toLowerCase()
+          : String(deriveEquipmentStatus(e)).toLowerCase();
+        return normalized === filterVal;
       });
     }
 
