@@ -245,7 +245,10 @@ const cabangModule = (function () {
 
     // Apply Status Filter
     if (currentStatusFilter) {
-      const filterVal = String(currentStatusFilter).toLowerCase() === 'alert' ? 'alarm' : String(currentStatusFilter).toLowerCase();
+      let filterVal = String(currentStatusFilter).toLowerCase();
+      if (filterVal === 'alert') filterVal = 'alarm';
+      if (filterVal === 'disconnect') filterVal = 'offline';
+      
       filtered = filtered.filter(e => {
         const normalized = window.normalizeStatus
           ? String(window.normalizeStatus(deriveEquipmentStatus(e))).toLowerCase()
