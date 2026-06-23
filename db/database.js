@@ -235,7 +235,7 @@ async function readBranchProfile() {
 /**
  * Mencari file log terbaru dengan memindai folder tanggal secara mundur
  */
-function getLatestTimestampFromHistory(equipmentName) {
+async function getLatestTimestampFromHistory(equipmentName) {
   try {
     const baseDir = path.resolve(__dirname, '../data');
     if (!fs.existsSync(baseDir)) return null;
@@ -245,34 +245,25 @@ function getLatestTimestampFromHistory(equipmentName) {
     const fileName = `${safeName}.log`;
 
     // Ambil semua folder bulan (YYYY-MM), urutkan terbaru di atas
-    const months = fs.readdirSync(baseDir)
+    const months = (await fs.promises.readdir(baseDir))
       .filter(f => /^\d{4}-\d{2}$/.test(f))
       .sort((a, b) => b.localeCompare(a));
 
     for (const month of months) {
       const monthPath = path.join(baseDir, month);
       // Ambil semua folder hari (DD), urutkan terbaru di atas
-      const days = fs.readdirSync(monthPath)
+      const days = (await fs.promises.readdir(monthPath))
         .filter(f => /^\d{2}$/.test(f))
         .sort((a, b) => b.localeCompare(a));
 
       for (const day of days) {
         const filePath = path.join(monthPath, day, fileName);
-        if (fs.existsSync(filePath)) {
-          // Ketemu! Ambil mtime file atau baca baris terakhir
-          const stats = fs.statSync(filePath);
-          
-          // Lebih akurat: baca baris terakhir untuk ambil field "timestamp"
-          const content = fs.readFileSync(filePath, 'utf8').trim().split('\n');
-          if (content.length > 0) {
-            try {
-              const lastLine = JSON.parse(content[content.length - 1]);
-              return lastLine.timestamp;
-            } catch (e) {
-              return stats.mtime.toISOString();
-            }
-          }
+        try {
+          // Cukup gunakan modified time (mtime) dari file log tanpa perlu membaca seluruh isi file
+          const stats = await fs.promises.stat(filePath);
           return stats.mtime.toISOString();
+        } catch (e) {
+          // File tidak ditemukan, lanjut pencarian
         }
       }
     }
@@ -453,7 +444,7 @@ async function getAllEquipment(filters = {}) {
       const latestLogs = getLatestLogsBySource(item.id);
       
       // 2. Jika log memori kosong, scan folder /data/ secara mundur
-      let latestTimeFromFile = getLatestTimestampFromHistory(item.name);
+      let latestTimeFromFile = await getLatestTimestampFromHistory(item.name);
 
       // Initialize with ALL configured sources for this equipment
       const mergedData = {};
