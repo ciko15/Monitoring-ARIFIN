@@ -1197,6 +1197,23 @@ const app = new Elysia()
         .get('/interfaces', async () => ({ success: true, data: await require('./network/monitor').getNetworkInterfaces() }))
         .get('/ifstats', async () => ({ success: true, data: await require('./network/monitor').getInterfacesWithStats() }))
         .get('/stats', async () => ({ success: true, data: await require('./network/monitor').getNetworkStats() }))
+        .get('/snmp-oid-catalog', async ({ query }) => {
+            const { getCatalog } = require('./utils/snmp_oid_catalog');
+            const profile = String((query.profile as string) || '').trim().toLowerCase();
+            const catalog = await getCatalog();
+            const filtered = profile
+                ? catalog.filter((entry: any) => Array.isArray(entry.profiles) && entry.profiles.includes(profile))
+                : catalog;
+
+            return {
+                success: true,
+                data: {
+                    total: filtered.length,
+                    profile: profile || null,
+                    items: filtered
+                }
+            };
+        })
         .post('/ping', async ({ body }) => {
             const { host, count } = body as any;
             return { success: true, data: await require('./network/monitor').pingHost(host, count || 4) };
@@ -1246,40 +1263,155 @@ const app = new Elysia()
             const openPorts = await scanPorts(deviceIp, parseInt(startPort), parseInt(endPort));
             return { success: true, data: { openPorts } };
         })
-        .post('/snmp-walk', async ({ body }) => {
-            const { ip, community, version, oid } = body as any;
+        .post('/snmp-get', async ({ body }) => {
+            const { ip, port, community, version, oid } = body as any;
             const snmp = require('snmp-native');
+            const { getCatalog, enrichVarBind, formatBindingLine } = require('./utils/snmp_oid_catalog');
+            let session: any = null;
+
+            try {
+                const safeIp = String(ip || '').trim().replace(/[^a-zA-Z0-9.:-]/g, '');
+                const safeCommunity = community ? String(community).replace(/[^a-zA-Z0-9_-]/g, '') : 'public';
+                const safeOid = oid ? String(oid).replace(/[^0-9.]/g, '') : '';
+                const portNum = Number.parseInt(String(port || '161'), 10);
+                const safePort = Number.isInteger(portNum) && portNum > 0 && portNum <= 65535 ? portNum : 161;
+                const versionMap: Record<string, number> = {
+                    '1': snmp.Versions.SNMPv1,
+                    '2c': snmp.Versions.SNMPv2c,
+                };
+                const safeVersion = versionMap[String(version || '2c')] ?? snmp.Versions.SNMPv2c;
+
+                if (!safeIp) throw new Error('Device IP is required');
+                if (!safeOid) throw new Error('OID is required for SNMP GET');
+
+                console.log(`[SNMP Terminal] GET ${safeIp}:${safePort} v${version || '2c'} with community ${safeCommunity} and OID ${safeOid}`);
+
+                session = new snmp.Session({
+                    host: safeIp,
+                    port: safePort,
+                    community: safeCommunity,
+                    version: safeVersion,
+                    timeouts: [4000, 4000, 4000],
+                });
+
+                const cleanOid = safeOid.startsWith('.') ? safeOid.substring(1) : safeOid;
+                const targetOid = cleanOid.split('.').map(Number);
+
+                const vb = await new Promise<any>((resolve, reject) => {
+                    session.get({ oid: targetOid }, (err: any, bindings: any[]) => {
+                        if (err) reject(err);
+                        else resolve(bindings?.[0] || null);
+                    });
+                });
+                const catalog = await getCatalog();
+                const binding = vb ? enrichVarBind(vb, catalog) : null;
+
+                return {
+                    success: true,
+                    data: {
+                        output: binding ? formatBindingLine(binding) : 'No data returned.',
+                        binding
+                    }
+                };
+            } catch (error: any) {
+                console.error('[SNMP Terminal] GET Error:', error);
+                const message = error?.message === 'Timeout'
+                    ? 'Timeout: target did not respond. Check IP/port, SNMP version, community string, UDP/161 access, and whether the device exposes that OID.'
+                    : error.message;
+                return {
+                    success: true,
+                    data: {
+                        output: `Error: ${message}`
+                    }
+                };
+            } finally {
+                if (session && typeof session.close === 'function') {
+                    try {
+                        session.close();
+                    } catch {}
+                }
+            }
+        })
+        .post('/snmp-walk', async ({ body }) => {
+            const { ip, port, community, version, oid } = body as any;
+            const snmp = require('snmp-native');
+            const { getCatalog, enrichVarBind, formatBindingLine } = require('./utils/snmp_oid_catalog');
+            let session: any = null;
 
             try {
                 // Security: sanitize inputs
-                const safeIp = ip.replace(/[^a-zA-Z0-9.:]/g, '');
-                const safeCommunity = community ? community.replace(/[^a-zA-Z0-9_-]/g, '') : 'public';
+                const safeIp = String(ip || '').trim().replace(/[^a-zA-Z0-9.:-]/g, '');
+                const safeCommunity = community ? String(community).replace(/[^a-zA-Z0-9_-]/g, '') : 'public';
                 const safeOid = oid ? oid.replace(/[^0-9.]/g, '') : '';
+                const portNum = Number.parseInt(String(port || '161'), 10);
+                const safePort = Number.isInteger(portNum) && portNum > 0 && portNum <= 65535 ? portNum : 161;
+                const versionMap: Record<string, number> = {
+                    '1': snmp.Versions.SNMPv1,
+                    '2c': snmp.Versions.SNMPv2c,
+                };
+                const safeVersion = versionMap[String(version || '2c')] ?? snmp.Versions.SNMPv2c;
 
-                console.log(`[SNMP Terminal] Walking ${safeIp} with community ${safeCommunity} and OID ${safeOid}`);
+                if (!safeIp) {
+                    throw new Error('Device IP is required');
+                }
 
-                const session = new snmp.Session({ host: safeIp, community: safeCommunity, timeouts: [4000, 4000] });
+                console.log(`[SNMP Terminal] Walking ${safeIp}:${safePort} v${version || '2c'} with community ${safeCommunity} and OID ${safeOid || '(default)'}`);
 
-                const cleanOid = safeOid.startsWith('.') ? safeOid.substring(1) : safeOid;
-                const targetOid = cleanOid ? cleanOid.split('.').map(Number) : [1, 3, 6, 1];
-
-                const vbs = await new Promise<any[]>((resolve, reject) => {
-                    session.getSubtree({ oid: targetOid, combinedTimeout: 15000 }, (err: any, bindings: any[]) => {
-                        if (err) reject(err);
-                        else resolve(bindings || []);
-                    });
+                session = new snmp.Session({
+                    host: safeIp,
+                    port: safePort,
+                    community: safeCommunity,
+                    version: safeVersion,
+                    timeouts: [4000, 4000, 4000],
                 });
 
-                session.close();
+                const cleanOid = safeOid.startsWith('.') ? safeOid.substring(1) : safeOid;
+                const fallbackRoots = cleanOid
+                    ? [cleanOid.split('.').map(Number)]
+                    : [
+                        [1, 3, 6, 1, 2, 1], // mib-2: closer to practical snmpwalk defaults
+                        [1, 3, 6, 1, 4, 1], // enterprises
+                    ];
+
+                let vbs: any[] = [];
+                let lastError: any = null;
+
+                for (const targetOid of fallbackRoots) {
+                    try {
+                        const result = await new Promise<any[]>((resolve, reject) => {
+                            session.getSubtree({ oid: targetOid, combinedTimeout: 12000 }, (err: any, bindings: any[]) => {
+                                if (err) reject(err);
+                                else resolve(bindings || []);
+                            });
+                        });
+
+                        if (result.length > 0) {
+                            vbs = result;
+                            break;
+                        }
+                    } catch (err: any) {
+                        lastError = err;
+                    }
+                }
+
+                if (vbs.length === 0 && lastError) {
+                    throw lastError;
+                }
 
                 let output = '';
                 if (vbs.length === 0) {
-                    output = 'No data returned or error.';
+                    output = 'No data returned from default SNMP walk roots.';
                 } else {
-                    output = vbs.map((vb: any) => {
-                        const oidStr = vb.oid.join('.');
-                        return `.${oidStr} = ${vb.value}`;
-                    }).join('\n');
+                    const catalog = await getCatalog();
+                    const bindings = vbs.map((vb: any) => enrichVarBind(vb, catalog));
+                    output = bindings.map((binding: any) => formatBindingLine(binding)).join('\n');
+                    return {
+                        success: true,
+                        data: {
+                            output,
+                            bindings
+                        }
+                    };
                 }
 
                 return {
@@ -1290,12 +1422,21 @@ const app = new Elysia()
                 };
             } catch (error: any) {
                 console.error('[SNMP Terminal] Error:', error);
+                const message = error?.message === 'Timeout'
+                    ? 'Timeout: target did not respond. Check IP/port, SNMP version, community string, UDP/161 access, and whether the device allows SNMP walk for that OID.'
+                    : error.message;
                 return {
                     success: true,
                     data: {
-                        output: `Error: ${error.message}`
+                        output: `Error: ${message}`
                     }
                 };
+            } finally {
+                if (session && typeof session.close === 'function') {
+                    try {
+                        session.close();
+                    } catch {}
+                }
             }
         })
     )

@@ -28,11 +28,102 @@
         'asterix_radar': ['connectivity', 'radar_name', 'last_cat034', 'data_source'],
         'asterix_adsb': ['connectivity', 'station', 'last_cat021', 'data_source'],
         'temp_humidity_modbus': ['temperature_c', 'humidity_pct', 'status_text', 'location'],
-        'snmp_system': ['connectivity', 'sys_name', 'cpu_usage', 'ram_usage_pct', 'disk_usage_pct', 'sys_uptime'],
+        'snmp_system': ['connectivity', 'sys_name', 'resolved_ip', 'hardware', 'operating_system', 'cpu_usage', 'physical_memory_usage_pct', 'disk_usage_pct', 'temperature_c'],
+        'snmp_network_basic': ['connectivity', 'sys_name', 'resolved_ip', 'top_interface_name', 'top_interface_status', 'top_interface_in_octets', 'top_interface_out_octets', 'temperature_c'],
         'pm5560_modbus': ['VLN_avg', 'VLL_avg', 'HZ', 'PF', 'KW', 'KWH'],
         'ils_gp_thales421': ['GP_ANGLE', 'RF_POWER', 'DDM_COURSE', 'CARRIER_PWR', 'RF_OUT', 'MON_POWER'],
         'ils_llz_thales421': ['CRS_RF', 'WIDTH_RF', 'NF_RF', 'CRS_SDM', 'IDENT_AM', 'FREQ_DEV']
     };
+
+    function isMetricPlaceholder(value) {
+        return value === null || value === undefined || value === '—' || value === '-';
+    }
+
+    function parseMetricNumber(value) {
+        if (typeof value === 'number') {
+            return Number.isFinite(value) ? value : null;
+        }
+
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed || trimmed === '—' || trimmed === '-') return null;
+            const normalized = trimmed.replace(/,/g, '');
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+
+        return null;
+    }
+
+    function formatCompactNumber(value, decimals = 0) {
+        const num = parseMetricNumber(value);
+        if (num === null) return '—';
+
+        return num.toLocaleString('id-ID', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+        });
+    }
+
+    function formatScaledUnit(value, units, decimals = 2, base = 1000) {
+        const num = parseMetricNumber(value);
+        if (num === null) return '—';
+        if (num === 0) return `0 ${units[0]}`;
+
+        const sign = num < 0 ? '-' : '';
+        let scaled = Math.abs(num);
+        let unitIndex = 0;
+
+        while (scaled >= base && unitIndex < units.length - 1) {
+            scaled /= base;
+            unitIndex += 1;
+        }
+
+        const fractionDigits = unitIndex === 0 ? 0 : decimals;
+        return `${sign}${scaled.toLocaleString('id-ID', {
+            minimumFractionDigits: fractionDigits,
+            maximumFractionDigits: fractionDigits,
+        })} ${units[unitIndex]}`;
+    }
+
+    function formatSnmpMetricValue(key, value) {
+        if (isMetricPlaceholder(value)) return '—';
+
+        if (typeof value === 'string' && /[a-z%]/i.test(value) && !/^\d+(\.\d+)?$/.test(value.trim())) {
+            return value;
+        }
+
+        if (/_octets?$/.test(key) || /_bytes?$/.test(key)) {
+            return formatScaledUnit(value, ['B', 'KB', 'MB', 'GB', 'TB', 'PB'], 2, 1000);
+        }
+
+        if (/_mb$/.test(key)) {
+            return formatScaledUnit(value, ['MB', 'GB', 'TB', 'PB'], 2, 1000);
+        }
+
+        if (/_gb$/.test(key)) {
+            return formatScaledUnit(value, ['GB', 'TB', 'PB'], 2, 1000);
+        }
+
+        if (/_count$/.test(key) || key === 'interface_count' || key === 'processor_count') {
+            return formatCompactNumber(value, 0);
+        }
+
+        if (/_c$/.test(key) && parseMetricNumber(value) !== null) {
+            return `${formatCompactNumber(value, 1)} °C`;
+        }
+
+        return value;
+    }
+
+    function normalizeLimitLabel(label) {
+        return String(label || '')
+            .split('(')[0]
+            .replace(/\[.*?\]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
 
     function calcAverage(values) {
         const nums = values
@@ -89,27 +180,34 @@
         if (value === null || value === undefined || value === '—' || value === '-') return '#4a7a9a';
         if (!window.limitationsCache || window.limitationsCache.length === 0) return '#e8f4ff';
 
-        // Clean label: "Carrier Power (W)" -> "Carrier Power"
-        // Also remove typical units like (%) or (MHz)
-        const cleanLabel = label.split('(')[0].trim().toLowerCase();
+        const cleanLabel = normalizeLimitLabel(label);
         const numVal = parseFloat(value);
         if (isNaN(numVal)) return '#e8f4ff';
 
-        // Find limit matching supCategory AND parameter name
-        const limit = window.limitationsCache.find(l => {
-            const limitSup = l.sup_category?.toLowerCase();
-            const targetSup = supCategory?.toLowerCase();
-            const limitName = l.name?.toLowerCase();
-            
-            // Match sup_category (if specified) and name
-            const supMatch = !targetSup || limitSup === targetSup;
-            const nameMatch = limitName === cleanLabel || 
-                             cleanLabel.includes(limitName) || 
-                             limitName.includes(cleanLabel) ||
-                             label.toLowerCase().includes(limitName);
-            
-            return supMatch && nameMatch;
+        const matchesLabel = (limitNameRaw) => {
+            const limitName = normalizeLimitLabel(limitNameRaw);
+            return limitName === cleanLabel ||
+                cleanLabel.includes(limitName) ||
+                limitName.includes(cleanLabel);
+        };
+
+        const findLimit = (mode) => window.limitationsCache.find(l => {
+            const limitSup = String(l.sup_category || '').toLowerCase();
+            const targetSup = String(supCategory || '').toLowerCase();
+            const isGenericSup = limitSup === 'generic' || limitSup === 'all' || limitSup === '*';
+
+            if (mode === 'exact') {
+                return !!targetSup && limitSup === targetSup && matchesLabel(l.name);
+            }
+
+            if (mode === 'generic') {
+                return isGenericSup && matchesLabel(l.name);
+            }
+
+            return matchesLabel(l.name);
         });
+
+        const limit = findLimit('exact') || findLimit('generic') || findLimit('any');
 
         if (!limit) return '#e8f4ff';
 
@@ -515,10 +613,13 @@
                             }
                             if (isObj && valObj.label) label = valObj.label;
 
-                            const val    = isObj ? (valObj.value ?? '—') : (valObj ?? '—');
+                            const rawVal = isObj ? (valObj.value ?? '—') : (valObj ?? '—');
+                            const val    = src.parsing_id.startsWith('snmp_')
+                                ? formatSnmpMetricValue(k, rawVal)
+                                : rawVal;
                             const unit   = isObj && valObj.unit ? valObj.unit : '';
                             const eqSup  = eq ? eq.sup_category : '';
-                            const valColor = getLimitColor(eqSup, label, val);
+                            const valColor = getLimitColor(eqSup, label, rawVal);
 
                             return `<div class="sp-card-preview-point">
                                 <span class="sp-preview-label" title="${label}">${label}</span>
@@ -1090,12 +1191,31 @@
             sections.push({ title: 'CPU', params: [
                 ['CPU Usage (%)', data.cpu_usage !== '—' ? `${data.cpu_usage} %` : '—', getLimitColor(sup, 'CPU Usage', data.cpu_usage)],
             ]});
+            sections.push({ title: 'TEMPERATURE', params: [
+                ['Temperature', formatSnmpMetricValue('temperature_c', data.temperature_c), getLimitColor(sup, 'Temperature', data.temperature_c)],
+                ['Sensor Name', data.temperature_sensor_name || '—', '#e8f4ff'],
+                ['Sensor Count', formatSnmpMetricValue('temperature_sensor_count', data.temperature_sensor_count), '#e8f4ff'],
+            ]});
             sections.push({ title: 'MEMORY (RAM)', params: [
-                ['RAM Total (MB)', data.ram_total_mb  || '—', '#e8f4ff'],
-                ['RAM Used (MB) [SNMP]',  data.ram_used_mb   || '—', '#e8f4ff'],
+                ['RAM Total', formatSnmpMetricValue('ram_total_mb', data.ram_total_mb), '#e8f4ff'],
+                ['RAM Used [SNMP]', formatSnmpMetricValue('ram_used_mb', data.ram_used_mb), '#e8f4ff'],
                 ['RAM Used (%) [SNMP]',   effectiveRamUsedPct !== null ? `${effectiveRamUsedPct.toFixed(1)} %` : '—', '#5a8aaa'],
-                ['RAM Available (MB)',    effectiveRamAvailMb !== null ? `${Math.round(effectiveRamAvailMb)}` : '—', '#e8f4ff'],
+                ['RAM Available', effectiveRamAvailMb !== null ? formatSnmpMetricValue('ram_available_mb', Math.round(effectiveRamAvailMb)) : '—', '#e8f4ff'],
                 ['RAM Available (%)',     effectiveRamAvailPct !== null ? `${effectiveRamAvailPct.toFixed(1)} %` : '—', getLimitColor('UPS', 'RAM Available', effectiveRamAvailPct)],
+            ]});
+            sections.push({ title: 'MEMORY (PHYSICAL/VIRTUAL)', params: [
+                ['Physical Total', formatSnmpMetricValue('physical_memory_total_mb', data.physical_memory_total_mb), '#e8f4ff'],
+                ['Physical Used', formatSnmpMetricValue('physical_memory_used_mb', data.physical_memory_used_mb), '#e8f4ff'],
+                ['Physical Usage (%)', data.physical_memory_usage_pct !== '—' ? `${data.physical_memory_usage_pct} %` : '—', '#5a8aaa'],
+                ['Virtual Total', formatSnmpMetricValue('virtual_memory_total_mb', data.virtual_memory_total_mb), '#e8f4ff'],
+                ['Virtual Used', formatSnmpMetricValue('virtual_memory_used_mb', data.virtual_memory_used_mb), '#e8f4ff'],
+                ['Virtual Usage (%)', data.virtual_memory_usage_pct !== '—' ? `${data.virtual_memory_usage_pct} %` : '—', '#5a8aaa'],
+                ['Swap Total', formatSnmpMetricValue('swap_total_mb', data.swap_total_mb), '#e8f4ff'],
+                ['Swap Used', formatSnmpMetricValue('swap_used_mb', data.swap_used_mb), '#e8f4ff'],
+                ['Swap Usage (%)', data.swap_usage_pct !== '—' ? `${data.swap_usage_pct} %` : '—', '#5a8aaa'],
+                ['Buffers', formatSnmpMetricValue('memory_buffers_mb', data.memory_buffers_mb), '#e8f4ff'],
+                ['Cached', formatSnmpMetricValue('cached_memory_mb', data.cached_memory_mb), '#e8f4ff'],
+                ['Shared', formatSnmpMetricValue('shared_memory_mb', data.shared_memory_mb), '#e8f4ff'],
             ]});
             if (data.mount_points && data.mount_points.length > 0) {
                 const diskParams = data.mount_points.map(mp => [
@@ -1106,12 +1226,36 @@
                 sections.push({ title: 'DISK', params: diskParams });
             } else {
                 sections.push({ title: 'DISK', params: [
-                    ['Disk Total (GB)', data.disk_total_gb  || '—', '#e8f4ff'],
-                    ['Disk Used (GB)',  data.disk_used_gb   || '—', '#e8f4ff'],
+                    ['Disk Total', formatSnmpMetricValue('disk_total_gb', data.disk_total_gb), '#e8f4ff'],
+                    ['Disk Used', formatSnmpMetricValue('disk_used_gb', data.disk_used_gb), '#e8f4ff'],
                     ['Disk Usage (%)',  data.disk_usage_pct !== '—' ? `${data.disk_usage_pct} %` : '—', '#e8f4ff'],
                 ]});
             }
-
+        } else if (parserId === 'snmp_network_basic') {
+            const isConn = data.connectivity === 'Connected';
+            const cc = isConn ? '#00ff88' : '#ff3355';
+            sections.push({ title: 'SISTEM JARINGAN', params: [
+                ['Konektivitas', data.connectivity || '—', cc],
+                ['Hostname', data.sys_name || '—', '#00d4ff'],
+                ['IP', data.resolved_ip || '—', '#e8f4ff'],
+                ['Hardware', data.hardware || '—', '#e8f4ff'],
+                ['OS', data.operating_system || '—', '#5a8aaa'],
+                ['Uptime', data.sys_uptime || '—', '#5a8aaa'],
+                ['Lokasi', data.sys_location || '—', '#e8f4ff'],
+            ]});
+            sections.push({ title: 'INTERFACE', params: [
+                ['Total Interface', formatSnmpMetricValue('interface_count', data.interface_count), '#e8f4ff'],
+                ['Interface Up', formatSnmpMetricValue('active_interface_count', data.active_interface_count), '#00ff88'],
+                ['Interface Down', formatSnmpMetricValue('down_interface_count', data.down_interface_count), '#ffcc00'],
+                ['Port Aktif', data.active_interfaces_summary || '—', '#00ff88'],
+                ['Port Tidak Aktif', data.down_interfaces_summary || '—', '#ffcc00'],
+                ['Top Interface', data.top_interface_name || '—', '#00d4ff'],
+                ['Status Top Interface', data.top_interface_status || '—', '#e8f4ff'],
+                ['In Octets', formatSnmpMetricValue('top_interface_in_octets', data.top_interface_in_octets), '#e8f4ff'],
+                ['Out Octets', formatSnmpMetricValue('top_interface_out_octets', data.top_interface_out_octets), '#e8f4ff'],
+                ['Temperature', formatSnmpMetricValue('temperature_c', data.temperature_c), getLimitColor('Switch', 'Temperature', data.temperature_c)],
+                ['Temp Sensor', data.temperature_sensor_name || '—', '#e8f4ff'],
+            ]});
         } else if (parserId === 'asterix_radar') {
             const isConn = data.connectivity === 'Connected';
             const cc = isConn ? '#00ff88' : '#ff3355';
@@ -1218,7 +1362,10 @@
                     .filter(([k]) => !k.startsWith('_'))
                     .map(([k, v]) => {
                         const label = k.replace(/_/g,' ').toUpperCase();
-                        return [label, v, getLimitColor(supCategory, label, v)];
+                        const displayValue = parserId.startsWith('snmp_')
+                            ? formatSnmpMetricValue(k, v)
+                            : v;
+                        return [label, displayValue, getLimitColor(supCategory, label, v)];
                     });
                 sections.push({ title: 'DATA', params: params.length > 0 ? params : [['No data available', '—', '#4a7a9a']] });
             }

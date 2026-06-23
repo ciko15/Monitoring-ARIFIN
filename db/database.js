@@ -55,11 +55,44 @@ const PARSER_TEMPLATES = {
   'snmp_system': [
     'connectivity',
     'sys_name',
+    'resolved_ip',
+    'hardware',
+    'operating_system',
+    'sys_object_id',
+    'sys_contact',
+    'sys_location',
+    'processor_count',
     'cpu_usage',
     'ram_usage_pct',
+    'physical_memory_usage_pct',
+    'virtual_memory_usage_pct',
+    'swap_usage_pct',
     'ram_available_mb',
     'ram_available_pct',
-    'disk_usage_pct'
+    'disk_usage_pct',
+    'temperature_c',
+    'temperature_sensor_name'
+  ],
+  'snmp_network_basic': [
+    'connectivity',
+    'sys_name',
+    'resolved_ip',
+    'hardware',
+    'operating_system',
+    'sys_object_id',
+    'sys_contact',
+    'sys_uptime',
+    'sys_location',
+    'interface_count',
+    'active_interface_count',
+    'down_interface_count',
+    'active_interfaces_summary',
+    'down_interfaces_summary',
+    'processor_count',
+    'top_interface_name',
+    'top_interface_status',
+    'temperature_c',
+    'temperature_sensor_name'
   ],
   'default': ['Status']
 };
@@ -251,6 +284,9 @@ function getLatestTimestampFromHistory(equipmentName) {
 
 // --- IN-MEMORY DATA (ENRICHED WITH PERSISTENCE) ---
 let equipmentLogsDB = [];
+const latestEquipmentDataBySource = new Map();
+const lastPersistedAtBySource = new Map();
+const LOG_PERSIST_INTERVAL_MS = 60 * 1000;
 // Load logs from file on startup
 (async () => {
   try {
@@ -319,6 +355,15 @@ function scheduleEquipmentLogsPersist() {
       console.error('[DB] Failed persisting equipment logs:', err);
     }
   }, 500);
+}
+
+function buildEquipmentSourceKey(equipmentId, source = 'default') {
+  return `${equipmentId}::${source || 'default'}`;
+}
+
+function upsertLatestEquipmentData(log) {
+  const key = buildEquipmentSourceKey(log.equipmentId, log.source);
+  latestEquipmentDataBySource.set(key, log);
 }
 
 let surveillanceStationsDB = [];
@@ -459,10 +504,12 @@ async function getAllEquipment(filters = {}) {
           const isTimedOut = (now - logTime) > (4 * 60 * 1000); // 4 minutes (consistent with watchdog)
 
           if (isTimedOut) {
-            // Keep data but set status to Disconnect
+            // Timeout: set status to Disconnect and parameters to '-'
+            const emptyData = {};
+            if (log.data) Object.keys(log.data).forEach(k => emptyData[k] = '-');
             mergedData[sourceName] = {
               ...mergedData[sourceName],
-              ...(log.data || {}),
+              ...emptyData,
               _status: 'Disconnect',
               _logged_at: log.logged_at
             };
@@ -602,10 +649,32 @@ async function getEquipmentById(id) {
   }
 
   // Overlay with real logs
+  const now = Date.now();
   for (const log of latestLogs) {
     const sourceName = log.source || 'default';
     if (mergedData[sourceName]) {
-      mergedData[sourceName] = { ...mergedData[sourceName], ...log.data, _status: log.status, _logged_at: log.logged_at, _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id };
+      const logTime = new Date(log.logged_at).getTime();
+      const isTimedOut = (now - logTime) > (4 * 60 * 1000); // 4 minutes
+
+      if (isTimedOut) {
+        const emptyData = {};
+        if (log.data) Object.keys(log.data).forEach(k => emptyData[k] = '-');
+        mergedData[sourceName] = { 
+          ...mergedData[sourceName], 
+          ...emptyData, 
+          _status: 'Disconnect', 
+          _logged_at: log.logged_at, 
+          _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id 
+        };
+      } else {
+        mergedData[sourceName] = { 
+          ...mergedData[sourceName], 
+          ...log.data, 
+          _status: log.status, 
+          _logged_at: log.logged_at, 
+          _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id 
+        };
+      }
     }
   }
 
@@ -859,11 +928,14 @@ async function getAllLimitations() {
 
 async function getLimitationsByEquipment(equipmentId) {
   const equipment = await getEquipmentById(equipmentId);
-  if (!equipment || !equipment.sup_category) return [];
+  if (!equipment) return [];
 
   const data = await readJson(LIMITATION_CONFIG_PATH);
-  // Return all limitations matching the equipment's sup_category
-  return data.filter(l => l.sup_category === equipment.sup_category);
+  const targetSup = String(equipment.sup_category || '').toLowerCase();
+  return data.filter(l => {
+    const limitSup = String(l.sup_category || '').toLowerCase();
+    return (!targetSup || limitSup === targetSup || limitSup === 'generic' || limitSup === 'all' || limitSup === '*');
+  });
 }
 
 async function createLimitation(data) {

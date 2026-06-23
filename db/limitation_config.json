@@ -291,5 +291,71 @@
     "max_alarm_limit": "30.0",
     "alv": "22.0",
     "ahv": "30.0"
+  },
+  {
+    "id": 9001,
+    "name": "Temperature",
+    "category": "Support",
+    "sup_category": "Generic",
+    "value_type": "numeric",
+    "max_warning_limit": "65.0",
+    "max_alarm_limit": "75.0",
+    "whv": "65.0",
+    "ahv": "75.0"
+  },
+  {
+    "id": 9002,
+    "name": "CPU Usage",
+    "category": "Support",
+    "sup_category": "Generic",
+    "value_type": "percent",
+    "max_warning_limit": "80.0",
+    "max_alarm_limit": "95.0",
+    "whv": "80.0",
+    "ahv": "95.0"
+  },
+  {
+    "id": 9003,
+    "name": "RAM Usage",
+    "category": "Support",
+    "sup_category": "Generic",
+    "value_type": "percent",
+    "max_warning_limit": "80.0",
+    "max_alarm_limit": "95.0",
+    "whv": "80.0",
+    "ahv": "95.0"
+  },
+  {
+    "id": 9004,
+    "name": "RAM Available",
+    "category": "Support",
+    "sup_category": "Generic",
+    "value_type": "percent",
+    "min_warning_limit": "20.0",
+    "min_alarm_limit": "5.0",
+    "wlv": "20.0",
+    "alv": "5.0"
+  },
+  {
+    "id": 9005,
+    "name": "Disk Usage",
+    "category": "Support",
+    "sup_category": "Generic",
+    "value_type": "percent",
+    "max_warning_limit": "80.0",
+    "max_alarm_limit": "95.0",
+    "whv": "80.0",
+    "ahv": "95.0"
+  },
+  {
+    "id": 9006,
+    "name": "Temperature",
+    "category": "Data Processing",
+    "sup_category": "Switch",
+    "value_type": "numeric",
+    "max_warning_limit": "65.0",
+    "max_alarm_limit": "75.0",
+    "whv": "65.0",
+    "ahv": "75.0"
   }
 ]

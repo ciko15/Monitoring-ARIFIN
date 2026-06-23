@@ -3,6 +3,57 @@
 var liveDataTimer = window.liveDataTimer;
 const API_URL = '/api';
 
+function parseSnmpMetricNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '—' || trimmed === '-') return null;
+    const parsed = Number(trimmed.replace(/,/g, ''));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function formatScaledSnmpUnit(value, units, decimals = 2, base = 1000) {
+  const num = parseSnmpMetricNumber(value);
+  if (num === null) return value;
+  if (num === 0) return `0 ${units[0]}`;
+
+  let scaled = Math.abs(num);
+  let unitIndex = 0;
+  while (scaled >= base && unitIndex < units.length - 1) {
+    scaled /= base;
+    unitIndex += 1;
+  }
+
+  const sign = num < 0 ? '-' : '';
+  const fractionDigits = unitIndex === 0 ? 0 : decimals;
+  return `${sign}${scaled.toLocaleString('id-ID', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits
+  })} ${units[unitIndex]}`;
+}
+
+function formatSnmpDisplayValue(key, value) {
+  if (typeof value === 'string' && /[a-z%]/i.test(value) && !/^\d+(\.\d+)?$/.test(value.trim())) {
+    return value;
+  }
+
+  if (/_octets?$/.test(key) || /_bytes?$/.test(key)) {
+    return formatScaledSnmpUnit(value, ['B', 'KB', 'MB', 'GB', 'TB', 'PB']);
+  }
+
+  if (/_mb$/.test(key)) {
+    return formatScaledSnmpUnit(value, ['MB', 'GB', 'TB', 'PB']);
+  }
+
+  if (/_gb$/.test(key)) {
+    return formatScaledSnmpUnit(value, ['GB', 'TB', 'PB']);
+  }
+
+  return value;
+}
+
 // ============================================
 // SNMP TOOLS FUNCTIONS
 // ============================================
@@ -154,9 +205,11 @@ async function getSnmpBulk() {
       
       for (const [key, value] of Object.entries(data)) {
         if (key !== 'error' && key !== 'cached') {
+          const rawValue = value.value || value;
+          const displayValue = formatSnmpDisplayValue(key, rawValue);
           html += '<div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">';
           html += '<div style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 4px;">' + key.replace(/_/g, ' ').toUpperCase() + '</div>';
-          html += '<div style="color: var(--text-primary); font-weight: 500;">' + (value.value || value) + '</div>';
+          html += '<div style="color: var(--text-primary); font-weight: 500;">' + displayValue + '</div>';
           html += '</div>';
         }
       }

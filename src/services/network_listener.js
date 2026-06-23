@@ -93,7 +93,7 @@ class NetworkListenerService {
             console.log(`[NetworkListener] Found ${sources.length} total sources`);
 
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal)
-            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01'];
+            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic'];
 
             for (const source of sources) {
                 // Start jika punya port ATAU parsing_id yang tidak butuh port
@@ -414,7 +414,7 @@ class NetworkListenerService {
         const pollSec = parseInt(poll_interval) || 60;
         const comm    = community || 'public';
 
-        const parserFile = 'snmp_system';
+        const parserFile = source.parsing_id === 'snmp_network_basic' ? 'snmp_network_basic' : 'snmp_system';
         const { pollSNMP } = require(`../parsers/${parserFile}`);
 
         this.activeListeners.add(id);
@@ -644,7 +644,7 @@ class NetworkListenerService {
         }
 
         // SNMP System Monitor (Server/Workstation/Switch)
-        if (parsing_id === 'snmp_system' || parsing_id === 'snmp_host_resources_01') {
+        if (parsing_id === 'snmp_system' || parsing_id === 'snmp_host_resources_01' || parsing_id === 'snmp_network_basic') {
             this.startSnmpSystemListener(source);
             return;
         }

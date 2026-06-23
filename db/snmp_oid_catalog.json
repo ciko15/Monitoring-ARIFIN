@@ -1,0 +1,263 @@
+[
+  {
+    "oid": "1.3.6.1.2.1.1.1.0",
+    "name": "sysDescr",
+    "label": "System Description",
+    "category": "system",
+    "profiles": ["server", "network"],
+    "mib": "SNMPv2-MIB",
+    "description": "Deskripsi perangkat atau sistem operasi."
+  },
+  {
+    "oid": "1.3.6.1.2.1.1.3.0",
+    "name": "sysUpTime",
+    "label": "System Uptime",
+    "category": "system",
+    "profiles": ["server", "network"],
+    "mib": "SNMPv2-MIB",
+    "description": "Lama perangkat aktif sejak boot terakhir."
+  },
+  {
+    "oid": "1.3.6.1.2.1.1.5.0",
+    "name": "sysName",
+    "label": "System Name",
+    "category": "system",
+    "profiles": ["server", "network"],
+    "mib": "SNMPv2-MIB",
+    "description": "Nama host atau nama perangkat."
+  },
+  {
+    "oid": "1.3.6.1.2.1.1.6.0",
+    "name": "sysLocation",
+    "label": "System Location",
+    "category": "system",
+    "profiles": ["server", "network"],
+    "mib": "SNMPv2-MIB",
+    "description": "Lokasi perangkat."
+  },
+  {
+    "oid": "1.3.6.1.2.1.2.1.0",
+    "name": "ifNumber",
+    "label": "Interface Count",
+    "category": "interface",
+    "profiles": ["network"],
+    "mib": "IF-MIB",
+    "description": "Jumlah interface jaringan."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.2.2.1.2",
+    "name": "ifDescr",
+    "label": "Interface Description",
+    "category": "interface",
+    "profiles": ["network"],
+    "mib": "IF-MIB",
+    "description": "Nama atau deskripsi interface."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.2.2.1.8",
+    "name": "ifOperStatus",
+    "label": "Interface Operational Status",
+    "category": "interface",
+    "profiles": ["network"],
+    "mib": "IF-MIB",
+    "description": "Status operasional interface."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.31.1.1.1.6",
+    "name": "ifHCInOctets",
+    "label": "Interface In Octets",
+    "category": "traffic",
+    "profiles": ["network"],
+    "mib": "IF-MIB",
+    "description": "Counter traffic masuk per interface."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.31.1.1.1.10",
+    "name": "ifHCOutOctets",
+    "label": "Interface Out Octets",
+    "category": "traffic",
+    "profiles": ["network"],
+    "mib": "IF-MIB",
+    "description": "Counter traffic keluar per interface."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.25.3.3.1.2",
+    "name": "hrProcessorLoad",
+    "label": "CPU Load",
+    "category": "cpu",
+    "profiles": ["server"],
+    "mib": "HOST-RESOURCES-MIB",
+    "description": "Persentase load CPU per processor."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.25.2.3.1.2",
+    "name": "hrStorageType",
+    "label": "Storage Type",
+    "category": "storage",
+    "profiles": ["server"],
+    "mib": "HOST-RESOURCES-MIB",
+    "description": "Jenis storage seperti RAM, disk, atau virtual memory."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.25.2.3.1.4",
+    "name": "hrStorageAllocationUnits",
+    "label": "Storage Allocation Unit",
+    "category": "storage",
+    "profiles": ["server"],
+    "mib": "HOST-RESOURCES-MIB",
+    "description": "Ukuran unit alokasi storage."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.25.2.3.1.5",
+    "name": "hrStorageSize",
+    "label": "Storage Size",
+    "category": "storage",
+    "profiles": ["server"],
+    "mib": "HOST-RESOURCES-MIB",
+    "description": "Ukuran total storage."
+  },
+  {
+    "oid_prefix": "1.3.6.1.2.1.25.2.3.1.6",
+    "name": "hrStorageUsed",
+    "label": "Storage Used",
+    "category": "storage",
+    "profiles": ["server"],
+    "mib": "HOST-RESOURCES-MIB",
+    "description": "Penggunaan storage saat ini."
+  },
+  {
+    "oid": "1.3.6.1.4.1.2021.4.3.0",
+    "name": "memTotalSwap",
+    "label": "Total Swap",
+    "category": "memory",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "unit": "kB",
+    "description": "Total swap tersedia."
+  },
+  {
+    "oid": "1.3.6.1.4.1.2021.4.4.0",
+    "name": "memAvailSwap",
+    "label": "Available Swap",
+    "category": "memory",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "unit": "kB",
+    "description": "Swap yang masih tersedia."
+  },
+  {
+    "oid": "1.3.6.1.4.1.2021.4.5.0",
+    "name": "memTotalReal",
+    "label": "Total RAM",
+    "category": "memory",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "unit": "kB",
+    "description": "Total RAM fisik."
+  },
+  {
+    "oid": "1.3.6.1.4.1.2021.4.6.0",
+    "name": "memAvailReal",
+    "label": "Available RAM",
+    "category": "memory",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "unit": "kB",
+    "description": "RAM fisik yang masih tersedia."
+  },
+  {
+    "oid_prefix": "1.3.6.1.4.1.2021.10.1.2",
+    "name": "laNames",
+    "label": "Load Average Label",
+    "category": "load",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "description": "Label load average seperti Load-1, Load-5, Load-15."
+  },
+  {
+    "oid_prefix": "1.3.6.1.4.1.2021.10.1.3",
+    "name": "laLoad",
+    "label": "Load Average",
+    "category": "load",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "description": "Nilai load average."
+  },
+  {
+    "oid": "1.3.6.1.4.1.2021.11.9.0",
+    "name": "ssCpuUser",
+    "label": "CPU User",
+    "category": "cpu",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "unit": "%",
+    "description": "Persentase CPU di user space."
+  },
+  {
+    "oid": "1.3.6.1.4.1.2021.11.10.0",
+    "name": "ssCpuSystem",
+    "label": "CPU System",
+    "category": "cpu",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "unit": "%",
+    "description": "Persentase CPU di kernel/system space."
+  },
+  {
+    "oid": "1.3.6.1.4.1.2021.11.11.0",
+    "name": "ssCpuIdle",
+    "label": "CPU Idle",
+    "category": "cpu",
+    "profiles": ["server"],
+    "mib": "UCD-SNMP-MIB",
+    "unit": "%",
+    "description": "Persentase CPU idle."
+  },
+  {
+    "oid_prefix": "1.3.6.1.4.1.2021.13.15.1.1.2",
+    "name": "diskIODevice",
+    "label": "Disk Device Name",
+    "category": "disk",
+    "profiles": ["server"],
+    "mib": "UCD-DISKIO-MIB",
+    "description": "Nama device disk atau block device."
+  },
+  {
+    "oid_prefix": "1.3.6.1.4.1.2021.13.15.1.1.3",
+    "name": "diskIONRead",
+    "label": "Disk Read Blocks",
+    "category": "disk",
+    "profiles": ["server"],
+    "mib": "UCD-DISKIO-MIB",
+    "description": "Jumlah block read per disk."
+  },
+  {
+    "oid_prefix": "1.3.6.1.4.1.2021.13.15.1.1.4",
+    "name": "diskIONWritten",
+    "label": "Disk Written Blocks",
+    "category": "disk",
+    "profiles": ["server"],
+    "mib": "UCD-DISKIO-MIB",
+    "description": "Jumlah block write per disk."
+  },
+  {
+    "oid_prefix": "1.3.6.1.4.1.2021.13.16.2.1.2",
+    "name": "lmTempSensorsDevice",
+    "label": "Temperature Sensor Name",
+    "category": "temperature",
+    "profiles": ["server"],
+    "mib": "LM-SENSORS-MIB",
+    "description": "Nama sensor suhu."
+  },
+  {
+    "oid_prefix": "1.3.6.1.4.1.2021.13.16.2.1.3",
+    "name": "lmTempSensorsValue",
+    "label": "Temperature Sensor Value",
+    "category": "temperature",
+    "profiles": ["server"],
+    "mib": "LM-SENSORS-MIB",
+    "unit": "milliC",
+    "scale": 1000,
+    "description": "Nilai suhu sensor, biasanya dalam millicelsius."
+  }
+]

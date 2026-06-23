@@ -2092,6 +2092,10 @@
                   <input type="text" id="snmpTermIp" placeholder="e.g. 192.168.1.1">
                 </div>
                 <div class="form-group">
+                  <label for="snmpTermPort">Port</label>
+                  <input type="number" id="snmpTermPort" placeholder="161" value="161">
+                </div>
+                <div class="form-group">
                   <label for="snmpTermCommunity">Community</label>
                   <input type="text" id="snmpTermCommunity" placeholder="default: public" value="public">
                 </div>
@@ -2106,10 +2110,13 @@
                 </div>
                 <div class="form-group">
                   <label for="snmpTermOid">OID (Optional)</label>
-                  <input type="text" id="snmpTermOid" placeholder="e.g. 1.3.6.1.2.1.1.1.0 (Leave empty for Walk)">
+                  <input type="text" id="snmpTermOid" placeholder="e.g. 1.3.6.1.2.1.1.1.0 (empty = auto root)">
                 </div>
               </div>
               <div class="form-actions" style="margin-top: 15px;">
+                <button class="btn btn-primary" id="btnRunSnmpGet" onclick="runSnmpGet()">
+                  <i class="fas fa-bullseye"></i> Run SNMP GET
+                </button>
                 <button class="btn btn-primary" id="btnRunSnmpWalk" onclick="runSnmpWalk()">
                   <i class="fas fa-running"></i> Run SNMP Walk
                 </button>

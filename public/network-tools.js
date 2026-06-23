@@ -14,6 +14,7 @@ window.lastCaptureError = null;
 window.connectedDevices = [];
 window.isScanningDevices = false;
 window.yourLocalIP = null;
+window.networkToolsAuthWarningShown = false;
 
 // Initialize Network Tools
 function initNetworkTools() {
@@ -72,16 +73,22 @@ async function loadNetworkInterfaces() {
   try {
     const headers = getAuthHeaders();
     if (!headers.Authorization) {
-        console.warn('[Network Tools] No Authorization header found. API call may fail.');
+        if (!window.networkToolsAuthWarningShown) {
+          addLogEntry('System', 'Anda belum login. Silakan login untuk melihat network interfaces.', 'warning');
+          window.networkToolsAuthWarningShown = true;
+        }
+        stopInterfacePolling();
+        return;
     }
     const response = await fetch('/api/network/ifstats', { headers });
     
     if (response.status === 401) {
-        throw new Error('Unauthorized - Please log in again');
+        throw new Error('Unauthorized - Invalid or expired login session');
     }
     const result = await response.json();
 
     if (result.success && result.data) {
+      window.networkToolsAuthWarningShown = false;
       const interfaces = result.data;
       console.log(`[Network Tools] Received ${interfaces.length} interfaces:`, interfaces);
       availableInterfaces = interfaces;
@@ -155,7 +162,11 @@ async function loadNetworkInterfaces() {
   } catch (error) {
     console.error('[Network Tools] Error loading interfaces:', error);
     if (error.message.includes('Unauthorized')) {
-        addLogEntry('System', 'Authentication expired. Please log in to see network interfaces.', 'warning');
+        if (!window.networkToolsAuthWarningShown) {
+          addLogEntry('System', 'Sesi login tidak valid atau sudah habis. Silakan login ulang untuk melihat network interfaces.', 'warning');
+          window.networkToolsAuthWarningShown = true;
+        }
+        stopInterfacePolling();
     }
   }
 }
@@ -919,14 +930,134 @@ async function scanTcpPorts() {
 }
 
 // === SNMP TERMINAL (NEW) ===
+function getSnmpTerminalInputs() {
+  return {
+    ip: document.getElementById('snmpTermIp')?.value?.trim(),
+    port: document.getElementById('snmpTermPort')?.value || '161',
+    community: document.getElementById('snmpTermCommunity')?.value || 'public',
+    version: document.getElementById('snmpTermVersion')?.value || '2c',
+    oid: document.getElementById('snmpTermOid')?.value?.trim()
+  };
+}
+
+function syncSnmpCommunity(source = 'init') {
+  const terminalInput = document.getElementById('snmpTermCommunity');
+  const scannerInput = document.getElementById('snmpScanCommunity');
+  const savedValue = localStorage.getItem('snmpCommunity');
+
+  if (!terminalInput || !scannerInput) return;
+
+  if (source === 'terminal') {
+    const value = terminalInput.value.trim() || 'public';
+    scannerInput.value = value;
+    localStorage.setItem('snmpCommunity', value);
+    return;
+  }
+
+  if (source === 'scanner') {
+    const value = scannerInput.value.trim() || 'public';
+    terminalInput.value = value;
+    localStorage.setItem('snmpCommunity', value);
+    return;
+  }
+
+  const initialValue = savedValue || terminalInput.value.trim() || scannerInput.value.trim() || 'public';
+  terminalInput.value = initialValue;
+  scannerInput.value = initialValue;
+}
+
+function populateSnmpTerminal(device) {
+  const ipInput = document.getElementById('snmpTermIp');
+  const oidInput = document.getElementById('snmpTermOid');
+
+  if (ipInput) ipInput.value = device.ip || '';
+  if (oidInput && !oidInput.value.trim()) {
+    oidInput.value = '1.3.6.1.2.1.1.1.0';
+  }
+  syncSnmpCommunity('scanner');
+}
+
+function renderSnmpTerminalCommand(command, version, community, ip, port, oid, message) {
+  const termOutput = document.getElementById('snmpTerminalOutput');
+  if (!termOutput) return;
+
+  const portSuffix = port && port !== '161' ? `:${port}` : '';
+  termOutput.innerHTML = `$ ${command} -v ${version} -c ${community} ${ip}${portSuffix} ${oid || ''}\n<span style="color: #888;">${message}</span>\n`;
+}
+
+function renderSnmpBindings(bindings) {
+  if (!Array.isArray(bindings) || bindings.length === 0) return '';
+
+  return bindings.map(binding => {
+    const title = binding.label || binding.name || binding.oid;
+    const meta = [binding.category, binding.mib].filter(Boolean).join(' | ');
+    const description = binding.description ? `\n${binding.description}` : '';
+    return `${title}\nOID: ${binding.oid}\nValue: ${binding.displayValue || binding.value}${meta ? `\nMeta: ${meta}` : ''}${description}`;
+  }).join('\n\n');
+}
+
+async function runSnmpGet() {
+  const btn = document.getElementById('btnRunSnmpGet');
+  const termOutput = document.getElementById('snmpTerminalOutput');
+  const { ip, port, community, version, oid } = getSnmpTerminalInputs();
+  syncSnmpCommunity('terminal');
+
+  if (!ip) {
+    alert('Device IP is required!');
+    return;
+  }
+
+  if (!oid) {
+    alert('OID is required for SNMP GET!');
+    return;
+  }
+
+  if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+  }
+
+  renderSnmpTerminalCommand('snmpget', version, community, ip, port, oid, 'Running SNMP GET...');
+  addLogEntry('SNMP Terminal', `Running SNMP GET on ${ip}:${port} for ${oid}...`, 'info');
+
+  try {
+    const response = await fetch('/api/network/snmp-get', {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, port, community, version, oid })
+    });
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      if (termOutput) {
+        const rendered = result.data.binding ? renderSnmpBindings([result.data.binding]) : result.data.output;
+        termOutput.innerHTML += `<pre style="color: #00ff00; margin: 0; white-space: pre-wrap;">${rendered}</pre>`;
+        termOutput.scrollTop = termOutput.scrollHeight;
+      }
+      addLogEntry('SNMP Terminal', 'SNMP GET complete', 'success');
+    } else {
+      throw new Error(result.error || result.message || 'Failed to run SNMP GET');
+    }
+  } catch (err) {
+    if (termOutput) {
+      termOutput.innerHTML += `<span style="color: #ef4444;">\nError: ${err.message}</span>`;
+      termOutput.scrollTop = termOutput.scrollHeight;
+    }
+    addLogEntry('SNMP Terminal Error', err.message, 'error');
+  } finally {
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-bullseye"></i> Run SNMP GET';
+    }
+  }
+}
+
 async function runSnmpWalk() {
   const btn = document.getElementById('btnRunSnmpWalk');
   const termOutput = document.getElementById('snmpTerminalOutput');
-  
-  const ip = document.getElementById('snmpTermIp')?.value;
-  const community = document.getElementById('snmpTermCommunity')?.value || 'public';
-  const version = document.getElementById('snmpTermVersion')?.value || '2c';
-  const oid = document.getElementById('snmpTermOid')?.value;
+  const { ip, port, community, version, oid } = getSnmpTerminalInputs();
+  syncSnmpCommunity('terminal');
 
   if (!ip) {
     alert('Device IP is required!');
@@ -937,25 +1068,23 @@ async function runSnmpWalk() {
       btn.disabled = true;
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
   }
-  
-  if (termOutput) {
-    termOutput.innerHTML = `$ snmpwalk -v ${version} -c ${community} ${ip} ${oid || ''}\n<span style="color: #888;">Running SNMP Walk... (This may take a while)</span>\n`;
-  }
 
-  addLogEntry('SNMP Terminal', `Running SNMP Walk on ${ip}...`, 'info');
+  renderSnmpTerminalCommand('snmpwalk', version, community, ip, port, oid, 'Running SNMP Walk... (This may take a while)');
+  addLogEntry('SNMP Terminal', `Running SNMP Walk on ${ip}:${port}...`, 'info');
 
   try {
     const response = await fetch('/api/network/snmp-walk', {
       method: 'POST',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ip, community, version, oid })
+      body: JSON.stringify({ ip, port, community, version, oid })
     });
     
     const result = await response.json();
     
     if (result.success && result.data) {
       if (termOutput) {
-        termOutput.innerHTML += `<pre style="color: #00ff00; margin: 0; white-space: pre-wrap;">${result.data.output}</pre>`;
+        const rendered = result.data.bindings ? renderSnmpBindings(result.data.bindings) : result.data.output;
+        termOutput.innerHTML += `<pre style="color: #00ff00; margin: 0; white-space: pre-wrap;">${rendered}</pre>`;
         termOutput.scrollTop = termOutput.scrollHeight;
       }
       addLogEntry('SNMP Terminal', 'SNMP Walk complete', 'success');
@@ -987,6 +1116,7 @@ async function scanSnmpDevices() {
   const tbody = document.getElementById('snmpScanResultBody');
   const countEl = document.getElementById('snmpDeviceCount');
   const community = document.getElementById('snmpScanCommunity')?.value || 'public';
+  syncSnmpCommunity('scanner');
 
   if (btn) {
       btn.disabled = true;
@@ -1017,13 +1147,19 @@ async function scanSnmpDevices() {
       } else {
         if (tbody) {
           tbody.innerHTML = devices.map(device => `
-            <tr>
+            <tr class="snmp-scan-row" data-ip="${device.ip}">
               <td style="font-family: monospace;">${device.ip}</td>
               <td title="${device.sysDescr}">${device.sysDescr || '-'}</td>
               <td>${device.interface || '-'}</td>
               <td><span class="status-up">✅ Active</span></td>
             </tr>
           `).join('');
+
+          tbody.querySelectorAll('.snmp-scan-row').forEach((row, index) => {
+            row.style.cursor = 'pointer';
+            row.title = 'Click to copy IP to SNMP Terminal';
+            row.addEventListener('click', () => populateSnmpTerminal(devices[index]));
+          });
         }
         addLogEntry('SNMP Scanner', `Found ${devices.length} SNMP devices`, 'success');
       }
@@ -1041,6 +1177,21 @@ async function scanSnmpDevices() {
   }
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+  syncSnmpCommunity('init');
+
+  const terminalInput = document.getElementById('snmpTermCommunity');
+  const scannerInput = document.getElementById('snmpScanCommunity');
+
+  if (terminalInput) {
+    terminalInput.addEventListener('input', () => syncSnmpCommunity('terminal'));
+  }
+
+  if (scannerInput) {
+    scannerInput.addEventListener('input', () => syncSnmpCommunity('scanner'));
+  }
+});
+
 // Global Exports
 window.initNetworkTools = initNetworkTools;
 window.startCapture = startCapture;
@@ -1051,6 +1202,7 @@ window.filterPackets = filterPackets;
 window.displayPacketDetails = displayPacketDetails;
 window.clearLog = clearLog;
 window.scanConnectedDevices = scanConnectedDevices;
+window.runSnmpGet = runSnmpGet;
 window.runSnmpWalk = runSnmpWalk;
 window.clearSnmpTerminal = clearSnmpTerminal;
 window.scanSnmpDevices = scanSnmpDevices;

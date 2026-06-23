@@ -110,5 +110,13 @@
     "category": "Data Processing",
     "files": "/src/parsers/snmp_system.js",
     "createdAt": "2026-04-29T00:00:00.000Z"
+  },
+  {
+    "id": "snmp_network_basic",
+    "name": "Network Device Monitor",
+    "description": "SNMP v2c basic network parser. System info, uptime, location, and interface count for switches/routers/network devices.",
+    "category": "Data Processing",
+    "files": "/src/parsers/snmp_network_basic.js",
+    "createdAt": "2026-06-03T00:00:00.000Z"
   }
 ]
