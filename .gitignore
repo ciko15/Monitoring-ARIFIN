@@ -11,3 +11,4 @@ build/
 _agents/
 _agent/
 brain/
+logs/

@@ -497,13 +497,25 @@ async function getAllEquipment(filters = {}) {
           if (isTimedOut) {
             // Timeout: set status to Disconnect and parameters to '-'
             const emptyData = {};
-            if (log.data) Object.keys(log.data).forEach(k => emptyData[k] = '-');
+            if (log.data) {
+              Object.keys(log.data).forEach(k => emptyData[k] = '-');
+              if (log.data.data && typeof log.data.data === 'object') {
+                Object.keys(log.data.data).forEach(k => emptyData[k] = '-');
+              }
+            }
+            const src = configSources.find(s => s.name === sourceName);
+            const template = src && PARSER_TEMPLATES[src.parsing_id] ? PARSER_TEMPLATES[src.parsing_id] : [];
+            const placeholder = {};
+            template.forEach(k => { placeholder[k] = '-'; });
+
             mergedData[sourceName] = {
               ...mergedData[sourceName],
               ...emptyData,
+              ...placeholder,
               _status: 'Disconnect',
               _logged_at: log.logged_at
             };
+            delete mergedData[sourceName].data;
           } else {
             // Valid fresh data
             mergedData[sourceName] = {
