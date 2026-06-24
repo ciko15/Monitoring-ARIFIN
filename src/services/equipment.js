@@ -47,30 +47,6 @@ class EquipmentService {
                 }
             }
 
-            // Fetch latest data logs - NEW
-            const logsResult = await this.db.getEquipmentLogs({ equipmentId, limit: 20 });
-            if (logsResult && logsResult.data && logsResult.data.length > 0) {
-                // Build lastData as { [source_name]: data } — satu entry per source, ambil yang terbaru
-                // Frontend (enhancements.js) mengakses eq.lastData[src.name]
-                const lastDataMap = {};
-                let latestUpdate = null;
-                for (const log of logsResult.data) {
-                    const srcName = log.source || 'default';
-                    if (!lastDataMap[srcName]) {
-                        lastDataMap[srcName] = {
-                            ...log.data,
-                            _logged_at:  log.logged_at,
-                            _status:     log.status,
-                            _parsing_id: log.connection_type,
-                        };
-                        if (!latestUpdate || log.logged_at > latestUpdate) {
-                            latestUpdate = log.logged_at;
-                        }
-                    }
-                }
-                equipment.lastData  = lastDataMap;
-                equipment.lastUpdate = latestUpdate;
-            }
 
             // Legacy field mapping for compatibility
             equipment.host = equipment.ip || equipment.snmpIP || equipment.host || (equipment.components && equipment.components.length > 0 ? equipment.components[0].ip_address : null);
