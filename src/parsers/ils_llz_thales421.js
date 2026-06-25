@@ -43,6 +43,13 @@ const SYNC_DATA    = Buffer.from([0x56, 0x00, 0xF9, 0x06]);
 const SYNC_HBEAT   = Buffer.from([0x1B, 0x00, 0xF9, 0x06]);
 const SYNC_ACK     = Buffer.from([0x13, 0x00, 0xF9, 0x06]);
 
+// Protocol confirmed via live capture (2026-06-25):
+// Trigger / keep-alive yang kita kirim ke device  : 13 00 F9 06
+// Heartbeat yang dikirim device ke kita           : 13 00 F8 06
+// Data packet dari device                         : F0 06 [seq] 89 03 05 44 D1 ... [CRC]
+const TRIGGER_SEND = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
+const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
+
 const PARAM_OFFSETS = {
     CRS_RF:    26,
     CRS_DDM:   30,
@@ -222,10 +229,26 @@ class IlsLlzThales421Parser extends BaseParser {
         };
     }
 
-    getPollRequests() { return []; }
-    getMode()         { return this._mode; }
-    getLastData()     { return this._lastDecoded ? this._lastDecoded.params : {}; }
-    reset()           { this._buf = Buffer.alloc(0); }
+    /**
+     * Returns the initial trigger packet to send on connect.
+     * Device membutuhkan ACK packet (13 00 F9 06) agar mulai streaming data.
+     */
+    getPollRequests() {
+        return [{ bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }];
+    }
+
+    /**
+     * Cek apakah chunk yang diterima adalah heartbeat dari device.
+     * Jika ya, caller harus membalas dengan TRIGGER_SEND.
+     */
+    isHeartbeat(chunk) {
+        return chunk && chunk.length >= 4 && chunk.slice(0, 4).equals(HBEAT_RECV);
+    }
+
+    getHeartbeatReply() { return TRIGGER_SEND; }
+    getMode()           { return this._mode; }
+    getLastData()       { return this._lastDecoded ? this._lastDecoded.params : {}; }
+    reset()             { this._buf = Buffer.alloc(0); }
 }
 
 module.exports = IlsLlzThales421Parser;

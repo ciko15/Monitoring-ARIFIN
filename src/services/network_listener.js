@@ -253,6 +253,10 @@ class NetworkListenerService {
         const ParserModule = require('../parsers/' + parsing_id);
         const parser = new ParserModule({ equipt_id });
 
+        // Cek apakah parser support protokol trigger+heartbeat (Thales 421)
+        const hasTriggerProtocol = typeof parser.isHeartbeat === 'function' &&
+                                   typeof parser.getHeartbeatReply === 'function';
+
         let socket = null;
         let reconnectTimer = null;
         let stopped = false;
@@ -260,17 +264,38 @@ class NetworkListenerService {
         const connect = () => {
             if (stopped) return;
             socket = new net.Socket();
-            socket.setTimeout(60000); // 60s — passive stream, heartbeat keeps it alive
+            socket.setTimeout(60000); // 60s — heartbeat akan menjaga koneksi tetap hidup
 
             socket.connect(port, ip_address, () => {
                 console.log(`[NetworkListener] ILS binary TCP connected: ${name} (${ip_address}:${port})`);
                 this.activeListeners.add(id);
                 this._binaryTcpSockets = this._binaryTcpSockets || new Map();
                 this._binaryTcpSockets.set(id, socket);
+
+                // Kirim trigger awal agar device mulai streaming (Thales 421 protocol)
+                if (hasTriggerProtocol) {
+                    const triggerReqs = parser.getPollRequests();
+                    for (const req of triggerReqs) {
+                        try {
+                            socket.write(req.bytes);
+                            console.log(`[NetworkListener] ILS trigger sent for ${name}: ${req.bytes.toString('hex').toUpperCase()}`);
+                        } catch (e) {
+                            console.warn(`[NetworkListener] ILS trigger write error ${name}: ${e.message}`);
+                        }
+                    }
+                }
             });
 
-            // Forward every chunk directly to parser — no buffering or framing
             socket.on('data', async (chunk) => {
+                // Balas heartbeat dari device agar stream tetap hidup tanpa RCMS
+                if (hasTriggerProtocol && parser.isHeartbeat(chunk)) {
+                    try {
+                        socket.write(parser.getHeartbeatReply());
+                        console.log(`[NetworkListener] ILS heartbeat replied for ${name}`);
+                    } catch (e) {
+                        console.warn(`[NetworkListener] ILS heartbeat reply error ${name}: ${e.message}`);
+                    }
+                }
                 await this.handleIncomingData(source, chunk, parser);
             });
 
