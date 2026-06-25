@@ -145,15 +145,26 @@ async function writeJson(filePath, data) {
       await fs.promises.writeFile(tempPath, content, 'utf8');
 
       try {
-        await fs.promises.rename(tempPath, filePath);
-      } catch (renameErr) {
-        // Windows can throw EPERM/EBUSY when target is briefly locked by AV/indexer.
-        // Fallback to copy+unlink so writes still succeed.
-        if (renameErr && (renameErr.code === 'EPERM' || renameErr.code === 'EBUSY')) {
-          await fs.promises.copyFile(tempPath, filePath);
-          await fs.promises.unlink(tempPath).catch(() => {});
-        } else {
-          throw renameErr;
+      let renameSuccess = false;
+      let retries = 3;
+      while (!renameSuccess && retries > 0) {
+        try {
+          await fs.promises.rename(tempPath, filePath);
+          renameSuccess = true;
+        } catch (renameErr) {
+          if (renameErr && (renameErr.code === 'EPERM' || renameErr.code === 'EBUSY')) {
+            retries--;
+            if (retries === 0) {
+              // Final fallback
+              await fs.promises.copyFile(tempPath, filePath);
+              await fs.promises.unlink(tempPath).catch(() => {});
+              renameSuccess = true;
+            } else {
+              await new Promise(r => setTimeout(r, 100)); // wait 100ms before retry
+            }
+          } else {
+            throw renameErr;
+          }
         }
       }
       return true;
@@ -310,8 +321,29 @@ async function syncEquipmentLogsFromDisk(force = false) {
       return;
     }
 
-    const data = await fs.promises.readFile(LOGS_DATA_PATH, 'utf8');
-    equipmentLogsDB = JSON.parse(data);
+    let data = null;
+    let retries = 3;
+    while (!data && retries > 0) {
+      try {
+        data = await fs.promises.readFile(LOGS_DATA_PATH, 'utf8');
+      } catch (err) {
+        if (err.code === 'EBUSY' || err.code === 'EPERM') {
+          retries--;
+          if (retries === 0) throw err;
+          await new Promise(r => setTimeout(r, 100));
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    try {
+        equipmentLogsDB = JSON.parse(data);
+    } catch (parseErr) {
+        console.error(`[DB] JSON Parse error in equipment_logs.json: ${parseErr.message}`);
+        // Jika file corrupt (misal terputus tengah jalan), reset array kosong
+        equipmentLogsDB = [];
+    }
     logsFileMtimeMs = mtimeMs;
   } catch (err) {
     console.error('[DB] Failed syncing logs from disk:', err);
