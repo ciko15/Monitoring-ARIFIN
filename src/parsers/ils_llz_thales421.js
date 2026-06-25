@@ -212,6 +212,11 @@ class IlsLlzThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
+                // Prevent buffer accumulation CPU spike (O(N^2) rescanning of short packets)
+                // If there are no valid frames, anything before the last 92 bytes is guaranteed garbage.
+                if (this._buf.length > PKT_C_SIZE) {
+                    this._buf = this._buf.slice(this._buf.length - PKT_C_SIZE);
+                }
                 return { success: false, error: 'No valid LLZ frames', status: 'Waiting',
                          _mode: this._mode,
                          data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
