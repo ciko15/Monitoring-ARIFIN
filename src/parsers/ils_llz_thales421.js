@@ -114,6 +114,10 @@ function decodePacket(pkt) {
     if (!pkt.slice(0, 4).equals(SYNC_DATA)) return null;
 
     const subtype   = pkt[12];
+    // Hanya proses packet dengan subtype 0x8D (Executive Measurement / Data Aktual)
+    // Jika subtype lain (misal 0x0D, 0x8C), format offset-nya berbeda sehingga data akan berantakan.
+    if (subtype !== 0x8D) return null;
+
     const txFlag    = pkt[13];
     const tx1IsMain = !!(txFlag & 0x40);
     const txData    = pkt[15] === 0x10 ? 'TX2' : 'TX1';
