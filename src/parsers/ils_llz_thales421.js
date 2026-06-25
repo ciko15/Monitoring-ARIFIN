@@ -262,4 +262,3 @@ module.exports = IlsLlzThales421Parser;
 module.exports.PARAM_OFFSETS = PARAM_OFFSETS;
 module.exports.LIMITS        = LIMITS;
 module.exports.PARAM_LABELS  = PARAM_LABELS;
-module.exports.SYNC_DATA     = SYNC_DATA;
