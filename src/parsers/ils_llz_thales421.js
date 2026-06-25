@@ -123,6 +123,13 @@ function decodePacket(pkt) {
     // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
     if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
     
+    // Pastikan ini adalah paket Transmitter ukuran penuh (long packet).
+    // Jika ada sync word lain yang muncul sebelum byte ke-77 (batas akhir float),
+    // berarti ini adalah paket pendek (ACK/Command dari ADRACS). Abaikan!
+    for (let j = 1; j < 77; j++) {
+        if (isPktCSync(pkt, j)) return null;
+    }
+    
     const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};

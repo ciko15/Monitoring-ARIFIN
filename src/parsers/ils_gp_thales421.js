@@ -117,6 +117,13 @@ function decodePktC(pkt) {
     // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
     if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
 
+    // Pastikan ini adalah paket Transmitter ukuran penuh (long packet).
+    // Batas akhir float untuk GP adalah offset 66 (GP_ANGLE).
+    // Jika ada sync word lain yang muncul sebelum byte ke-70, ini adalah paket pendek.
+    for (let j = 1; j < 70; j++) {
+        if (isPktCSync(pkt, j)) return null;
+    }
+
     const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
