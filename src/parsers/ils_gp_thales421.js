@@ -33,6 +33,11 @@ const BaseParser = require('./base');
 
 const PKT_C_SIZE = 92;
 
+// Protokol Mandiri Thales 421 (Sama dengan LLZ)
+const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // Request Data (Executive Measurement)
+const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat idle dari device
+const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
+
 function isPktCSync(buf, i) {
     return i + 3 < buf.length &&
            buf[i] === 0x11 && buf[i+1] === 0x8D && buf[i+3] === 0x0C;
@@ -222,7 +227,18 @@ class IlsGpThales421Parser extends BaseParser {
         };
     }
 
-    getPollRequests() { return []; }
+    getPollRequests() {
+        return [{ bytes: TRIGGER_SEND, label: 'DATA_REQUEST' }];
+    }
+    
+    isHeartbeat(buf) {
+        return buf.length >= 4 && buf.slice(0, 4).equals(HBEAT_RECV);
+    }
+    
+    getHeartbeatReply() {
+        return HBEAT_REPLY;
+    }
+
     getMode()         { return this._mode; }
     getLastData()     { return this._lastDecoded ? this._lastDecoded.params : {}; }
     reset()           { this._buf = Buffer.alloc(0); }

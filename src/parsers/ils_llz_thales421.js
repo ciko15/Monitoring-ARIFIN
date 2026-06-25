@@ -44,10 +44,10 @@ const SYNC_HBEAT   = Buffer.from([0x1B, 0x00, 0xF9, 0x06]);
 const SYNC_ACK     = Buffer.from([0x13, 0x00, 0xF9, 0x06]);
 
 // Protocol confirmed via live capture (2026-06-25):
-// Trigger / keep-alive yang kita kirim ke device  : 13 00 F9 06
+// Trigger / keep-alive yang kita kirim ke device  : 0B 00 F9 06
 // Heartbeat yang dikirim device ke kita           : 13 00 F8 06
 // Data packet dari device                         : F0 06 [seq] 89 03 05 44 D1 ... [CRC]
-const TRIGGER_SEND = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
+const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
 const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
 
 const PARAM_OFFSETS = {
