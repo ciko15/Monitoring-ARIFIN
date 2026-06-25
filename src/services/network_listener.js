@@ -266,23 +266,28 @@ class NetworkListenerService {
             socket = new net.Socket();
             socket.setTimeout(60000); // 60s — heartbeat akan menjaga koneksi tetap hidup
 
+            let pollTimer = null;
+
             socket.connect(port, ip_address, () => {
                 console.log(`[NetworkListener] ILS binary TCP connected: ${name} (${ip_address}:${port})`);
                 this.activeListeners.add(id);
                 this._binaryTcpSockets = this._binaryTcpSockets || new Map();
                 this._binaryTcpSockets.set(id, socket);
 
-                // Kirim trigger awal agar device mulai streaming (Thales 421 protocol)
+                // Kirim trigger secara berkala agar aliran data tidak terputus walau direbut ADRACS
                 if (hasTriggerProtocol) {
-                    const triggerReqs = parser.getPollRequests();
-                    for (const req of triggerReqs) {
-                        try {
-                            socket.write(req.bytes);
-                            console.log(`[NetworkListener] ILS trigger sent for ${name}: ${req.bytes.toString('hex').toUpperCase()}`);
-                        } catch (e) {
-                            console.warn(`[NetworkListener] ILS trigger write error ${name}: ${e.message}`);
+                    const doPoll = () => {
+                        const triggerReqs = parser.getPollRequests();
+                        for (const req of triggerReqs) {
+                            try {
+                                socket.write(req.bytes);
+                            } catch (e) {
+                                console.warn(`[NetworkListener] ILS trigger write error ${name}: ${e.message}`);
+                            }
                         }
-                    }
+                    };
+                    doPoll();
+                    pollTimer = setInterval(doPoll, 5000); // Paksa minta data tiap 5 detik
                 }
             });
 
@@ -291,7 +296,6 @@ class NetworkListenerService {
                 if (hasTriggerProtocol && parser.isHeartbeat(chunk)) {
                     try {
                         socket.write(parser.getHeartbeatReply());
-                        console.log(`[NetworkListener] ILS heartbeat replied for ${name}`);
                     } catch (e) {
                         console.warn(`[NetworkListener] ILS heartbeat reply error ${name}: ${e.message}`);
                     }
@@ -310,6 +314,7 @@ class NetworkListenerService {
 
             socket.on('close', () => {
                 console.log(`[NetworkListener] ILS binary TCP disconnected ${name}, retry in 15s`);
+                if (pollTimer) clearInterval(pollTimer);
                 this.activeListeners.delete(id);
                 if (typeof parser.reset === 'function') parser.reset();
                 if (!stopped) reconnectTimer = setTimeout(connect, 15000);
