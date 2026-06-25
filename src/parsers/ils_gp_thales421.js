@@ -112,6 +112,11 @@ function decodePktC(pkt) {
     const byte2     = pkt[2];
     const isRemote  = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
+
+    // 0x00 = TX1, 0x10 = TX2
+    // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
+    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
+
     const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
