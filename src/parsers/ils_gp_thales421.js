@@ -133,7 +133,13 @@ function extractFrames(buf) {
     for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
         if (isPktCSync(buf, i)) {
             const dec = decodePktC(buf.slice(i, i + PKT_C_SIZE));
-            if (dec) { results.push({ pos: i, decoded: dec }); i += PKT_C_SIZE - 1; }
+            if (dec) {
+                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
+                if (dec.tx_data === dec.tx_main) {
+                    results.push({ pos: i, decoded: dec });
+                }
+                i += PKT_C_SIZE - 1; 
+            }
         }
     }
     return results;

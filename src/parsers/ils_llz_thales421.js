@@ -116,6 +116,7 @@ function decodePacket(pkt) {
     const subtype   = pkt[12];
     const txFlag    = pkt[13];
     const tx1IsMain = !!(txFlag & 0x40);
+    const txData    = pkt[15] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
     for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
@@ -126,6 +127,7 @@ function decodePacket(pkt) {
     return {
         tx_main:  tx1IsMain ? 'TX1' : 'TX2',
         tx_stby:  tx1IsMain ? 'TX2' : 'TX1',
+        tx_data:  txData,
         subtype,
         tx_flag:  txFlag,
         params,
@@ -144,7 +146,10 @@ function extractFrames(buf) {
         if (buf.slice(i, i+4).equals(SYNC_DATA)) {
             const dec = decodePacket(buf.slice(i, i + PACKET_SIZE));
             if (dec) {
-                results.push({ pos: i, decoded: dec });
+                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
+                if (dec.tx_data === dec.tx_main) {
+                    results.push({ pos: i, decoded: dec });
+                }
                 i += PACKET_SIZE;
                 continue;
             }
