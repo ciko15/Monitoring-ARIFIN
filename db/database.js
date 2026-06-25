@@ -144,34 +144,33 @@ async function writeJson(filePath, data) {
 
       await fs.promises.writeFile(tempPath, content, 'utf8');
 
-      try {
-        let renameSuccess = false;
-        let retries = 3;
-        while (!renameSuccess && retries > 0) {
-          try {
-            await fs.promises.rename(tempPath, filePath);
-            renameSuccess = true;
-          } catch (renameErr) {
-            if (renameErr && (renameErr.code === 'EPERM' || renameErr.code === 'EBUSY')) {
-              retries--;
-              if (retries === 0) {
-                // Final fallback
-                await fs.promises.copyFile(tempPath, filePath);
-                await fs.promises.unlink(tempPath).catch(() => {});
-                renameSuccess = true;
-              } else {
-                await new Promise(r => setTimeout(r, 100)); // wait 100ms before retry
-              }
+      let renameSuccess = false;
+      let retries = 3;
+      while (!renameSuccess && retries > 0) {
+        try {
+          await fs.promises.rename(tempPath, filePath);
+          renameSuccess = true;
+        } catch (renameErr) {
+          if (renameErr && (renameErr.code === 'EPERM' || renameErr.code === 'EBUSY')) {
+            retries--;
+            if (retries === 0) {
+              // Final fallback
+              await fs.promises.copyFile(tempPath, filePath);
+              await fs.promises.unlink(tempPath).catch(() => {});
+              renameSuccess = true;
             } else {
-              throw renameErr;
+              await new Promise(r => setTimeout(r, 100)); // wait 100ms before retry
             }
+          } else {
+            throw renameErr;
           }
         }
-        return true;
-      } catch (err) {
-        console.error(`Error writing JSON to ${filePath}:`, err);
-        return false;
       }
+      return true;
+    } catch (err) {
+      console.error(`Error writing JSON to ${filePath}:`, err);
+      return false;
+    }
   });
   const trackedWrite = currentWrite.catch(() => false);
   writeLocks.set(filePath, trackedWrite);
