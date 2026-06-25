@@ -38,33 +38,33 @@ const BaseParser = require('./base');
  *   off=84  FREQ_DEV    Freq Deviation       kHz
  */
 
-const PACKET_SIZE  = 96;
-const SYNC_DATA    = Buffer.from([0x56, 0x00, 0xF9, 0x06]);
-const SYNC_HBEAT   = Buffer.from([0x1B, 0x00, 0xF9, 0x06]);
-const SYNC_ACK     = Buffer.from([0x13, 0x00, 0xF9, 0x06]);
+const PKT_C_SIZE = 92;
 
-// Protocol confirmed via live capture (2026-06-25):
-// Trigger / keep-alive yang kita kirim ke device  : 0B 00 F9 06
-// Heartbeat yang dikirim device ke kita           : 13 00 F8 06
-// Data packet dari device                         : F0 06 [seq] 89 03 05 44 D1 ... [CRC]
+// Protokol Mandiri Thales 421 (Hasil Sniffing)
 const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
 const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
+const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
+
+function isPktCSync(buf, i) {
+    return i + 3 < buf.length &&
+           buf[i] === 0x11 && buf[i+1] === 0x8D && buf[i+3] === 0x0C;
+}
 
 const PARAM_OFFSETS = {
-    CRS_RF:    26,
-    CRS_DDM:   30,
-    CRS_SDM:   34,
-    IDENT_AM:  38,
-    WIDTH_RF:  42,
-    WIDTH_DDM: 46,
-    WIDTH_SDM: 50,
-    CLR_RF:    54,
-    CLR_DDM:   58,
-    CLR_SDM:   62,
-    NF_RF:     68,
-    NF_DDM:    72,
-    NF_SDM:    76,
-    FREQ_DEV:  84,
+    CRS_RF:    15,
+    CRS_DDM:   19,
+    CRS_SDM:   23,
+    IDENT_AM:  27,
+    WIDTH_RF:  31,
+    WIDTH_DDM: 35,
+    WIDTH_SDM: 39,
+    CLR_RF:    43,
+    CLR_DDM:   47,
+    CLR_SDM:   51,
+    NF_RF:     57,
+    NF_DDM:    61,
+    NF_SDM:    65,
+    FREQ_DEV:  73,
 };
 
 // Limits [min, max]
@@ -97,6 +97,8 @@ const PARAM_LABELS = {
     FREQ_DEV:  ['Freq Deviation', 'kHz'],
 };
 
+const DDM_X100 = new Set(['CRS_DDM', 'WIDTH_DDM', 'CLR_DDM', 'NF_DDM']);
+
 const PASSIVE_TIMEOUT = 30000;
 const POLL_INTERVAL   = 2000;
 const POLL_REQ_DELAY  = 150;
@@ -110,55 +112,48 @@ function readFloat(buf, offset) {
 }
 
 function decodePacket(pkt) {
-    if (!pkt || pkt.length < PACKET_SIZE) return null;
-    if (!pkt.slice(0, 4).equals(SYNC_DATA)) return null;
+    if (!pkt || pkt.length < PKT_C_SIZE) return null;
+    if (!isPktCSync(pkt, 0)) return null;
 
-    const subtype   = pkt[12];
-    // Hanya proses packet dengan subtype 0x8D (Executive Measurement / Data Aktual)
-    // Jika subtype lain (misal 0x0D, 0x8C), format offset-nya berbeda sehingga data akan berantakan.
-    if (subtype !== 0x8D) return null;
-
-    const txFlag    = pkt[13];
-    const tx1IsMain = !!(txFlag & 0x40);
-    const txData    = pkt[15] === 0x10 ? 'TX2' : 'TX1';
+    const byte2     = pkt[2];
+    const isRemote  = !!(byte2 & 0x80);
+    const tx1IsMain = !!(byte2 & 0x40);
+    const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
     for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
-        const val = readFloat(pkt, offset);
-        if (val !== null) params[key] = parseFloat(val.toFixed(4));
+        let val = readFloat(pkt, offset);
+        if (val === null) continue;
+        val = DDM_X100.has(key)
+            ? parseFloat((val * 100).toFixed(4))
+            : parseFloat(val.toFixed(4));
+        params[key] = val;
     }
 
     return {
         tx_main:  tx1IsMain ? 'TX1' : 'TX2',
         tx_stby:  tx1IsMain ? 'TX2' : 'TX1',
         tx_data:  txData,
-        subtype,
-        tx_flag:  txFlag,
+        is_remote: isRemote,
+        subtype:  pkt[1], // 0x8D
+        tx_flag:  byte2,
         params,
     };
 }
 
 function extractFrames(buf) {
     const results = [];
-    let i = 0;
-    while (i <= buf.length - PACKET_SIZE) {
-        // Skip heartbeat and ACK packets
-        if (buf.slice(i, i+4).equals(SYNC_HBEAT) || buf.slice(i, i+4).equals(SYNC_ACK)) {
-            i += 4;
-            continue;
-        }
-        if (buf.slice(i, i+4).equals(SYNC_DATA)) {
-            const dec = decodePacket(buf.slice(i, i + PACKET_SIZE));
+    for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
+        if (isPktCSync(buf, i)) {
+            const dec = decodePacket(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
                 // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
                 if (dec.tx_data === dec.tx_main) {
                     results.push({ pos: i, decoded: dec });
                 }
-                i += PACKET_SIZE;
-                continue;
+                i += PKT_C_SIZE - 1;
             }
         }
-        i++;
     }
     return results;
 }
@@ -191,8 +186,11 @@ class IlsLlzThales421Parser extends BaseParser {
             this._buf = Buffer.concat([this._buf, chunk]);
 
             if (this._buf.length > 131072) {
-                const pos = this._buf.lastIndexOf(SYNC_DATA);
-                this._buf = pos > 0 ? this._buf.slice(pos) : Buffer.alloc(0);
+                let ls = 0;
+                for (let i = this._buf.length - 4; i >= 0; i--) {
+                    if (isPktCSync(this._buf, i)) { ls = i; break; }
+                }
+                this._buf = ls > 0 ? this._buf.slice(ls) : Buffer.alloc(0);
             }
 
             const now = Date.now();
@@ -211,7 +209,7 @@ class IlsLlzThales421Parser extends BaseParser {
             this._lastDecoded = latest.decoded;
             this._lastDataTime = now;
             if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
-            this._buf = this._buf.slice(latest.pos + PACKET_SIZE);
+            this._buf = this._buf.slice(latest.pos + PKT_C_SIZE);
 
             return this._buildOutput(latest.decoded, false);
         } catch (err) {
