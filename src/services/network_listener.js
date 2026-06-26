@@ -809,7 +809,8 @@ class NetworkListenerService {
         const { id, equipt_id, name } = source;
         console.log(`[NetworkListener] Received data from ${name} (${rawData.length} bytes)`);
         // Debug: log first 80 hex chars to help diagnose protocol
-        console.log(`[NetworkListener] Raw[${name}]: ${rawData.slice(0,40).toString("hex")}`);
+        // DUMP 200 BYTES FOR DEBUGGING ILS MONITOR PACKETS
+        console.log(`[NetworkListener] Raw[${name}]: ${rawData.slice(0,200).toString("hex")}`);
 
         try {
             let parsedResult = { success: false };
