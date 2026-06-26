@@ -466,11 +466,19 @@ class NetworkListenerService {
             }
         };
 
-        setTimeout(doPoll, 2000);
-        const timer = setInterval(doPoll, pollSec * 1000);
-
-        if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
-        this._snmpSystemTimers.set(id, timer);
+        // Add random jitter (0 to 15 seconds) to prevent 'Thundering Herd'
+        // di mana puluhan server ditembak SNMP secara bersamaan yang membuat
+        // UDP packet terbuang (drop) oleh switch/buffer.
+        const jitterMs = Math.floor(Math.random() * 15000);
+        const initialDelay = 2000 + jitterMs;
+        
+        setTimeout(() => {
+            doPoll();
+            const timer = setInterval(doPoll, pollSec * 1000);
+            
+            if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
+            this._snmpSystemTimers.set(id, timer);
+        }, initialDelay);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
