@@ -11,8 +11,8 @@ class QueuedDataProcessor {
         this.warningTimestamps = new Map();
         this.isRunning = false;
         this.isProcessing = false;
-        this.pollIntervalMs = options.pollIntervalMs || 1000;
-        this.batchSize = options.batchSize || 25;
+        this.pollIntervalMs = options.pollIntervalMs || 200;
+        this.batchSize = options.batchSize || 100;
         this._timer = null;
     }
 
