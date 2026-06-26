@@ -1,14 +1,13 @@
 const net = require('net');
 const fs = require('fs');
 
-const IP = '192.168.50.160'; // Ganti dengan IP GP
-const PORT = 950;          
+const IP = '192.168.51.10'; // Ganti jika IP Localizer beda
+const PORT = 2001;          // Ganti jika port beda
 
 console.log(`Connecting to ${IP}:${PORT}...`);
 const client = new net.Socket();
 client.connect(PORT, IP, () => {
-    console.log('Connected! Sending Kickstart packet for GP...');
-    client.write(Buffer.from([0x01, 0x30, 0x30, 0x02, 0x45, 0x39, 0x03, 0x34, 0x35]));
+    console.log('Connected! Listening for data (Please ensure ADRACS is open on the Monitor tab)...');
 });
 
 client.on('data', (data) => {

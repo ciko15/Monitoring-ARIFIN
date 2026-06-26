@@ -253,18 +253,18 @@ class IlsLlzThales421Parser extends BaseParser {
      * Device membutuhkan ACK packet (13 00 F9 06) agar mulai streaming data.
      */
     getPollRequests() {
-        return [{ bytes: Buffer.from([0x01, 0x30, 0x30, 0x02, 0x46, 0x39, 0x03, 0x35, 0x35]), label: 'DATA_REQUEST' }];
+        return [{ bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }];
     }
 
     /**
      * Cek apakah chunk yang diterima adalah heartbeat dari device.
-     * Jika ya, caller harus membalas dengan HBEAT_REPLY.
+     * Jika ya, caller harus membalas dengan TRIGGER_SEND.
      */
     isHeartbeat(chunk) {
         return chunk && chunk.length >= 4 && chunk.slice(0, 4).equals(HBEAT_RECV);
     }
 
-    getHeartbeatReply() { return HBEAT_REPLY; }
+    getHeartbeatReply() { return TRIGGER_SEND; }
     getMode()           { return this._mode; }
     getLastData()       { return this._lastDecoded ? this._lastDecoded.params : {}; }
     reset()             { this._buf = Buffer.alloc(0); }

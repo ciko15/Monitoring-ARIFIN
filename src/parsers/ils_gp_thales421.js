@@ -244,7 +244,7 @@ class IlsGpThales421Parser extends BaseParser {
     }
 
     getPollRequests() {
-        return [{ bytes: Buffer.from([0x01, 0x30, 0x30, 0x02, 0x45, 0x39, 0x03, 0x34, 0x35]), label: 'DATA_REQUEST' }];
+        return [{ bytes: TRIGGER_SEND, label: 'DATA_REQUEST' }];
     }
     
     isHeartbeat(buf) {
