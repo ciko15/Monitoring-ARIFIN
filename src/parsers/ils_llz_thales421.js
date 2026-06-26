@@ -44,10 +44,13 @@ const PKT_C_SIZE = 92;
 const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
 const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
 const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
+const PKT_SYNC = Buffer.from([0x11, 0x8D]);
 
 function isPktCSync(buf, i) {
+    // 0x0C = Transmitter, 0x0E = Monitor
     return i + 3 < buf.length &&
-           buf[i] === 0x11 && buf[i+1] === 0x8D && buf[i+3] === 0x0C;
+           buf[i] === 0x11 && buf[i+1] === 0x8D && 
+           (buf[i+3] === 0x0C || buf[i+3] === 0x0E);
 }
 
 const PARAM_OFFSETS = {
@@ -111,27 +114,9 @@ function readFloat(buf, offset) {
     } catch (e) { return null; }
 }
 
-function decodePacket(pkt) {
-    if (!pkt || pkt.length < PKT_C_SIZE) return null;
-    if (!isPktCSync(pkt, 0)) return null;
-
-    const byte2     = pkt[2];
-    const isRemote  = !!(byte2 & 0x80);
-    const tx1IsMain = !!(byte2 & 0x40);
-    
-    // 0x00 = TX1, 0x10 = TX2
-    // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
-    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
-    
-    // Validasi Header Struktural: Pastikan ini benar-benar paket Transmitter murni!
-    // Paket transmitter murni selalu memiliki byte 5 & 6 = 0x00, dan byte 11-14 = 0x00.
-    // Jika ADRACS meminta halaman lain (yang ukurannya berbeda / nilainya bergeser),
-    // header-nya pasti tidak akan persis seperti ini.
+function decodeFrameC(pkt) {
     if (pkt[5] !== 0x00 || pkt[6] !== 0x00) return null;
-    if (pkt[11] !== 0x00 || pkt[12] !== 0x00 || pkt[13] !== 0x00 || pkt[14] !== 0x00) return null;
     
-    const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
-
     const params = {};
     for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
         let val = readFloat(pkt, offset);
@@ -142,13 +127,28 @@ function decodePacket(pkt) {
         params[key] = val;
     }
 
+    // pkt[3] is the page type (0x0C = TX, 0x0E = MON)
+    const subtype = pkt[3] === 0x0C ? 'Transmitter' : 'Monitor';
+
+    // In TX, pkt[13] is the TX flag (0x40 = TX1, 0x00 = TX2).
+    // Let's use pkt[13] if it's 0x40 or 0x00.
+    // Wait, in Monitor, pkt[13] was 0x00 for MON 1!
+    // But what is it for MON 2? If we don't know, we can guess pkt[4] or pkt[13].
+    // Let's just use pkt[4] which is 0x00 for MON 1 and 0x10 for TX2? 
+    // In original code, byte 4 was 0x00 (TX1) or 0x10 (TX2).
+    const txData = (pkt[4] === 0x10 || pkt[4] === 0xAC) ? 'TX2' : 'TX1';
+    
+    // pkt[2] has the remote/main flags
+    const byte2 = pkt[2];
+    const isRemote = !!(byte2 & 0x80);
+    const tx1IsMain = !!(byte2 & 0x40);
+
     return {
-        tx_main:  tx1IsMain ? 'TX1' : 'TX2',
-        tx_stby:  tx1IsMain ? 'TX2' : 'TX1',
-        tx_data:  txData,
+        subtype,
+        tx_data: txData,
+        tx_main: tx1IsMain ? 'TX 1' : 'TX 2',
+        tx_stby: tx1IsMain ? 'TX 2' : 'TX 1',
         is_remote: isRemote,
-        subtype:  pkt[1], // 0x8D
-        tx_flag:  byte2,
         params,
     };
 }
@@ -157,12 +157,9 @@ function extractFrames(buf) {
     const results = [];
     for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
         if (isPktCSync(buf, i)) {
-            const dec = decodePacket(buf.slice(i, i + PKT_C_SIZE));
+            const dec = decodeFrameC(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
-                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
-                if (dec.tx_data === dec.tx_main) {
-                    results.push({ pos: i, decoded: dec });
-                }
+                results.push({ pos: i, decoded: dec });
                 i += PKT_C_SIZE - 1;
             }
         }

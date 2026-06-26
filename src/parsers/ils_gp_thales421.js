@@ -40,7 +40,8 @@ const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat
 
 function isPktCSync(buf, i) {
     return i + 3 < buf.length &&
-           buf[i] === 0x11 && buf[i+1] === 0x8D && buf[i+3] === 0x0C;
+           buf[i] === 0x11 && buf[i+1] === 0x8D &&
+           (buf[i+3] === 0x0C || buf[i+3] === 0x0E);
 }
 
 const OFFSETS = {
@@ -107,24 +108,7 @@ function readFloat(buf, offset) {
 
 function decodePktC(pkt) {
     if (!pkt || pkt.length < PKT_C_SIZE) return null;
-    if (!isPktCSync(pkt, 0)) return null;
-
-    const byte2     = pkt[2];
-    const isRemote  = !!(byte2 & 0x80);
-    const tx1IsMain = !!(byte2 & 0x40);
-
-    // 0x00 = TX1, 0x10 = TX2
-    // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
-    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
-
-    // Validasi Header Struktural: Pastikan ini benar-benar paket Transmitter murni!
-    // Paket transmitter murni selalu memiliki byte 5 & 6 = 0x00, dan byte 11-14 = 0x00.
-    // Jika ADRACS meminta halaman lain (yang ukurannya berbeda / nilainya bergeser),
-    // header-nya pasti tidak akan persis seperti ini.
     if (pkt[5] !== 0x00 || pkt[6] !== 0x00) return null;
-    if (pkt[11] !== 0x00 || pkt[12] !== 0x00 || pkt[13] !== 0x00 || pkt[14] !== 0x00) return null;
-
-    const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
     for (const [key, offset] of Object.entries(OFFSETS)) {
@@ -136,8 +120,21 @@ function decodePktC(pkt) {
         params[key] = val;
     }
 
-    return { tx_main: tx1IsMain ? 'TX1' : 'TX2', tx_stby: tx1IsMain ? 'TX2' : 'TX1',
-             is_remote: isRemote, tx_data: txData, params };
+    const subtype = pkt[3] === 0x0C ? 'Transmitter' : 'Monitor';
+    const txData = (pkt[4] === 0x10 || pkt[4] === 0xAC) ? 'TX2' : 'TX1';
+    
+    const byte2 = pkt[2];
+    const isRemote = !!(byte2 & 0x80);
+    const tx1IsMain = !!(byte2 & 0x40);
+
+    return {
+        subtype,
+        tx_data: txData,
+        tx_main: tx1IsMain ? 'TX 1' : 'TX 2',
+        tx_stby: tx1IsMain ? 'TX 2' : 'TX 1',
+        is_remote: isRemote,
+        params,
+    };
 }
 
 function extractFrames(buf) {
@@ -146,10 +143,7 @@ function extractFrames(buf) {
         if (isPktCSync(buf, i)) {
             const dec = decodePktC(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
-                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
-                if (dec.tx_data === dec.tx_main) {
-                    results.push({ pos: i, decoded: dec });
-                }
+                results.push({ pos: i, decoded: dec });
                 i += PKT_C_SIZE - 1; 
             }
         }
