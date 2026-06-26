@@ -108,7 +108,6 @@ function readFloat(buf, offset) {
 
 function decodePktC(pkt) {
     if (!pkt || pkt.length < PKT_C_SIZE) return null;
-    if (pkt[5] !== 0x00 || pkt[6] !== 0x00) return null;
 
     const params = {};
     for (const [key, offset] of Object.entries(OFFSETS)) {

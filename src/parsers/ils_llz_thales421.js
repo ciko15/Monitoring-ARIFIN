@@ -115,8 +115,6 @@ function readFloat(buf, offset) {
 }
 
 function decodeFrameC(pkt) {
-    if (pkt[5] !== 0x00 || pkt[6] !== 0x00) return null;
-    
     const params = {};
     for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
         let val = readFloat(pkt, offset);
