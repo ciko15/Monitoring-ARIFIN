@@ -253,7 +253,7 @@ class IlsLlzThales421Parser extends BaseParser {
      * Device membutuhkan ACK packet (13 00 F9 06) agar mulai streaming data.
      */
     getPollRequests() {
-        return [{ bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }];
+        return [{ bytes: Buffer.from([0x01, 0x30, 0x30, 0x02, 0x46, 0x39, 0x03, 0x35, 0x35]), label: 'DATA_REQUEST' }];
     }
 
     /**
