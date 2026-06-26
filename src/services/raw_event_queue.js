@@ -33,7 +33,7 @@ class RawEventQueue {
 
     _nextFileName() {
         this._sequence = (this._sequence + 1) % 1000000;
-        return `${Date.now()}-${process.pid}-${this._sequence}.json`;
+        return `${Date.now()}-${process.pid}-${this._sequence.toString().padStart(6, '0')}.json`;
     }
 
     async enqueue(event) {
