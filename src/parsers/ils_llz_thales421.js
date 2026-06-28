@@ -38,7 +38,7 @@ const BaseParser = require('./base');
  *   off=84  FREQ_DEV    Freq Deviation       kHz
  */
 
-const PKT_C_SIZE = 92;
+const PKT_C_SIZE = 100;
 
 // Protokol Mandiri Thales 421 (Hasil Sniffing)
 const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
@@ -54,20 +54,20 @@ function isPktCSync(buf, i) {
 }
 
 const PARAM_OFFSETS = {
-    CRS_RF:    15,
-    CRS_DDM:   19,
-    CRS_SDM:   23,
-    IDENT_AM:  27,
-    WIDTH_RF:  31,
-    WIDTH_DDM: 35,
-    WIDTH_SDM: 39,
-    CLR_RF:    43,
-    CLR_DDM:   47,
-    CLR_SDM:   51,
-    NF_RF:     57,
-    NF_DDM:    61,
-    NF_SDM:    65,
-    FREQ_DEV:  73,
+    CRS_RF: 43,
+    CRS_DDM: 47,
+    CRS_SDM: 51,
+    IDENT_AM: 55,
+    WIDTH_RF: 59,
+    WIDTH_DDM: 63,
+    WIDTH_SDM: 67,
+    CLR_RF: 71,
+    CLR_DDM: 75,
+    CLR_SDM: 79,
+    NF_RF: 83,
+    NF_DDM: 87,
+    NF_SDM: 91,
+    FREQ_DEV: 95
 };
 
 // Limits [min, max]

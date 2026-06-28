@@ -45,19 +45,17 @@ function isPktCSync(buf, i) {
 }
 
 const OFFSETS = {
-    RF_POWER:    15,
-    DDM_COURSE:  19,
-    CARRIER_PWR: 23,
-    CSB_POWER:   31,
-    DDM_CLR:     35,
-    SBO_POWER:   39,
-    CLR_POWER:   43,
-    CLR_DDM:     47,
-    CLR_SDM:     51,
-    RF_OUT:      57,
-    DDM_MON:     61,
-    MON_POWER:   65,
-    GP_ANGLE:    66,
+    CRS_POS_RF: 43,
+    CRS_POS_DDM: 47,
+    CRS_POS_SDM: 51,
+    CRS_WID_RF: 55,
+    CRS_WID_DDM: 59,
+    CRS_WID_SDM: 63,
+    CLR_WID_RF: 67,
+    CLR_WID_DDM: 71,
+    CLR_WID_SDM: 75,
+    NF_POS_RF: 79,
+    NF_POS_DDM: 83
 };
 
 const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'DDM_MON']);
