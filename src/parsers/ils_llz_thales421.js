@@ -115,18 +115,20 @@ function readFloat(buf, offset) {
 }
 
 function decodeFrameC(pkt) {
-    const params = {};
-    for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
-        let val = readFloat(pkt, offset);
-        if (val === null) continue;
-        val = DDM_X100.has(key)
-            ? parseFloat((val * 100).toFixed(4))
-            : parseFloat(val.toFixed(4));
-        params[key] = val;
-    }
-
-    // pkt[3] is the page type (0x0C = TX, 0x0E = MON)
     const subtype = pkt[3] === 0x0C ? 'Transmitter' : 'Monitor';
+    const params = {};
+    
+    // Hanya ekstrak nilai RF dari paket Monitor (0x0E) agar tidak tertimpa angka 0 dari paket TX (0x0C)
+    if (subtype === 'Monitor') {
+        for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
+            let val = readFloat(pkt, offset);
+            if (val === null) continue;
+            val = DDM_X100.has(key)
+                ? parseFloat((val * 100).toFixed(4))
+                : parseFloat(val.toFixed(4));
+            params[key] = val;
+        }
+    }
 
     // In TX, pkt[13] is the TX flag (0x40 = TX1, 0x00 = TX2).
     // Let's use pkt[13] if it's 0x40 or 0x00.
@@ -217,13 +219,29 @@ class IlsLlzThales421Parser extends BaseParser {
                          data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
             }
 
-            const latest = frames[frames.length - 1];
-            this._lastDecoded = latest.decoded;
+            // Gabungkan state dari semua frame di chunk ini (supaya data RF dari Monitor tidak hilang)
+            this._lastDecoded = this._lastDecoded || { params: {} };
+            let lastPos = 0;
+            
+            for (const frame of frames) {
+                const d = frame.decoded;
+                this._lastDecoded.tx_main = d.tx_main;
+                this._lastDecoded.tx_stby = d.tx_stby;
+                this._lastDecoded.is_remote = d.is_remote;
+                this._lastDecoded.tx_data = d.tx_data;
+                this._lastDecoded.subtype = d.subtype;
+                
+                if (d.subtype === 'Monitor') {
+                    Object.assign(this._lastDecoded.params, d.params);
+                }
+                lastPos = frame.pos;
+            }
+
             this._lastDataTime = now;
             if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
-            this._buf = this._buf.slice(latest.pos + PKT_C_SIZE);
+            this._buf = this._buf.slice(lastPos + PKT_C_SIZE);
 
-            return this._buildOutput(latest.decoded, false);
+            return this._buildOutput(this._lastDecoded, false);
         } catch (err) {
             return { success: false, error: err.message, status: 'Error', timestamp: new Date().toISOString() };
         }
