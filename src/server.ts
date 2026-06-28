@@ -105,6 +105,8 @@ const PIPELINE_MODE = process.env.PIPELINE_MODE || 'inline';
 const SHOULD_START_WEB = SERVICE_ROLE === 'all' || SERVICE_ROLE === 'web';
 const SHOULD_START_COLLECTOR = SERVICE_ROLE === 'all' || SERVICE_ROLE === 'collector';
 const SHOULD_START_PROCESSOR = SERVICE_ROLE === 'all' || SERVICE_ROLE === 'processor';
+const SERVICE_STARTED_AT = Date.now();
+const STARTUP_WATCHDOG_GRACE_MS = parseInt(process.env.STARTUP_WATCHDOG_GRACE_MS || '') || 3 * 60 * 1000;
 
 // Global State
 export const state = {
@@ -196,6 +198,12 @@ async function seedUpsJakarta() {
  */
 async function checkEquipmentWatchdog() {
     try {
+        const uptimeMs = Date.now() - SERVICE_STARTED_AT;
+        if (uptimeMs < STARTUP_WATCHDOG_GRACE_MS) {
+            console.log(`[WATCHDOG] Startup grace active (${Math.ceil((STARTUP_WATCHDOG_GRACE_MS - uptimeMs) / 1000)}s remaining)`);
+            return;
+        }
+
         console.log('[WATCHDOG] Checking for timed-out equipment and partial failures...');
         const result = await db.getAllEquipment({ includeData: true, isActive: true });
         const equipmentList = result.data || [];
@@ -263,6 +271,31 @@ function getEquipmentCountByCategory(equipmentList: any[]) {
         Surveillance: equipmentList?.filter(e => e.category === 'Surveillance').length || 0,
         'Data Processing': equipmentList?.filter(e => e.category === 'Data Processing').length || 0,
         Support: equipmentList?.filter(e => e.category === 'Support').length || 0
+    };
+}
+
+async function getRawQueueStats() {
+    const fs = require('fs');
+    const path = require('path');
+    const baseDir = path.resolve(process.cwd(), 'data', 'raw-queue');
+    const countJsonFiles = async (dirName: string) => {
+        const dirPath = path.join(baseDir, dirName);
+        const entries = await fs.promises.readdir(dirPath).catch(() => []);
+        return entries.filter((name: string) => name.endsWith('.json')).length;
+    };
+
+    const [pending, processing, failed] = await Promise.all([
+        countJsonFiles('pending'),
+        countJsonFiles('processing'),
+        countJsonFiles('failed')
+    ]);
+
+    return {
+        pending,
+        processing,
+        failed,
+        maxPending: parseInt(process.env.QUEUE_MAX_PENDING || '') || 5000,
+        ttlMs: parseInt(process.env.QUEUE_TTL_MS || process.env.RAW_EVENT_QUEUE_TTL_MS || '') || 30 * 60 * 1000
     };
 }
 
@@ -505,7 +538,34 @@ const app = new Elysia()
         });
     })
 
-    .get('/health', () => ({ status: 'ok', runtime: 'Bun', framework: 'Elysia' }))
+    .get('/health', async () => {
+        const { isEmsEnabled } = require('./connection/ems');
+        const queue = await getRawQueueStats();
+        const memory = process.memoryUsage();
+        const uptimeMs = Date.now() - SERVICE_STARTED_AT;
+        const queueNearLimit = queue.pending >= Math.floor(queue.maxPending * 0.9);
+
+        return {
+            status: queueNearLimit ? 'degraded' : 'ok',
+            runtime: 'Bun',
+            framework: 'Elysia',
+            serviceRole: SERVICE_ROLE,
+            pipelineMode: PIPELINE_MODE,
+            uptimeSeconds: Math.round(process.uptime()),
+            startupGraceActive: uptimeMs < STARTUP_WATCHDOG_GRACE_MS,
+            ems: {
+                enabled: isEmsEnabled()
+            },
+            queue,
+            memory: {
+                rss: memory.rss,
+                heapUsed: memory.heapUsed,
+                heapTotal: memory.heapTotal,
+                external: memory.external
+            },
+            checkedAt: new Date().toISOString()
+        };
+    })
 
     // --- PUBLIC PARSING CONFIG ROUTES ---
     .get('/api/parsing-configs', async () => await db.getAllParsingConfigs())

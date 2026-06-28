@@ -1,3 +1,20 @@
+const stabilityEnv = {
+  EMS_ENABLED: process.env.EMS_ENABLED || 'true',
+  EMS_PUBLISH_TIMEOUT_MS: process.env.EMS_PUBLISH_TIMEOUT_MS || 2000,
+  EMS_RETRY_BACKOFF_MS: process.env.EMS_RETRY_BACKOFF_MS || 30000,
+  EMS_MAX_BACKOFF_MS: process.env.EMS_MAX_BACKOFF_MS || 300000,
+  FAIL_COUNT_TO_DISCONNECT: process.env.FAIL_COUNT_TO_DISCONNECT || 3,
+  RECOVERY_COUNT_TO_NORMAL: process.env.RECOVERY_COUNT_TO_NORMAL || 1,
+  DISCONNECT_REPEAT_INTERVAL_MS: process.env.DISCONNECT_REPEAT_INTERVAL_MS || 15 * 60 * 1000,
+  QUEUE_TTL_MS: process.env.QUEUE_TTL_MS || 30 * 60 * 1000,
+  QUEUE_MAX_PENDING: process.env.QUEUE_MAX_PENDING || 5000,
+  STARTUP_WATCHDOG_GRACE_MS: process.env.STARTUP_WATCHDOG_GRACE_MS || 3 * 60 * 1000,
+  COLLECTOR_START_BATCH_SIZE: process.env.COLLECTOR_START_BATCH_SIZE || 10,
+  COLLECTOR_START_BATCH_DELAY_MS: process.env.COLLECTOR_START_BATCH_DELAY_MS || 3000,
+  LOG_THROTTLE_MS: process.env.LOG_THROTTLE_MS || 60000,
+  RAW_DEBUG: process.env.RAW_DEBUG || 'false'
+};
+
 module.exports = {
   apps: [{
     name: 'monitoring-arifin',
@@ -23,7 +40,8 @@ module.exports = {
       RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
       RABBITMQ_USERNAME: process.env.RABBITMQ_USERNAME || 'smart-toc-hq',
       RABBITMQ_PASSWORD: process.env.RABBITMQ_PASSWORD || 'smarthq123!',
-      RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || 'dev-smart'
+      RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || 'dev-smart',
+      ...stabilityEnv
     },
     env_production: {
       NODE_ENV: 'production',
@@ -38,12 +56,15 @@ module.exports = {
       RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
       RABBITMQ_USERNAME: process.env.RABBITMQ_USERNAME || 'smart-toc-hq',
       RABBITMQ_PASSWORD: process.env.RABBITMQ_PASSWORD || 'smarthq123!',
-      RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || 'dev-smart'
+      RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || 'dev-smart',
+      ...stabilityEnv
     },
     // Menggunakan path relatif agar aman di Windows
     error_file: './logs/pm2-error.log',
     out_file: './logs/pm2-out.log',
     log_file: './logs/pm2-combined.log',
+    merge_logs: true,
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     time: true,
     max_restarts: 10,
     min_uptime: '10s'

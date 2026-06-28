@@ -526,33 +526,21 @@ async function getAllEquipment(filters = {}) {
           const isTimedOut = (now - logTime) > (4 * 60 * 1000); // 4 minutes (consistent with watchdog)
 
           if (isTimedOut) {
-            // Timeout: set status to Disconnect and parameters to '-'
-            const emptyData = {};
-            if (log.data) {
-              Object.keys(log.data).forEach(k => emptyData[k] = '-');
-              if (log.data.data && typeof log.data.data === 'object') {
-                Object.keys(log.data.data).forEach(k => emptyData[k] = '-');
-              }
-            }
-            const src = configSources.find(s => s.name === sourceName);
-            const template = src && PARSER_TEMPLATES[src.parsing_id] ? PARSER_TEMPLATES[src.parsing_id] : [];
-            const placeholder = {};
-            template.forEach(k => { placeholder[k] = '-'; });
-
+            // Timeout: keep last known values visible, but mark the source stale/disconnected.
             mergedData[sourceName] = {
               ...mergedData[sourceName],
-              ...emptyData,
-              ...placeholder,
+              ...(log.data || {}),
               _status: 'Disconnect',
+              _stale: true,
               _logged_at: log.logged_at
             };
-            delete mergedData[sourceName].data;
           } else {
             // Valid fresh data
             mergedData[sourceName] = {
               ...mergedData[sourceName],
               ...(log.data || {}),
               _status: log.status || 'Normal',
+              _stale: false,
               _logged_at: log.logged_at
             };
           }
@@ -691,12 +679,11 @@ async function getEquipmentById(id) {
       const isTimedOut = (now - logTime) > (4 * 60 * 1000); // 4 minutes
 
       if (isTimedOut) {
-        const emptyData = {};
-        if (log.data) Object.keys(log.data).forEach(k => emptyData[k] = '-');
         mergedData[sourceName] = { 
           ...mergedData[sourceName], 
-          ...emptyData, 
+          ...(log.data || {}),
           _status: 'Disconnect', 
+          _stale: true,
           _logged_at: log.logged_at, 
           _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id 
         };
@@ -705,6 +692,7 @@ async function getEquipmentById(id) {
           ...mergedData[sourceName], 
           ...log.data, 
           _status: log.status, 
+          _stale: false,
           _logged_at: log.logged_at, 
           _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id 
         };

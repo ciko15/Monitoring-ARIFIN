@@ -6,6 +6,65 @@ const path = require('path');
 let connection = null;
 let channel = null;
 const assertedQueues = new Set();
+let nextConnectAttemptAt = 0;
+let currentBackoffMs = 0;
+const logTimestamps = new Map();
+
+function parsePositiveInt(value, fallback) {
+    const parsed = parseInt(value || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isEmsEnabled() {
+    return String(process.env.EMS_ENABLED || 'true').toLowerCase() !== 'false';
+}
+
+const EMS_PUBLISH_TIMEOUT_MS = parsePositiveInt(process.env.EMS_PUBLISH_TIMEOUT_MS, 2000);
+const EMS_RETRY_BACKOFF_MS = parsePositiveInt(process.env.EMS_RETRY_BACKOFF_MS, 30000);
+const EMS_MAX_BACKOFF_MS = parsePositiveInt(process.env.EMS_MAX_BACKOFF_MS, 300000);
+const EMS_LOG_THROTTLE_MS = parsePositiveInt(process.env.LOG_THROTTLE_MS, 60000);
+
+function makeEmsError(code, message) {
+    const error = new Error(message);
+    error.code = code;
+    return error;
+}
+
+function shouldLog(key, throttleMs = EMS_LOG_THROTTLE_MS) {
+    const now = Date.now();
+    const lastLoggedAt = logTimestamps.get(key) || 0;
+    if (now - lastLoggedAt < throttleMs) return false;
+    logTimestamps.set(key, now);
+    return true;
+}
+
+function isExpectedEmsError(error) {
+    return error && (error.code === 'EMS_DISABLED' || error.code === 'EMS_BACKOFF');
+}
+
+function logPublishResult(result, successMessage) {
+    if (result && result.skipped) {
+        if (shouldLog(`publish-skipped:${result.reason}:${result.queue}`)) {
+            console.log(`[EMS-DEBUG] Publish skipped to ${result.queue}: ${result.reason}`);
+        }
+        return;
+    }
+
+    console.log(successMessage);
+}
+
+function withTimeout(promise, timeoutMs, label) {
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+            reject(makeEmsError('EMS_TIMEOUT', `${label} timeout after ${timeoutMs}ms`));
+        }, timeoutMs);
+    });
+
+    return Promise.race([promise, timeout]).finally(() => {
+        if (timer) clearTimeout(timer);
+    });
+}
 
 function readBranchProfileSync() {
     try {
@@ -104,21 +163,35 @@ const MessagingTopology = {
 
 async function connect() {
     if (connection && channel) return channel;
+    if (!isEmsEnabled()) {
+        throw makeEmsError('EMS_DISABLED', 'EMS publishing disabled');
+    }
+
+    const now = Date.now();
+    if (nextConnectAttemptAt && now < nextConnectAttemptAt) {
+        throw makeEmsError('EMS_BACKOFF', `RabbitMQ reconnect backoff active for ${Math.ceil((nextConnectAttemptAt - now) / 1000)}s`);
+    }
 
     try {
-        connection = await amqp.connect(RabbitConfig);
-        channel = await connection.createChannel();
+        connection = await withTimeout(amqp.connect(RabbitConfig), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ connect');
+        channel = await withTimeout(connection.createChannel(), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ channel');
+        currentBackoffMs = 0;
+        nextConnectAttemptAt = 0;
         console.log('✅ [EMS] Berhasil terhubung ke RabbitMQ menggunakan amqplib');
 
         connection.on('error', error => {
-            console.error('❌ [EMS] RabbitMQ connection error:', error.message);
+            if (shouldLog(`connection-error:${error.message}`)) {
+                console.error('❌ [EMS] RabbitMQ connection error:', error.message);
+            }
             connection = null;
             channel = null;
             assertedQueues.clear();
         });
 
         connection.on('close', () => {
-            console.warn('⚠️ [EMS] RabbitMQ connection closed');
+            if (shouldLog('connection-closed')) {
+                console.warn('⚠️ [EMS] RabbitMQ connection closed');
+            }
             connection = null;
             channel = null;
             assertedQueues.clear();
@@ -126,7 +199,14 @@ async function connect() {
 
         return channel;
     } catch (error) {
-        console.error('❌ [EMS] Gagal terhubung ke RabbitMQ:', error.message);
+        currentBackoffMs = currentBackoffMs
+            ? Math.min(currentBackoffMs * 2, EMS_MAX_BACKOFF_MS)
+            : EMS_RETRY_BACKOFF_MS;
+        nextConnectAttemptAt = Date.now() + currentBackoffMs;
+
+        if (shouldLog(`connect-failed:${error.code || error.message}`)) {
+            console.error(`❌ [EMS] Gagal terhubung ke RabbitMQ: ${error.message}. Retry in ${Math.round(currentBackoffMs / 1000)}s`);
+        }
         throw error;
     }
 }
@@ -192,6 +272,15 @@ function resolveQueue(messagePattern, messageName, targetSiteId) {
 }
 
 async function sendToQueue(queue, message) {
+    if (!isEmsEnabled()) {
+        return {
+            skipped: true,
+            reason: 'EMS_DISABLED',
+            queue,
+            message
+        };
+    }
+
     const ch = await connect();
     await assertQueue(queue);
 
@@ -225,11 +314,13 @@ async function publishMessage(messagePattern, messageName, payload = {}, options
         const envelope = buildMessageEnvelope(messagePattern, messageName, payload, options);
         const result = await sendToQueue(queue, envelope);
 
-        console.log(`[EMS-DEBUG] Publish success to ${queue} (${messageName})`);
+        logPublishResult(result, `[EMS-DEBUG] Publish success to ${queue} (${messageName})`);
         if (typeof callback === 'function') callback(result, null);
         return result;
     } catch (error) {
-        console.error(`[EMS-DEBUG] Publish failed (${messageName}):`, error.message);
+        if (!isExpectedEmsError(error) && shouldLog(`publish-failed:${messageName}:${error.code || error.message}`)) {
+            console.error(`[EMS-DEBUG] Publish failed (${messageName}):`, error.message);
+        }
         if (typeof callback === 'function') callback(null, error);
         throw error;
     }
@@ -243,11 +334,13 @@ async function publishCategorizedEvent(category, messageName, payload = {}, opti
         const envelope = buildMessageEnvelope('EVENT', messageName, payload, options);
 
         const result = await sendToQueue(queue, envelope);
-        console.log(`[EMS-DEBUG] Publish categorized event to ${queue} (${messageName})`);
+        logPublishResult(result, `[EMS-DEBUG] Publish categorized event to ${queue} (${messageName})`);
         if (typeof callback === 'function') callback(result, null);
         return result;
     } catch (error) {
-        console.error(`[EMS-DEBUG] Categorized event failed (${messageName}):`, error.message);
+        if (!isExpectedEmsError(error) && shouldLog(`categorized-failed:${messageName}:${error.code || error.message}`)) {
+            console.error(`[EMS-DEBUG] Categorized event failed (${messageName}):`, error.message);
+        }
         if (typeof callback === 'function') callback(null, error);
         throw error;
     }
@@ -266,11 +359,13 @@ async function publishByCategory(category, payload = {}, options = {}, callback)
         };
 
         const result = await sendToQueue(queue, message);
-        console.log(`[EMS-DEBUG] Publish success to ${queue}`);
+        logPublishResult(result, `[EMS-DEBUG] Publish success to ${queue}`);
         if (typeof callback === 'function') callback(result, null);
         return result;
     } catch (error) {
-        console.error('[EMS-DEBUG] Publish failed:', error.message);
+        if (!isExpectedEmsError(error) && shouldLog(`publish-by-category:${category}:${error.code || error.message}`)) {
+            console.error('[EMS-DEBUG] Publish failed:', error.message);
+        }
         if (typeof callback === 'function') callback(null, error);
         throw error;
     }
@@ -288,11 +383,13 @@ async function produceInternalMessage(queue, metadata = {}, payload = {}, callba
         };
 
         const result = await sendToQueue(queue, message);
-        console.log(`[EMS-DEBUG] Publish success to ${queue}`);
+        logPublishResult(result, `[EMS-DEBUG] Publish success to ${queue}`);
         if (typeof callback === 'function') callback(result, null);
         return result;
     } catch (error) {
-        console.error(`[EMS-DEBUG] Publish failed to ${queue}:`, error.message);
+        if (!isExpectedEmsError(error) && shouldLog(`produce:${queue}:${error.code || error.message}`)) {
+            console.error(`[EMS-DEBUG] Publish failed to ${queue}:`, error.message);
+        }
         if (typeof callback === 'function') callback(null, error);
         throw error;
     }
@@ -315,6 +412,7 @@ module.exports = {
     getQueueByCategory,
     getCategoryCode,
     normalizeSiteId,
+    isEmsEnabled,
     EquipmentCategoryQueue,
     EquipmentCategoryCode,
     AirNavServiceQueue,

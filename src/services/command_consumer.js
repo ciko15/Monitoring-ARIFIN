@@ -1,5 +1,5 @@
 const db = require('../../db/database');
-const { connect, normalizeSiteId } = require('../connection/ems');
+const { connect, normalizeSiteId, isEmsEnabled } = require('../connection/ems');
 const {
     getLocalSiteId,
     publishThresholdResult,
@@ -22,10 +22,16 @@ class CommandConsumer {
         this.siteId = null;
         this.isRunning = false;
         this._restartTimer = null;
+        this._restartDelayMs = parseInt(process.env.EMS_RETRY_BACKOFF_MS || '', 10) || 30000;
+        this._maxRestartDelayMs = parseInt(process.env.EMS_MAX_BACKOFF_MS || '', 10) || 300000;
     }
 
     async start() {
         if (this.isRunning) return;
+        if (!isEmsEnabled()) {
+            console.log('[CMD] EMS command consumer disabled');
+            return;
+        }
         this.isRunning = true;
         await this._initialize().catch(error => {
             console.error('[CMD] Failed to start consumer:', error.message);
@@ -57,6 +63,7 @@ class CommandConsumer {
             await ch.consume(queue, msg => this._onMessage(queue, msg), { noAck: false });
             console.log(`[CMD] Listening on ${queue}`);
         }
+        this._restartDelayMs = parseInt(process.env.EMS_RETRY_BACKOFF_MS || '', 10) || 30000;
     }
 
     _getQueues() {
@@ -71,13 +78,16 @@ class CommandConsumer {
 
     _scheduleRestart() {
         if (!this.isRunning || this._restartTimer) return;
+        const jitterMs = Math.floor(Math.random() * 5000);
+        const delayMs = this._restartDelayMs + jitterMs;
         this._restartTimer = setTimeout(async () => {
             this._restartTimer = null;
             await this._initialize().catch(error => {
                 console.error('[CMD] Consumer restart failed:', error.message);
+                this._restartDelayMs = Math.min(this._restartDelayMs * 2, this._maxRestartDelayMs);
                 this._scheduleRestart();
             });
-        }, 5000);
+        }, delayMs);
     }
 
     async _onMessage(queue, msg) {

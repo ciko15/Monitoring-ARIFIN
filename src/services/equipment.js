@@ -10,12 +10,25 @@ const {
     publishEquipmentTelemetry,
     publishEquipmentStatusChanged
 } = require('./message_bus');
+const { SourceStatusGate } = require('./source_status_gate');
 
 class EquipmentService {
     constructor(db) {
         this.db = db;
         this.activeCollectors = new Map(); // equipment_id -> collector interval
         this.parsers = new Map(); // equipment_id -> parser instance
+        this.statusGate = new SourceStatusGate();
+    }
+
+    _publishAsync(label, producer) {
+        Promise.resolve()
+            .then(producer)
+            .catch(error => {
+                const key = `ems-publish:${label}:${error.code || error.message}`;
+                if (this.statusGate.shouldLog(key)) {
+                    console.warn(`[EMS] ${label} publish skipped/failed: ${error.message}`);
+                }
+            });
     }
 
     /**
@@ -208,12 +221,12 @@ class EquipmentService {
             
             const equipment = await this.db.getEquipmentById(equipmentId);
             if (equipment) {
-                await publishEquipmentStatusChanged(
+                this._publishAsync('equipment.status.changed', () => publishEquipmentStatusChanged(
                     equipment,
                     status,
                     error,
                     { changedAt: new Date().toISOString() }
-                ).catch(e => console.warn('[EMS] Failed to publish status.changed event:', e.message));
+                ));
             }
         } catch (error) {
             console.error('[EquipmentService] Error updating status:', error);
@@ -233,6 +246,25 @@ class EquipmentService {
 
             const airport = equipment ? await this.db.getAirportById(equipment.airportId) : null;
             const equipName = equipment.name;
+            const sourceName = parsedData.source || (parsedData._sources && parsedData._sources.length > 0 ? parsedData._sources[0].name : 'default');
+            const gateDecision = this.statusGate.evaluate(
+                {
+                    id: `${equipmentId}:${sourceName}`,
+                    equipt_id: equipmentId,
+                    name: sourceName
+                },
+                status,
+                {
+                    confirmDisconnect: false,
+                    connectionType
+                }
+            );
+
+            if (!gateDecision.shouldEmit) {
+                return;
+            }
+
+            const finalStatus = gateDecision.status;
 
             // 1. JSON-line file logging (data/YYYY-MM/DD/...)
             try {
@@ -240,7 +272,7 @@ class EquipmentService {
                 await fileLogger.log(equipName, equipmentId, {
                     ...parsedData,
                     source: connectionType,
-                    status,
+                    status: finalStatus,
                     _ip: parsedData._ip || equipment.ip || equipment.host || 'unknown'
                 });
             } catch (err) {
@@ -251,9 +283,9 @@ class EquipmentService {
             const datalog = {
                 equipmentId,
                 equipment_name: equipName,
-                status,
+                status: finalStatus,
                 data: parsedData.data || {},
-                source: parsedData.source || (parsedData._sources && parsedData._sources.length > 0 ? parsedData._sources[0].name : 'default'),
+                source: sourceName,
                 connection_type: connectionType,
                 airport_name: airport ? airport.name : 'Unknown',
                 airport_city: airport ? airport.city : 'Unknown',
@@ -261,8 +293,7 @@ class EquipmentService {
             };
             await this.db.createEquipmentLog(datalog);
 
-            await publishEquipmentTelemetry(datalog, equipment)
-                .catch(e => console.warn('[EMS] Failed to publish equipment.telemetry.received:', e.message));
+            this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(datalog, equipment));
         } catch (error) {
             console.error('[EquipmentService] Error saving to logs:', error);
         }

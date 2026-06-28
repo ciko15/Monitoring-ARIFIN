@@ -8,12 +8,16 @@ const connectionManager = require('../connection/manager');
 const db = require('../../db/database');
 const EquipmentService = require('./equipment');
 const RawEventQueue = require('./raw_event_queue');
+const { SourceStatusGate } = require('./source_status_gate');
+
+const RAW_DEBUG = String(process.env.RAW_DEBUG || 'false').toLowerCase() === 'true';
 
 class NetworkListenerService {
     constructor() {
         this.equipmentService = new EquipmentService(db);
         this.activeListeners = new Set(); // source_id -> true
         this._parseWarningTimestamps = new Map();
+        this.statusGate = new SourceStatusGate();
         this.pipelineMode = process.env.PIPELINE_MODE || 'inline';
         this.serviceRole = process.env.SERVICE_ROLE || 'all';
         this.rawEventQueue = this.pipelineMode === 'split' ? new RawEventQueue() : null;
@@ -32,11 +36,40 @@ class NetworkListenerService {
         return true;
     }
 
+    _shouldLogMessage(key, throttleMs) {
+        return this.statusGate.shouldLog(key, throttleMs);
+    }
+
+    _logThrottled(level, key, message, throttleMs) {
+        if (!this._shouldLogMessage(key, throttleMs)) return;
+        const logger = console[level] || console.log;
+        logger.call(console, message);
+    }
+
     _isSplitCollectorMode() {
         return this.pipelineMode === 'split' && (this.serviceRole === 'collector' || this.serviceRole === 'all');
     }
 
     async _handleLogOutput(source, parsedData, connectionType, status) {
+        const decision = this.statusGate.evaluate(source, status, {
+            confirmDisconnect: true,
+            connectionType
+        });
+
+        if (!decision.shouldEmit) {
+            if (decision.reason === 'disconnect-not-confirmed') {
+                this._logThrottled(
+                    'log',
+                    `status-gate:${decision.state.sourceKey}:pending-disconnect`,
+                    `[StatusGate] Pending disconnect for ${source.name} (${decision.state.failCount}/${this.statusGate.failCountToDisconnect})`,
+                    30000
+                );
+            }
+            return;
+        }
+
+        const finalStatus = decision.status;
+
         if (this._isSplitCollectorMode()) {
             await this.rawEventQueue.enqueue({
                 type: 'parsed',
@@ -50,7 +83,7 @@ class NetworkListenerService {
                 },
                 parsedData,
                 connectionType,
-                status
+                status: finalStatus
             });
             return;
         }
@@ -59,7 +92,7 @@ class NetworkListenerService {
             source.equipt_id,
             parsedData,
             connectionType,
-            status
+            finalStatus
         );
     }
 
@@ -94,12 +127,21 @@ class NetworkListenerService {
 
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal)
             const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic'];
+            const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 10;
+            const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 3000;
+            const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+            let startedCount = 0;
 
             for (const source of sources) {
                 // Start jika punya port ATAU parsing_id yang tidak butuh port
                 if (source.udp_port || source.tcp_port || PORTLESS_PARSERS.includes(source.parsing_id)) {
                     console.log(`[NetworkListener] Starting listener for ${source.name} (${source.parsing_id})`);
                     this.startListener(source); // Tidak di-await agar berjalan paralel dan tidak memblock loop
+                    startedCount++;
+
+                    if (startedCount % startBatchSize === 0) {
+                        await sleep(startBatchDelayMs);
+                    }
                 }
             }
 
@@ -179,16 +221,16 @@ class NetworkListenerService {
             });
 
             socket.on('error', (err) => {
-                console.error(`[NetworkListener] PM5560 error ${source.name}: ${err.message}`);
+                this._logThrottled('error', `pm5560:error:${id}:${err.message}`, `[NetworkListener] PM5560 error ${source.name}: ${err.message}`);
             });
 
             socket.on('timeout', () => {
-                console.warn(`[NetworkListener] PM5560 timeout ${source.name}, reconnecting...`);
+                this._logThrottled('warn', `pm5560:timeout:${id}`, `[NetworkListener] PM5560 timeout ${source.name}, reconnecting...`);
                 socket.destroy();
             });
 
             socket.on('close', () => {
-                console.log(`[NetworkListener] PM5560 disconnected ${source.name}, retry in 15s`);
+                this._logThrottled('log', `pm5560:close:${id}`, `[NetworkListener] PM5560 disconnected ${source.name}, retry in 15s`);
                 this.activeListeners.delete(id);
                 parser.reset();
                 if (!stopped) reconnectTimer = setTimeout(connect, 15000);
@@ -304,16 +346,16 @@ class NetworkListenerService {
             });
 
             socket.on('error', (err) => {
-                console.error(`[NetworkListener] ILS binary TCP error ${name}: ${err.message}`);
+                this._logThrottled('error', `ils:error:${id}:${err.message}`, `[NetworkListener] ILS binary TCP error ${name}: ${err.message}`);
             });
 
             socket.on('timeout', () => {
-                console.warn(`[NetworkListener] ILS binary TCP timeout ${name}, reconnecting...`);
+                this._logThrottled('warn', `ils:timeout:${id}`, `[NetworkListener] ILS binary TCP timeout ${name}, reconnecting...`);
                 socket.destroy();
             });
 
             socket.on('close', () => {
-                console.log(`[NetworkListener] ILS binary TCP disconnected ${name}, retry in 15s`);
+                this._logThrottled('log', `ils:close:${id}`, `[NetworkListener] ILS binary TCP disconnected ${name}, retry in 15s`);
                 if (pollTimer) clearInterval(pollTimer);
                 this.activeListeners.delete(id);
                 if (typeof parser.reset === 'function') parser.reset();
@@ -399,16 +441,16 @@ class NetworkListenerService {
             });
 
             socket.on('error', (err) => {
-                console.error(`[TempHumidity] Error ${name}: ${err.message}`);
+                this._logThrottled('error', `temp-humidity:error:${id}:${err.message}`, `[TempHumidity] Error ${name}: ${err.message}`);
             });
 
             socket.on('timeout', () => {
-                console.warn(`[TempHumidity] Timeout ${name}, reconnecting...`);
+                this._logThrottled('warn', `temp-humidity:timeout:${id}`, `[TempHumidity] Timeout ${name}, reconnecting...`);
                 socket.destroy();
             });
 
             socket.on('close', () => {
-                console.log(`[TempHumidity] Disconnected ${name}, retry in 15s`);
+                this._logThrottled('log', `temp-humidity:close:${id}`, `[TempHumidity] Disconnected ${name}, retry in 15s`);
                 this.activeListeners.delete(id);
                 if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
                 parser.reset();
@@ -454,7 +496,12 @@ class NetworkListenerService {
             console.log(`[SNMP System] Polling ${name} (${ip_address})...`);
             try {
                 const result = await pollSNMP(ip_address, comm);
-                console.log(`[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error||'none'}`);
+                const logLine = `[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error||'none'}`;
+                if (String(result.status || '').toLowerCase() === 'disconnect') {
+                    this._logThrottled('log', `snmp-system:disconnect:${id}`, logLine);
+                } else {
+                    console.log(logLine);
+                }
                 await this._handleLogOutput(
                     source,
                     { data: result.data, source: name, _ip: ip_address },
@@ -815,10 +862,10 @@ class NetworkListenerService {
      */
     async handleIncomingData(source, rawData, parser) {
         const { id, equipt_id, name } = source;
-        console.log(`[NetworkListener] Received data from ${name} (${rawData.length} bytes)`);
-        // Debug: log first 80 hex chars to help diagnose protocol
-        // DUMP 200 BYTES FOR DEBUGGING ILS MONITOR PACKETS
-        console.log(`[NetworkListener] Raw[${name}]: ${rawData.slice(0,200).toString("hex")}`);
+        if (RAW_DEBUG) {
+            console.log(`[NetworkListener] Received data from ${name} (${rawData.length} bytes)`);
+            console.log(`[NetworkListener] Raw[${name}]: ${rawData.slice(0,200).toString("hex")}`);
+        }
 
         try {
             let parsedResult = { success: false };

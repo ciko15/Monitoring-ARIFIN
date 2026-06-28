@@ -10,11 +10,13 @@ class RawEventQueue {
         this._sequence = 0;
 
         // Cleanup TTL (ms). Default: 30 minutes as requested.
-        this.ttlMs = parseInt(process.env.RAW_EVENT_QUEUE_TTL_MS || '') || 30 * 60 * 1000;
+        this.ttlMs = parseInt(process.env.QUEUE_TTL_MS || process.env.RAW_EVENT_QUEUE_TTL_MS || '') || 30 * 60 * 1000;
         // How often to run cleanup (ms)
         this.cleanupIntervalMs = parseInt(process.env.RAW_EVENT_QUEUE_CLEANUP_INTERVAL_MS || '') || 60 * 1000;
+        this.maxPending = parseInt(process.env.QUEUE_MAX_PENDING || '') || 5000;
 
         this._cleanupTimer = null;
+        this._limitWarningAt = 0;
 
         this._ensureDir(this.baseDir);
         this._ensureDir(this.pendingDir);
@@ -37,6 +39,8 @@ class RawEventQueue {
     }
 
     async enqueue(event) {
+        await this._enforcePendingLimit();
+
         const fileName = this._nextFileName();
         const tempPath = path.join(this.pendingDir, `${fileName}.tmp`);
         const finalPath = path.join(this.pendingDir, fileName);
@@ -45,6 +49,29 @@ class RawEventQueue {
         await fs.promises.writeFile(tempPath, body, 'utf8');
         await fs.promises.rename(tempPath, finalPath);
         return finalPath;
+    }
+
+    async _enforcePendingLimit() {
+        if (!this.maxPending || this.maxPending <= 0) return;
+
+        const entries = (await fs.promises.readdir(this.pendingDir))
+            .filter(name => name.endsWith('.json'))
+            .sort((a, b) => a.localeCompare(b));
+
+        if (entries.length < this.maxPending) return;
+
+        const overflowCount = entries.length - this.maxPending + 1;
+        const toRemove = entries.slice(0, overflowCount);
+
+        for (const fileName of toRemove) {
+            await fs.promises.unlink(path.join(this.pendingDir, fileName)).catch(() => {});
+        }
+
+        const now = Date.now();
+        if (now - this._limitWarningAt > 60000) {
+            this._limitWarningAt = now;
+            console.warn(`[RawEventQueue] pending limit reached max=${this.maxPending}; dropped oldest=${toRemove.length}`);
+        }
     }
 
     startCleanup() {

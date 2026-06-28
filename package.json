@@ -24,7 +24,9 @@
     "pm2:monit:windows": "pm2 monit",
     "pm2:setup-startup": "pm2 startup && pm2 save",
     "pm2:setup": "./setup_pm2.sh",
-    "pm2:setup:windows": "echo Use PM2 on Windows with npm run pm2:start:windows"
+    "pm2:setup:windows": "echo Use PM2 on Windows with npm run pm2:start:windows",
+    "pm2:logrotate:install": "pm2 install pm2-logrotate",
+    "pm2:logrotate:config": "pm2 set pm2-logrotate:max_size 10M && pm2 set pm2-logrotate:retain 7 && pm2 set pm2-logrotate:compress true"
   },
   "keywords": [
     "bun",
