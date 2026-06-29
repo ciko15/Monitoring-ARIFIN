@@ -54,6 +54,10 @@ class RawEventQueue {
     async _enforcePendingLimit() {
         if (!this.maxPending || this.maxPending <= 0) return;
 
+        const now = Date.now();
+        if (now - (this._lastEnforceTime || 0) < 5000) return;
+        this._lastEnforceTime = now;
+
         const entries = (await fs.promises.readdir(this.pendingDir))
             .filter(name => name.endsWith('.json'))
             .sort((a, b) => a.localeCompare(b));
@@ -67,9 +71,9 @@ class RawEventQueue {
             await fs.promises.unlink(path.join(this.pendingDir, fileName)).catch(() => {});
         }
 
-        const now = Date.now();
-        if (now - this._limitWarningAt > 60000) {
-            this._limitWarningAt = now;
+        const warnNow = Date.now();
+        if (warnNow - this._limitWarningAt > 60000) {
+            this._limitWarningAt = warnNow;
             console.warn(`[RawEventQueue] pending limit reached max=${this.maxPending}; dropped oldest=${toRemove.length}`);
         }
     }
@@ -114,11 +118,15 @@ class RawEventQueue {
 
 
     async claimBatch(limit = 20) {
-        const entries = await fs.promises.readdir(this.pendingDir);
-        const fileNames = entries
-            .filter(name => name.endsWith('.json'))
-            .sort((a, b) => a.localeCompare(b))
-            .slice(0, limit);
+        if (!this._cachedPending || this._cachedPending.length === 0) {
+            const entries = await fs.promises.readdir(this.pendingDir);
+            this._cachedPending = entries
+                .filter(name => name.endsWith('.json'))
+                .sort((a, b) => a.localeCompare(b));
+        }
+
+        const fileNames = this._cachedPending.splice(0, limit);
+        if (fileNames.length === 0) return [];
 
         const claimed = [];
         for (const fileName of fileNames) {

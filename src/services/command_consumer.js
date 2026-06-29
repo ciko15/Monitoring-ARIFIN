@@ -114,9 +114,13 @@ class CommandConsumer {
     }
 
     async _dispatch(queue, header, body) {
-        const messageName = header.message_name;
+        const messageName = header.message_name || header.REQUEST_TYPE;
         const correlationId = header.correlation_id;
         const targetSiteId = header.target_site_id || this.siteId;
+
+        if (messageName && (messageName.includes('telemetry') || messageName.includes('status'))) {
+            return;
+        }
 
         switch (messageName) {
             case 'configuration.threshold.apply':
