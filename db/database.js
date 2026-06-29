@@ -526,10 +526,9 @@ async function getAllEquipment(filters = {}) {
           const isTimedOut = (now - logTime) > (4 * 60 * 1000); // 4 minutes (consistent with watchdog)
 
           if (isTimedOut) {
-            // Timeout: keep last known values visible, but mark the source stale/disconnected.
+            // Timeout: mark the source disconnected and let placeholder values (-) take over.
             mergedData[sourceName] = {
               ...mergedData[sourceName],
-              ...(log.data || {}),
               _status: 'Disconnect',
               _stale: true,
               _logged_at: log.logged_at
@@ -681,7 +680,6 @@ async function getEquipmentById(id) {
       if (isTimedOut) {
         mergedData[sourceName] = { 
           ...mergedData[sourceName], 
-          ...(log.data || {}),
           _status: 'Disconnect', 
           _stale: true,
           _logged_at: log.logged_at, 
