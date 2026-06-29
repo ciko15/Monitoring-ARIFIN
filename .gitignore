@@ -12,3 +12,4 @@ _agents/
 _agent/
 brain/
 logs/
+db/*.json
