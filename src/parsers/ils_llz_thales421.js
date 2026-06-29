@@ -41,7 +41,7 @@ const BaseParser = require('./base');
 const PKT_C_SIZE = 100;
 
 // Protokol Mandiri Thales 421 (Hasil Sniffing)
-const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
+const TRIGGER_SEND = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
 const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
 const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
 const PKT_SYNC = Buffer.from([0x11, 0x8D]);

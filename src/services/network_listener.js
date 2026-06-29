@@ -119,6 +119,7 @@ class NetworkListenerService {
      */
     async initialize() {
         console.log('[NetworkListener] Initializing listeners...');
+        this.stopAll();
         
         try {
             // Fetch all equipment sources (authentications)
