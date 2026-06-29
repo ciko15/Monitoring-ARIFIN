@@ -174,11 +174,7 @@ async function connect() {
 
     try {
         connection = await withTimeout(amqp.connect(RabbitConfig), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ connect');
-        channel = await withTimeout(connection.createChannel(), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ channel');
-        currentBackoffMs = 0;
-        nextConnectAttemptAt = 0;
-        console.log('✅ [EMS] Berhasil terhubung ke RabbitMQ menggunakan amqplib');
-
+        
         connection.on('error', error => {
             if (shouldLog(`connection-error:${error.message}`)) {
                 console.error('❌ [EMS] RabbitMQ connection error:', error.message);
@@ -196,6 +192,26 @@ async function connect() {
             channel = null;
             assertedQueues.clear();
         });
+
+        channel = await withTimeout(connection.createChannel(), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ channel');
+        
+        channel.on('error', error => {
+            if (shouldLog(`channel-error:${error.message}`)) {
+                console.error('❌ [EMS] RabbitMQ channel error:', error.message);
+            }
+            channel = null;
+        });
+
+        channel.on('close', () => {
+            if (shouldLog('channel-closed')) {
+                console.warn('⚠️ [EMS] RabbitMQ channel closed');
+            }
+            channel = null;
+        });
+
+        currentBackoffMs = 0;
+        nextConnectAttemptAt = 0;
+        console.log('✅ [EMS] Berhasil terhubung ke RabbitMQ menggunakan amqplib');
 
         return channel;
     } catch (error) {

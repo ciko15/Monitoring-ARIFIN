@@ -214,7 +214,17 @@ class IlsLlzThales421Parser extends BaseParser {
                 if (this._buf.length > PKT_C_SIZE) {
                     this._buf = this._buf.slice(this._buf.length - PKT_C_SIZE);
                 }
-                return { success: false, error: 'No valid LLZ frames', status: 'Waiting',
+                let waitingError = 'No valid LLZ frames';
+                for (let i = 0; i < this._buf.length; i++) {
+                    if (isPktCSync(this._buf, i)) {
+                        if (i + PKT_C_SIZE > this._buf.length) {
+                            waitingError = 'Menunggu data';
+                        }
+                        break;
+                    }
+                }
+                
+                return { success: false, error: waitingError, status: 'Waiting',
                          _mode: this._mode,
                          data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
             }
@@ -274,12 +284,14 @@ class IlsLlzThales421Parser extends BaseParser {
         return [{ bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }];
     }
 
-    /**
-     * Cek apakah chunk yang diterima adalah heartbeat dari device.
-     * Jika ya, caller harus membalas dengan TRIGGER_SEND.
-     */
-    isHeartbeat(chunk) {
-        return chunk && chunk.length >= 4 && chunk.slice(0, 4).equals(HBEAT_RECV);
+    isHeartbeat(buf) {
+        if (buf && buf.length >= 4) {
+            const b0 = buf[0];
+            const b2 = buf[2];
+            return (b0 === 0x13 || b0 === 0x1B) && buf[1] === 0x00 &&
+                   (b2 === 0xF8 || b2 === 0xF9) && buf[3] === 0x06;
+        }
+        return false;
     }
 
     getHeartbeatReply() { return TRIGGER_SEND; }
