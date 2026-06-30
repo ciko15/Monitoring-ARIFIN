@@ -139,6 +139,12 @@ function decodeFrameC(pkt) {
     // In original code, byte 4 was 0x00 (TX1) or 0x10 (TX2).
     const txData = (pkt[4] === 0x10 || pkt[4] === 0xAC) ? 'TX2' : 'TX1';
     
+    let mon_id = null;
+    if (subtype === 'Monitor') {
+        // Pada Thales ILS 420, pkt[13] = 0x00 untuk MON 1, dan 0xF0 (atau selain 0x00) untuk MON 2.
+        mon_id = (pkt[13] === 0x00) ? 'MON1' : 'MON2';
+    }
+    
     // pkt[2] has the remote/main flags
     const byte2 = pkt[2];
     const isRemote = !!(byte2 & 0x80);
@@ -147,6 +153,7 @@ function decodeFrameC(pkt) {
     return {
         subtype,
         tx_data: txData,
+        mon_id: mon_id,
         tx_main: tx1IsMain ? 'TX 1' : 'TX 2',
         tx_stby: tx1IsMain ? 'TX 2' : 'TX 1',
         is_remote: isRemote,
@@ -245,7 +252,7 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._lastDecoded.subtype = d.subtype;
                 
                 if (d.subtype === 'Monitor') {
-                    const prefix = d.tx_data === 'TX2' ? 'M2_' : 'M1_';
+                    const prefix = d.mon_id === 'MON2' ? 'M2_' : 'M1_';
                     for (const [key, value] of Object.entries(d.params)) {
                         this._lastDecoded.params[prefix + key] = value;
                     }
