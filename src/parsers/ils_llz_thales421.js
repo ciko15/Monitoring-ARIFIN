@@ -169,12 +169,14 @@ function extractFrames(buf) {
 
 function checkAlarms(params) {
     const alarms = [];
-    for (const [key, lim] of Object.entries(LIMITS)) {
-        const v = params[key];
-        if (v == null) continue;
-        if (v < lim[0] || v > lim[1]) {
-            const [label, unit] = PARAM_LABELS[key] || [key, ''];
-            alarms.push(`${label}=${v.toFixed(3)}${unit !== '' ? ' '+unit : ''} [${lim[0]}~${lim[1]}]`);
+    for (const prefix of ['M1_', 'M2_']) {
+        for (const [key, lim] of Object.entries(LIMITS)) {
+            const v = params[prefix + key];
+            if (v == null) continue;
+            if (v < lim[0] || v > lim[1]) {
+                const [label, unit] = PARAM_LABELS[key] || [key, ''];
+                alarms.push(`MON ${prefix === 'M1_' ? '1' : '2'} ${label}=${v.toFixed(3)}${unit !== '' ? ' '+unit : ''} [${lim[0]}~${lim[1]}]`);
+            }
         }
     }
     return alarms;
@@ -242,7 +244,10 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._lastDecoded.subtype = d.subtype;
                 
                 if (d.subtype === 'Monitor') {
-                    Object.assign(this._lastDecoded.params, d.params);
+                    const prefix = d.tx_data === 'TX2' ? 'M2_' : 'M1_';
+                    for (const [key, value] of Object.entries(d.params)) {
+                        this._lastDecoded.params[prefix + key] = value;
+                    }
                 }
                 lastPos = frame.pos;
             }

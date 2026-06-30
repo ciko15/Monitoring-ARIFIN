@@ -1332,18 +1332,23 @@
             ]});
             
             const paramLabels = {
-                CRS_RF: 'CRS RF Level', CRS_DDM: 'CRS DDM', CRS_SDM: 'CRS SDM',
-                IDENT_AM: 'Ident AM', WIDTH_RF: 'Width RF Level', WIDTH_DDM: 'Width DDM',
-                WIDTH_SDM: 'Width SDM', CLR_RF: 'CLR RF Level', CLR_DDM: 'CLR DDM',
-                CLR_SDM: 'CLR SDM', NF_RF: 'NF RF Level', NF_DDM: 'NF DDM',
-                NF_SDM: 'NF SDM', FREQ_DEV: 'Freq Deviation'
+                CRS_RF: 'CRS Pos. RF Level', CRS_DDM: 'CRS Pos. DDM', CRS_SDM: 'CRS Pos. SDM',
+                IDENT_AM: 'Ident AM', WIDTH_RF: 'CRS Width RF Level', WIDTH_DDM: 'CRS Width DDM',
+                WIDTH_SDM: 'CRS Width SDM', CLR_RF: 'CLR Width RF Level', CLR_DDM: 'CLR Width DDM',
+                CLR_SDM: 'CLR Width SDM', NF_RF: 'Nearfield Pos. RF Level', NF_DDM: 'Nearfield Pos. DDM',
+                NF_SDM: 'Nearfield Pos. SDM', FREQ_DEV: 'Freq Deviation'
             };
             
-            sections.push({ title: 'MONITORING PARAMETERS', params: Object.entries(paramLabels).map(([key, label]) => {
-                const val = data[key];
-                const unit = (key === 'FREQ_DEV') ? 'kHz' : (key.includes('DDM') ? '' : '%');
-                return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
-            })});
+            for (const prefix of ['M1_', 'M2_']) {
+                sections.push({ 
+                    title: `EXECUTIVE MONITOR ${prefix === 'M1_' ? '1' : '2'}`, 
+                    params: Object.entries(paramLabels).map(([key, label]) => {
+                        const val = data[prefix + key];
+                        const unit = (key === 'FREQ_DEV') ? 'kHz' : (key.includes('DDM') ? '' : '%');
+                        return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
+                    })
+                });
+            }
         } else {
             // Check if we have a template for this parser
             const tmpl = window.templatesCache?.find(t => t.id === parserId);

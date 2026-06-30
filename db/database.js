@@ -45,7 +45,7 @@ const PARSER_TEMPLATES = {
   'custom_1775446808830': ['m1_sys_delay', 'm1_reply_eff', 'm1_fwd_power', 'm1_5v_ps', 'm1_15v_ps', 'm1_48v_ps', 'ident'],
   'custom_1775512889323': ['latitude', 'longitude', 'altitude', 'groundSpeed', 'trackAngle'],
   'thales_llz_421': ['CRS_DDM', 'CRS_SDM', 'NF_DDM', 'NF_SDM', 'WIDTH_DDM', 'WIDTH_SDM', 'CRS_RF', 'NF_RF'],
-  'ils_llz_thales421': ['tx_main', 'tx_stby', 'CRS_RF', 'CRS_DDM', 'CRS_SDM', 'IDENT_AM', 'WIDTH_RF', 'WIDTH_DDM', 'WIDTH_SDM', 'CLR_RF', 'CLR_DDM', 'CLR_SDM', 'NF_RF', 'NF_DDM', 'NF_SDM', 'FREQ_DEV'],
+  'ils_llz_thales421': ['tx_main', 'tx_stby', 'M1_CRS_RF', 'M1_CRS_DDM', 'M1_CRS_SDM', 'M1_IDENT_AM', 'M1_WIDTH_RF', 'M1_WIDTH_DDM', 'M1_WIDTH_SDM', 'M1_CLR_RF', 'M1_CLR_DDM', 'M1_CLR_SDM', 'M1_NF_RF', 'M1_NF_DDM', 'M1_NF_SDM', 'M1_FREQ_DEV', 'M2_CRS_RF', 'M2_CRS_DDM', 'M2_CRS_SDM', 'M2_IDENT_AM', 'M2_WIDTH_RF', 'M2_WIDTH_DDM', 'M2_WIDTH_SDM', 'M2_CLR_RF', 'M2_CLR_DDM', 'M2_CLR_SDM', 'M2_NF_RF', 'M2_NF_DDM', 'M2_NF_SDM', 'M2_FREQ_DEV'],
   'ils_gp_thales421': ['tx_main', 'tx_stby', 'GP_ANGLE', 'RF_POWER', 'DDM_COURSE', 'CARRIER_PWR', 'CSB_POWER', 'DDM_CLR', 'SBO_POWER', 'CLR_POWER', 'CLR_DDM', 'CLR_SDM', 'RF_OUT', 'DDM_MON', 'MON_POWER'],
   'pm5560_modbus': ['VL1N', 'VL2N', 'VL3N', 'VL12', 'VL23', 'VL31', 'IL1', 'IL2', 'IL3', 'KW', 'KVAR', 'KVA', 'PF', 'HZ', 'KWH'],
   'vhf_marc_rse': ['frequency_mhz', 'mode', 'status', 'supply_voltage', 'pa_temp_c', 'fwd_power_w', 'refl_power_w', 'modulation_pct', 'sensitivity_dbm', 'squelch_dbm', 'rx_supply_voltage'],
