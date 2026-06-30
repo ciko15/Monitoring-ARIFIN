@@ -54,20 +54,20 @@ function isPktCSync(buf, i) {
 }
 
 const PARAM_OFFSETS = {
-    CRS_RF: 43,
-    CRS_DDM: 47,
-    CRS_SDM: 51,
-    IDENT_AM: 55,
-    WIDTH_RF: 59,
-    WIDTH_DDM: 63,
-    WIDTH_SDM: 67,
-    CLR_RF: 71,
-    CLR_DDM: 75,
-    CLR_SDM: 79,
-    NF_RF: 83,
-    NF_DDM: 87,
-    NF_SDM: 91,
-    FREQ_DEV: 95
+    CRS_RF: 39,
+    CRS_DDM: 43,
+    CRS_SDM: 47,
+    IDENT_AM: 51,
+    WIDTH_RF: 55,
+    WIDTH_DDM: 59,
+    WIDTH_SDM: 63,
+    CLR_RF: 67,
+    CLR_DDM: 71,
+    CLR_SDM: 75,
+    NF_RF: 79,
+    NF_DDM: 83,
+    NF_SDM: 87,
+    FREQ_DEV: 91
 };
 
 // Limits [min, max]
