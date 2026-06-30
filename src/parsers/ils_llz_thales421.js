@@ -54,20 +54,20 @@ function isPktCSync(buf, i) {
 }
 
 const PARAM_OFFSETS = {
-    CRS_RF: 39,
-    CRS_DDM: 43,
-    CRS_SDM: 47,
-    IDENT_AM: 51,
-    WIDTH_RF: 55,
-    WIDTH_DDM: 59,
-    WIDTH_SDM: 63,
-    CLR_RF: 67,
-    CLR_DDM: 71,
-    CLR_SDM: 75,
-    NF_RF: 79,
-    NF_DDM: 83,
-    NF_SDM: 87,
-    FREQ_DEV: 91
+    CRS_RF: 15,
+    CRS_DDM: 19,
+    CRS_SDM: 23,
+    IDENT_AM: 27,
+    WIDTH_RF: 31,
+    WIDTH_DDM: 35,
+    WIDTH_SDM: 39,
+    CLR_RF: 43,
+    CLR_DDM: 47,
+    CLR_SDM: 51,
+    NF_RF: 57,
+    NF_DDM: 61,
+    NF_SDM: 65,
+    FREQ_DEV: 73
 };
 
 // Limits [min, max]
@@ -100,7 +100,6 @@ const PARAM_LABELS = {
     FREQ_DEV:  ['Freq Deviation', 'kHz'],
 };
 
-const DDM_X100 = new Set(['CRS_DDM', 'WIDTH_DDM', 'CLR_DDM', 'NF_DDM']);
 
 const PASSIVE_TIMEOUT = 30000;
 const POLL_INTERVAL   = 2000;
@@ -124,9 +123,7 @@ function decodeFrameC(pkt) {
         for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
             let val = readFloat(pkt, offset);
             if (val === null) continue;
-            val = DDM_X100.has(key)
-                ? parseFloat((val * 100).toFixed(4))
-                : parseFloat(val.toFixed(4));
+            val = parseFloat(val.toFixed(4));
             params[key] = val;
         }
     }
