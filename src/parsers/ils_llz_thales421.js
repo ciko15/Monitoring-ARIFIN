@@ -120,6 +120,7 @@ function decodeFrameC(pkt) {
     
     // Hanya ekstrak nilai RF dari paket Monitor (0x0E) agar tidak tertimpa angka 0 dari paket TX (0x0C)
     if (subtype === 'Monitor') {
+        console.log('\n[DEBUG] FULL MON FRAME:', pkt.toString('hex'));
         for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
             let val = readFloat(pkt, offset);
             if (val === null) continue;
