@@ -38,36 +38,26 @@ const BaseParser = require('./base');
  *   off=84  FREQ_DEV    Freq Deviation       kHz
  */
 
-const PKT_C_SIZE = 100;
-
-// Protokol Mandiri Thales 421 (Hasil Sniffing)
-const TRIGGER_SEND = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
-const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
-const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
-const PKT_SYNC = Buffer.from([0x11, 0x8D]);
-
-function isPktCSync(buf, i) {
-    // 0x0C = Transmitter, 0x0E = Monitor
-    return i + 3 < buf.length &&
-           buf[i] === 0x11 && buf[i+1] === 0x8D && 
-           (buf[i+3] === 0x0C || buf[i+3] === 0x0E);
-}
+const PACKET_SIZE  = 96;
+const SYNC_DATA    = Buffer.from([0x56, 0x00, 0xF9, 0x06]);
+const SYNC_HBEAT   = Buffer.from([0x1B, 0x00, 0xF9, 0x06]);
+const SYNC_ACK     = Buffer.from([0x13, 0x00, 0xF9, 0x06]);
 
 const PARAM_OFFSETS = {
-    CRS_RF: 15,
-    CRS_DDM: 19,
-    CRS_SDM: 23,
-    IDENT_AM: 27,
-    WIDTH_RF: 31,
-    WIDTH_DDM: 35,
-    WIDTH_SDM: 39,
-    CLR_RF: 43,
-    CLR_DDM: 47,
-    CLR_SDM: 51,
-    NF_RF: 57,
-    NF_DDM: 61,
-    NF_SDM: 65,
-    FREQ_DEV: 73
+    CRS_RF:    26,
+    CRS_DDM:   30,
+    CRS_SDM:   34,
+    IDENT_AM:  38,
+    WIDTH_RF:  42,
+    WIDTH_DDM: 46,
+    WIDTH_SDM: 50,
+    CLR_RF:    54,
+    CLR_DDM:   58,
+    CLR_SDM:   62,
+    NF_RF:     68,
+    NF_DDM:    72,
+    NF_SDM:    76,
+    FREQ_DEV:  84,
 };
 
 // Limits [min, max]
@@ -100,7 +90,6 @@ const PARAM_LABELS = {
     FREQ_DEV:  ['Freq Deviation', 'kHz'],
 };
 
-
 const PASSIVE_TIMEOUT = 30000;
 const POLL_INTERVAL   = 2000;
 const POLL_REQ_DELAY  = 150;
@@ -113,75 +102,67 @@ function readFloat(buf, offset) {
     } catch (e) { return null; }
 }
 
-function decodeFrameC(pkt) {
-    const subtype = pkt[3] === 0x0C ? 'Transmitter' : 'Monitor';
-    const params = {};
-    
-    // Hanya ekstrak nilai RF dari paket Monitor (0x0E) agar tidak tertimpa angka 0 dari paket TX (0x0C)
-    if (subtype === 'Monitor') {
-        console.log('\n[DEBUG] FULL MON FRAME:', pkt.toString('hex'));
-        for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
-            let val = readFloat(pkt, offset);
-            if (val === null) continue;
-            val = parseFloat(val.toFixed(4));
-            params[key] = val;
-        }
-    }
+function decodePacket(pkt) {
+    if (!pkt || pkt.length < PACKET_SIZE) return null;
+    if (!pkt.slice(0, 4).equals(SYNC_DATA)) return null;
 
-    // In TX, pkt[13] is the TX flag (0x40 = TX1, 0x00 = TX2).
-    // Let's use pkt[13] if it's 0x40 or 0x00.
-    // Wait, in Monitor, pkt[13] was 0x00 for MON 1!
-    // But what is it for MON 2? If we don't know, we can guess pkt[4] or pkt[13].
-    // Let's just use pkt[4] which is 0x00 for MON 1 and 0x10 for TX2? 
-    // In original code, byte 4 was 0x00 (TX1) or 0x10 (TX2).
-    const txData = (pkt[4] === 0x10 || pkt[4] === 0xAC) ? 'TX2' : 'TX1';
+    const subtype   = pkt[12];
+    const txFlag    = pkt[13];
+    const tx1IsMain = !!(txFlag & 0x40);
+    const isMonitor = (subtype === 0x8D);
     
-    let mon_id = null;
-    if (subtype === 'Monitor') {
-        // Pada Thales ILS 420, pkt[13] = 0x00 untuk MON 1, dan 0xF0 (atau selain 0x00) untuk MON 2.
-        mon_id = (pkt[13] === 0x00) ? 'MON1' : 'MON2';
+    // Asumsi: Jika flag 0x00 maka MON1, lainnya MON2
+    const prefix = isMonitor ? ((txFlag === 0x00) ? 'M1_' : 'M2_') : '';
+
+    const params = {};
+    for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
+        const val = readFloat(pkt, offset);
+        if (val !== null) params[prefix + key] = parseFloat(val.toFixed(4));
     }
-    
-    // pkt[2] has the remote/main flags
-    const byte2 = pkt[2];
-    const isRemote = !!(byte2 & 0x80);
-    const tx1IsMain = !!(byte2 & 0x40);
 
     return {
+        tx_main:  tx1IsMain ? 'TX1' : 'TX2',
+        tx_stby:  tx1IsMain ? 'TX2' : 'TX1',
         subtype,
-        tx_data: txData,
-        mon_id: mon_id,
-        tx_main: tx1IsMain ? 'TX 1' : 'TX 2',
-        tx_stby: tx1IsMain ? 'TX 2' : 'TX 1',
-        is_remote: isRemote,
+        tx_flag:  txFlag,
+        is_monitor: isMonitor,
         params,
     };
 }
 
 function extractFrames(buf) {
     const results = [];
-    for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
-        if (isPktCSync(buf, i)) {
-            const dec = decodeFrameC(buf.slice(i, i + PKT_C_SIZE));
+    let i = 0;
+    while (i <= buf.length - PACKET_SIZE) {
+        // Skip heartbeat and ACK packets
+        if (buf.slice(i, i+4).equals(SYNC_HBEAT) || buf.slice(i, i+4).equals(SYNC_ACK)) {
+            i += 4;
+            continue;
+        }
+        if (buf.slice(i, i+4).equals(SYNC_DATA)) {
+            const dec = decodePacket(buf.slice(i, i + PACKET_SIZE));
             if (dec) {
-                results.push({ pos: i, decoded: dec });
-                i += PKT_C_SIZE - 1;
+                // Hanya simpan data Monitor
+                if (dec.is_monitor) {
+                    results.push({ pos: i, decoded: dec });
+                }
+                i += PACKET_SIZE;
+                continue;
             }
         }
+        i++;
     }
     return results;
 }
 
 function checkAlarms(params) {
     const alarms = [];
-    for (const prefix of ['M1_', 'M2_']) {
-        for (const [key, lim] of Object.entries(LIMITS)) {
-            const v = params[prefix + key];
-            if (v == null) continue;
-            if (v < lim[0] || v > lim[1]) {
-                const [label, unit] = PARAM_LABELS[key] || [key, ''];
-                alarms.push(`MON ${prefix === 'M1_' ? '1' : '2'} ${label}=${v.toFixed(3)}${unit !== '' ? ' '+unit : ''} [${lim[0]}~${lim[1]}]`);
-            }
+    for (const [key, lim] of Object.entries(LIMITS)) {
+        const v = params[key];
+        if (v == null) continue;
+        if (v < lim[0] || v > lim[1]) {
+            const [label, unit] = PARAM_LABELS[key] || [key, ''];
+            alarms.push(`${label}=${v.toFixed(3)}${unit !== '' ? ' '+unit : ''} [${lim[0]}~${lim[1]}]`);
         }
     }
     return alarms;
@@ -202,11 +183,8 @@ class IlsLlzThales421Parser extends BaseParser {
             this._buf = Buffer.concat([this._buf, chunk]);
 
             if (this._buf.length > 131072) {
-                let ls = 0;
-                for (let i = this._buf.length - 4; i >= 0; i--) {
-                    if (isPktCSync(this._buf, i)) { ls = i; break; }
-                }
-                this._buf = ls > 0 ? this._buf.slice(ls) : Buffer.alloc(0);
+                const pos = this._buf.lastIndexOf(SYNC_DATA);
+                this._buf = pos > 0 ? this._buf.slice(pos) : Buffer.alloc(0);
             }
 
             const now = Date.now();
@@ -216,52 +194,26 @@ class IlsLlzThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
-                // Prevent buffer accumulation CPU spike (O(N^2) rescanning of short packets)
-                // If there are no valid frames, anything before the last 92 bytes is guaranteed garbage.
-                if (this._buf.length > PKT_C_SIZE) {
-                    this._buf = this._buf.slice(this._buf.length - PKT_C_SIZE);
-                }
-                let waitingError = 'No valid LLZ frames';
-                for (let i = 0; i < this._buf.length; i++) {
-                    if (isPktCSync(this._buf, i)) {
-                        if (i + PKT_C_SIZE > this._buf.length) {
-                            waitingError = 'Menunggu data';
-                        }
-                        break;
-                    }
-                }
-                
-                return { success: false, error: waitingError, status: 'Waiting',
+                return { success: false, error: 'No valid LLZ frames', status: 'Waiting',
                          _mode: this._mode,
                          data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
             }
 
-            // Gabungkan state dari semua frame di chunk ini (supaya data RF dari Monitor tidak hilang)
-            this._lastDecoded = this._lastDecoded || { params: {} };
-            let lastPos = 0;
-            
-            for (const frame of frames) {
-                const d = frame.decoded;
-                this._lastDecoded.tx_main = d.tx_main;
-                this._lastDecoded.tx_stby = d.tx_stby;
-                this._lastDecoded.is_remote = d.is_remote;
-                this._lastDecoded.tx_data = d.tx_data;
-                this._lastDecoded.subtype = d.subtype;
-                
-                if (d.subtype === 'Monitor') {
-                    const prefix = d.mon_id === 'MON2' ? 'M2_' : 'M1_';
-                    for (const [key, value] of Object.entries(d.params)) {
-                        this._lastDecoded.params[prefix + key] = value;
-                    }
-                }
-                lastPos = frame.pos;
+            // Merge frames params
+            if (!this._accumulatedParams) this._accumulatedParams = {};
+            for (const f of frames) {
+                Object.assign(this._accumulatedParams, f.decoded.params);
             }
 
+            const latest = frames[frames.length - 1];
+            this._lastDecoded = latest.decoded;
+            // Gunakan gabungan params MON1 & MON2
+            this._lastDecoded.params = { ...this._accumulatedParams };
             this._lastDataTime = now;
             if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
-            this._buf = this._buf.slice(lastPos + PKT_C_SIZE);
+            this._buf = this._buf.slice(latest.pos + PACKET_SIZE);
 
-            return this._buildOutput(this._lastDecoded, false);
+            return this._buildOutput(latest.decoded, false);
         } catch (err) {
             return { success: false, error: err.message, status: 'Error', timestamp: new Date().toISOString() };
         }
@@ -286,31 +238,14 @@ class IlsLlzThales421Parser extends BaseParser {
         };
     }
 
-    /**
-     * Returns the initial trigger packet to send on connect.
-     * Device membutuhkan ACK packet (13 00 F9 06) agar mulai streaming data.
-     */
-    getPollRequests() {
-        return [{ bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }];
-    }
-
-    isHeartbeat(buf) {
-        if (buf && buf.length >= 4) {
-            const b0 = buf[0];
-            const b2 = buf[2];
-            return (b0 === 0x13 || b0 === 0x1B) && buf[1] === 0x00 &&
-                   (b2 === 0xF8 || b2 === 0xF9) && buf[3] === 0x06;
-        }
-        return false;
-    }
-
-    getHeartbeatReply() { return TRIGGER_SEND; }
-    getMode()           { return this._mode; }
-    getLastData()       { return this._lastDecoded ? this._lastDecoded.params : {}; }
-    reset()             { this._buf = Buffer.alloc(0); }
+    getPollRequests() { return []; }
+    getMode()         { return this._mode; }
+    getLastData()     { return this._lastDecoded ? this._lastDecoded.params : {}; }
+    reset()           { this._buf = Buffer.alloc(0); }
 }
 
 module.exports = IlsLlzThales421Parser;
 module.exports.PARAM_OFFSETS = PARAM_OFFSETS;
 module.exports.LIMITS        = LIMITS;
 module.exports.PARAM_LABELS  = PARAM_LABELS;
+module.exports.SYNC_DATA     = SYNC_DATA;
