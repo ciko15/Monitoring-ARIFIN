@@ -1,112 +1,814 @@
 {
   "dvor_maru_220": [
-    { "parameter": "carrier_power", "operator": "lt", "value": 80.0, "severity": "alarm", "message": "Carrier Power Low" },
-    { "parameter": "carrier_power", "operator": "gt", "value": 120.0, "severity": "alarm", "message": "Carrier Power High" },
-    { "parameter": "rf_input", "operator": "lt", "value": -25.0, "severity": "alarm", "message": "RF Input Low" },
-    { "parameter": "rf_input", "operator": "gt", "value": 0.0, "severity": "alarm", "message": "RF Input High" },
-    { "parameter": "azimuth", "operator": "lt", "value": 116.2, "severity": "alarm", "message": "Azimuth Low" },
-    { "parameter": "azimuth", "operator": "gt", "value": 118.2, "severity": "alarm", "message": "Azimuth High" },
-    { "parameter": "fm_index", "operator": "lt", "value": 15.0, "severity": "alarm", "message": "FM Index Low" },
-    { "parameter": "fm_index", "operator": "gt", "value": 17.0, "severity": "alarm", "message": "FM Index High" },
-    { "parameter": "am_30hz", "operator": "lt", "value": 28.0, "severity": "alarm", "message": "AM 30Hz Low" },
-    { "parameter": "am_30hz", "operator": "gt", "value": 32.0, "severity": "alarm", "message": "AM 30Hz High" },
-    { "parameter": "am_9960hz", "operator": "lt", "value": 25.0, "severity": "alarm", "message": "AM 9960Hz Low" },
-    { "parameter": "am_9960hz", "operator": "gt", "value": 32.5, "severity": "alarm", "message": "AM 9960Hz High" },
-    { "parameter": "am_1020hz", "operator": "lt", "value": 6.0, "severity": "alarm", "message": "AM 1020Hz Low" },
-    { "parameter": "am_1020hz", "operator": "gt", "value": 8.0, "severity": "alarm", "message": "AM 1020Hz High" }
+    {
+      "parameter": "carrier_power",
+      "operator": "lt",
+      "value": 80,
+      "severity": "alarm",
+      "message": "Carrier Power Low"
+    },
+    {
+      "parameter": "carrier_power",
+      "operator": "gt",
+      "value": 120,
+      "severity": "alarm",
+      "message": "Carrier Power High"
+    },
+    {
+      "parameter": "rf_input",
+      "operator": "lt",
+      "value": -25,
+      "severity": "alarm",
+      "message": "RF Input Low"
+    },
+    {
+      "parameter": "rf_input",
+      "operator": "gt",
+      "value": 0,
+      "severity": "alarm",
+      "message": "RF Input High"
+    },
+    {
+      "parameter": "azimuth",
+      "operator": "lt",
+      "value": 116.2,
+      "severity": "alarm",
+      "message": "Azimuth Low"
+    },
+    {
+      "parameter": "azimuth",
+      "operator": "gt",
+      "value": 118.2,
+      "severity": "alarm",
+      "message": "Azimuth High"
+    },
+    {
+      "parameter": "fm_index",
+      "operator": "lt",
+      "value": 15,
+      "severity": "alarm",
+      "message": "FM Index Low"
+    },
+    {
+      "parameter": "fm_index",
+      "operator": "gt",
+      "value": 17,
+      "severity": "alarm",
+      "message": "FM Index High"
+    },
+    {
+      "parameter": "am_30hz",
+      "operator": "lt",
+      "value": 28,
+      "severity": "alarm",
+      "message": "AM 30Hz Low"
+    },
+    {
+      "parameter": "am_30hz",
+      "operator": "gt",
+      "value": 32,
+      "severity": "alarm",
+      "message": "AM 30Hz High"
+    },
+    {
+      "parameter": "am_9960hz",
+      "operator": "lt",
+      "value": 25,
+      "severity": "alarm",
+      "message": "AM 9960Hz Low"
+    },
+    {
+      "parameter": "am_9960hz",
+      "operator": "gt",
+      "value": 32.5,
+      "severity": "alarm",
+      "message": "AM 9960Hz High"
+    },
+    {
+      "parameter": "am_1020hz",
+      "operator": "lt",
+      "value": 6,
+      "severity": "alarm",
+      "message": "AM 1020Hz Low"
+    },
+    {
+      "parameter": "am_1020hz",
+      "operator": "gt",
+      "value": 8,
+      "severity": "alarm",
+      "message": "AM 1020Hz High"
+    }
   ],
   "dme_maru_310_320": [
-    { "parameter": "sys_delay", "operator": "lt", "value": 49.5, "severity": "alarm", "message": "System Delay Low" },
-    { "parameter": "sys_delay", "operator": "gt", "value": 50.5, "severity": "alarm", "message": "System Delay High" },
-    { "parameter": "dur_a", "operator": "lt", "value": 3.0, "severity": "alarm", "message": "Pulse Duration A Low" },
-    { "parameter": "dur_a", "operator": "gt", "value": 3.8, "severity": "alarm", "message": "Pulse Duration A High" },
-    { "parameter": "dur_b", "operator": "lt", "value": 3.0, "severity": "alarm", "message": "Pulse Duration B Low" },
-    { "parameter": "dur_b", "operator": "gt", "value": 3.8, "severity": "alarm", "message": "Pulse Duration B High" },
-    { "parameter": "rise_a", "operator": "lt", "value": 1.5, "severity": "alarm", "message": "Rise Time A Low" },
-    { "parameter": "rise_a", "operator": "gt", "value": 2.5, "severity": "alarm", "message": "Rise Time A High" },
-    { "parameter": "rise_b", "operator": "lt", "value": 1.5, "severity": "alarm", "message": "Rise Time B Low" },
-    { "parameter": "rise_b", "operator": "gt", "value": 2.5, "severity": "alarm", "message": "Rise Time B High" },
-    { "parameter": "decay_a", "operator": "lt", "value": 1.5, "severity": "alarm", "message": "Decay Time A Low" },
-    { "parameter": "decay_a", "operator": "gt", "value": 2.5, "severity": "alarm", "message": "Decay Time A High" },
-    { "parameter": "decay_b", "operator": "lt", "value": 1.5, "severity": "alarm", "message": "Decay Time B Low" },
-    { "parameter": "decay_b", "operator": "gt", "value": 2.5, "severity": "alarm", "message": "Decay Time B High" },
-    { "parameter": "spacing", "operator": "lt", "value": 11.5, "severity": "alarm", "message": "Pulse Spacing Low" },
-    { "parameter": "spacing", "operator": "gt", "value": 12.5, "severity": "alarm", "message": "Pulse Spacing High" },
-    { "parameter": "reply_eff", "operator": "lt", "value": 70.0, "severity": "alarm", "message": "Reply Efficiency Low" },
-    { "parameter": "pair_rate", "operator": "lt", "value": 700.0, "severity": "alarm", "message": "Pair Rate Low" },
-    { "parameter": "pair_rate", "operator": "gt", "value": 1400.0, "severity": "alarm", "message": "Pair Rate High" },
-    { "parameter": "fwd_power", "operator": "lt", "value": 800.0, "severity": "alarm", "message": "Forward Power Low" },
-    { "parameter": "fwd_power", "operator": "gt", "value": 1200.0, "severity": "alarm", "message": "Forward Power High" }
+    {
+      "parameter": "sys_delay",
+      "operator": "lt",
+      "value": 49.5,
+      "severity": "alarm",
+      "message": "System Delay Low"
+    },
+    {
+      "parameter": "sys_delay",
+      "operator": "gt",
+      "value": 50.5,
+      "severity": "alarm",
+      "message": "System Delay High"
+    },
+    {
+      "parameter": "dur_a",
+      "operator": "lt",
+      "value": 3,
+      "severity": "alarm",
+      "message": "Pulse Duration A Low"
+    },
+    {
+      "parameter": "dur_a",
+      "operator": "gt",
+      "value": 3.8,
+      "severity": "alarm",
+      "message": "Pulse Duration A High"
+    },
+    {
+      "parameter": "dur_b",
+      "operator": "lt",
+      "value": 3,
+      "severity": "alarm",
+      "message": "Pulse Duration B Low"
+    },
+    {
+      "parameter": "dur_b",
+      "operator": "gt",
+      "value": 3.8,
+      "severity": "alarm",
+      "message": "Pulse Duration B High"
+    },
+    {
+      "parameter": "rise_a",
+      "operator": "lt",
+      "value": 1.5,
+      "severity": "alarm",
+      "message": "Rise Time A Low"
+    },
+    {
+      "parameter": "rise_a",
+      "operator": "gt",
+      "value": 2.5,
+      "severity": "alarm",
+      "message": "Rise Time A High"
+    },
+    {
+      "parameter": "rise_b",
+      "operator": "lt",
+      "value": 1.5,
+      "severity": "alarm",
+      "message": "Rise Time B Low"
+    },
+    {
+      "parameter": "rise_b",
+      "operator": "gt",
+      "value": 2.5,
+      "severity": "alarm",
+      "message": "Rise Time B High"
+    },
+    {
+      "parameter": "decay_a",
+      "operator": "lt",
+      "value": 1.5,
+      "severity": "alarm",
+      "message": "Decay Time A Low"
+    },
+    {
+      "parameter": "decay_a",
+      "operator": "gt",
+      "value": 2.5,
+      "severity": "alarm",
+      "message": "Decay Time A High"
+    },
+    {
+      "parameter": "decay_b",
+      "operator": "lt",
+      "value": 1.5,
+      "severity": "alarm",
+      "message": "Decay Time B Low"
+    },
+    {
+      "parameter": "decay_b",
+      "operator": "gt",
+      "value": 2.5,
+      "severity": "alarm",
+      "message": "Decay Time B High"
+    },
+    {
+      "parameter": "spacing",
+      "operator": "lt",
+      "value": 11.5,
+      "severity": "alarm",
+      "message": "Pulse Spacing Low"
+    },
+    {
+      "parameter": "spacing",
+      "operator": "gt",
+      "value": 12.5,
+      "severity": "alarm",
+      "message": "Pulse Spacing High"
+    },
+    {
+      "parameter": "reply_eff",
+      "operator": "lt",
+      "value": 70,
+      "severity": "alarm",
+      "message": "Reply Efficiency Low"
+    },
+    {
+      "parameter": "pair_rate",
+      "operator": "lt",
+      "value": 700,
+      "severity": "alarm",
+      "message": "Pair Rate Low"
+    },
+    {
+      "parameter": "pair_rate",
+      "operator": "gt",
+      "value": 1400,
+      "severity": "alarm",
+      "message": "Pair Rate High"
+    },
+    {
+      "parameter": "fwd_power",
+      "operator": "lt",
+      "value": 800,
+      "severity": "alarm",
+      "message": "Forward Power Low"
+    },
+    {
+      "parameter": "fwd_power",
+      "operator": "gt",
+      "value": 1200,
+      "severity": "alarm",
+      "message": "Forward Power High"
+    }
   ],
   "ils_gp_thales421": [
-    { "parameter": "GP_ANGLE", "operator": "lt", "value": 2.75, "severity": "alarm", "message": "GP Angle Low" },
-    { "parameter": "GP_ANGLE", "operator": "gt", "value": 3.25, "severity": "alarm", "message": "GP Angle High" },
-    { "parameter": "RF_POWER", "operator": "lt", "value": 90.0, "severity": "alarm", "message": "RF Power Low" },
-    { "parameter": "RF_POWER", "operator": "gt", "value": 110.0, "severity": "alarm", "message": "RF Power High" },
-    { "parameter": "CSB_POWER", "operator": "lt", "value": 85.0, "severity": "alarm", "message": "CSB Power Low" },
-    { "parameter": "CSB_POWER", "operator": "gt", "value": 110.0, "severity": "alarm", "message": "CSB Power High" },
-    { "parameter": "CLR_POWER", "operator": "lt", "value": 85.0, "severity": "alarm", "message": "CLR Power Low" },
-    { "parameter": "CLR_POWER", "operator": "gt", "value": 120.0, "severity": "alarm", "message": "CLR Power High" },
-    { "parameter": "RF_OUT", "operator": "lt", "value": 70.0, "severity": "alarm", "message": "RF Output Low" },
-    { "parameter": "RF_OUT", "operator": "gt", "value": 125.0, "severity": "alarm", "message": "RF Output High" },
-    { "parameter": "CARRIER_PWR", "operator": "lt", "value": 65.0, "severity": "alarm", "message": "Carrier Power Low" },
-    { "parameter": "CARRIER_PWR", "operator": "gt", "value": 82.0, "severity": "alarm", "message": "Carrier Power High" },
-    { "parameter": "SBO_POWER", "operator": "lt", "value": 65.0, "severity": "alarm", "message": "SBO Power Low" },
-    { "parameter": "SBO_POWER", "operator": "gt", "value": 82.0, "severity": "alarm", "message": "SBO Power High" },
-    { "parameter": "CLR_SDM", "operator": "lt", "value": 65.0, "severity": "alarm", "message": "CLR SDM Low" },
-    { "parameter": "CLR_SDM", "operator": "gt", "value": 82.0, "severity": "alarm", "message": "CLR SDM High" },
-    { "parameter": "MON_POWER", "operator": "lt", "value": 65.0, "severity": "alarm", "message": "Monitor Power Low" },
-    { "parameter": "MON_POWER", "operator": "gt", "value": 90.0, "severity": "alarm", "message": "Monitor Power High" },
-    { "parameter": "DDM_COURSE", "operator": "lt", "value": -4.0, "severity": "alarm", "message": "DDM Course Low" },
-    { "parameter": "DDM_COURSE", "operator": "gt", "value": 4.0, "severity": "alarm", "message": "DDM Course High" },
-    { "parameter": "DDM_CLR", "operator": "lt", "value": 10.0, "severity": "alarm", "message": "DDM Clear Low" },
-    { "parameter": "DDM_CLR", "operator": "gt", "value": 22.0, "severity": "alarm", "message": "DDM Clear High" },
-    { "parameter": "CLR_DDM", "operator": "lt", "value": 20.0, "severity": "alarm", "message": "CLR DDM Low" },
-    { "parameter": "CLR_DDM", "operator": "gt", "value": 35.0, "severity": "alarm", "message": "CLR DDM High" },
-    { "parameter": "DDM_MON", "operator": "lt", "value": -4.0, "severity": "alarm", "message": "DDM Monitor Low" },
-    { "parameter": "DDM_MON", "operator": "gt", "value": 4.0, "severity": "alarm", "message": "DDM Monitor High" }
+    {
+      "parameter": "GP_ANGLE",
+      "operator": "lt",
+      "value": 2.75,
+      "severity": "alarm",
+      "message": "GP Angle Low"
+    },
+    {
+      "parameter": "GP_ANGLE",
+      "operator": "gt",
+      "value": 3.25,
+      "severity": "alarm",
+      "message": "GP Angle High"
+    },
+    {
+      "parameter": "RF_POWER",
+      "operator": "lt",
+      "value": 90,
+      "severity": "alarm",
+      "message": "RF Power Low"
+    },
+    {
+      "parameter": "RF_POWER",
+      "operator": "gt",
+      "value": 110,
+      "severity": "alarm",
+      "message": "RF Power High"
+    },
+    {
+      "parameter": "CSB_POWER",
+      "operator": "lt",
+      "value": 85,
+      "severity": "alarm",
+      "message": "CSB Power Low"
+    },
+    {
+      "parameter": "CSB_POWER",
+      "operator": "gt",
+      "value": 110,
+      "severity": "alarm",
+      "message": "CSB Power High"
+    },
+    {
+      "parameter": "CLR_POWER",
+      "operator": "lt",
+      "value": 85,
+      "severity": "alarm",
+      "message": "CLR Power Low"
+    },
+    {
+      "parameter": "CLR_POWER",
+      "operator": "gt",
+      "value": 120,
+      "severity": "alarm",
+      "message": "CLR Power High"
+    },
+    {
+      "parameter": "RF_OUT",
+      "operator": "lt",
+      "value": 70,
+      "severity": "alarm",
+      "message": "RF Output Low"
+    },
+    {
+      "parameter": "RF_OUT",
+      "operator": "gt",
+      "value": 125,
+      "severity": "alarm",
+      "message": "RF Output High"
+    },
+    {
+      "parameter": "CARRIER_PWR",
+      "operator": "lt",
+      "value": 65,
+      "severity": "alarm",
+      "message": "Carrier Power Low"
+    },
+    {
+      "parameter": "CARRIER_PWR",
+      "operator": "gt",
+      "value": 82,
+      "severity": "alarm",
+      "message": "Carrier Power High"
+    },
+    {
+      "parameter": "SBO_POWER",
+      "operator": "lt",
+      "value": 65,
+      "severity": "alarm",
+      "message": "SBO Power Low"
+    },
+    {
+      "parameter": "SBO_POWER",
+      "operator": "gt",
+      "value": 82,
+      "severity": "alarm",
+      "message": "SBO Power High"
+    },
+    {
+      "parameter": "CLR_SDM",
+      "operator": "lt",
+      "value": 65,
+      "severity": "alarm",
+      "message": "CLR SDM Low"
+    },
+    {
+      "parameter": "CLR_SDM",
+      "operator": "gt",
+      "value": 82,
+      "severity": "alarm",
+      "message": "CLR SDM High"
+    },
+    {
+      "parameter": "MON_POWER",
+      "operator": "lt",
+      "value": 65,
+      "severity": "alarm",
+      "message": "Monitor Power Low"
+    },
+    {
+      "parameter": "MON_POWER",
+      "operator": "gt",
+      "value": 90,
+      "severity": "alarm",
+      "message": "Monitor Power High"
+    },
+    {
+      "parameter": "DDM_COURSE",
+      "operator": "lt",
+      "value": -4,
+      "severity": "alarm",
+      "message": "DDM Course Low"
+    },
+    {
+      "parameter": "DDM_COURSE",
+      "operator": "gt",
+      "value": 4,
+      "severity": "alarm",
+      "message": "DDM Course High"
+    },
+    {
+      "parameter": "DDM_CLR",
+      "operator": "lt",
+      "value": 10,
+      "severity": "alarm",
+      "message": "DDM Clear Low"
+    },
+    {
+      "parameter": "DDM_CLR",
+      "operator": "gt",
+      "value": 22,
+      "severity": "alarm",
+      "message": "DDM Clear High"
+    },
+    {
+      "parameter": "CLR_DDM",
+      "operator": "lt",
+      "value": 20,
+      "severity": "alarm",
+      "message": "CLR DDM Low"
+    },
+    {
+      "parameter": "CLR_DDM",
+      "operator": "gt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "CLR DDM High"
+    },
+    {
+      "parameter": "DDM_MON",
+      "operator": "lt",
+      "value": -4,
+      "severity": "alarm",
+      "message": "DDM Monitor Low"
+    },
+    {
+      "parameter": "DDM_MON",
+      "operator": "gt",
+      "value": 4,
+      "severity": "alarm",
+      "message": "DDM Monitor High"
+    }
   ],
   "ils_llz_thales421": [
-    { "parameter": "CRS_RF", "operator": "lt", "value": 85.0, "severity": "alarm", "message": "CRS RF Level Low" },
-    { "parameter": "CRS_RF", "operator": "gt", "value": 115.0, "severity": "alarm", "message": "CRS RF Level High" },
-    { "parameter": "WIDTH_RF", "operator": "lt", "value": 85.0, "severity": "alarm", "message": "Width RF Level Low" },
-    { "parameter": "WIDTH_RF", "operator": "gt", "value": 115.0, "severity": "alarm", "message": "Width RF Level High" },
-    { "parameter": "CLR_RF", "operator": "lt", "value": 85.0, "severity": "alarm", "message": "CLR RF Level Low" },
-    { "parameter": "CLR_RF", "operator": "gt", "value": 115.0, "severity": "alarm", "message": "CLR RF Level High" },
-    { "parameter": "NF_RF", "operator": "lt", "value": 70.0, "severity": "alarm", "message": "NF RF Level Low" },
-    { "parameter": "NF_RF", "operator": "gt", "value": 125.0, "severity": "alarm", "message": "NF RF Level High" },
-    { "parameter": "CRS_SDM", "operator": "lt", "value": 35.0, "severity": "alarm", "message": "CRS SDM Low" },
-    { "parameter": "CRS_SDM", "operator": "gt", "value": 45.0, "severity": "alarm", "message": "CRS SDM High" },
-    { "parameter": "WIDTH_SDM", "operator": "lt", "value": 35.0, "severity": "alarm", "message": "Width SDM Low" },
-    { "parameter": "WIDTH_SDM", "operator": "gt", "value": 45.0, "severity": "alarm", "message": "Width SDM High" },
-    { "parameter": "CLR_SDM", "operator": "lt", "value": 35.0, "severity": "alarm", "message": "CLR SDM Low" },
-    { "parameter": "CLR_SDM", "operator": "gt", "value": 45.0, "severity": "alarm", "message": "CLR SDM High" },
-    { "parameter": "NF_SDM", "operator": "lt", "value": 35.0, "severity": "alarm", "message": "NF SDM Low" },
-    { "parameter": "NF_SDM", "operator": "gt", "value": 45.0, "severity": "alarm", "message": "NF SDM High" },
-    { "parameter": "IDENT_AM", "operator": "lt", "value": 5.0, "severity": "alarm", "message": "Ident AM Low" },
-    { "parameter": "IDENT_AM", "operator": "gt", "value": 20.0, "severity": "alarm", "message": "Ident AM High" }
+    {
+      "parameter": "M1_CRS_RF",
+      "operator": "lt",
+      "value": 85,
+      "severity": "alarm",
+      "message": "CRS RF Level Low"
+    },
+    {
+      "parameter": "M2_CRS_RF",
+      "operator": "lt",
+      "value": 85,
+      "severity": "alarm",
+      "message": "CRS RF Level Low"
+    },
+    {
+      "parameter": "M1_CRS_RF",
+      "operator": "gt",
+      "value": 115,
+      "severity": "alarm",
+      "message": "CRS RF Level High"
+    },
+    {
+      "parameter": "M2_CRS_RF",
+      "operator": "gt",
+      "value": 115,
+      "severity": "alarm",
+      "message": "CRS RF Level High"
+    },
+    {
+      "parameter": "M1_WIDTH_RF",
+      "operator": "lt",
+      "value": 85,
+      "severity": "alarm",
+      "message": "Width RF Level Low"
+    },
+    {
+      "parameter": "M2_WIDTH_RF",
+      "operator": "lt",
+      "value": 85,
+      "severity": "alarm",
+      "message": "Width RF Level Low"
+    },
+    {
+      "parameter": "M1_WIDTH_RF",
+      "operator": "gt",
+      "value": 115,
+      "severity": "alarm",
+      "message": "Width RF Level High"
+    },
+    {
+      "parameter": "M2_WIDTH_RF",
+      "operator": "gt",
+      "value": 115,
+      "severity": "alarm",
+      "message": "Width RF Level High"
+    },
+    {
+      "parameter": "M1_CLR_RF",
+      "operator": "lt",
+      "value": 85,
+      "severity": "alarm",
+      "message": "CLR RF Level Low"
+    },
+    {
+      "parameter": "M2_CLR_RF",
+      "operator": "lt",
+      "value": 85,
+      "severity": "alarm",
+      "message": "CLR RF Level Low"
+    },
+    {
+      "parameter": "M1_CLR_RF",
+      "operator": "gt",
+      "value": 115,
+      "severity": "alarm",
+      "message": "CLR RF Level High"
+    },
+    {
+      "parameter": "M2_CLR_RF",
+      "operator": "gt",
+      "value": 115,
+      "severity": "alarm",
+      "message": "CLR RF Level High"
+    },
+    {
+      "parameter": "M1_NF_RF",
+      "operator": "lt",
+      "value": 70,
+      "severity": "alarm",
+      "message": "NF RF Level Low"
+    },
+    {
+      "parameter": "M2_NF_RF",
+      "operator": "lt",
+      "value": 70,
+      "severity": "alarm",
+      "message": "NF RF Level Low"
+    },
+    {
+      "parameter": "M1_NF_RF",
+      "operator": "gt",
+      "value": 125,
+      "severity": "alarm",
+      "message": "NF RF Level High"
+    },
+    {
+      "parameter": "M2_NF_RF",
+      "operator": "gt",
+      "value": 125,
+      "severity": "alarm",
+      "message": "NF RF Level High"
+    },
+    {
+      "parameter": "M1_CRS_SDM",
+      "operator": "lt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "CRS SDM Low"
+    },
+    {
+      "parameter": "M2_CRS_SDM",
+      "operator": "lt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "CRS SDM Low"
+    },
+    {
+      "parameter": "M1_CRS_SDM",
+      "operator": "gt",
+      "value": 45,
+      "severity": "alarm",
+      "message": "CRS SDM High"
+    },
+    {
+      "parameter": "M2_CRS_SDM",
+      "operator": "gt",
+      "value": 45,
+      "severity": "alarm",
+      "message": "CRS SDM High"
+    },
+    {
+      "parameter": "M1_WIDTH_SDM",
+      "operator": "lt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "Width SDM Low"
+    },
+    {
+      "parameter": "M2_WIDTH_SDM",
+      "operator": "lt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "Width SDM Low"
+    },
+    {
+      "parameter": "M1_WIDTH_SDM",
+      "operator": "gt",
+      "value": 45,
+      "severity": "alarm",
+      "message": "Width SDM High"
+    },
+    {
+      "parameter": "M2_WIDTH_SDM",
+      "operator": "gt",
+      "value": 45,
+      "severity": "alarm",
+      "message": "Width SDM High"
+    },
+    {
+      "parameter": "M1_CLR_SDM",
+      "operator": "lt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "CLR SDM Low"
+    },
+    {
+      "parameter": "M2_CLR_SDM",
+      "operator": "lt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "CLR SDM Low"
+    },
+    {
+      "parameter": "M1_CLR_SDM",
+      "operator": "gt",
+      "value": 45,
+      "severity": "alarm",
+      "message": "CLR SDM High"
+    },
+    {
+      "parameter": "M2_CLR_SDM",
+      "operator": "gt",
+      "value": 45,
+      "severity": "alarm",
+      "message": "CLR SDM High"
+    },
+    {
+      "parameter": "M1_NF_SDM",
+      "operator": "lt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "NF SDM Low"
+    },
+    {
+      "parameter": "M2_NF_SDM",
+      "operator": "lt",
+      "value": 35,
+      "severity": "alarm",
+      "message": "NF SDM Low"
+    },
+    {
+      "parameter": "M1_NF_SDM",
+      "operator": "gt",
+      "value": 45,
+      "severity": "alarm",
+      "message": "NF SDM High"
+    },
+    {
+      "parameter": "M2_NF_SDM",
+      "operator": "gt",
+      "value": 45,
+      "severity": "alarm",
+      "message": "NF SDM High"
+    },
+    {
+      "parameter": "M1_IDENT_AM",
+      "operator": "lt",
+      "value": 5,
+      "severity": "alarm",
+      "message": "Ident AM Low"
+    },
+    {
+      "parameter": "M2_IDENT_AM",
+      "operator": "lt",
+      "value": 5,
+      "severity": "alarm",
+      "message": "Ident AM Low"
+    },
+    {
+      "parameter": "M1_IDENT_AM",
+      "operator": "gt",
+      "value": 20,
+      "severity": "alarm",
+      "message": "Ident AM High"
+    },
+    {
+      "parameter": "M2_IDENT_AM",
+      "operator": "gt",
+      "value": 20,
+      "severity": "alarm",
+      "message": "Ident AM High"
+    }
   ],
   "pm5560_modbus": [
-    { "parameter": "VL1N", "operator": "lt", "value": 200.0, "severity": "alarm", "message": "Van Voltage Low" },
-    { "parameter": "VL1N", "operator": "gt", "value": 240.0, "severity": "alarm", "message": "Van Voltage High" },
-    { "parameter": "VL2N", "operator": "lt", "value": 200.0, "severity": "alarm", "message": "Vbn Voltage Low" },
-    { "parameter": "VL2N", "operator": "gt", "value": 240.0, "severity": "alarm", "message": "Vbn Voltage High" },
-    { "parameter": "VL3N", "operator": "lt", "value": 200.0, "severity": "alarm", "message": "Vcn Voltage Low" },
-    { "parameter": "VL3N", "operator": "gt", "value": 240.0, "severity": "alarm", "message": "Vcn Voltage High" },
-    { "parameter": "HZ", "operator": "lt", "value": 49.5, "severity": "alarm", "message": "Frequency Low" },
-    { "parameter": "HZ", "operator": "gt", "value": 50.5, "severity": "alarm", "message": "Frequency High" },
-    { "parameter": "PF", "operator": "lt", "value": 0.8, "severity": "alarm", "message": "Power Factor Low" }
+    {
+      "parameter": "VL1N",
+      "operator": "lt",
+      "value": 200,
+      "severity": "alarm",
+      "message": "Van Voltage Low"
+    },
+    {
+      "parameter": "VL1N",
+      "operator": "gt",
+      "value": 240,
+      "severity": "alarm",
+      "message": "Van Voltage High"
+    },
+    {
+      "parameter": "VL2N",
+      "operator": "lt",
+      "value": 200,
+      "severity": "alarm",
+      "message": "Vbn Voltage Low"
+    },
+    {
+      "parameter": "VL2N",
+      "operator": "gt",
+      "value": 240,
+      "severity": "alarm",
+      "message": "Vbn Voltage High"
+    },
+    {
+      "parameter": "VL3N",
+      "operator": "lt",
+      "value": 200,
+      "severity": "alarm",
+      "message": "Vcn Voltage Low"
+    },
+    {
+      "parameter": "VL3N",
+      "operator": "gt",
+      "value": 240,
+      "severity": "alarm",
+      "message": "Vcn Voltage High"
+    },
+    {
+      "parameter": "HZ",
+      "operator": "lt",
+      "value": 49.5,
+      "severity": "alarm",
+      "message": "Frequency Low"
+    },
+    {
+      "parameter": "HZ",
+      "operator": "gt",
+      "value": 50.5,
+      "severity": "alarm",
+      "message": "Frequency High"
+    },
+    {
+      "parameter": "PF",
+      "operator": "lt",
+      "value": 0.8,
+      "severity": "alarm",
+      "message": "Power Factor Low"
+    }
   ],
   "temp_humidity_modbus": [
-    { "parameter": "temperature_c", "operator": "gte", "value": 35.0, "severity": "alarm", "message": "Temperature Critical" },
-    { "parameter": "temperature_c", "operator": "gte", "value": 30.0, "severity": "warning", "message": "Temperature High" }
+    {
+      "parameter": "temperature_c",
+      "operator": "gte",
+      "value": 35,
+      "severity": "alarm",
+      "message": "Temperature Critical"
+    },
+    {
+      "parameter": "temperature_c",
+      "operator": "gte",
+      "value": 30,
+      "severity": "warning",
+      "message": "Temperature High"
+    }
   ],
   "snmp": [
-    { "parameter": "cpu_usage", "operator": "gte", "value": 95.0, "severity": "alarm", "message": "CPU Usage Critical" },
-    { "parameter": "cpu_usage", "operator": "gte", "value": 80.0, "severity": "warning", "message": "CPU Usage High" },
-    { "parameter": "ram_usage_pct", "operator": "gte", "value": 95.0, "severity": "alarm", "message": "RAM Usage Critical" },
-    { "parameter": "ram_usage_pct", "operator": "gte", "value": 80.0, "severity": "warning", "message": "RAM Usage High" },
-    { "parameter": "disk_usage_pct", "operator": "gte", "value": 95.0, "severity": "alarm", "message": "Disk Usage Critical" },
-    { "parameter": "disk_usage_pct", "operator": "gte", "value": 80.0, "severity": "warning", "message": "Disk Usage High" }
+    {
+      "parameter": "cpu_usage",
+      "operator": "gte",
+      "value": 95,
+      "severity": "alarm",
+      "message": "CPU Usage Critical"
+    },
+    {
+      "parameter": "cpu_usage",
+      "operator": "gte",
+      "value": 80,
+      "severity": "warning",
+      "message": "CPU Usage High"
+    },
+    {
+      "parameter": "ram_usage_pct",
+      "operator": "gte",
+      "value": 95,
+      "severity": "alarm",
+      "message": "RAM Usage Critical"
+    },
+    {
+      "parameter": "ram_usage_pct",
+      "operator": "gte",
+      "value": 80,
+      "severity": "warning",
+      "message": "RAM Usage High"
+    },
+    {
+      "parameter": "disk_usage_pct",
+      "operator": "gte",
+      "value": 95,
+      "severity": "alarm",
+      "message": "Disk Usage Critical"
+    },
+    {
+      "parameter": "disk_usage_pct",
+      "operator": "gte",
+      "value": 80,
+      "severity": "warning",
+      "message": "Disk Usage High"
+    }
   ]
 }
