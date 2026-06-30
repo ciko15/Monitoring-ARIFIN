@@ -446,6 +446,9 @@
             console.warn('[Enhancements] Failed to refresh source detail:', e);
         }
 
+        // Cegah popup terbuka kembali jika sudah ditutup saat fetch berlangsung
+        if (!_activeSourceDetail || _activeSourceDetail.id !== src.id) return;
+
         const { latestData, eqSup } = getSourceDetailPayload(src);
         const nextSignature = buildSourceDetailSignature(src, latestData, eqSup);
         if (!forceRender && nextSignature === _sourceDetailSignature) return;
