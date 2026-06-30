@@ -22,7 +22,9 @@ const cabangModule = (function () {
   let isLoadingEquipment = false;
   let lastRenderSignature = '';
   let lastEquipmentFetchAt = 0;
+  let sourceConfigs = [];
   const MIN_FETCH_INTERVAL_MS = 7000;
+  const CACHE_VERSION = 'source-aware-2026-06-30';
 
   // DOM Elements
   const cabangGrid = document.getElementById('cabangGrid');
@@ -34,11 +36,82 @@ const cabangModule = (function () {
 
   // Initialize
   function init() {
+    refreshCacheVersion();
+    loadCachedSourceConfigs();
     bindEvents();
     loadAirports();
     // Load all equipment initially
     loadEquipment();
     startAutoRefresh();
+  }
+
+  function refreshCacheVersion() {
+    const currentVersion = localStorage.getItem('cabang_cache_version');
+    if (currentVersion === CACHE_VERSION) return;
+
+    localStorage.removeItem('cabang_equipment_cache');
+    localStorage.setItem('cabang_cache_version', CACHE_VERSION);
+  }
+
+  function normalizeList(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [];
+  }
+
+  function loadCachedSourceConfigs() {
+    try {
+      sourceConfigs = normalizeList(JSON.parse(localStorage.getItem('cabang_source_config_cache') || '[]'));
+    } catch (e) {
+      console.warn('[Cabang] Failed to parse source config cache:', e);
+      sourceConfigs = [];
+    }
+  }
+
+  async function loadSourceConfigs() {
+    try {
+      const response = await fetch('/api/config/authentications');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      sourceConfigs = normalizeList(await response.json());
+      localStorage.setItem('cabang_source_config_cache', JSON.stringify(sourceConfigs));
+    } catch (error) {
+      console.warn('[Cabang] Failed loading source configs:', error);
+    }
+  }
+
+  function buildPlaceholderSource(src) {
+    return {
+      _status: 'Disconnect',
+      _logged_at: null,
+      _parsing_id: src.parsing_id || null,
+      _ip: src.ip_address || null
+    };
+  }
+
+  function hydrateEquipmentSources(items) {
+    if (!Array.isArray(items) || sourceConfigs.length === 0) return items;
+
+    return items.map(item => {
+      const matchingSources = sourceConfigs.filter(src =>
+        String(src.equipt_id ?? src.equipmentId ?? '') === String(item.id)
+      );
+
+      if (matchingSources.length === 0) return item;
+
+      const existingLastData = item.lastData && typeof item.lastData === 'object' ? item.lastData : {};
+      const hydratedLastData = { ...existingLastData };
+
+      matchingSources.forEach(src => {
+        if (!src.name || hydratedLastData[src.name]) return;
+        hydratedLastData[src.name] = buildPlaceholderSource(src);
+      });
+
+      return {
+        ...item,
+        lastData: hydratedLastData
+      };
+    });
   }
 
   function bindEvents() {
@@ -131,7 +204,7 @@ const cabangModule = (function () {
     const cachedData = localStorage.getItem('cabang_equipment_cache');
     if (cachedData && !equipmentData.length) {
       try {
-        equipmentData = JSON.parse(cachedData);
+        equipmentData = hydrateEquipmentSources(JSON.parse(cachedData));
         window.equipmentDataCache = equipmentData;
         renderCabangGrid();
         // If we have cache, the first fetch should be silent
@@ -166,7 +239,13 @@ const cabangModule = (function () {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const result = await response.json();
-      equipmentData = result.data || result;
+      equipmentData = normalizeList(result);
+
+      if (equipmentData.some(item => !item.lastData || Object.keys(item.lastData).length === 0)) {
+        await loadSourceConfigs();
+        equipmentData = hydrateEquipmentSources(equipmentData);
+      }
+
       window.equipmentDataCache = equipmentData; // expose for enhancements.js
 
       // Save to cache for next visit
@@ -191,6 +270,9 @@ const cabangModule = (function () {
       status: item.status,
       lastUpdate: item.lastUpdate,
       lastDataKeys: item.lastData ? Object.keys(item.lastData) : [],
+      lastDataStatuses: item.lastData
+        ? Object.values(item.lastData).map(src => src && src._status ? src._status : null)
+        : [],
       lastDataTimes: item.lastData
         ? Object.values(item.lastData).map(src => src && src._logged_at ? src._logged_at : null)
         : []
@@ -291,14 +373,14 @@ const cabangModule = (function () {
       if (item.lastData) {
         // Ambil semua source dan urutkan berdasarkan waktu update terbaru (_logged_at)
         const sources = Object.keys(item.lastData).sort((a, b) => {
-          const timeA = item.lastData[a]._logged_at ? new Date(item.lastData[a]._logged_at).getTime() : 0;
-          const timeB = item.lastData[b]._logged_at ? new Date(item.lastData[b]._logged_at).getTime() : 0;
+          const timeA = item.lastData[a]?._logged_at ? new Date(item.lastData[a]._logged_at).getTime() : 0;
+          const timeB = item.lastData[b]?._logged_at ? new Date(item.lastData[b]._logged_at).getTime() : 0;
           return timeB - timeA; // Terbaru di atas
         });
 
         if (sources.length > 0) {
           const cardsHtml = sources.map(sourceName => {
-            const sourceData = item.lastData[sourceName];
+            const sourceData = item.lastData[sourceName] || {};
             const srcStatus = sourceData._status || 'Normal';
             const logDate = sourceData._logged_at ? new Date(sourceData._logged_at) : null;
             const isToday = logDate && logDate.toDateString() === new Date().toDateString();
