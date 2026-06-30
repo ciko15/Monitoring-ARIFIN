@@ -28,7 +28,7 @@
     "name": "TX 1 APP",
     "equipt_id": "1775111531489",
     "ip_address": "192.168.210.130",
-    "tcp_port": "8010",
+    "tcp_port": "80",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": {
@@ -46,7 +46,7 @@
     "name": "TX 2 APP",
     "equipt_id": "1775111531489",
     "ip_address": "192.168.210.131",
-    "tcp_port": "8010",
+    "tcp_port": "80",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": {
@@ -64,7 +64,7 @@
     "name": "TX SEC APP",
     "equipt_id": "1776723070329",
     "ip_address": "192.168.210.132",
-    "tcp_port": "8010",
+    "tcp_port": "80",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "sup_category": "VHF A/G",
@@ -82,7 +82,7 @@
     "name": "RX SEC APP",
     "equipt_id": "1776723070329",
     "ip_address": "192.168.210.135",
-    "tcp_port": "8010",
+    "tcp_port": "80",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": {
@@ -100,7 +100,7 @@
     "name": "RX 1 APP",
     "equipt_id": "1775111531489",
     "ip_address": "192.168.210.133",
-    "tcp_port": "8010",
+    "tcp_port": "80",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": {
@@ -118,7 +118,7 @@
     "name": "RX 2 APP",
     "equipt_id": "1775111531489",
     "ip_address": "192.168.210.134",
-    "tcp_port": "8010",
+    "tcp_port": "80",
     "udp_port": null,
     "parsing_id": "vhf_t6tv",
     "extra_config": {

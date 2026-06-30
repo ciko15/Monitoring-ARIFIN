@@ -164,8 +164,14 @@ class NetworkListenerService {
         const username = extra.username || 'admin';
         const password = extra.password || 'admin';
         const pollMs   = (extra.interval || 5) * 1000;
+        const configuredFallbackPorts = Array.isArray(extra.fallback_ports)
+            ? extra.fallback_ports
+            : (Array.isArray(extra.fallbackPorts) ? extra.fallbackPorts : []);
+        const fallbackPorts = [...configuredFallbackPorts];
+        if (port !== 80 && !fallbackPorts.includes(80)) fallbackPorts.push(80);
 
-        console.log(`[NetworkListener] Starting T6TV WS for ${source.name} at ${ip_address}:${port}${wsPath}`);
+        const portPlan = [port, ...fallbackPorts].filter((p, i, arr) => arr.indexOf(p) === i).join(' -> ');
+        console.log(`[NetworkListener] Starting T6TV WS for ${source.name} at ${ip_address}:${port}${wsPath} (ports: ${portPlan})`);
 
         const T6tvConnector = require('../connection/t6tv_connector');
         const VhfT6tvParser = require('../parsers/vhf_t6tv');
@@ -178,7 +184,18 @@ class NetworkListenerService {
             console.error(`[NetworkListener] T6TV error for ${source.name}:`, err.message || err);
         };
 
-        const connector = new T6tvConnector(id, ip_address, port, username, password, wsPath, pollMs, onData, onError);
+        const connector = new T6tvConnector(
+            id,
+            ip_address,
+            port,
+            username,
+            password,
+            wsPath,
+            pollMs,
+            onData,
+            onError,
+            { fallbackPorts }
+        );
         connector.start();
         this.activeListeners.add(id);
         this._t6tvConnectors = this._t6tvConnectors || new Map();
