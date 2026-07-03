@@ -894,36 +894,83 @@ async function getOtenticationByEquipment(equipmentId) {
   return data.filter(a => a.equipt_id == equipmentId);
 }
 
+async function syncEquipmentDataSourceRelation(equipmentId, sourceData) {
+  const equipmentList = await readJson(EQUIPMENT_CONFIG_PATH);
+  const equipmentIndex = equipmentList.findIndex(e => String(e.id) === String(equipmentId));
+
+  if (equipmentIndex === -1) {
+    return null;
+  }
+
+  const equipment = equipmentList[equipmentIndex];
+  const currentSources = Array.isArray(equipment.dataSources) ? equipment.dataSources : [];
+  const nextSource = {
+    id: sourceData.id,
+    name: sourceData.name || 'Source',
+    ip: sourceData.ip_address || null,
+    port: sourceData.tcp_port || sourceData.udp_port || sourceData.snmp_port || null,
+    parser: sourceData.parsing_id || null,
+    enabled: true
+  };
+
+  const mergedSources = currentSources.filter(src => String(src.id) !== String(sourceData.id));
+  mergedSources.push(nextSource);
+
+  equipmentList[equipmentIndex] = {
+    ...equipment,
+    dataSources: mergedSources,
+    category: equipment.category || 'Support',
+    sup_category: equipment.sup_category || null
+  };
+
+  await writeJson(EQUIPMENT_CONFIG_PATH, equipmentList);
+  return equipmentList[equipmentIndex];
+}
+
 async function createOtentication(data) {
   let authList = await readJson(AUTH_CONFIG_PATH);
+  const { id: _ignoredId, ...sourceData } = data || {};
   const newItem = {
     id: Date.now() + Math.floor(Math.random() * 1000),
-    name: data.name,
-    equipt_id: data.equipt_id || null,
-    ip_address: data.ip_address,
-    tcp_port: data.tcp_port || null,
-    udp_port: data.udp_port || null,
-    parsing_id: data.parsing_id || null,
-    sup_category: data.sup_category || null,
-    latitude: data.latitude !== undefined ? parseFloat(data.latitude) : null,
-    longitude: data.longitude !== undefined ? parseFloat(data.longitude) : null,
-    // MARC RSE specific
-    ...(data.marc_ports !== undefined ? { marc_ports: data.marc_ports } : {}),
-    ...(data.poll_interval !== undefined ? { poll_interval: data.poll_interval } : {}),
-    // T6TV / other extra config
-    ...(data.extra_config !== undefined ? { extra_config: data.extra_config } : {}),
+    name: sourceData.name || 'Source',
+    equipt_id: sourceData.equipt_id || null,
+    ip_address: sourceData.ip_address ?? sourceData.ip ?? null,
+    tcp_port: sourceData.tcp_port || null,
+    udp_port: sourceData.udp_port || null,
+    parsing_id: sourceData.parsing_id || null,
+    sup_category: sourceData.sup_category || null,
+    latitude: sourceData.latitude !== undefined ? parseFloat(sourceData.latitude) : null,
+    longitude: sourceData.longitude !== undefined ? parseFloat(sourceData.longitude) : null,
+    ...sourceData,
   };
   authList.push(newItem);
   await writeJson(AUTH_CONFIG_PATH, authList);
+  await syncEquipmentDataSourceRelation(newItem.equipt_id, newItem);
   return newItem;
 }
 
 async function updateOtentication(id, data) {
   let list = await readJson(AUTH_CONFIG_PATH);
-  const index = list.findIndex(a => a.id == id);
+  const index = list.findIndex(a => String(a.id) === String(id));
   if (index !== -1) {
-    list[index] = { ...list[index], ...data };
+    const merged = {
+      ...list[index],
+      ...data,
+      id: list[index].id,
+      equipt_id: data.equipt_id !== undefined ? data.equipt_id : list[index].equipt_id,
+      ip_address: data.ip_address !== undefined ? data.ip_address : list[index].ip_address,
+      tcp_port: data.tcp_port !== undefined ? data.tcp_port : list[index].tcp_port,
+      udp_port: data.udp_port !== undefined ? data.udp_port : list[index].udp_port,
+      parsing_id: data.parsing_id !== undefined ? data.parsing_id : list[index].parsing_id,
+      sup_category: data.sup_category !== undefined ? data.sup_category : list[index].sup_category,
+      latitude: data.latitude !== undefined ? parseFloat(data.latitude) : list[index].latitude,
+      longitude: data.longitude !== undefined ? parseFloat(data.longitude) : list[index].longitude,
+    };
+    list[index] = merged;
     await writeJson(AUTH_CONFIG_PATH, list);
+    if (list[index].equipt_id) {
+      await syncEquipmentDataSourceRelation(list[index].equipt_id, list[index]);
+    }
     return list[index];
   }
   return null;
@@ -1330,6 +1377,7 @@ module.exports = {
   getOtenticationByEquipment,
   createOtentication,
   updateOtentication,
+  syncEquipmentDataSourceRelation,
   deleteOtentication,
   deleteOtenticationByEquipment,
   syncAllOtenticationLocations,

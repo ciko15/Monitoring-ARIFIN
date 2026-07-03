@@ -500,20 +500,22 @@ class NetworkListenerService {
     // SNMP SYSTEM MONITOR (Server / Workstation / Switch)
     // ─────────────────────────────────────────────────────────────────────────
     startSnmpSystemListener(source) {
-        const { id, equipt_id, ip_address, name, community, poll_interval } = source;
+        const { id, equipt_id, ip_address, name, community, poll_interval, snmp_port, snmp_version } = source;
         const pollSec = parseInt(poll_interval) || 60;
         const comm    = community || 'public';
+        const port    = parseInt(snmp_port) || 161;
+        const version = snmp_version || '2c';
 
         const parserFile = source.parsing_id === 'snmp_network_basic' ? 'snmp_network_basic' : 'snmp_system';
         const { pollSNMP } = require(`../parsers/${parserFile}`);
 
         this.activeListeners.add(id);
-        console.log(`[SNMP System] Listener started: ${name} (${ip_address})`);
+        console.log(`[SNMP System] Listener started: ${name} (${ip_address}:${port}, v${version})`);
 
         const doPoll = async () => {
-            console.log(`[SNMP System] Polling ${name} (${ip_address})...`);
+            console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
             try {
-                const result = await pollSNMP(ip_address, comm);
+                const result = await pollSNMP(ip_address, comm, { port, version });
                 const logLine = `[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error||'none'}`;
                 if (String(result.status || '').toLowerCase() === 'disconnect') {
                     this._logThrottled('log', `snmp-system:disconnect:${id}`, logLine);

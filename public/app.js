@@ -468,6 +468,24 @@ function clearMarcPortsCheckboxes() {
   }
 }
 
+const SNMP_PARSING_IDS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic'];
+
+function isSnmpParsingId(parsingId) {
+  return SNMP_PARSING_IDS.includes(String(parsingId || ''));
+}
+
+function resetSnmpFields() {
+  const communityInput = document.getElementById('snmpCommunity');
+  const versionSelect = document.getElementById('snmpVersion');
+  const portInput = document.getElementById('snmpPort');
+  const pollInput = document.getElementById('snmpPollInterval');
+
+  if (communityInput) communityInput.value = 'public';
+  if (versionSelect) versionSelect.value = '2c';
+  if (portInput) portInput.value = '161';
+  if (pollInput) pollInput.value = '60';
+}
+
 window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   const parsingConfig = await loadParsingConfig();
   const modal = document.getElementById('dataSourceOverlayModal');
@@ -487,8 +505,13 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   const supCategorySelect = document.getElementById('dataSourceSupCategory');
   const ipInput = document.getElementById('dataSourceIp');
   const portInput = document.getElementById('dataSourceUdpPort');
+  const tcpPortGroup = document.getElementById('dataSourceTcpPortGroup');
   const latInput = document.getElementById('dataSourceLatitude');
   const lngInput = document.getElementById('dataSourceLongitude');
+  const snmpCommunityInput = document.getElementById('snmpCommunity');
+  const snmpVersionSelect = document.getElementById('snmpVersion');
+  const snmpPortInput = document.getElementById('snmpPort');
+  const snmpPollIntervalInput = document.getElementById('snmpPollInterval');
 
   // Set Modal Title
   if (titleEl) titleEl.innerHTML = editSource
@@ -542,6 +565,17 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     if (portInput) portInput.value = editSource.tcp_port || editSource.udp_port || '';
     if (latInput) latInput.value = editSource.latitude || '';
     if (lngInput) lngInput.value = editSource.longitude || '';
+
+    if (isSnmpParsingId(editSource.parsing_id)) {
+      if (snmpCommunityInput) snmpCommunityInput.value = editSource.community || 'public';
+      if (snmpVersionSelect) snmpVersionSelect.value = editSource.snmp_version || '2c';
+      if (snmpPortInput) snmpPortInput.value = editSource.snmp_port || '161';
+      if (snmpPollIntervalInput) snmpPollIntervalInput.value = editSource.poll_interval || '60';
+      if (portInput) portInput.value = '';
+    } else {
+      resetSnmpFields();
+    }
+
     // Populate T6TV extra fields if editing
     const extra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? JSON.parse(editSource.extra_config) : editSource.extra_config) : {};
     const t6tvDiv = document.getElementById('t6tvExtraFields');
@@ -569,6 +603,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   } else {
     form.reset();
     clearMarcPortsCheckboxes();
+    resetSnmpFields();
     if (equipmentSelect) equipmentSelect.value = equipmentId;
     if (dataSourceIdInput) dataSourceIdInput.value = generateUniqueCode(8);
 
@@ -600,11 +635,14 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     templateSelect.addEventListener('change', () => {
       const extra = document.getElementById('t6tvExtraFields');
       const marcExtra = document.getElementById('marcExtraFields');
+      const snmpExtra = document.getElementById('snmpExtraFields');
       const portField = document.getElementById('dataSourceUdpPort');
+      const isSnmp = isSnmpParsingId(templateSelect.value);
       if (extra) extra.style.display = templateSelect.value === 'vhf_t6tv' ? 'block' : 'none';
       if (marcExtra) marcExtra.style.display = templateSelect.value === 'vhf_marc_rse' ? 'block' : 'none';
+      if (snmpExtra) snmpExtra.style.display = isSnmp ? 'block' : 'none';
+      if (tcpPortGroup) tcpPortGroup.style.display = isSnmp ? 'none' : '';
       if (portField) {
-        const isSnmp = templateSelect.value === 'snmp_system' || templateSelect.value === 'snmp_host_resources_01';
         portField.required = templateSelect.value !== 'vhf_t6tv' && !isSnmp;
         if (templateSelect.value === 'vhf_t6tv' && !portField.value) portField.value = '80';
         if (templateSelect.value === 'vhf_marc_rse' && !portField.value) portField.value = '950';
@@ -614,6 +652,12 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         } else if (portField.placeholder === 'Tidak diperlukan untuk SNMP') {
           portField.placeholder = 'Masukkan Port';
         }
+      }
+      if (isSnmp) {
+        if (snmpCommunityInput && !snmpCommunityInput.value) snmpCommunityInput.value = 'public';
+        if (snmpVersionSelect && !snmpVersionSelect.value) snmpVersionSelect.value = '2c';
+        if (snmpPortInput && !snmpPortInput.value) snmpPortInput.value = '161';
+        if (snmpPollIntervalInput && !snmpPollIntervalInput.value) snmpPollIntervalInput.value = '60';
       }
       if (templateSelect.value !== 'vhf_marc_rse') clearMarcPortsCheckboxes();
     });
@@ -651,7 +695,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   form.onsubmit = async (event) => {
     event.preventDefault();
 
-    const isSnmpTemplate = templateSelect.value === 'snmp_system' || templateSelect.value === 'snmp_host_resources_01';
+    const isSnmpTemplate = isSnmpParsingId(templateSelect.value);
     const normalizedPort = isSnmpTemplate ? null : (portInput.value ? portInput.value : null);
 
     const payload = {
@@ -672,12 +716,13 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       // MARC RSE: simpan marc_ports langsung di root object (bukan extra_config)
       ...(templateSelect.value === 'vhf_marc_rse' ? { marc_ports: getMarcPortsFromCheckboxes() } : {}),
       ...(templateSelect.value === 'vhf_marc_rse' ? { poll_interval: 30 } : {}),
-      // SNMP System: isi default parameter SNMP
-      ...(templateSelect.value === 'snmp_system' ? {
+      // SNMP: simpan parameter komunikasi dari form.
+      ...(isSnmpTemplate ? {
         protocol: 'snmp',
-        community: 'public',
-        snmp_version: '2c',
-        poll_interval: 60
+        community: snmpCommunityInput && snmpCommunityInput.value ? snmpCommunityInput.value.trim() : 'public',
+        snmp_version: snmpVersionSelect && snmpVersionSelect.value ? snmpVersionSelect.value : '2c',
+        snmp_port: snmpPortInput && snmpPortInput.value ? parseInt(snmpPortInput.value, 10) || 161 : 161,
+        poll_interval: snmpPollIntervalInput && snmpPollIntervalInput.value ? parseInt(snmpPollIntervalInput.value, 10) || 60 : 60
       } : {})
     };
 

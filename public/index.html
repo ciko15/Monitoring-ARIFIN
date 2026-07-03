@@ -285,6 +285,14 @@
             </div>
           </div>
           <div class="form-group">
+            <label for="dataSourceTemplate">Template Parsing</label>
+            <div class="custom-select-wrapper">
+              <select id="dataSourceTemplate" required>
+                <option value="">Pilih Template</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
             <label for="dataSourceId">ID Data Source</label>
             <input type="text" id="dataSourceId" readonly>
           </div>
@@ -310,8 +318,36 @@
             <input type="text" id="dataSourceIp" required placeholder="e.g., 192.168.1.10">
           </div>
           <div class="form-group">
-            <label for="dataSourceUdpPort">TCP Port</label>
-            <input type="number" id="dataSourceUdpPort" placeholder="e.g., 950">
+            <div id="dataSourceTcpPortGroup">
+              <label for="dataSourceUdpPort">TCP Port</label>
+              <input type="number" id="dataSourceUdpPort" placeholder="e.g., 950">
+            </div>
+
+            <!-- SNMP Extra Fields — shown only when template = snmp_* -->
+            <div id="snmpExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">SNMP COMMUNICATION</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div>
+                  <label style="font-size:11px;" for="snmpCommunity">Community</label>
+                  <input type="text" id="snmpCommunity" value="public" placeholder="public" style="width:100%; box-sizing:border-box;">
+                </div>
+                <div>
+                  <label style="font-size:11px;" for="snmpVersion">SNMP Version</label>
+                  <select id="snmpVersion" style="width:100%; box-sizing:border-box;">
+                    <option value="2c">v2c</option>
+                    <option value="1">v1</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;" for="snmpPort">SNMP Port</label>
+                  <input type="number" id="snmpPort" value="161" min="1" max="65535" style="width:100%; box-sizing:border-box;">
+                </div>
+                <div>
+                  <label style="font-size:11px;" for="snmpPollInterval">Poll Interval (detik)</label>
+                  <input type="number" id="snmpPollInterval" value="60" min="5" max="3600" style="width:100%; box-sizing:border-box;">
+                </div>
+              </div>
+            </div>
 
             <!-- T6TV Extra Fields — shown only when template = vhf_t6tv -->
             <div id="t6tvExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
@@ -387,14 +423,6 @@
                   <i class="fas fa-map-marker-alt"></i>
                 </button>
               </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="dataSourceTemplate">Template Parsing</label>
-            <div class="custom-select-wrapper">
-              <select id="dataSourceTemplate" required>
-                <option value="">Pilih Template</option>
-              </select>
             </div>
           </div>
           <div class="form-actions">

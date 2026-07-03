@@ -45,8 +45,28 @@ function formatUptime(ticks) {
     return `${m}m`;
 }
 
-function createSession(host, community) {
-    return new snmp.Session({ host, community, timeouts: [4000, 4000, 4000] });
+function normalizeSnmpVersion(version) {
+    const value = String(version || '2c').toLowerCase().replace(/^v/, '');
+    return value === '1' ? snmp.Versions.SNMPv1 : snmp.Versions.SNMPv2c;
+}
+
+function normalizeSnmpOptions(options = {}) {
+    if (!options || typeof options !== 'object') return { port: 161, version: '2c' };
+    return {
+        port: parseInt(options.port, 10) || 161,
+        version: options.version || '2c',
+    };
+}
+
+function createSession(host, community, options = {}) {
+    const snmpOptions = normalizeSnmpOptions(options);
+    return new snmp.Session({
+        host,
+        community,
+        port: snmpOptions.port,
+        version: normalizeSnmpVersion(snmpOptions.version),
+        timeouts: [4000, 4000, 4000],
+    });
 }
 
 function snmpGet(session, oid) {
@@ -146,8 +166,8 @@ async function readSwitchTemperature(session, sysObjectID) {
     return readTemperatureSensors(session, snmpWalk);
 }
 
-async function pollSNMP(host, community = 'public') {
-    const session = createSession(host, community);
+async function pollSNMP(host, community = 'public', options = {}) {
+    const session = createSession(host, community, options);
     try {
         const [sysName, sysDescr, sysObjectID, sysContact, sysUpTime, sysLocation, ifNumber, ifDescrVbs, ifNameVbs, ifOperStatusVbs, ifInOctetsVbs, ifOutOctetsVbs, ifHCInOctetsVbs, ifHCOutOctetsVbs] = await Promise.all([
             snmpGet(session, OID.sysName),
@@ -300,13 +320,21 @@ async function pollSNMP(host, community = 'public') {
     }
 }
 
-async function pollSNMPWithTimeout(host, community = 'public', timeoutMs = 15000) {
+async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 15000) {
+    if (typeof options === 'number') {
+        timeoutMs = options;
+        options = {};
+    }
+
+    const snmpOptions = normalizeSnmpOptions(options);
+    const effectiveTimeoutMs = Number(options && options.timeoutMs) || timeoutMs;
+
     return new Promise((resolve) => {
         const timer = setTimeout(() => {
             resolve({
                 success: false,
                 status: 'Disconnect',
-                error: 'SNMP timeout',
+                error: `SNMP timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
                 data: {
                     connectivity: 'Disconnected',
                     resolved_ip: host,
@@ -340,9 +368,9 @@ async function pollSNMPWithTimeout(host, community = 'public', timeoutMs = 15000
                 },
                 timestamp: new Date().toISOString(),
             });
-        }, timeoutMs);
+        }, effectiveTimeoutMs);
 
-        pollSNMP(host, community)
+        pollSNMP(host, community, snmpOptions)
             .then((result) => {
                 clearTimeout(timer);
                 resolve(result);
