@@ -1002,7 +1002,7 @@ async function getLimitationsByEquipment(equipmentId) {
   const equipment = await getEquipmentById(equipmentId);
   if (!equipment) return [];
 
-  const data = await readJson(LIMITATION_CONFIG_PATH);
+  const data = await readJson(LIMITATION_CONFIG_PATH, []);
   const targetSup = String(equipment.sup_category || '').toLowerCase();
   return data.filter(l => {
     const limitSup = String(l.sup_category || '').toLowerCase();

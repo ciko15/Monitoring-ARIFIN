@@ -351,13 +351,19 @@ class NetworkListenerService {
                 }
             });
 
+            if (!this._lastHeartbeatReply) this._lastHeartbeatReply = new Map();
+            
             socket.on('data', async (chunk) => {
-                // Balas heartbeat dari device agar stream tetap hidup tanpa RCMS
+                // Balas heartbeat dari device agar stream tetap hidup tanpa RCMS (max 1x per 5 detik untuk mencegah ping-pong storm)
                 if (hasTriggerProtocol && parser.isHeartbeat(chunk)) {
-                    try {
-                        socket.write(parser.getHeartbeatReply());
-                    } catch (e) {
-                        console.warn(`[NetworkListener] ILS heartbeat reply error ${name}: ${e.message}`);
+                    const lastReply = this._lastHeartbeatReply.get(id) || 0;
+                    if (Date.now() - lastReply > 5000) {
+                        try {
+                            socket.write(parser.getHeartbeatReply());
+                            this._lastHeartbeatReply.set(id, Date.now());
+                        } catch (e) {
+                            console.warn(`[NetworkListener] ILS heartbeat reply error ${name}: ${e.message}`);
+                        }
                     }
                 }
                 await this.handleIncomingData(source, chunk, parser);
