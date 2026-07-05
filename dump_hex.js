@@ -11,9 +11,9 @@ client.connect(950, '192.168.51.10', () => {
 
 client.on('data', (data) => {
     console.log('\n--- RAW HEX DUMP ---');
+    console.log('Length:', data.length, 'bytes');
     console.log(data.toString('hex'));
     console.log('--------------------\n');
-    client.destroy(); 
 });
 
 client.on('error', (err) => {
@@ -21,5 +21,6 @@ client.on('error', (err) => {
 });
 
 setTimeout(() => {
+    console.log('[+] Timeout reached, closing connection.');
     client.destroy();
-}, 5000);
+}, 10000);
