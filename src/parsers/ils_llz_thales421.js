@@ -42,6 +42,7 @@ const PACKET_SIZE  = 96;
 const SYNC_DATA    = Buffer.from([0x56, 0x00, 0xF9, 0x06]);
 const SYNC_HBEAT   = Buffer.from([0x1B, 0x00, 0xF9, 0x06]);
 const SYNC_ACK     = Buffer.from([0x13, 0x00, 0xF9, 0x06]);
+const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]);
 
 const PARAM_OFFSETS = {
     CRS_RF:    26,
@@ -238,7 +239,22 @@ class IlsLlzThales421Parser extends BaseParser {
         };
     }
 
-    getPollRequests() { return []; }
+    getPollRequests() {
+        return [{ bytes: TRIGGER_SEND, label: 'DATA_REQUEST' }];
+    }
+    
+    isHeartbeat(buf) {
+        if (buf.length < 4) return false;
+        const b0 = buf[0];
+        const b2 = buf[2];
+        return (b0 === 0x13 || b0 === 0x1B) && buf[1] === 0x00 &&
+               b2 === 0xF9 && buf[3] === 0x06;
+    }
+    
+    getHeartbeatReply() {
+        return TRIGGER_SEND;
+    }
+
     getMode()         { return this._mode; }
     getLastData()     { return this._lastDecoded ? this._lastDecoded.params : {}; }
     reset()           { this._buf = Buffer.alloc(0); }
