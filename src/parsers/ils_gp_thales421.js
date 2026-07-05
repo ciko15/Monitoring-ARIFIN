@@ -260,7 +260,10 @@ class IlsGpThales421Parser extends BaseParser {
     }
 
     getPollRequests() {
-        return [{ bytes: TRIGGER_SEND, label: 'DATA_REQUEST' }];
+        if (this._mode === 'ACTIVE') {
+            return [{ bytes: TRIGGER_SEND, label: 'DATA_REQUEST' }];
+        }
+        return [];
     }
     
     isHeartbeat(buf) {

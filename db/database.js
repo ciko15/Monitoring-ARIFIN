@@ -288,6 +288,14 @@ let equipmentLogsDB = [];
 const latestEquipmentDataBySource = new Map();
 const lastPersistedAtBySource = new Map();
 const LOG_PERSIST_INTERVAL_MS = 60 * 1000;
+
+function rebuildLatestEquipmentData() {
+  latestEquipmentDataBySource.clear();
+  for (const log of equipmentLogsDB) {
+    upsertLatestEquipmentData(log);
+  }
+}
+
 // Load logs from file on startup
 (async () => {
   try {
@@ -297,6 +305,7 @@ const LOG_PERSIST_INTERVAL_MS = 60 * 1000;
       const stats = fs.statSync(LOGS_DATA_PATH);
       logsFileMtimeMs = stats.mtimeMs || 0;
       logsDiskSyncAt = Date.now();
+      rebuildLatestEquipmentData();
       console.log(`[DB] Persistent logs loaded: ${equipmentLogsDB.length} records`);
     }
   } catch (err) {
@@ -338,6 +347,7 @@ async function syncEquipmentLogsFromDisk(force = false) {
 
     try {
         equipmentLogsDB = JSON.parse(data);
+        rebuildLatestEquipmentData();
     } catch (parseErr) {
         console.error(`[DB] JSON Parse error in equipment_logs.json: ${parseErr.message}`);
         // Jika file corrupt (misal terputus tengah jalan), reset array kosong
@@ -475,7 +485,10 @@ async function getAllEquipment(filters = {}) {
       const latestLogs = getLatestLogsBySource(item.id);
       
       // 2. Jika log memori kosong, scan folder /data/ secara mundur
-      let latestTimeFromFile = await getLatestTimestampFromHistory(item.name);
+      let latestTimeFromFile = null;
+      if (latestLogs.length === 0) {
+        latestTimeFromFile = await getLatestTimestampFromHistory(item.name);
+      }
 
       // Initialize with ALL configured sources for this equipment
       const mergedData = {};
@@ -603,21 +616,13 @@ async function getAllEquipment(filters = {}) {
  * Helper to get the latest log for each source of an equipment
  */
 function getLatestLogsBySource(equipmentId) {
-  const latestBySource = new Map();
-
-  // Filter logs for this equipment and find latest for each source
-  const equipmentLogs = equipmentLogsDB.filter(l => String(l.equipmentId) === String(equipmentId));
-
-  for (const log of equipmentLogs) {
-    const source = log.source || 'default';
-    const existing = latestBySource.get(source);
-
-    if (!existing || new Date(log.logged_at) > new Date(existing.logged_at)) {
-      latestBySource.set(source, log);
+  const result = [];
+  for (const [key, log] of latestEquipmentDataBySource.entries()) {
+    if (String(log.equipmentId) === String(equipmentId)) {
+      result.push(log);
     }
   }
-
-  return Array.from(latestBySource.values());
+  return result;
 }
 
 async function getEquipmentStatsSummary() {
@@ -1154,6 +1159,7 @@ async function getAllCategories() {
 async function createEquipmentLog(data) {
   const log = { ...data, id: Date.now(), logged_at: data.logged_at || new Date().toISOString() };
   equipmentLogsDB.push(log);
+  upsertLatestEquipmentData(log);
   // Simpan max 50 log per source (bukan global shift yang bisa evict source lain)
   const sourceKey = `${data.equipmentId}::${data.source || 'default'}`;
   const sourceLogs = equipmentLogsDB.filter(
