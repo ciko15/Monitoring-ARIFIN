@@ -34,9 +34,9 @@ const BaseParser = require('./base');
 const PKT_C_SIZE = 92;
 
 // Protokol Mandiri Thales 421 (Sama dengan LLZ)
-const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // Request Data (Executive Measurement)
-const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat idle dari device
-const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
+const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xE9, 0x06]); // Request Data (Executive Measurement)
+const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xE8, 0x06]); // Heartbeat idle dari device
+const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xE9, 0x06]); // Balasan heartbeat kita ke device
 
 function isPktCSync(buf, i) {
     return i + 3 < buf.length &&
@@ -112,6 +112,13 @@ function decodePktC(pkt) {
     const byte2     = pkt[2];
     const isRemote  = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
+
+    // 0x00 = TX1, 0x10 = TX2
+    // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
+    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
+
+    // Validation removed because our own triggers don't always match this signature
+
     const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
@@ -196,6 +203,11 @@ class IlsGpThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
+                // Prevent buffer accumulation CPU spike (O(N^2) rescanning of short packets)
+                // If there are no valid frames, anything before the last 92 bytes is guaranteed garbage.
+                if (this._buf.length > PKT_C_SIZE) {
+                    this._buf = this._buf.slice(this._buf.length - PKT_C_SIZE);
+                }
                 const waitingError = hasPartialFrame(this._buf) ? 'Menunggu data' : 'No valid GP frames';
                 return { success: false, error: waitingError, status: 'Waiting',
                          _mode: this._mode,
@@ -234,7 +246,14 @@ class IlsGpThales421Parser extends BaseParser {
     }
 
     getPollRequests() {
-        return [{ bytes: TRIGGER_SEND, label: 'DATA_REQUEST' }];
+        if (this.getMode() === 'ACTIVE') {
+            const KICKSTART = Buffer.from([0x01, 0x30, 0x30, 0x02, 0x45, 0x39, 0x03, 0x34, 0x35]);
+            return [
+                { bytes: KICKSTART, label: 'KICKSTART' },
+                { bytes: TRIGGER_SEND, label: 'DATA_REQUEST' }
+            ];
+        }
+        return [];
     }
     
     isHeartbeat(buf) {
@@ -245,7 +264,12 @@ class IlsGpThales421Parser extends BaseParser {
         return HBEAT_REPLY;
     }
 
-    getMode()         { return this._mode; }
+    getMode() {
+        if (Date.now() - this._lastDataTime > PASSIVE_TIMEOUT && this._mode === 'PASSIVE') {
+            this._mode = 'ACTIVE';
+        }
+        return this._mode;
+    }
     getLastData()     { return this._lastDecoded ? this._lastDecoded.params : {}; }
     reset()           { this._buf = Buffer.alloc(0); }
 }
