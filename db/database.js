@@ -1158,52 +1158,12 @@ async function getAllCategories() {
 // --- EQUIPMENT LOGS ---
 async function createEquipmentLog(data) {
   const log = { ...data, id: Date.now(), logged_at: data.logged_at || new Date().toISOString() };
-  equipmentLogsDB.push(log);
-  upsertLatestEquipmentData(log);
-  // Simpan max 50 log per source (bukan global shift yang bisa evict source lain)
-  const sourceKey = `${data.equipmentId}::${data.source || 'default'}`;
-  const sourceLogs = equipmentLogsDB.filter(
-    l => String(l.equipmentId) === String(data.equipmentId) && (l.source || 'default') === (data.source || 'default')
-  );
-  if (sourceLogs.length > 50) {
-    // Hapus log terlama untuk source ini saja
-    const oldest = sourceLogs[0];
-    const idx = equipmentLogsDB.indexOf(oldest);
-    if (idx >= 0) equipmentLogsDB.splice(idx, 1);
-  }
-  // Hard cap total agar memory tidak habis
-  if (equipmentLogsDB.length > 5000) {
-    // Pastikan kita tidak menghapus log TERAKHIR dari suatu source
-    const latestIndices = new Set();
-    const sourceSeen = new Set();
-    
-    // Scan dari belakang untuk mencari index terakhir tiap source
-    for (let i = equipmentLogsDB.length - 1; i >= 0; i--) {
-      const l = equipmentLogsDB[i];
-      const key = `${l.equipmentId}::${l.source || 'default'}`;
-      if (!sourceSeen.has(key)) {
-        sourceSeen.add(key);
-        latestIndices.add(i);
-      }
-    }
-
-    // Cari index tertua yang bukan index terakhir
-    let indexToRemove = -1;
-    for (let i = 0; i < equipmentLogsDB.length; i++) {
-      if (!latestIndices.has(i)) {
-        indexToRemove = i;
-        break;
-      }
-    }
-
-    if (indexToRemove !== -1) {
-      equipmentLogsDB.splice(indexToRemove, 1);
-    } else {
-      equipmentLogsDB.shift(); // Fallback
-    }
-  }
   
-  scheduleEquipmentLogsPersist();
+  // [STATELESS FORWARDER MODE]
+  // We NO LONGER store logs in `equipmentLogsDB` array.
+  // We NO LONGER persist history to `equipment_logs.json`.
+  // We ONLY keep 1 latest snapshot in memory for the live dashboard.
+  upsertLatestEquipmentData(log);
   
   return log;
 }

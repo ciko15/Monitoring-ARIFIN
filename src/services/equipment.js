@@ -266,18 +266,8 @@ class EquipmentService {
 
             const finalStatus = gateDecision.status;
 
-            // 1. JSON-line file logging (data/YYYY-MM/DD/...)
-            try {
-                const fileLogger = require('../utils/fileLogger');
-                await fileLogger.log(equipName, equipmentId, {
-                    ...parsedData,
-                    source: connectionType,
-                    status: finalStatus,
-                    _ip: parsedData._ip || equipment.ip || equipment.host || 'unknown'
-                });
-            } catch (err) {
-                console.error('[EquipmentService] File logging error:', err);
-            }
+            // 1. JSON-line file logging (DISABLED for Stateless Forwarder mode)
+            // No file creation to save disk space and I/O.
 
             // 2. Database logging (in-memory/JSON store)
             const datalog = {
