@@ -269,7 +269,12 @@ class IlsGpThales421Parser extends BaseParser {
         return HBEAT_REPLY;
     }
 
-    getMode()         { return this._mode; }
+    getMode() {
+        if (Date.now() - this._lastDataTime > PASSIVE_TIMEOUT && this._mode === 'PASSIVE') {
+            this._mode = 'ACTIVE';
+        }
+        return this._mode;
+    }
     getLastData()     { return this._lastDecoded ? this._lastDecoded.params : {}; }
     reset()           { this._buf = Buffer.alloc(0); }
 }
