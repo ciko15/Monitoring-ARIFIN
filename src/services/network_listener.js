@@ -646,7 +646,11 @@ class NetworkListenerService {
     startMarcRseListener(source) {
         const { id, equipt_id, ip_address, tcp_port, marc_ports, poll_interval, name } = source;
         const port    = parseInt(tcp_port) || 950;
-        const ports   = Array.isArray(marc_ports) ? marc_ports : [];
+        let ports   = Array.isArray(marc_ports) ? marc_ports : [];
+        if (ports.length === 0) {
+            // Default to polling all known MARC ports if not explicitly specified
+            ports = [2, 3, 4, 5, 6, 7, 8, 9];
+        }
         const pollSec = parseInt(poll_interval) || 30;
 
         const VhfMarcRseParser = require('../parsers/vhf_marc_rse');
