@@ -251,7 +251,7 @@ class IlsGpThales421Parser extends BaseParser {
     }
 
     getPollRequests() {
-        if (this._mode === 'ACTIVE') {
+        if (this.getMode() === 'ACTIVE') {
             const KICKSTART = Buffer.from([0x01, 0x30, 0x30, 0x02, 0x45, 0x39, 0x03, 0x34, 0x35]);
             return [
                 { bytes: KICKSTART, label: 'KICKSTART' },
