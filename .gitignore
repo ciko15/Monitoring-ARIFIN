@@ -13,3 +13,9 @@ _agent/
 brain/
 logs/
 db/*.json
+!db/data_limitation_config.json
+!db/limitation_config.json
+!db/equipment_parsing_config.json
+!db/snmp_oid_catalog.json
+!db/sup_category.json
+!db/templates_config.json
