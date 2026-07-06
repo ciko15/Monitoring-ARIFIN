@@ -47,7 +47,9 @@ class NetworkListenerService {
     }
 
     _isSplitCollectorMode() {
-        return this.pipelineMode === 'split' && (this.serviceRole === 'collector' || this.serviceRole === 'all');
+        // [BYPASS] Selalu return false agar pemrosesan dilakukan di RAM (In-Memory)
+        // Mencegah memory crash akibat antrean file yang membludak.
+        return false;
     }
 
     async _handleLogOutput(source, parsedData, connectionType, status) {

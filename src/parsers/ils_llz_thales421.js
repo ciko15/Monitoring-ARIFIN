@@ -258,7 +258,11 @@ class IlsLlzThales421Parser extends BaseParser {
      */
     getPollRequests() {
         if (this._mode === 'ACTIVE') {
-            return [{ bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }];
+            const KICKSTART = Buffer.from([0x01, 0x30, 0x30, 0x02, 0x46, 0x39, 0x03, 0x35, 0x35]);
+            return [
+                { bytes: KICKSTART, label: 'KICKSTART' },
+                { bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }
+            ];
         }
         return [];
     }
