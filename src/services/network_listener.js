@@ -20,7 +20,7 @@ class NetworkListenerService {
         this.statusGate = new SourceStatusGate();
         this.pipelineMode = process.env.PIPELINE_MODE || 'inline';
         this.serviceRole = process.env.SERVICE_ROLE || 'all';
-        this.rawEventQueue = this.pipelineMode === 'split' ? new RawEventQueue() : null;
+        this.rawEventQueue = null; // [BYPASS] Tidak menggunakan rawEventQueue lagi untuk Stateless Forwarder
     }
 
     _shouldLogParseWarning(sourceId, errorKey, throttleMs = 15000) {
