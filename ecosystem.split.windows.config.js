@@ -60,7 +60,8 @@ module.exports = {
       watch: false,
       max_memory_restart: '1G',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        EMS_ENABLED: 'false'
       },
       error_file: './logs/pm2-processor-error.log',
       out_file: './logs/pm2-processor-out.log',
