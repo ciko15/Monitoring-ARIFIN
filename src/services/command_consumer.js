@@ -99,7 +99,8 @@ class CommandConsumer {
             const body = envelope.body || {};
             const targetSiteId = normalizeSiteId(header.target_site_id || this.siteId);
 
-            if (targetSiteId !== this.siteId) {
+            const isTelemetry = header.message_name === 'equipment.telemetry.received' || header.message_name === 'equipment.status.changed';
+            if (!isTelemetry && targetSiteId !== this.siteId) {
                 console.log(`[CMD] Ignored ${header.message_name || 'unknown'} for target ${targetSiteId}`);
                 this.channel.ack(msg);
                 return;
