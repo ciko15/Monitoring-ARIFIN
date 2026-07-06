@@ -33,29 +33,30 @@ const BaseParser = require('./base');
 
 const PKT_C_SIZE = 92;
 
-// Protokol Mandiri Thales 421 untuk GP (Menggunakan E9/E8, berbeda dengan LLZ yang F9/F8)
-const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xE9, 0x06]); // Request Data (Executive Measurement)
-const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xE8, 0x06]); // Heartbeat idle dari device
-const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xE9, 0x06]); // Balasan heartbeat kita ke device
+// Protokol Mandiri Thales 421 (Sama dengan LLZ)
+const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // Request Data (Executive Measurement)
+const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat idle dari device
+const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
 
 function isPktCSync(buf, i) {
     return i + 3 < buf.length &&
-           buf[i] === 0x11 && buf[i+1] === 0x8D &&
-           (buf[i+3] === 0x0C || buf[i+3] === 0x0E);
+           buf[i] === 0x11 && buf[i+1] === 0x8D && buf[i+3] === 0x0C;
 }
 
 const OFFSETS = {
-    CRS_POS_RF: 43,
-    CRS_POS_DDM: 47,
-    CRS_POS_SDM: 51,
-    CRS_WID_RF: 55,
-    CRS_WID_DDM: 59,
-    CRS_WID_SDM: 63,
-    CLR_WID_RF: 67,
-    CLR_WID_DDM: 71,
-    CLR_WID_SDM: 75,
-    NF_POS_RF: 79,
-    NF_POS_DDM: 83
+    RF_POWER:    15,
+    DDM_COURSE:  19,
+    CARRIER_PWR: 23,
+    CSB_POWER:   31,
+    DDM_CLR:     35,
+    SBO_POWER:   39,
+    CLR_POWER:   43,
+    CLR_DDM:     47,
+    CLR_SDM:     51,
+    RF_OUT:      57,
+    DDM_MON:     61,
+    MON_POWER:   65,
+    GP_ANGLE:    66,
 };
 
 const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'DDM_MON']);
@@ -106,35 +107,37 @@ function readFloat(buf, offset) {
 
 function decodePktC(pkt) {
     if (!pkt || pkt.length < PKT_C_SIZE) return null;
+    if (!isPktCSync(pkt, 0)) return null;
 
-    const subtype = pkt[3] === 0x0C ? 'Transmitter' : 'Monitor';
-    const params = {};
-    
-    // Hanya ekstrak nilai RF dari paket Monitor (0x0E) agar tidak tertimpa angka 0 dari paket TX
-    if (subtype === 'Monitor') {
-        for (const [key, offset] of Object.entries(OFFSETS)) {
-            let val = readFloat(pkt, offset);
-            if (val === null) continue;
-            val = DDM_X100.has(key)
-                ? parseFloat((val * 100).toFixed(3))
-                : parseFloat(val.toFixed(3));
-            params[key] = val;
-        }
-    }
-    const txData = (pkt[4] === 0x10 || pkt[4] === 0xAC) ? 'TX2' : 'TX1';
-    
-    const byte2 = pkt[2];
-    const isRemote = !!(byte2 & 0x80);
+    const byte2     = pkt[2];
+    const isRemote  = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
 
-    return {
-        subtype,
-        tx_data: txData,
-        tx_main: tx1IsMain ? 'TX 1' : 'TX 2',
-        tx_stby: tx1IsMain ? 'TX 2' : 'TX 1',
-        is_remote: isRemote,
-        params,
-    };
+    // 0x00 = TX1, 0x10 = TX2
+    // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
+    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
+
+    // Validasi Header Struktural: Pastikan ini benar-benar paket Transmitter murni!
+    // Paket transmitter murni selalu memiliki byte 5 & 6 = 0x00, dan byte 11-14 = 0x00.
+    // Jika ADRACS meminta halaman lain (yang ukurannya berbeda / nilainya bergeser),
+    // header-nya pasti tidak akan persis seperti ini.
+    if (pkt[5] !== 0x00 || pkt[6] !== 0x00) return null;
+    if (pkt[11] !== 0x00 || pkt[12] !== 0x00 || pkt[13] !== 0x00 || pkt[14] !== 0x00) return null;
+
+    const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
+
+    const params = {};
+    for (const [key, offset] of Object.entries(OFFSETS)) {
+        let val = readFloat(pkt, offset);
+        if (val === null) continue;
+        val = DDM_X100.has(key)
+            ? parseFloat((val * 100).toFixed(3))
+            : parseFloat(val.toFixed(3));
+        params[key] = val;
+    }
+
+    return { tx_main: tx1IsMain ? 'TX1' : 'TX2', tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+             is_remote: isRemote, tx_data: txData, params };
 }
 
 function extractFrames(buf) {
@@ -143,7 +146,10 @@ function extractFrames(buf) {
         if (isPktCSync(buf, i)) {
             const dec = decodePktC(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
-                results.push({ pos: i, decoded: dec });
+                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
+                if (dec.tx_data === dec.tx_main) {
+                    results.push({ pos: i, decoded: dec });
+                }
                 i += PKT_C_SIZE - 1; 
             }
         }
@@ -202,9 +208,10 @@ class IlsGpThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
-                // Prevent buffer accumulation CPU spike
-                if (this._buf.length > 1024) {
-                    this._buf = this._buf.slice(this._buf.length - 512);
+                // Prevent buffer accumulation CPU spike (O(N^2) rescanning of short packets)
+                // If there are no valid frames, anything before the last 92 bytes is guaranteed garbage.
+                if (this._buf.length > PKT_C_SIZE) {
+                    this._buf = this._buf.slice(this._buf.length - PKT_C_SIZE);
                 }
                 const waitingError = hasPartialFrame(this._buf) ? 'Menunggu data' : 'No valid GP frames';
                 return { success: false, error: waitingError, status: 'Waiting',
@@ -212,29 +219,13 @@ class IlsGpThales421Parser extends BaseParser {
                          data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
             }
 
-            // Gabungkan state dari semua frame di chunk ini (supaya data RF dari Monitor tidak hilang)
-            this._lastDecoded = this._lastDecoded || { params: {} };
-            let lastPos = 0;
-            
-            for (const frame of frames) {
-                const d = frame.decoded;
-                this._lastDecoded.tx_main = d.tx_main;
-                this._lastDecoded.tx_stby = d.tx_stby;
-                this._lastDecoded.is_remote = d.is_remote;
-                this._lastDecoded.tx_data = d.tx_data;
-                this._lastDecoded.subtype = d.subtype;
-                
-                if (d.subtype === 'Monitor') {
-                    Object.assign(this._lastDecoded.params, d.params);
-                }
-                lastPos = frame.pos;
-            }
-
+            const latest = frames[frames.length - 1];
+            this._lastDecoded = latest.decoded;
             this._lastDataTime = now;
             if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
-            this._buf = this._buf.slice(lastPos + PKT_C_SIZE);
+            this._buf = this._buf.slice(latest.pos + PKT_C_SIZE);
 
-            return this._buildOutput(this._lastDecoded, false);
+            return this._buildOutput(latest.decoded, false);
         } catch (err) {
             return { success: false, error: err.message, status: 'Error', timestamp: new Date().toISOString() };
         }
@@ -267,16 +258,11 @@ class IlsGpThales421Parser extends BaseParser {
     }
     
     isHeartbeat(buf) {
-        if (buf.length < 4) return false;
-        // GP often sends 1B 00 E9 06 or 13 00 E8 06 as heartbeat/ACK
-        const b0 = buf[0];
-        const b2 = buf[2];
-        return (b0 === 0x13 || b0 === 0x1B) && buf[1] === 0x00 &&
-               (b2 === 0xE8 || b2 === 0xE9) && buf[3] === 0x06;
+        return buf.length >= 4 && buf.slice(0, 4).equals(HBEAT_RECV);
     }
     
     getHeartbeatReply() {
-        return TRIGGER_SEND;
+        return HBEAT_REPLY;
     }
 
     getMode()         { return this._mode; }
