@@ -118,6 +118,22 @@ class CommandConsumer {
         const correlationId = header.correlation_id;
         const targetSiteId = header.target_site_id || this.siteId;
 
+        if (messageName && (messageName === 'equipment.telemetry.received' || messageName === 'equipment.status.changed')) {
+            if (body && (body.equipment_id || body.equipmentId)) {
+                await db.createEquipmentLog({
+                    equipmentId: body.equipment_id || body.equipmentId,
+                    equipment_name: body.equipment_name || 'Unknown',
+                    status: body.status,
+                    data: body.data || body.telemetry || {},
+                    source: body.source || 'RabbitMQ',
+                    connection_type: body.connection_type || 'Unknown',
+                    airport_name: body.airport_name || 'Unknown',
+                    logged_at: body.logged_at || new Date().toISOString()
+                });
+            }
+            return;
+        }
+
         if (messageName && (messageName.includes('telemetry') || messageName.includes('status'))) {
             return;
         }
