@@ -1342,16 +1342,14 @@
                 NF_SDM: 'Nearfield Pos. SDM', FREQ_DEV: 'Freq Deviation'
             };
             
-            for (const prefix of ['M1_', 'M2_']) {
-                sections.push({ 
-                    title: `EXECUTIVE MONITOR ${prefix === 'M1_' ? '1' : '2'}`, 
-                    params: Object.entries(paramLabels).map(([key, label]) => {
-                        const val = data[prefix + key];
-                        const unit = (key === 'FREQ_DEV') ? 'kHz' : (key.includes('DDM') ? '' : '%');
-                        return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
-                    })
-                });
-            }
+            sections.push({ 
+                title: `MONITORING PARAMETERS`, 
+                params: Object.entries(paramLabels).map(([key, label]) => {
+                    const val = data[key];
+                    const unit = (key === 'FREQ_DEV') ? 'kHz' : (key.includes('DDM') ? '' : '%');
+                    return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
+                })
+            });
         } else {
             // Check if we have a template for this parser
             const tmpl = window.templatesCache?.find(t => t.id === parserId);
