@@ -123,12 +123,7 @@ function decodePacket(pkt) {
     // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
     if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
     
-    // Validasi Header Struktural: Pastikan ini benar-benar paket Transmitter murni!
-    // Paket transmitter murni selalu memiliki byte 5 & 6 = 0x00, dan byte 11-14 = 0x00.
-    // Jika ADRACS meminta halaman lain (yang ukurannya berbeda / nilainya bergeser),
-    // header-nya pasti tidak akan persis seperti ini.
-    if (pkt[5] !== 0x00 || pkt[6] !== 0x00) return null;
-    if (pkt[11] !== 0x00 || pkt[12] !== 0x00 || pkt[13] !== 0x00 || pkt[14] !== 0x00) return null;
+    // Validation removed because our own triggers don't always match this signature
     
     const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
