@@ -1,73 +1,27 @@
 const BaseParser = require('./base');
 
-/**
- * ILS Localizer (LLZ) Parser — Thales ILS 420
- * AirNav Indonesia · Sentani Airport (WAJJ)
- *
- * Source  : IP 192.168.51.10  Port 950  (Moxa NPort TCP)
- * Protocol: Binary stream, DATA packet = 96 bytes
- *
- * Sync markers:
- *   SYNC_DATA  = 56 00 F9 06  (96-byte data packet)
- *   SYNC_HBEAT = 1B 00 F9 06  (heartbeat — skip)
- *   SYNC_ACK   = 13 00 F9 06  (ACK — skip)
- *
- * Packet structure (96 bytes):
- *   byte  0- 3: SYNC_DATA  = 56 00 F9 06
- *   byte  4- 7: F0 06 [seq] 92  — sequence counter
- *   byte  8-11: 01 00 00 11     — fixed header
- *   byte    12: subtype (0x0D or 0x8D)
- *   byte    13: TX flag (0x40=TX1 MAIN, 0x00=TX2 MAIN)
- *   byte 14-25: metadata
- *   byte 26-95: PAYLOAD  float32 LE
- *
- * Parameters (float32 LE, offset from packet start):
- *   off=26  CRS_RF      CRS RF Level         %
- *   off=30  CRS_DDM     CRS DDM              (raw, scale TBC)
- *   off=34  CRS_SDM     CRS SDM              %
- *   off=38  IDENT_AM    Ident AM             %
- *   off=42  WIDTH_RF    Width RF Level       %
- *   off=46  WIDTH_DDM   Width DDM            (raw, scale TBC)
- *   off=50  WIDTH_SDM   Width SDM            %
- *   off=54  CLR_RF      CLR RF Level         %
- *   off=58  CLR_DDM     CLR DDM              (raw, scale TBC)
- *   off=62  CLR_SDM     CLR SDM              %
- *   off=68  NF_RF       Near Field RF Level  %
- *   off=72  NF_DDM      Near Field DDM       (raw, scale TBC)
- *   off=76  NF_SDM      Near Field SDM       %
- *   off=84  FREQ_DEV    Freq Deviation       kHz
- */
-
-const PKT_C_SIZE = 92;
-
-// Protokol Mandiri Thales 421 (Hasil Sniffing)
-const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
-const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
-const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
-
-function isPktCSync(buf, i) {
-    return i + 3 < buf.length &&
-           buf[i] === 0x11 && buf[i+1] === 0x8D && buf[i+3] === 0x0C;
-}
+const PACKET_SIZE  = 96;
+const SYNC_DATA    = Buffer.from([0x56, 0x00, 0xF9, 0x06]);
+const SYNC_HBEAT   = Buffer.from([0x1B, 0x00, 0xF9, 0x06]);
+const SYNC_ACK     = Buffer.from([0x13, 0x00, 0xF9, 0x06]);
 
 const PARAM_OFFSETS = {
-    CRS_RF:    15,
-    CRS_DDM:   19,
-    CRS_SDM:   23,
-    IDENT_AM:  27,
-    WIDTH_RF:  31,
-    WIDTH_DDM: 35,
-    WIDTH_SDM: 39,
-    CLR_RF:    43,
-    CLR_DDM:   47,
-    CLR_SDM:   51,
-    NF_RF:     57,
-    NF_DDM:    61,
-    NF_SDM:    65,
-    FREQ_DEV:  73,
+    CRS_RF:    26,
+    CRS_DDM:   30,
+    CRS_SDM:   34,
+    IDENT_AM:  38,
+    WIDTH_RF:  42,
+    WIDTH_DDM: 46,
+    WIDTH_SDM: 50,
+    CLR_RF:    54,
+    CLR_DDM:   58,
+    CLR_SDM:   62,
+    NF_RF:     68,
+    NF_DDM:    72,
+    NF_SDM:    76,
+    FREQ_DEV:  84,
 };
 
-// Limits [min, max]
 const LIMITS = {
     CRS_RF:   [85.0, 115.0],
     WIDTH_RF:  [85.0, 115.0],
@@ -97,11 +51,7 @@ const PARAM_LABELS = {
     FREQ_DEV:  ['Freq Deviation', 'kHz'],
 };
 
-const DDM_X100 = new Set(['CRS_DDM', 'WIDTH_DDM', 'CLR_DDM', 'NF_DDM']);
-
 const PASSIVE_TIMEOUT = 30000;
-const POLL_INTERVAL   = 2000;
-const POLL_REQ_DELAY  = 150;
 
 function readFloat(buf, offset) {
     try {
@@ -112,48 +62,45 @@ function readFloat(buf, offset) {
 }
 
 function decodePacket(pkt) {
-    if (!pkt || pkt.length < PKT_C_SIZE) return null;
-    if (!isPktCSync(pkt, 0)) return null;
+    if (!pkt || pkt.length < PACKET_SIZE) return null;
+    if (!pkt.slice(0, 4).equals(SYNC_DATA)) return null;
 
-    const byte2     = pkt[2];
-    const isRemote  = !!(byte2 & 0x80);
-    const tx1IsMain = !!(byte2 & 0x40);
-    const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
+    const subtype   = pkt[12];
+    const txFlag    = pkt[13];
+    const tx1IsMain = !!(txFlag & 0x40);
 
     const params = {};
     for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
-        let val = readFloat(pkt, offset);
-        if (val === null) continue;
-        val = DDM_X100.has(key)
-            ? parseFloat((val * 100).toFixed(4))
-            : parseFloat(val.toFixed(4));
-        params[key] = val;
+        const val = readFloat(pkt, offset);
+        if (val !== null) params[key] = parseFloat(val.toFixed(4));
     }
 
     return {
         tx_main:  tx1IsMain ? 'TX1' : 'TX2',
         tx_stby:  tx1IsMain ? 'TX2' : 'TX1',
-        tx_data:  txData,
-        is_remote: isRemote,
-        subtype:  pkt[1], // 0x8D
-        tx_flag:  byte2,
+        subtype,
+        tx_flag:  txFlag,
         params,
     };
 }
 
 function extractFrames(buf) {
     const results = [];
-    for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
-        if (isPktCSync(buf, i)) {
-            const dec = decodePacket(buf.slice(i, i + PKT_C_SIZE));
+    let i = 0;
+    while (i <= buf.length - PACKET_SIZE) {
+        if (buf.slice(i, i+4).equals(SYNC_HBEAT) || buf.slice(i, i+4).equals(SYNC_ACK)) {
+            i += 4;
+            continue;
+        }
+        if (buf.slice(i, i+4).equals(SYNC_DATA)) {
+            const dec = decodePacket(buf.slice(i, i + PACKET_SIZE));
             if (dec) {
-                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
-                if (dec.tx_data === dec.tx_main) {
-                    results.push({ pos: i, decoded: dec });
-                }
-                i += PKT_C_SIZE - 1;
+                results.push({ pos: i, decoded: dec });
+                i += PACKET_SIZE;
+                continue;
             }
         }
+        i++;
     }
     return results;
 }
@@ -186,11 +133,8 @@ class IlsLlzThales421Parser extends BaseParser {
             this._buf = Buffer.concat([this._buf, chunk]);
 
             if (this._buf.length > 131072) {
-                let ls = 0;
-                for (let i = this._buf.length - 4; i >= 0; i--) {
-                    if (isPktCSync(this._buf, i)) { ls = i; break; }
-                }
-                this._buf = ls > 0 ? this._buf.slice(ls) : Buffer.alloc(0);
+                const pos = this._buf.lastIndexOf(SYNC_DATA);
+                this._buf = pos > 0 ? this._buf.slice(pos) : Buffer.alloc(0);
             }
 
             const now = Date.now();
@@ -209,7 +153,7 @@ class IlsLlzThales421Parser extends BaseParser {
             this._lastDecoded = latest.decoded;
             this._lastDataTime = now;
             if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
-            this._buf = this._buf.slice(latest.pos + PKT_C_SIZE);
+            this._buf = this._buf.slice(latest.pos + PACKET_SIZE);
 
             return this._buildOutput(latest.decoded, false);
         } catch (err) {
@@ -236,29 +180,14 @@ class IlsLlzThales421Parser extends BaseParser {
         };
     }
 
-    /**
-     * Returns the initial trigger packet to send on connect.
-     * Device membutuhkan ACK packet (13 00 F9 06) agar mulai streaming data.
-     */
-    getPollRequests() {
-        return [{ bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }];
-    }
-
-    /**
-     * Cek apakah chunk yang diterima adalah heartbeat dari device.
-     * Jika ya, caller harus membalas dengan TRIGGER_SEND.
-     */
-    isHeartbeat(chunk) {
-        return chunk && chunk.length >= 4 && chunk.slice(0, 4).equals(HBEAT_RECV);
-    }
-
-    getHeartbeatReply() { return TRIGGER_SEND; }
-    getMode()           { return this._mode; }
-    getLastData()       { return this._lastDecoded ? this._lastDecoded.params : {}; }
-    reset()             { this._buf = Buffer.alloc(0); }
+    getPollRequests() { return []; }
+    getMode()         { return this._mode; }
+    getLastData()     { return this._lastDecoded ? this._lastDecoded.params : {}; }
+    reset()           { this._buf = Buffer.alloc(0); }
 }
 
 module.exports = IlsLlzThales421Parser;
 module.exports.PARAM_OFFSETS = PARAM_OFFSETS;
 module.exports.LIMITS        = LIMITS;
 module.exports.PARAM_LABELS  = PARAM_LABELS;
+module.exports.SYNC_DATA     = SYNC_DATA;
