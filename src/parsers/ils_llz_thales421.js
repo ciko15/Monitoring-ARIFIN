@@ -118,13 +118,6 @@ function decodePacket(pkt) {
     const byte2     = pkt[2];
     const isRemote  = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
-    
-    // 0x00 = TX1, 0x10 = TX2
-    // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
-    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
-    
-    // Validation removed because our own triggers don't always match this signature
-    
     const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
@@ -207,10 +200,6 @@ class IlsLlzThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
-                // Prevent buffer accumulation CPU spike
-                if (this._buf.length > 1024) {
-                    this._buf = this._buf.slice(this._buf.length - 512);
-                }
                 return { success: false, error: 'No valid LLZ frames', status: 'Waiting',
                          _mode: this._mode,
                          data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
@@ -252,14 +241,7 @@ class IlsLlzThales421Parser extends BaseParser {
      * Device membutuhkan ACK packet (13 00 F9 06) agar mulai streaming data.
      */
     getPollRequests() {
-        if (this.getMode() === 'ACTIVE') {
-            const KICKSTART = Buffer.from([0x01, 0x30, 0x30, 0x02, 0x46, 0x39, 0x03, 0x35, 0x35]);
-            return [
-                { bytes: KICKSTART, label: 'KICKSTART' },
-                { bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }
-            ];
-        }
-        return [];
+        return [{ bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }];
     }
 
     /**
@@ -271,12 +253,7 @@ class IlsLlzThales421Parser extends BaseParser {
     }
 
     getHeartbeatReply() { return TRIGGER_SEND; }
-    getMode() {
-        if (Date.now() - this._lastDataTime > PASSIVE_TIMEOUT && this._mode === 'PASSIVE') {
-            this._mode = 'ACTIVE';
-        }
-        return this._mode;
-    }
+    getMode()           { return this._mode; }
     getLastData()       { return this._lastDecoded ? this._lastDecoded.params : {}; }
     reset()             { this._buf = Buffer.alloc(0); }
 }
