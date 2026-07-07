@@ -1,6 +1,6 @@
 const net = require('net');
-const TARGET_IP = process.argv[2] || '192.168.51.10';
-const TARGET_PORT = parseInt(process.argv[3]) || 950;
+const HOST = '192.168.50.160';
+const PORT = 950;
 
 let currentByte = 0x00;
 let client = null;
@@ -18,7 +18,7 @@ function testNext() {
 
     client = new net.Socket();
     
-    client.connect(TARGET_PORT, TARGET_IP, () => {
+    client.connect(PORT, HOST, () => {
         client.write(trigger);
         
         timeoutTimer = setTimeout(() => {
