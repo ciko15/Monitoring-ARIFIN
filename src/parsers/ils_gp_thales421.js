@@ -93,7 +93,7 @@ const PARAM_LABELS = {
     GP_ANGLE:    ['GP Angle',           '°'],
 };
 
-const PASSIVE_TIMEOUT = 30000;
+const PASSIVE_TIMEOUT = 4000; // 4 detik, jika tidak ada data dari ADRACS, kita ambil alih
 const POLL_INTERVAL   = 2000;
 const POLL_REQ_DELAY  = 150;
 

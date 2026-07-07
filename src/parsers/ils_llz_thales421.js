@@ -99,7 +99,7 @@ const PARAM_LABELS = {
 
 const DDM_X100 = new Set(['CRS_DDM', 'WIDTH_DDM', 'CLR_DDM', 'NF_DDM']);
 
-const PASSIVE_TIMEOUT = 30000;
+const PASSIVE_TIMEOUT = 4000; // 4 detik, jika tidak ada data dari ADRACS, kita ambil alih
 const POLL_INTERVAL   = 2000;
 const POLL_REQ_DELAY  = 150;
 
@@ -247,17 +247,12 @@ class IlsLlzThales421Parser extends BaseParser {
         };
     }
 
-    /**
-     * Returns the initial trigger packet to send on connect.
-     * Device membutuhkan ACK packet (13 00 F9 06) agar mulai streaming data.
-     */
     getPollRequests() {
         if (this.getMode() === 'ACTIVE') {
-            const KICKSTART = Buffer.from([0x01, 0x30, 0x30, 0x02, 0x46, 0x39, 0x03, 0x35, 0x35]);
-            return [
-                { bytes: KICKSTART, label: 'KICKSTART' },
-                { bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }
-            ];
+            // Menggunakan trigger rahasia hasil brute-force (00 00 F9 06) 
+            // agar bisa memancing keluarnya paket 56 00 F9 06 saat ADRACS mati
+            const TRIGGER_POLL = Buffer.from([0x00, 0x00, 0xF9, 0x06]);
+            return [{ bytes: TRIGGER_POLL, label: 'POLL_TRIGGER' }];
         }
         return [];
     }
