@@ -680,8 +680,13 @@
         const eqCard = document.querySelector(`.cabang-card[data-id="${equipmentId}"]`);
         if (eqCard) {
             eqCard.classList.remove('has-alarm', 'has-warning');
-            if (statuses.includes('alarm'))   eqCard.classList.add('has-alarm');
-            else if (statuses.includes('warning')) eqCard.classList.add('has-warning');
+            if (statuses.length > 0 && statuses.every(st => st === 'alarm')) {
+                eqCard.classList.add('has-alarm');
+            } else if (statuses.length > 0 && statuses.every(st => st === 'offline' || st === 'disconnect')) {
+                // Biarkan abu-abu
+            } else if (statuses.includes('alarm') || statuses.includes('warning') || statuses.includes('disconnect') || statuses.includes('offline')) {
+                eqCard.classList.add('has-warning');
+            }
         }
     }
 

@@ -293,11 +293,11 @@ const cabangModule = (function () {
     function deriveEquipmentStatus(item) {
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
         const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status));
-        if (sourceStatuses.includes('alarm')) return 'alarm';
-        if (sourceStatuses.includes('warning')) return 'warning';
+        
+        if (sourceStatuses.every(st => st === 'alarm')) return 'alarm';
         if (sourceStatuses.every(st => st === 'offline')) return 'offline';
-        if (sourceStatuses.includes('offline')) return 'warning';
-        if (sourceStatuses.includes('normal')) return 'normal';
+        if (sourceStatuses.includes('alarm') || sourceStatuses.includes('warning') || sourceStatuses.includes('offline')) return 'warning';
+        return 'normal';
       }
 
       const fallback = String(item?.status || 'offline').toLowerCase();
