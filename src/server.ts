@@ -51,6 +51,28 @@ function authenticate(app: any) {
 
 // Import services and managers
 const db = require('../db/database');
+const { SyncManager } = require('./utils/syncManager.js');
+const syncManager = new SyncManager(db);
+
+// Automatically push config changes when DB writes happen
+db.setConfigUpdateHook((filePath: string, data: any) => {
+    const configMap: Record<string, string> = {
+        'equipment_config.json': 'equipment',
+        'airport_config.json': 'airports',
+        'equipment_parsing_config.json': 'parsers',
+        'equipment_otentication_config.json': 'auth',
+        'limitation_config.json': 'limitations',
+        'templates_config.json': 'templates',
+        'users_config.json': 'users',
+        'sup_category.json': 'sup-category'
+    };
+    const baseName = require('path').basename(filePath);
+    const configType = configMap[baseName];
+    if (configType) {
+        syncManager.pushConfigToBranches(configType, data).catch((err: any) => console.error(err));
+    }
+});
+
 const EquipmentService = require('./services/equipment');
 const equipmentService = new EquipmentService(db);
 const DataCollectorScheduler = require('./scheduler/collector');
@@ -364,6 +386,62 @@ const app = new Elysia()
     })
 
     // --- HISTORY LOGS ROUTES (File-based) ---
+    .group('/api/sync', app => app
+        .post('/config', async ({ body, request, set }: any) => {
+            const token = request.headers.get('x-sync-token');
+            if (token !== 'ARIFIN-SYNC-2026') {
+                set.status = 403;
+                return { success: false, error: 'Forbidden: Invalid sync token' };
+            }
+
+            const { configType, payload } = body as any;
+            if (!configType || !payload) {
+                set.status = 400;
+                return { success: false, error: 'Missing configType or payload' };
+            }
+
+            try {
+                console.log(`[SYNC-RCV] Received sync for ${configType}`);
+                const path = require('path');
+                
+                const FILE_MAP: Record<string, string> = {
+                    'equipment': 'equipment_config.json',
+                    'airports': 'airport_config.json',
+                    'parsers': 'equipment_parsing_config.json',
+                    'auth': 'equipment_otentication_config.json',
+                    'limitations': 'limitation_config.json',
+                    'templates': 'templates_config.json',
+                    'users': 'users_config.json',
+                    'sup-category': 'sup_category.json'
+                };
+
+                const fileName = FILE_MAP[configType];
+                if (!fileName) {
+                    set.status = 400;
+                    return { success: false, error: 'Unknown configType' };
+                }
+
+                const filePath = path.join(__dirname, '../db', fileName);
+                await db.writeJson(filePath, payload);
+
+                // Restart PM2 to apply configs
+                setTimeout(() => {
+                    const { exec } = require('child_process');
+                    console.log('[SYNC-RCV] Restarting monitoring-collector and monitoring-processor...');
+                    exec('pm2 restart monitoring-collector monitoring-processor', (err: any) => {
+                        if (err) console.error('[SYNC-RCV] Restart error:', err.message);
+                    });
+                }, 1000);
+
+                return { success: true, message: `Sync applied for ${configType}` };
+            } catch (err: any) {
+                console.error('[SYNC-RCV] Error processing sync:', err);
+                set.status = 500;
+                return { success: false, error: err.message };
+            }
+        })
+    )
+
     .group('/api/history-logs', app => app
         .use(authenticate)
         .get('', async ({ query }) => {

@@ -134,6 +134,11 @@ async function readJson(filePath, defaultValue = []) {
   return defaultValue;
 }
 
+let onConfigUpdated = null;
+function setConfigUpdateHook(hook) {
+  onConfigUpdated = hook;
+}
+
 async function writeJson(filePath, data) {
   const previousWrite = writeLocks.get(filePath) || Promise.resolve();
   const currentWrite = previousWrite.then(async () => {
@@ -166,6 +171,9 @@ async function writeJson(filePath, data) {
           }
         }
       }
+      if (renameSuccess && onConfigUpdated) {
+        setTimeout(() => onConfigUpdated(filePath, data), 0);
+      }
       return true;
     } catch (err) {
       console.error(`Error writing JSON to ${filePath}:`, err);
@@ -184,10 +192,18 @@ async function writeJson(filePath, data) {
   }
 }
 
-// --- AIRPORT CONFIG HELPERS ---
+// --- AIRPORT CONFIG HELPERS (ARRAY MODE) ---
 async function readAirportConfig() {
   const data = await readJson(AIRPORT_CONFIG_PATH, null);
-  return data || {
+  if (Array.isArray(data)) return data;
+  
+  // Backward compatibility: If it's a single object, convert to array
+  if (data && typeof data === 'object') {
+    return [data];
+  }
+
+  // Default fallback if empty
+  return [{
     id: 1,
     name: 'Bandara Sentani',
     city: 'Jayapura',
@@ -196,7 +212,7 @@ async function readAirportConfig() {
     ipBranch: '172.19.16.1',
     status: 'Normal',
     totalEquipment: 3
-  };
+  }];
 }
 
 async function writeAirportConfig(data) {
@@ -204,7 +220,8 @@ async function writeAirportConfig(data) {
 }
 
 async function readBranchProfile() {
-  const fallbackAirport = await readAirportConfig();
+  const airports = await readAirportConfig();
+  const fallbackAirport = airports.length > 0 ? airports[0] : {};
   const fallback = {
     siteId: fallbackAirport.siteId || fallbackAirport.code || 'WAJJ',
     airportCode: fallbackAirport.code || fallbackAirport.siteId || 'WAJJ',
@@ -411,40 +428,56 @@ async function query(sql, params = []) {
 
 // --- AIRPORTS ---
 async function getAllAirports() {
-  return [await readAirportConfig()];
+  return await readAirportConfig();
 }
 
 async function getAirportsPaginated(options = {}) {
-  const airport = await readAirportConfig();
-  const { page = 1, limit = 20 } = options;
+  const airports = await readAirportConfig();
   return {
-    data: [airport],
-    pagination: { page, limit, total: 1, totalPages: 1 }
+    data: airports,
+    meta: {
+      total: airports.length,
+      page: 1,
+      limit: 50,
+      totalPages: 1
+    }
   };
 }
 
 async function getAirportById(id) {
-  const airport = await readAirportConfig();
-  return airport.id == id ? airport : null;
+  const airports = await readAirportConfig();
+  return airports.find(a => a.id == id) || null;
 }
 
 async function createAirport(data) {
-  console.log('[Airport] Create ignored - using single config mode');
-  return await readAirportConfig();
+  const airports = await readAirportConfig();
+  const newId = airports.length > 0 ? Math.max(...airports.map(a => a.id)) + 1 : 1;
+  const newAirport = { id: newId, ...data };
+  airports.push(newAirport);
+  await writeAirportConfig(airports);
+  return newAirport;
 }
 
 async function updateAirport(id, data) {
-  const airport = await readAirportConfig();
-  if (airport.id == id) {
-    const updated = { ...airport, ...data };
-    await writeAirportConfig(updated);
-    return updated;
+  const airports = await readAirportConfig();
+  const index = airports.findIndex(a => a.id == id);
+  if (index !== -1) {
+    airports[index] = { ...airports[index], ...data };
+    await writeAirportConfig(airports);
+    return airports[index];
   }
   return null;
 }
 
 async function deleteAirport(id) {
-  console.log('[Airport] Delete ignored - using single config mode');
+  let airports = await readAirportConfig();
+  const initialLength = airports.length;
+  airports = airports.filter(a => a.id != id);
+  if (airports.length !== initialLength) {
+    await writeAirportConfig(airports);
+    return true;
+  }
+  return false;
 }
 
 // --- EQUIPMENT ---
@@ -1295,6 +1328,7 @@ module.exports = {
   writeAirportConfig,
   readJson,
   writeJson,
+  setConfigUpdateHook,
   
   // Analytics/History scan
   getLatestTimestampFromHistory,
