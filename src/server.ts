@@ -44,20 +44,10 @@ function authorize(allowedRoles: string[]) {
 
 function authenticate(app: any) {
     return app.derive(({ set, request, query }: any) => {
-        let token = '';
-        const auth = request.headers.get('authorization');
-
-        if (auth && auth.startsWith('Bearer ')) {
-            token = auth.substring(7);
-        } else if (query && query.token) {
-            token = query.token;
-        }
-
-        if (!token) {
-            set.status = 401;
-            return { user: null, error: 'Authentication required', success: false };
-        }
-
+        // Otentikasi dinonaktifkan atas permintaan user
+        return { user: { username: 'admin', role: 'superadmin' }, error: null, success: true };
+    });
+}
         // Security Fix: Do not allow arbitrary static-token-admin
         // For now, we still use the token format but we should validate it.
         // In a production environment, this should be a JWT verified with a secret.

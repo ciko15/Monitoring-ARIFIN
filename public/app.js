@@ -2,8 +2,10 @@
 const API_URL = '/api';
 
 // State
-let authToken = localStorage.getItem('authToken') || new URLSearchParams(window.location.search).get('token') || null;
-let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+localStorage.setItem('authToken', 'admin_token');
+localStorage.setItem('currentUser', JSON.stringify({ username: 'admin', role: 'superadmin' }));
+let authToken = 'admin_token';
+let currentUser = { username: 'admin', role: 'superadmin' };
 let equipmentData = [];
 let airportsData = [];
 let supCategoriesData = [];
@@ -1693,10 +1695,9 @@ function updateAuthUI() {
   };
 
   if (currentUser) {
-    if (sidebarLoginBtn) sidebarLoginBtn.classList.add('hidden');
-    if (sidebarPanel) sidebarPanel.classList.remove('hidden');
-    if (logoutBtn) logoutBtn.classList.remove('hidden');
-    if (userNameEl) userNameEl.textContent = currentUser.username;
+    if (sidebarLoginBtn) sidebarLoginBtn.style.display = 'none';
+    if (logoutBtn) logoutBtn.style.display = 'none'; // Sembunyikan tombol logout
+    if (userNameEl) userNameEl.textContent = 'Admin Mode';
     if (loginModal) loginModal.classList.add('hidden');
 
     // Show/Hide menu items based on role
