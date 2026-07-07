@@ -251,13 +251,9 @@ class IlsLlzThales421Parser extends BaseParser {
         const mode = this.getMode();
         console.log(`[LLZ-DEBUG] getPollRequests called. Mode is: ${mode}`);
         if (mode === 'ACTIVE') {
-            console.log(`[LLZ-DEBUG] Sending KICKSTART and ACK_TRIGGER because ADRACS is offline`);
-            const KICKSTART = Buffer.from([0x01, 0x30, 0x30, 0x02, 0x46, 0x39, 0x03, 0x35, 0x35]);
-            const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]);
-            return [
-                { bytes: KICKSTART, label: 'KICKSTART' },
-                { bytes: TRIGGER_SEND, label: 'ACK_TRIGGER' }
-            ];
+            console.log(`[LLZ-DEBUG] Sending POLL_TRIGGER 00 00 F9 06 because ADRACS is offline`);
+            const TRIGGER_POLL = Buffer.from([0x00, 0x00, 0xF9, 0x06]);
+            return [{ bytes: TRIGGER_POLL, label: 'POLL_TRIGGER' }];
         }
         return [];
     }

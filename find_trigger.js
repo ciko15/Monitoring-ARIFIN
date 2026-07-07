@@ -8,7 +8,7 @@ let timeoutTimer = null;
 
 function testNext() {
     if (currentByte > 0xFF) {
-        console.log('[!] Selesai mencari. Tidak ada trigger yang cocok.');
+        console.log('[!] Selesai mencari.');
         process.exit(0);
     }
 
@@ -22,7 +22,7 @@ function testNext() {
         client.write(trigger);
         
         timeoutTimer = setTimeout(() => {
-            console.log(`    [-] Tidak ada respon dalam 1.5 detik.`);
+            console.log(`    [-] Tidak ada respon 5600F906 dalam 1.5 detik.`);
             client.destroy();
             currentByte++;
             testNext();
@@ -30,23 +30,20 @@ function testNext() {
     });
 
     client.on('data', (data) => {
-        // Cek apakah ada F0 06 di dalam data (header paket data ILS Thales)
+        // Cek apakah ada 56 00 F9 06 di dalam data
         let found = false;
-        for (let i = 0; i <= data.length - 2; i++) {
-            if (data[i] === 0xF0 && data[i+1] === 0x06) {
+        for (let i = 0; i <= data.length - 4; i++) {
+            if (data[i] === 0x56 && data[i+1] === 0x00 && data[i+2] === 0xF9 && data[i+3] === 0x06) {
                 found = true;
                 break;
             }
         }
         
         if (found) {
-            console.log(`    [+++] BINGO! Trigger ${hexStr} berhasil memancing paket DATA F0 06 (panjang: ${data.length} bytes)!`);
-            console.log(`    [DATA] ${data.toString('hex')}`);
+            console.log(`    [+++] BINGO! Trigger ${hexStr} berhasil memancing paket 56 00 F9 06!`);
             clearTimeout(timeoutTimer);
             client.destroy();
-            process.exit(0);
-        } else {
-            console.log(`    [?] Menerima balasan tapi bukan F0 06 (panjang: ${data.length}): ${data.toString('hex')}`);
+            process.exit(0); // Berhenti karena sudah ketemu
         }
     });
 
