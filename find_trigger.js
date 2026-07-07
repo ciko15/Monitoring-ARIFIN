@@ -30,20 +30,23 @@ function testNext() {
     });
 
     client.on('data', (data) => {
-        // Cek apakah ada 56 00 F9 06 di dalam data
+        // Cek apakah ada F0 06 di dalam data (header paket data ILS Thales)
         let found = false;
-        for (let i = 0; i <= data.length - 4; i++) {
-            if (data[i] === 0x56 && data[i+1] === 0x00 && data[i+2] === 0xF9 && data[i+3] === 0x06) {
+        for (let i = 0; i <= data.length - 2; i++) {
+            if (data[i] === 0xF0 && data[i+1] === 0x06) {
                 found = true;
                 break;
             }
         }
         
         if (found) {
-            console.log(`    [+++] BINGO! Trigger ${hexStr} berhasil memancing paket 56 00 F9 06!`);
+            console.log(`    [+++] BINGO! Trigger ${hexStr} berhasil memancing paket DATA F0 06 (panjang: ${data.length} bytes)!`);
+            console.log(`    [DATA] ${data.toString('hex')}`);
             clearTimeout(timeoutTimer);
             client.destroy();
             process.exit(0); // Berhenti karena sudah ketemu
+        } else {
+            console.log(`    [?] Menerima balasan tapi bukan F0 06 (panjang: ${data.length}): ${data.toString('hex')}`);
         }
     });
 
