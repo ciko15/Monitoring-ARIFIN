@@ -319,6 +319,8 @@ class NetworkListenerService {
         const hasTriggerProtocol = typeof parser.isHeartbeat === 'function' &&
                                    typeof parser.getHeartbeatReply === 'function';
 
+        console.log(`[LLZ-TRACE] startBinaryTcpListener called for ${name} (${ip_address}:${port}), hasTriggerProtocol=${hasTriggerProtocol}`);
+
         let socket = null;
         let reconnectTimer = null;
         let stopped = false;
@@ -740,6 +742,7 @@ class NetworkListenerService {
 
         // ILS GP / LLZ — binary streaming TCP, bypass SOH/STX/ETX buffering
         if (parsing_id === 'ils_gp_thales421' || parsing_id === 'ils_llz_thales421') {
+            console.log(`[LLZ-TRACE] Routing ${source.name} to startBinaryTcpListener`);
             this.startBinaryTcpListener(source);
             return;
         }
