@@ -1,6 +1,6 @@
 const net = require('net');
 const TARGET_IP = process.argv[2] || '192.168.51.10';
-const TARGET_PORT = 950;
+const TARGET_PORT = parseInt(process.argv[3]) || 950;
 
 let currentByte = 0x00;
 let client = null;
