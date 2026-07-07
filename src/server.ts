@@ -48,22 +48,6 @@ function authenticate(app: any) {
         return { user: { username: 'admin', role: 'superadmin' }, error: null, success: true };
     });
 }
-        // Security Fix: Do not allow arbitrary static-token-admin
-        // For now, we still use the token format but we should validate it.
-        // In a production environment, this should be a JWT verified with a secret.
-        const parts = token.split('-');
-        if (parts[0] === 'session' && parts.length >= 3) {
-            const role = parts[1];
-            const username = parts[2];
-            return { user: { role, username } };
-        }
-
-        console.warn(`[AUTH-GATE] Denied access to ${request.url} - Invalid Token`);
-        set.status = 401;
-        return { user: null, error: 'Invalid or expired token', success: false };
-    });
-}
-
 
 // Import services and managers
 const db = require('../db/database');
