@@ -1,5 +1,5 @@
 const net = require('net');
-const HOST = '192.168.51.10';
+const HOST = '192.168.50.160';
 const PORT = 950;
 
 let currentByte = 0x00;
