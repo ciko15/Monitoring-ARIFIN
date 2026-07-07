@@ -3,8 +3,8 @@ const client = new net.Socket();
 
 const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]);
 
-client.connect(950, '192.168.51.10', () => {
-    console.log('[+] Connected to 192.168.51.10:950');
+client.connect(950, '192.168.50.160', () => {
+    console.log('[+] Connected to 192.168.50.160:950');
     console.log('[+] Mengirim Trigger Request...');
     client.write(TRIGGER_SEND);
 });

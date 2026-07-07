@@ -248,9 +248,10 @@ class IlsLlzThales421Parser extends BaseParser {
     }
 
     getPollRequests() {
-        if (this.getMode() === 'ACTIVE') {
-            // Menggunakan trigger rahasia hasil brute-force (00 00 F9 06) 
-            // agar bisa memancing keluarnya paket 56 00 F9 06 saat ADRACS mati
+        const mode = this.getMode();
+        console.log(`[LLZ-DEBUG] getPollRequests called. Mode is: ${mode}`);
+        if (mode === 'ACTIVE') {
+            console.log(`[LLZ-DEBUG] Sending POLL_TRIGGER 00 00 F9 06 because ADRACS is offline`);
             const TRIGGER_POLL = Buffer.from([0x00, 0x00, 0xF9, 0x06]);
             return [{ bytes: TRIGGER_POLL, label: 'POLL_TRIGGER' }];
         }
