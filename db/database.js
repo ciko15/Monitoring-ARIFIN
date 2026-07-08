@@ -441,11 +441,33 @@ function upsertLatestEquipmentData(log) {
   if (process.env.SERVICE_ROLE === 'collector' || !process.env.SERVICE_ROLE) {
     try {
       const stateObj = Object.fromEntries(latestEquipmentDataBySource);
+      const fs = require('fs');
+      const path = require('path');
+      const dataDir = path.dirname(IPC_STATE_PATH);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
       fs.writeFileSync(IPC_STATE_PATH, JSON.stringify(stateObj));
-    } catch (e) {}
+    } catch (e) {
+      console.error('[DB] Error writing IPC_STATE_PATH:', e.message);
+    }
   }
 }
 
+function syncIpcStateForWeb() {
+  if (process.env.SERVICE_ROLE === 'web' || !process.env.SERVICE_ROLE) {
+    try {
+      const fs = require('fs');
+      const content = fs.readFileSync(IPC_STATE_PATH, 'utf8');
+      const stateObj = JSON.parse(content);
+      for (const key of Object.keys(stateObj)) {
+        latestEquipmentDataBySource.set(key, stateObj[key]);
+      }
+    } catch (e) {
+      console.error('[DB] Error reading/parsing IPC_STATE_PATH:', e.message);
+    }
+  }
+}
 function getLatestLogsBySource(equipmentId) {
   syncIpcStateForWeb(); // Sync memory before serving UI
   
