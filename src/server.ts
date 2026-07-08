@@ -302,15 +302,8 @@ const app = new Elysia()
     .use(cors())
     .use(serverTiming())
     .derive(({ request, set }: any) => {
-        const auth = request.headers.get('authorization');
-        if (auth && auth.startsWith('Bearer ')) {
-            const token = auth.substring(7);
-            const parts = token.split('-');
-            if (parts[0] === 'session' && parts.length >= 3) {
-                return { user: { role: parts[1], username: parts[2] } };
-            }
-        }
-        return { user: null };
+        // Otentikasi dinonaktifkan atas permintaan user (selalu bypass sebagai superadmin)
+        return { user: { role: 'superadmin', username: 'admin' } };
     })
 
     // Web Application SEO & Aesthetics Implementation
