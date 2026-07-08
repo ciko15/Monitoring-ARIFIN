@@ -1309,12 +1309,7 @@
                 ['Warning threshold', '≥ 30.0 °C', '#ffcc00'],
                 ['Alarm threshold',   '≥ 35.0 °C', '#ff3355'],
             ]});
-        const parserIdLower = (parserId || "").toLowerCase();
-        const sourceNameLower = (sourceName || "").toLowerCase();
-        const isGP = parserIdLower.includes("ils_gp") || (parserIdLower.startsWith("custom_") && (sourceNameLower.includes("glide") || sourceNameLower.includes("gp")));
-        const isLLZ = parserIdLower.includes("ils_llz") || (parserIdLower.startsWith("custom_") && (sourceNameLower.includes("localizer") || sourceNameLower.includes("llz")));
-
-        } else if (isGP) {
+        } else if (parserId === 'ils_gp_thales421') {
             const sup = 'ILS-GP';
             sections.push({ title: 'SYSTEM STATUS', params: [
                 ['TX MAIN',      data.tx_main_label || '—', '#00ffcc'],
@@ -1337,7 +1332,7 @@
                 return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
             })});
 
-        } else if (isLLZ) {
+        } else if (parserId === 'ils_llz_thales421') {
             const sup = 'ILS-LLZ';
             sections.push({ title: 'SYSTEM STATUS', params: [
                 ['TX MAIN',      data.tx_main_label || '—', '#00ffcc'],
@@ -1362,7 +1357,20 @@
             });
         } else {
             // Check if we have a template for this parser
-            const tmpl = window.templatesCache?.find(t => t.id === parserId);
+            let tmpl = window.templatesCache?.find(t => t.id === parserId);
+            
+            // Map custom IDs to known templates based on equipment name
+            if (!tmpl && parserId && parserId.startsWith('custom_')) {
+                const nameLower = (sourceName || '').toLowerCase();
+                if (nameLower.includes('glide') || nameLower.includes('gp')) {
+                    tmpl = window.templatesCache?.find(t => t.id === 'ils_gp_normac');
+                } else if (nameLower.includes('localizer') || nameLower.includes('llz')) {
+                    tmpl = window.templatesCache?.find(t => t.id === 'ils_llz_normac');
+                } else if (nameLower.includes('vhf')) {
+                    tmpl = window.templatesCache?.find(t => t.id === 'vhf_t6tv');
+                }
+            }
+
             if (tmpl && tmpl.parameters && tmpl.parameters.length > 0) {
                 const params = tmpl.parameters.map(p => {
                     const key = p.name || p.label;
