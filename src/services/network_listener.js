@@ -741,7 +741,7 @@ class NetworkListenerService {
         }
 
         // ILS GP / LLZ — binary streaming TCP, bypass SOH/STX/ETX buffering
-        if (parsing_id === 'ils_gp_thales421' || parsing_id === 'ils_llz_thales421' || parsing_id === 'ils_gp_normac' || parsing_id === 'ils_gp_normac7030') {
+        if (parsing_id === 'ils_gp_thales421' || parsing_id === 'ils_llz_thales421' || parsing_id === 'ils_gp_normac' || parsing_id === 'ils_gp_normac7030' || parsing_id === 'custom_1783483057654') {
             console.log(`[LLZ-TRACE] Routing ${source.name} to startBinaryTcpListener`);
             this.startBinaryTcpListener(source);
             return;
