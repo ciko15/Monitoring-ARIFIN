@@ -410,8 +410,6 @@ function buildEquipmentSourceKey(equipmentId, sourceName) {
   return `${equipmentId}_${sourceName || 'default'}`;
 }
 
-const fs = require('fs');
-const path = require('path');
 const IPC_STATE_PATH = path.join(process.cwd(), 'data', 'ipc_state.json');
 let lastIpcSyncTime = 0;
 
