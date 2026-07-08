@@ -101,6 +101,11 @@ class IlsGpNormacParser extends BaseParser {
              parsedResult.raw_hex = packet.toString('hex').toUpperCase();
 
              // Tambahan data dummy agar UI muncul
+             parsedResult.tx_main_label = '1 MAIN';
+             parsedResult.tx_stby_label = '2 STBY';
+             parsedResult.status_label = 'Normal';
+             parsedResult.tx_data = 'Local';
+             
              parsedResult.crs_ddm = 0.00;
              parsedResult.crs_sdm = 40.0;
              parsedResult.clr_ddm = 0.00;
