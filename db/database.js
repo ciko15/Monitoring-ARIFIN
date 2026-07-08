@@ -406,15 +406,59 @@ function scheduleEquipmentLogsPersist() {
   }, 500);
 }
 
-function buildEquipmentSourceKey(equipmentId, source = 'default') {
-  return `${equipmentId}::${source || 'default'}`;
+function buildEquipmentSourceKey(equipmentId, sourceName) {
+  return `${equipmentId}_${sourceName || 'default'}`;
+}
+
+const fs = require('fs');
+const path = require('path');
+const IPC_STATE_PATH = path.join(process.cwd(), 'data', 'ipc_state.json');
+let lastIpcSyncTime = 0;
+
+function syncIpcStateForWeb() {
+  if (process.env.SERVICE_ROLE === 'web') {
+    try {
+      if (fs.existsSync(IPC_STATE_PATH)) {
+        const stats = fs.statSync(IPC_STATE_PATH);
+        if (stats.mtimeMs > lastIpcSyncTime) {
+          const stateStr = fs.readFileSync(IPC_STATE_PATH, 'utf-8');
+          const stateObj = JSON.parse(stateStr);
+          for (const [k, v] of Object.entries(stateObj)) {
+            latestEquipmentDataBySource.set(k, v);
+          }
+          lastIpcSyncTime = stats.mtimeMs;
+        }
+      }
+    } catch (e) {
+      console.error('[IPC] Failed to sync state:', e.message);
+    }
+  }
 }
 
 function upsertLatestEquipmentData(log) {
   const key = buildEquipmentSourceKey(log.equipmentId, log.source);
   latestEquipmentDataBySource.set(key, log);
+  
+  // Update lightweight IPC file so Web process can read it
+  if (process.env.SERVICE_ROLE === 'collector' || !process.env.SERVICE_ROLE) {
+    try {
+      const stateObj = Object.fromEntries(latestEquipmentDataBySource);
+      fs.writeFileSync(IPC_STATE_PATH, JSON.stringify(stateObj));
+    } catch (e) {}
+  }
 }
 
+function getLatestLogsBySource(equipmentId) {
+  syncIpcStateForWeb(); // Sync memory before serving UI
+  
+  const result = [];
+  for (const [key, log] of latestEquipmentDataBySource.entries()) {
+    if (String(log.equipmentId) === String(equipmentId)) {
+      result.push(log);
+    }
+  }
+  return result;
+}
 let surveillanceStationsDB = [];
 let radarTargetsDB = [];
 let adsbAircraftDB = [];
