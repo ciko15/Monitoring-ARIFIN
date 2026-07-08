@@ -73,11 +73,16 @@ class IlsGpNormacParser extends BaseParser {
                 parsedResult.raw_hex = packet.toString('hex').toUpperCase();
 
                 // TODO: Ekstrak parameter dari offset byte tertentu (sementara pakai data dummy agar UI muncul)
-                parsedResult.crs_ddm = 0.00;
-                parsedResult.crs_sdm = 40.0;
-                parsedResult.clr_ddm = 0.00;
-                parsedResult.clr_sdm = 40.0;
-                parsedResult.rf_level = -10.5;
+                parsedResult.tx_main_label = '1 MAIN';
+                parsedResult.tx_stby_label = '2 STBY';
+                parsedResult.status_label = 'Normal';
+                parsedResult.tx_data = 'Local';
+                
+                parsedResult.DDM_COURSE = 0.00;
+                parsedResult.CARRIER_PWR = 40.0;
+                parsedResult.DDM_CLR = 0.00;
+                parsedResult.CLR_SDM = 40.0;
+                parsedResult.RF_POWER = 100.5;
 
                 // Hapus paket yang sudah diproses dari buffer
                 this.buffer = this.buffer.subarray(hdlcIndex + 104);
@@ -106,11 +111,11 @@ class IlsGpNormacParser extends BaseParser {
              parsedResult.status_label = 'Normal';
              parsedResult.tx_data = 'Local';
              
-             parsedResult.crs_ddm = 0.00;
-             parsedResult.crs_sdm = 40.0;
-             parsedResult.clr_ddm = 0.00;
-             parsedResult.clr_sdm = 40.0;
-             parsedResult.rf_level = -10.5;
+             parsedResult.DDM_COURSE = 0.00;
+             parsedResult.CARRIER_PWR = 40.0;
+             parsedResult.DDM_CLR = 0.00;
+             parsedResult.CLR_SDM = 40.0;
+             parsedResult.RF_POWER = 100.5;
 
              // Hapus dari buffer
              this.buffer = this.buffer.subarray(11);

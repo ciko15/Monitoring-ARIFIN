@@ -1309,7 +1309,7 @@
                 ['Warning threshold', '≥ 30.0 °C', '#ffcc00'],
                 ['Alarm threshold',   '≥ 35.0 °C', '#ff3355'],
             ]});
-        } else if (parserId === 'ils_gp_thales421') {
+                } else if (parserId === 'ils_gp_thales421' || parserId === 'ils_gp_normac') {
             const sup = 'ILS-GP';
             sections.push({ title: 'SYSTEM STATUS', params: [
                 ['TX MAIN',      data.tx_main_label || '—', '#00ffcc'],
