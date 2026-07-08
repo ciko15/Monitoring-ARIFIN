@@ -1309,7 +1309,12 @@
                 ['Warning threshold', '≥ 30.0 °C', '#ffcc00'],
                 ['Alarm threshold',   '≥ 35.0 °C', '#ff3355'],
             ]});
-        } else if (parserId === 'ils_gp_thales421') {
+        const parserIdLower = (parserId || "").toLowerCase();
+        const sourceNameLower = (sourceName || "").toLowerCase();
+        const isGP = parserIdLower.includes("ils_gp") || (parserIdLower.startsWith("custom_") && (sourceNameLower.includes("glide") || sourceNameLower.includes("gp")));
+        const isLLZ = parserIdLower.includes("ils_llz") || (parserIdLower.startsWith("custom_") && (sourceNameLower.includes("localizer") || sourceNameLower.includes("llz")));
+
+        } else if (isGP) {
             const sup = 'ILS-GP';
             sections.push({ title: 'SYSTEM STATUS', params: [
                 ['TX MAIN',      data.tx_main_label || '—', '#00ffcc'],
@@ -1332,7 +1337,7 @@
                 return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
             })});
 
-        } else if (parserId === 'ils_llz_thales421') {
+        } else if (isLLZ) {
             const sup = 'ILS-LLZ';
             sections.push({ title: 'SYSTEM STATUS', params: [
                 ['TX MAIN',      data.tx_main_label || '—', '#00ffcc'],
