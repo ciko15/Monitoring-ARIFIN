@@ -726,7 +726,30 @@ class NetworkListenerService {
         this._marcPollTimers = this._marcPollTimers || new Map();
         this._marcPollTimers.set(id, pollTimer);
 
-        console.log(`[NetworkListener] MARC RSE listener started for ${name} (ports: ${ports.join(',')})`);
+    }
+
+    _getParserModule(parsing_id) {
+        if (!parsing_id || !parsing_id.startsWith('custom_')) return parsing_id;
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const configs = JSON.parse(fs.readFileSync(path.join(__dirname, '../../db/equipment_parsing_config.json'), 'utf8'));
+            const custom = configs.find(c => c.id === parsing_id);
+            if (custom && custom.files) {
+                const basename = path.basename(custom.files, '.js');
+                // Auto-correct if user accidentally chose factory.js or base.js
+                if (basename === 'factory' || basename === 'base' || !basename) {
+                    const nameLower = (custom.name || '').toLowerCase();
+                    if (nameLower.includes('vhf')) return 'vhf_t6tv';
+                    if (nameLower.includes('glide') || nameLower.includes('gp')) return 'ils_gp_normac';
+                    if (nameLower.includes('localizer') || nameLower.includes('llz')) return 'ils_llz_normac';
+                }
+                return basename;
+            }
+        } catch(e) {
+            console.warn(`[NetworkListener] Error resolving custom parser ${parsing_id}:`, e.message);
+        }
+        return parsing_id;
     }
 
     async startListener(source) {
@@ -734,45 +757,47 @@ class NetworkListenerService {
         const port = parseInt(udp_port || tcp_port);
         const protocol = udp_port ? 'udp' : 'tcp';
 
+        const moduleName = this._getParserModule(parsing_id);
+
         // T6TV uses WebSocket — route to dedicated handler
-        if (parsing_id === 'vhf_t6tv') {
+        if (moduleName === 'vhf_t6tv') {
             await this.startT6tvListener(source);
             return;
         }
 
         // PM5560 Modbus — dedicated raw TCP handler (bypass DVOR/DME buffering)
-        if (parsing_id === 'pm5560_modbus') {
+        if (moduleName === 'pm5560_modbus') {
             this.startPm5560Listener(source);
             return;
         }
 
         // ILS GP / LLZ — binary streaming TCP, bypass SOH/STX/ETX buffering
-        if (parsing_id === 'ils_gp_thales421' || parsing_id === 'ils_llz_thales421' || parsing_id === 'ils_gp_normac' || parsing_id === 'ils_gp_normac7030' || parsing_id === 'custom_1783483057654') {
+        if (moduleName === 'ils_gp_thales421' || moduleName === 'ils_llz_thales421' || moduleName === 'ils_gp_normac' || moduleName === 'ils_gp_normac7030' || moduleName === 'ils_llz_normac' || moduleName === 'ils_llz_normac7030') {
             console.log(`[LLZ-TRACE] Routing ${source.name} to startBinaryTcpListener`);
             this.startBinaryTcpListener(source);
             return;
         }
 
         // Temp/Humidity sensor — Modbus TCP FC03 port 502
-        if (parsing_id === 'temp_humidity_modbus') {
+        if (moduleName === 'temp_humidity_modbus') {
             this.startTempHumidityListener(source);
             return;
         }
 
         // MARC RSE — shared TCP client, binary SLIP protocol
-        if (parsing_id === 'vhf_marc_rse') {
+        if (moduleName === 'vhf_marc_rse') {
             this.startMarcRseListener(source);
             return;
         }
 
         // SNMP System Monitor (Server/Workstation/Switch)
-        if (parsing_id === 'snmp_system' || parsing_id === 'snmp_host_resources_01' || parsing_id === 'snmp_network_basic') {
+        if (moduleName === 'snmp_system' || moduleName === 'snmp_host_resources_01' || moduleName === 'snmp_network_basic') {
             this.startSnmpSystemListener(source);
             return;
         }
 
         // ASTERIX Radar CAT034 (UDP multicast per site)
-        if (parsing_id === 'asterix_radar') {
+        if (moduleName === 'asterix_radar') {
             this.startAsterixListener(source, 'asterix_radar');
             return;
         }

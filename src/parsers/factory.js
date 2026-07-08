@@ -24,10 +24,34 @@ class ParserFactory {
      * @returns {BaseParser|null} Parser instance or null if type not supported
      */
     static createParser(connectionType, config) {
+        // --- Custom Parser ID Resolution ---
+        let moduleName = connectionType?.toLowerCase();
+        if (moduleName && moduleName.startsWith('custom_')) {
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const configs = JSON.parse(fs.readFileSync(path.join(__dirname, '../../db/equipment_parsing_config.json'), 'utf8'));
+                const custom = configs.find(c => c.id === moduleName);
+                if (custom && custom.files) {
+                    const basename = path.basename(custom.files, '.js');
+                    if (basename === 'factory' || basename === 'base' || !basename) {
+                        const nameLower = (custom.name || '').toLowerCase();
+                        if (nameLower.includes('vhf')) moduleName = 'vhf_t6tv';
+                        else if (nameLower.includes('glide') || nameLower.includes('gp')) moduleName = 'ils_gp_normac';
+                        else if (nameLower.includes('localizer') || nameLower.includes('llz')) moduleName = 'ils_llz_normac';
+                    } else {
+                        moduleName = basename;
+                    }
+                }
+            } catch(e) {
+                console.warn(`[ParserFactory] Error resolving custom parser ${moduleName}:`, e.message);
+            }
+        }
+
         // --- SECURE DYNAMIC LOADING LOGIC ---
         // If a specific parser file is defined, try to load it safely from the same directory
         const parserFile = config.parser_file || config.files;
-        if (parserFile) {
+        if (parserFile && !moduleName.startsWith('custom_')) {
             try {
                 const path = require('path');
                 // Security: Prevent path traversal by only taking the basename
@@ -56,7 +80,7 @@ class ParserFactory {
         }
 
         // --- STATIC FALLBACK ---
-        switch (connectionType?.toLowerCase()) {
+        switch (moduleName) {
             case 'rcms':
                 return new RcmsParser(config);
             
