@@ -94,10 +94,10 @@ class IlsGpNormacParser extends BaseParser {
             }
         } 
         // Cek paket format kedua (dimulai dengan 01 1F 00 ...)
-        else if (this.buffer.length >= 95) {
-             // Potong 95 byte paket
-             const packet = this.buffer.subarray(0, 95);
-             parsedResult.frame_type = 'BINARY_95';
+        else if (this.buffer.length >= 11) {
+             // Potong 11 byte paket
+             const packet = this.buffer.subarray(0, 11);
+             parsedResult.frame_type = 'BINARY_11';
              parsedResult.raw_hex = packet.toString('hex').toUpperCase();
 
              // Tambahan data dummy agar UI muncul
@@ -113,7 +113,7 @@ class IlsGpNormacParser extends BaseParser {
              parsedResult.rf_level = -10.5;
 
              // Hapus dari buffer
-             this.buffer = this.buffer.subarray(95);
+             this.buffer = this.buffer.subarray(11);
 
              const alarmResult = this.checkAlarms(parsedResult);
              return {
