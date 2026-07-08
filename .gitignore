@@ -18,4 +18,4 @@ db/*.json
 !db/equipment_parsing_config.json
 !db/snmp_oid_catalog.json
 !db/sup_category.json
-!db/templates_config.json
+!db/templates_config.jsondata/ipc_state.json
