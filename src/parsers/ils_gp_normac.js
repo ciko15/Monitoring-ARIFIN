@@ -21,6 +21,7 @@ class IlsGpNormacParser extends BaseParser {
      * Polling mechanism support
      */
     getPollRequests() {
+        console.log(`[Normarc GP] getPollRequests called. Sending trigger: ${TRIGGER_SEND.toString('hex')}`);
         return [
             { name: 'GP_STATUS_REQ', bytes: TRIGGER_SEND }
         ];
@@ -71,8 +72,12 @@ class IlsGpNormacParser extends BaseParser {
                 parsedResult.frame_type = 'HDLC_104';
                 parsedResult.raw_hex = packet.toString('hex').toUpperCase();
 
-                // TODO: Ekstrak parameter dari offset byte tertentu
-                // Contoh: parsedResult.crs_ddm = this.extractField(packet, { byte_offset: 20, length: 4, type: 'float' });
+                // TODO: Ekstrak parameter dari offset byte tertentu (sementara pakai data dummy agar UI muncul)
+                parsedResult.crs_ddm = 0.00;
+                parsedResult.crs_sdm = 40.0;
+                parsedResult.clr_ddm = 0.00;
+                parsedResult.clr_sdm = 40.0;
+                parsedResult.rf_level = -10.5;
 
                 // Hapus paket yang sudah diproses dari buffer
                 this.buffer = this.buffer.subarray(hdlcIndex + 104);
@@ -87,6 +92,13 @@ class IlsGpNormacParser extends BaseParser {
              const packet = this.buffer.subarray(0, 95);
              parsedResult.frame_type = 'BINARY_95';
              parsedResult.raw_hex = packet.toString('hex').toUpperCase();
+
+             // Tambahan data dummy agar UI muncul
+             parsedResult.crs_ddm = 0.00;
+             parsedResult.crs_sdm = 40.0;
+             parsedResult.clr_ddm = 0.00;
+             parsedResult.clr_sdm = 40.0;
+             parsedResult.rf_level = -10.5;
 
              // Hapus dari buffer
              this.buffer = this.buffer.subarray(95);
