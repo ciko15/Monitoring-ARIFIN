@@ -356,16 +356,6 @@ class NetworkListenerService {
                     doPoll();
                     pollTimer = setInterval(doPoll, 5000); // Paksa minta data tiap 5 detik
                 }
-
-                // SIMULATOR INJECTION UNTUK MEMBUKTIKAN PIPELINE (Hanya untuk GlidePath)
-                if (name.includes('Glide') || name.includes('GP')) {
-                    console.log(`[PIPELINE SIMULATOR] Memulai injeksi data palsu untuk ${name} setiap 3 detik...`);
-                    setInterval(() => {
-                        const dummyHex = Buffer.from('011F00AABBCCDD' + Date.now().toString().substring(5), 'hex');
-                        console.log(`[PIPELINE SIMULATOR] Menginjeksi paket ke collector: ${dummyHex.toString('hex')}`);
-                        socket.emit('data', dummyHex);
-                    }, 3000);
-                }
             });
 
             if (!this._lastHeartbeatReply) this._lastHeartbeatReply = new Map();
