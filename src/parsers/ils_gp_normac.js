@@ -49,89 +49,31 @@ class IlsGpNormacParser extends BaseParser {
         console.log(`[Normarc GP] Menerima data: ${rawData.length} bytes -> ${rawData.toString('hex').toUpperCase()}`);
 
         const parsedResult = {
-            raw_hex: '',
             status: 'Normal',
-            frame_type: 'Unknown',
-            // Default parameters (akan di-mapping manual nanti)
-            crs_ddm: null,
-            crs_sdm: null,
-            clr_ddm: null,
-            clr_sdm: null,
-            rf_level: null
+            frame_type: 'TEST_PIPELINE',
+            // Kita tampilkan hex raw-nya langsung ke UI untuk di-debug!
+            debug_length: this.buffer.length,
+            debug_hex: this.buffer.toString('hex').toUpperCase().substring(0, 60) + '...',
+            crs_ddm: 0.00,
+            crs_sdm: 40.0,
+            clr_ddm: 0.00,
+            clr_sdm: 40.0,
+            rf_level: -10.5
         };
 
-        // Deteksi HDLC Frame (dimulai dengan 7E 7E)
-        const hdlcIndex = this.buffer.indexOf(Buffer.from([0x7E, 0x7E]));
-        
-        if (hdlcIndex !== -1) {
-            // Kita menemukan frame HDLC
-            if (this.buffer.length >= hdlcIndex + 104) {
-                // Potong 104 byte paket
-                const packet = this.buffer.subarray(hdlcIndex, hdlcIndex + 104);
-                
-                parsedResult.frame_type = 'HDLC_104';
-                parsedResult.raw_hex = packet.toString('hex').toUpperCase();
-
-                // TODO: Ekstrak parameter dari offset byte tertentu (sementara pakai data dummy agar UI muncul)
-                parsedResult.crs_ddm = 0.00;
-                parsedResult.crs_sdm = 40.0;
-                parsedResult.clr_ddm = 0.00;
-                parsedResult.clr_sdm = 40.0;
-                parsedResult.rf_level = -10.5;
-
-                // Hapus paket yang sudah diproses dari buffer
-                this.buffer = this.buffer.subarray(hdlcIndex + 104);
-                
-                console.log(`[Normarc GP] Raw HDLC: ${parsedResult.raw_hex}`);
-                const alarmResult = this.checkAlarms(parsedResult);
-                return {
-                    success: true,
-                    data: parsedResult,
-                    status: alarmResult.status,
-                    alarms: alarmResult.alarms,
-                    warnings: alarmResult.warnings
-                };
-            }
-        } 
-        // Cek paket format kedua (dimulai dengan 01 1F 00 ...)
-        else if (this.buffer.length >= 95) {
-             // Potong 95 byte paket
-             const packet = this.buffer.subarray(0, 95);
-             parsedResult.frame_type = 'BINARY_95';
-             parsedResult.raw_hex = packet.toString('hex').toUpperCase();
-
-             // Tambahan data dummy agar UI muncul
-             parsedResult.tx_main_label = '1 MAIN';
-             parsedResult.tx_stby_label = '2 STBY';
-             parsedResult.status_label = 'Normal';
-             parsedResult.tx_data = 'Local';
-             
-             parsedResult.crs_ddm = 0.00;
-             parsedResult.crs_sdm = 40.0;
-             parsedResult.clr_ddm = 0.00;
-             parsedResult.clr_sdm = 40.0;
-             parsedResult.rf_level = -10.5;
-
-             // Hapus dari buffer
-             this.buffer = this.buffer.subarray(95);
-
-             const alarmResult = this.checkAlarms(parsedResult);
-             return {
-                 success: true,
-                 data: parsedResult,
-                 status: alarmResult.status,
-                 alarms: alarmResult.alarms,
-                 warnings: alarmResult.warnings
-             };
-        }
-
-        // Jika data belum lengkap, simpan di buffer dan tunggu data selanjutnya
-        if (this.buffer.length > 2048) {
-            // Cegah memory leak jika buffer terlalu besar dan tidak ada frame yang valid
+        // Hapus buffer agar tidak menumpuk terus menerus di memory saat testing
+        if (this.buffer.length > 1024) {
             this.buffer = Buffer.alloc(0);
         }
 
-        return { success: false, error: 'No valid GP frames' };
+        const alarmResult = this.checkAlarms(parsedResult);
+        return {
+            success: true, // SELALU KEMBALIKAN TRUE AGAR MASUK KE DATABASE DAN UI!
+            data: parsedResult,
+            status: alarmResult.status,
+            alarms: alarmResult.alarms,
+            warnings: alarmResult.warnings
+        };
     }
 }
 
