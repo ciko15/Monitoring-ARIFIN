@@ -76,6 +76,7 @@ class IlsGpNormacParser extends BaseParser {
                 // Hapus paket yang sudah diproses dari buffer
                 this.buffer = this.buffer.subarray(hdlcIndex + 104);
                 
+                console.log(`[Normarc GP] Raw HDLC: ${parsedResult.raw_hex}`);
                 return this.checkAlarms(parsedResult);
             }
         } 
