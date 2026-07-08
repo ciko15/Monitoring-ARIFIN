@@ -14,6 +14,7 @@ const VhfMarcRseParser = require('./vhf_marc_rse');
 const TempHumidityParser = require('./temp_humidity_modbus');
 const IlsGpThales421Parser = require('./ils_gp_thales421');
 const IlsLlzThales421Parser = require('./ils_llz_thales421');
+const IlsGpNormacParser = require('./ils_gp_normac');
 
 class ParserFactory {
     /**
@@ -93,6 +94,9 @@ class ParserFactory {
             case 'ils_llz_thales421':
                 return new IlsLlzThales421Parser(config);
 
+            case 'ils_gp_normac':
+                return new IlsGpNormacParser(config);
+
             case 'json':
                 return new JsonParser(config);
             
@@ -124,6 +128,7 @@ class ParserFactory {
             'temp_humidity_modbus',
             'ils_gp_thales421',
             'ils_llz_thales421',
+            'ils_gp_normac',
             'vhf_t6tv',
             'vhf_marc_rse'
         ];
