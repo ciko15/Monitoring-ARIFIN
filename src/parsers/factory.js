@@ -95,6 +95,7 @@ class ParserFactory {
                 return new IlsLlzThales421Parser(config);
 
             case 'ils_gp_normac':
+            case 'ils_gp_normac7030':
                 return new IlsGpNormacParser(config);
 
             case 'json':
@@ -129,6 +130,7 @@ class ParserFactory {
             'ils_gp_thales421',
             'ils_llz_thales421',
             'ils_gp_normac',
+            'ils_gp_normac7030',
             'vhf_t6tv',
             'vhf_marc_rse'
         ];
