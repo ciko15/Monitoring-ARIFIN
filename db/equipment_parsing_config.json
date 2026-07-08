@@ -118,5 +118,13 @@
     "category": "Data Processing",
     "files": "/src/parsers/snmp_network_basic.js",
     "createdAt": "2026-06-03T00:00:00.000Z"
+  },
+  {
+    "id": "ils_gp_normac",
+    "name": "ILS GP Normarc",
+    "description": "ILS Glide Path (GP) Parser untuk Normarc via HDLC/Binary.",
+    "category": "Navigation",
+    "files": "/src/parsers/ils_gp_normac.js",
+    "createdAt": "2026-07-08T00:00:00.000Z"
   }
 ]
