@@ -45,6 +45,7 @@ class IlsGpNormacParser extends BaseParser {
 
         // Tambahkan data baru ke internal buffer
         this.buffer = Buffer.concat([this.buffer, rawData]);
+        console.log(`[Normarc GP] Menerima data: ${rawData.length} bytes -> ${rawData.toString('hex').toUpperCase()}`);
 
         const parsedResult = {
             raw_hex: '',

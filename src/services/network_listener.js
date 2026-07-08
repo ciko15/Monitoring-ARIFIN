@@ -312,7 +312,13 @@ class NetworkListenerService {
         const { id, equipt_id, ip_address, tcp_port, parsing_id, name } = source;
         const port = parseInt(tcp_port) || 950;
 
-        const ParserModule = require('../parsers/' + parsing_id);
+        // Petakan custom_id ke file js yang benar
+        let moduleName = parsing_id;
+        if (parsing_id === 'ils_gp_normac7030' || parsing_id === 'custom_1783483057654') {
+            moduleName = 'ils_gp_normac';
+        }
+
+        const ParserModule = require('../parsers/' + moduleName);
         const parser = new ParserModule({ equipt_id });
 
         // Cek apakah parser support protokol trigger+heartbeat (Thales 421)
