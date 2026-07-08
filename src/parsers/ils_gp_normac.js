@@ -83,7 +83,14 @@ class IlsGpNormacParser extends BaseParser {
                 this.buffer = this.buffer.subarray(hdlcIndex + 104);
                 
                 console.log(`[Normarc GP] Raw HDLC: ${parsedResult.raw_hex}`);
-                return this.checkAlarms(parsedResult);
+                const alarmResult = this.checkAlarms(parsedResult);
+                return {
+                    success: true,
+                    data: parsedResult,
+                    status: alarmResult.status,
+                    alarms: alarmResult.alarms,
+                    warnings: alarmResult.warnings
+                };
             }
         } 
         // Cek paket format kedua (dimulai dengan 01 1F 00 ...)
@@ -103,7 +110,14 @@ class IlsGpNormacParser extends BaseParser {
              // Hapus dari buffer
              this.buffer = this.buffer.subarray(95);
 
-             return this.checkAlarms(parsedResult);
+             const alarmResult = this.checkAlarms(parsedResult);
+             return {
+                 success: true,
+                 data: parsedResult,
+                 status: alarmResult.status,
+                 alarms: alarmResult.alarms,
+                 warnings: alarmResult.warnings
+             };
         }
 
         // Jika data belum lengkap, simpan di buffer dan tunggu data selanjutnya
@@ -112,7 +126,7 @@ class IlsGpNormacParser extends BaseParser {
             this.buffer = Buffer.alloc(0);
         }
 
-        return null; // Return null jika frame belum utuh
+        return { success: false, error: 'No valid GP frames' };
     }
 }
 
