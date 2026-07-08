@@ -313,10 +313,7 @@ class NetworkListenerService {
         const port = parseInt(tcp_port) || 950;
 
         // Petakan custom_id ke file js yang benar
-        let moduleName = parsing_id;
-        if (parsing_id === 'ils_gp_normac7030' || parsing_id === 'custom_1783483057654') {
-            moduleName = 'ils_gp_normac';
-        }
+        let moduleName = this._getParserModule(parsing_id);
 
         const ParserModule = require('../parsers/' + moduleName);
         const parser = new ParserModule({ equipt_id });
