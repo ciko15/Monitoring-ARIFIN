@@ -34,11 +34,8 @@ process.on('SIGTERM', () => {
 // Authorization middleware
 function authorize(allowedRoles: string[]) {
     return ({ user, set }: any) => {
-        const userRole = user?.role;
-        if (!userRole || !allowedRoles.includes(userRole)) {
-            set.status = 403;
-            throw new Error('Unauthorized');
-        }
+        // Bypass otorisasi sepenuhnya
+        return;
     };
 }
 
