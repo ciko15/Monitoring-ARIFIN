@@ -24,7 +24,8 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        PORT: 3100
+        PORT: 3100,
+        SERVICE_ROLE: 'web'
       },
       error_file: './logs/pm2-web-error.log',
       out_file: './logs/pm2-web-out.log',
@@ -42,7 +43,8 @@ module.exports = {
       watch: false,
       max_memory_restart: '1G',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        SERVICE_ROLE: 'collector'
       },
       error_file: './logs/pm2-collector-error.log',
       out_file: './logs/pm2-collector-out.log',
@@ -60,7 +62,8 @@ module.exports = {
       watch: false,
       max_memory_restart: '1G',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        SERVICE_ROLE: 'processor'
       },
       error_file: './logs/pm2-processor-error.log',
       out_file: './logs/pm2-processor-out.log',
