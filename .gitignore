@@ -19,3 +19,4 @@ db/*.json
 !db/snmp_oid_catalog.json
 !db/sup_category.json
 !db/templates_config.jsondata/ipc_state.json
+data/ipc_state.json
