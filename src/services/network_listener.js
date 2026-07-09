@@ -106,9 +106,11 @@ class NetworkListenerService {
             return;
         }
 
+        const dataToSave = { ...parsedData, source: source.name };
+
         await this.equipmentService.saveToLogs(
             source.equipt_id,
-            parsedData,
+            dataToSave,
             connectionType,
             finalStatus
         );

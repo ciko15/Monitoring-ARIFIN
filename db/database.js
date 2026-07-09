@@ -460,20 +460,7 @@ function upsertLatestEquipmentData(log) {
   }
 }
 
-function syncIpcStateForWeb() {
-  if (process.env.SERVICE_ROLE === 'web' || !process.env.SERVICE_ROLE) {
-    try {
-      const fs = require('fs');
-      const content = fs.readFileSync(IPC_STATE_PATH, 'utf8');
-      const stateObj = JSON.parse(content);
-      for (const key of Object.keys(stateObj)) {
-        latestEquipmentDataBySource.set(key, stateObj[key]);
-      }
-    } catch (e) {
-      console.error('[DB] Error reading/parsing IPC_STATE_PATH:', e.message);
-    }
-  }
-}
+
 function getLatestLogsBySource(equipmentId) {
   syncIpcStateForWeb(); // Sync memory before serving UI
   
@@ -1263,6 +1250,10 @@ async function getAllCategories() {
 async function createEquipmentLog(data) {
   const log = { ...data, id: Date.now(), logged_at: data.logged_at || new Date().toISOString() };
   
+  if (data.source === 'TX 1 APP' || data.equipment_name === 'VHF Primary APP') {
+    console.log('[DB-DEBUG] createEquipmentLog called for TX 1 APP! Data:', JSON.stringify(log));
+  }
+
   // [STATELESS FORWARDER MODE]
   // We NO LONGER store logs in `equipmentLogsDB` array.
   // We NO LONGER persist history to `equipment_logs.json`.
