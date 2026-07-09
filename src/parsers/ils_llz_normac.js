@@ -86,20 +86,13 @@ class IlsLlzNormacParser extends BaseParser {
                 // Posisi offset disesuaikan dengan struktur payload 204 byte
                 let offset = frameSize === 204 ? 40 : 24; 
                 
-                // DDM & SDM Course & Clearance (Little Endian)
-                const rawCrsDdm = validPacket.readInt16LE(offset); 
-                const rawCrsSdm = validPacket.readInt16LE(offset + 4); 
-                const rawClrDdm = validPacket.readInt16LE(offset + 12); 
-                const rawClrSdm = validPacket.readInt16LE(offset + 16);
-                
-                parsedResult.DDM_COURSE = parseFloat((rawCrsDdm / 10000).toFixed(2));
-                parsedResult.SDM_COURSE = parseFloat((Math.abs(rawCrsSdm) / 100).toFixed(1));
-                parsedResult.DDM_CLR = parseFloat((rawClrDdm / 10000).toFixed(2));
-                parsedResult.CLR_SDM = parseFloat((Math.abs(rawClrSdm) / 100).toFixed(1));
+                parsedResult.DDM_COURSE = null;
+                parsedResult.SDM_COURSE = null;
+                parsedResult.DDM_CLR = null;
+                parsedResult.CLR_SDM = null;
                 
                 // RF Power
-                const rawPwr = validPacket.readInt16LE(offset + 8);
-                parsedResult.RF_POWER = parseFloat((Math.abs(rawPwr) / 10).toFixed(1)) || 40.0;
+                parsedResult.RF_POWER = null;
                 
                 parsedResult.tx_main_label = '1 MAIN';
                 parsedResult.tx_stby_label = '2 STBY';
