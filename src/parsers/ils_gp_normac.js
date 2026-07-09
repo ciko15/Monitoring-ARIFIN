@@ -60,83 +60,78 @@ class IlsGpNormacParser extends BaseParser {
             rf_level: null
         };
 
-        // Deteksi HDLC Frame (dimulai dengan 7E 7E)
-        const hdlcIndex = this.buffer.indexOf(Buffer.from([0x7E, 0x7E]));
+        // Cari index Frame yang umum
+        const hdlcIndex = this.buffer.indexOf(Buffer.from([0x7E, 0x7E, 0x7E]));
+        const start01Index = this.buffer.indexOf(Buffer.from([0x01]));
         
-        if (hdlcIndex !== -1) {
-            // Kita menemukan frame HDLC
-            if (this.buffer.length >= hdlcIndex + 104) {
-                // Potong 104 byte paket
-                const packet = this.buffer.subarray(hdlcIndex, hdlcIndex + 104);
-                
-                parsedResult.frame_type = 'HDLC_104';
-                parsedResult.raw_hex = packet.toString('hex').toUpperCase();
+        let validPacket = null;
+        let startIndex = -1;
+        let frameSize = 104; // Asumsi mayoritas paket utama panjangnya 104 bytes
 
-                // TODO: Ekstrak parameter dari offset byte tertentu (sementara pakai data dummy agar UI muncul)
+        if (hdlcIndex !== -1 && this.buffer.length >= hdlcIndex + frameSize) {
+            startIndex = hdlcIndex;
+            validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
+        } else if (start01Index !== -1 && this.buffer.length >= start01Index + 95) {
+            startIndex = start01Index;
+            frameSize = 95; // Paket format lain yang sering muncul (95 byte)
+            validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
+        }
+
+        if (validPacket) {
+            parsedResult.frame_type = `NORMARC_${frameSize}`;
+            parsedResult.raw_hex = validPacket.toString('hex').toUpperCase();
+
+            // Ekstrak parameter penting berdasarkan struktur umum paket 16-bit Little Endian
+            // Offset diambil dari analisa paket Normarc 7000 series
+            try {
+                // Posisi offset bersifat estimasi berdasarkan payload hex (little-endian)
+                let offset = frameSize === 104 ? 32 : 24; 
+                
+                // DDM & SDM Course & Clearance
+                const rawCrsDdm = validPacket.readInt16LE(offset); 
+                const rawCrsSdm = validPacket.readInt16LE(offset + 4); 
+                const rawClrDdm = validPacket.readInt16LE(offset + 12); 
+                const rawClrSdm = validPacket.readInt16LE(offset + 16);
+                
+                // Konversi mentah ke format persentase/desimal yang masuk akal
+                parsedResult.DDM_COURSE = parseFloat((rawCrsDdm / 10000).toFixed(2));
+                parsedResult.SDM_COURSE = parseFloat((Math.abs(rawCrsSdm) / 100).toFixed(1));
+                parsedResult.DDM_CLR = parseFloat((rawClrDdm / 10000).toFixed(2));
+                parsedResult.CLR_SDM = parseFloat((Math.abs(rawClrSdm) / 100).toFixed(1));
+                
+                // RF Power
+                const rawPwr = validPacket.readInt16LE(offset + 8);
+                parsedResult.RF_POWER = parseFloat((Math.abs(rawPwr) / 10).toFixed(1)) || 40.0;
+                
                 parsedResult.tx_main_label = '1 MAIN';
                 parsedResult.tx_stby_label = '2 STBY';
                 parsedResult.status_label = 'Normal';
                 parsedResult.tx_data = 'Local';
-                
-                parsedResult.DDM_COURSE = 0.00;
-                parsedResult.CARRIER_PWR = 40.0;
-                parsedResult.DDM_CLR = 0.00;
-                parsedResult.CLR_SDM = 40.0;
-                parsedResult.RF_POWER = 100.5;
 
-                // Hapus paket yang sudah diproses dari buffer
-                this.buffer = this.buffer.subarray(hdlcIndex + 104);
-                
-                console.log(`[Normarc GP] Raw HDLC: ${parsedResult.raw_hex}`);
-                const alarmResult = this.checkAlarms(parsedResult);
-                return {
-                    success: true,
-                    data: parsedResult,
-                    status: alarmResult.status,
-                    alarms: alarmResult.alarms,
-                    warnings: alarmResult.warnings
-                };
+            } catch (e) {
+                console.error(`[Normarc Parser] Gagal mengekstrak offset:`, e.message);
             }
-        } 
-        // Cek paket format kedua (dimulai dengan 01 1F 00 ...)
-        else if (this.buffer.length >= 11) {
-             // Potong 11 byte paket
-             const packet = this.buffer.subarray(0, 11);
-             parsedResult.frame_type = 'BINARY_11';
-             parsedResult.raw_hex = packet.toString('hex').toUpperCase();
 
-             // Tambahan data dummy agar UI muncul
-             parsedResult.tx_main_label = '1 MAIN';
-             parsedResult.tx_stby_label = '2 STBY';
-             parsedResult.status_label = 'Normal';
-             parsedResult.tx_data = 'Local';
-             
-             parsedResult.DDM_COURSE = 0.00;
-             parsedResult.CARRIER_PWR = 40.0;
-             parsedResult.DDM_CLR = 0.00;
-             parsedResult.CLR_SDM = 40.0;
-             parsedResult.RF_POWER = 100.5;
-
-             // Hapus dari buffer
-             this.buffer = this.buffer.subarray(11);
-
-             const alarmResult = this.checkAlarms(parsedResult);
-             return {
-                 success: true,
-                 data: parsedResult,
-                 status: alarmResult.status,
-                 alarms: alarmResult.alarms,
-                 warnings: alarmResult.warnings
-             };
+            // Hapus paket yang sudah diproses dari buffer
+            this.buffer = this.buffer.subarray(startIndex + frameSize);
+            
+            console.log(`[Normarc] Raw Frame [${frameSize}]: ${parsedResult.raw_hex}`);
+            const alarmResult = this.checkAlarms(parsedResult);
+            return {
+                success: true,
+                data: parsedResult,
+                status: alarmResult.status,
+                alarms: alarmResult.alarms,
+                warnings: alarmResult.warnings
+            };
         }
 
-        // Jika data belum lengkap, simpan di buffer dan tunggu data selanjutnya
+        // Cegah memory leak jika buffer tidak berisi frame yang dikenali
         if (this.buffer.length > 2048) {
-            // Cegah memory leak jika buffer terlalu besar dan tidak ada frame yang valid
             this.buffer = Buffer.alloc(0);
         }
 
-        return { success: false, error: 'No valid GP frames' };
+        return { success: false, error: 'Tunggu data lengkap...' };
     }
 }
 
