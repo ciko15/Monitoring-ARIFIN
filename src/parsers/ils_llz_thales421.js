@@ -1,138 +1,283 @@
 const BaseParser = require('./base');
 
 /**
- * ILS Glide Path (GP) Parser — Normarc
- * 
- * Supports parsing of HDLC-framed (7E 7E 7E...) packets and binary stream.
+ * ILS Localizer (LLZ) Parser — Thales ILS 420
+ * AirNav Indonesia · Sentani Airport (WAJJ)
+ *
+ * Source  : IP 192.168.51.10  Port 950  (Moxa NPort TCP)
+ * Protocol: Binary stream, DATA packet = 96 bytes
+ *
+ * Sync markers:
+ *   SYNC_DATA  = 56 00 F9 06  (96-byte data packet)
+ *   SYNC_HBEAT = 1B 00 F9 06  (heartbeat — skip)
+ *   SYNC_ACK   = 13 00 F9 06  (ACK — skip)
+ *
+ * Packet structure (96 bytes):
+ *   byte  0- 3: SYNC_DATA  = 56 00 F9 06
+ *   byte  4- 7: F0 06 [seq] 92  — sequence counter
+ *   byte  8-11: 01 00 00 11     — fixed header
+ *   byte    12: subtype (0x0D or 0x8D)
+ *   byte    13: TX flag (0x40=TX1 MAIN, 0x00=TX2 MAIN)
+ *   byte 14-25: metadata
+ *   byte 26-95: PAYLOAD  float32 LE
+ *
+ * Parameters (float32 LE, offset from packet start):
+ *   off=26  CRS_RF      CRS RF Level         %
+ *   off=30  CRS_DDM     CRS DDM              (raw, scale TBC)
+ *   off=34  CRS_SDM     CRS SDM              %
+ *   off=38  IDENT_AM    Ident AM             %
+ *   off=42  WIDTH_RF    Width RF Level       %
+ *   off=46  WIDTH_DDM   Width DDM            (raw, scale TBC)
+ *   off=50  WIDTH_SDM   Width SDM            %
+ *   off=54  CLR_RF      CLR RF Level         %
+ *   off=58  CLR_DDM     CLR DDM              (raw, scale TBC)
+ *   off=62  CLR_SDM     CLR SDM              %
+ *   off=68  NF_RF       Near Field RF Level  %
+ *   off=72  NF_DDM      Near Field DDM       (raw, scale TBC)
+ *   off=76  NF_SDM      Near Field SDM       %
+ *   off=84  FREQ_DEV    Freq Deviation       kHz
  */
 
-// Hex trigger from sniffing
-const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // Adjust if Normarc needs a different trigger
+const PKT_C_SIZE = 92;
+
+// Protokol Mandiri Thales 421 (Hasil Sniffing)
+const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
+const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
+const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
+
+function isPktCSync(buf, i) {
+    return i + 3 < buf.length &&
+           buf[i] === 0x11 && buf[i+1] === 0x8D && buf[i+3] === 0x0C;
+}
+
+const PARAM_OFFSETS = {
+    CRS_RF:    15,
+    CRS_DDM:   19,
+    CRS_SDM:   23,
+    IDENT_AM:  27,
+    WIDTH_RF:  31,
+    WIDTH_DDM: 35,
+    WIDTH_SDM: 39,
+    CLR_RF:    43,
+    CLR_DDM:   47,
+    CLR_SDM:   51,
+    NF_RF:     57,
+    NF_DDM:    61,
+    NF_SDM:    65,
+    FREQ_DEV:  73,
+};
+
+// Limits [min, max]
+const LIMITS = {
+    CRS_RF:   [85.0, 115.0],
+    WIDTH_RF:  [85.0, 115.0],
+    CLR_RF:    [85.0, 115.0],
+    NF_RF:     [70.0, 125.0],
+    CRS_SDM:   [35.0,  45.0],
+    WIDTH_SDM: [35.0,  45.0],
+    CLR_SDM:   [35.0,  45.0],
+    NF_SDM:    [35.0,  45.0],
+    IDENT_AM:  [5.0,   20.0],
+};
+
+const PARAM_LABELS = {
+    CRS_RF:    ['CRS RF Level',   '%'  ],
+    CRS_DDM:   ['CRS DDM',        ''   ],
+    CRS_SDM:   ['CRS SDM',        '%'  ],
+    IDENT_AM:  ['Ident AM',       '%'  ],
+    WIDTH_RF:  ['Width RF Level', '%'  ],
+    WIDTH_DDM: ['Width DDM',      ''   ],
+    WIDTH_SDM: ['Width SDM',      '%'  ],
+    CLR_RF:    ['CLR RF Level',   '%'  ],
+    CLR_DDM:   ['CLR DDM',        ''   ],
+    CLR_SDM:   ['CLR SDM',        '%'  ],
+    NF_RF:     ['NF RF Level',    '%'  ],
+    NF_DDM:    ['NF DDM',         ''   ],
+    NF_SDM:    ['NF SDM',         '%'  ],
+    FREQ_DEV:  ['Freq Deviation', 'kHz'],
+};
+
+const DDM_X100 = new Set(['CRS_DDM', 'WIDTH_DDM', 'CLR_DDM', 'NF_DDM']);
+
+const PASSIVE_TIMEOUT = 4000; // 4 detik, jika tidak ada data dari ADRACS, kita ambil alih
+const POLL_INTERVAL   = 2000;
+const POLL_REQ_DELAY  = 150;
+
+function readFloat(buf, offset) {
+    try {
+        if (offset + 4 > buf.length) return null;
+        const v = buf.readFloatLE(offset);
+        return (isFinite(v) && Math.abs(v) < 1e6) ? v : null;
+    } catch (e) { return null; }
+}
+
+function decodePacket(pkt) {
+    if (!pkt || pkt.length < PKT_C_SIZE) return null;
+    if (!isPktCSync(pkt, 0)) return null;
+
+    const byte2     = pkt[2];
+    const isRemote  = !!(byte2 & 0x80);
+    const tx1IsMain = !!(byte2 & 0x40);
+    
+    // 0x00 = TX1, 0x10 = TX2
+    // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
+    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
+    
+    // Validation removed because our own triggers don't always match this signature
+    
+    const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
+
+    const params = {};
+    for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
+        let val = readFloat(pkt, offset);
+        if (val === null) continue;
+        val = DDM_X100.has(key)
+            ? parseFloat((val * 100).toFixed(4))
+            : parseFloat(val.toFixed(4));
+        params[key] = val;
+    }
+
+    return {
+        tx_main:  tx1IsMain ? 'TX1' : 'TX2',
+        tx_stby:  tx1IsMain ? 'TX2' : 'TX1',
+        tx_data:  txData,
+        is_remote: isRemote,
+        subtype:  pkt[1], // 0x8D
+        tx_flag:  byte2,
+        params,
+    };
+}
+
+function extractFrames(buf) {
+    const results = [];
+    for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
+        if (isPktCSync(buf, i)) {
+            const dec = decodePacket(buf.slice(i, i + PKT_C_SIZE));
+            if (dec) {
+                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
+                if (dec.tx_data === dec.tx_main) {
+                    results.push({ pos: i, decoded: dec });
+                }
+                i += PKT_C_SIZE - 1;
+            }
+        }
+    }
+    return results;
+}
+
+function checkAlarms(params) {
+    const alarms = [];
+    for (const [key, lim] of Object.entries(LIMITS)) {
+        const v = params[key];
+        if (v == null) continue;
+        if (v < lim[0] || v > lim[1]) {
+            const [label, unit] = PARAM_LABELS[key] || [key, ''];
+            alarms.push(`${label}=${v.toFixed(3)}${unit !== '' ? ' '+unit : ''} [${lim[0]}~${lim[1]}]`);
+        }
+    }
+    return alarms;
+}
 
 class IlsLlzThales421Parser extends BaseParser {
-    constructor(config) {
-        super(config);
-        
-        // Buat buffer internal untuk menangani potongan-potongan TCP packet
-        this.buffer = Buffer.alloc(0);
+    constructor(opts = {}) {
+        super(opts);
+        this._buf = Buffer.alloc(0);
+        this._lastDataTime = Date.now();
+        this._mode = 'PASSIVE';
+        this._lastDecoded = null;
     }
 
-    /**
-     * Polling mechanism support
-     */
-    getPollRequests() {
-        console.log(`[Normarc GP] getPollRequests called. Sending trigger: ${TRIGGER_SEND.toString('hex')}`);
-        return [
-            { name: 'GP_STATUS_REQ', bytes: TRIGGER_SEND }
-        ];
-    }
-
-    isHeartbeat(chunk) {
-        // Implement logic if device sends specific heartbeat packets
-        // For now, return false to just parse everything
-        return false;
-    }
-
-    getHeartbeatReply() {
-        return Buffer.alloc(0);
-    }
-
-    /**
-     * Parse raw incoming data stream
-     * @param {Buffer} rawData 
-     */
     parse(rawData) {
-        if (!Buffer.isBuffer(rawData)) return null;
+        try {
+            const chunk = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData);
+            this._buf = Buffer.concat([this._buf, chunk]);
 
-        // Tambahkan data baru ke internal buffer
-        this.buffer = Buffer.concat([this.buffer, rawData]);
-        console.log(`[Normarc GP] Menerima data: ${rawData.length} bytes -> ${rawData.toString('hex').toUpperCase()}`);
-
-        const parsedResult = {
-            raw_hex: '',
-            status: 'Normal',
-            frame_type: 'Unknown',
-            // Default parameters (akan di-mapping manual nanti)
-            crs_ddm: null,
-            crs_sdm: null,
-            clr_ddm: null,
-            clr_sdm: null,
-            rf_level: null
-        };
-
-        // Cari index Frame yang umum
-        const hdlcIndex = this.buffer.indexOf(Buffer.from([0x7E, 0x7E, 0x7E]));
-        const start01Index = this.buffer.indexOf(Buffer.from([0x01]));
-        
-        let validPacket = null;
-        let startIndex = -1;
-        let frameSize = 104; // Asumsi mayoritas paket utama panjangnya 104 bytes
-
-        if (hdlcIndex !== -1 && this.buffer.length >= hdlcIndex + frameSize) {
-            startIndex = hdlcIndex;
-            validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
-        } else if (start01Index !== -1 && this.buffer.length >= start01Index + 95) {
-            startIndex = start01Index;
-            frameSize = 95; // Paket format lain yang sering muncul (95 byte)
-            validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
-        }
-
-        if (validPacket) {
-            parsedResult.frame_type = `NORMARC_${frameSize}`;
-            parsedResult.raw_hex = validPacket.toString('hex').toUpperCase();
-
-            // Ekstrak parameter penting berdasarkan struktur umum paket 16-bit Little Endian
-            // Offset diambil dari analisa paket Normarc 7000 series
-            try {
-                // Posisi offset bersifat estimasi berdasarkan payload hex (little-endian)
-                let offset = frameSize === 104 ? 32 : 24; 
-                
-                // DDM & SDM Course & Clearance
-                const rawCrsDdm = validPacket.readInt16LE(offset); 
-                const rawCrsSdm = validPacket.readInt16LE(offset + 4); 
-                const rawClrDdm = validPacket.readInt16LE(offset + 12); 
-                const rawClrSdm = validPacket.readInt16LE(offset + 16);
-                
-                // Konversi mentah ke format persentase/desimal yang masuk akal
-                parsedResult.DDM_COURSE = parseFloat((rawCrsDdm / 10000).toFixed(2));
-                parsedResult.SDM_COURSE = parseFloat((Math.abs(rawCrsSdm) / 100).toFixed(1));
-                parsedResult.DDM_CLR = parseFloat((rawClrDdm / 10000).toFixed(2));
-                parsedResult.CLR_SDM = parseFloat((Math.abs(rawClrSdm) / 100).toFixed(1));
-                
-                // RF Power
-                const rawPwr = validPacket.readInt16LE(offset + 8);
-                parsedResult.RF_POWER = parseFloat((Math.abs(rawPwr) / 10).toFixed(1)) || 40.0;
-                
-                parsedResult.tx_main_label = '1 MAIN';
-                parsedResult.tx_stby_label = '2 STBY';
-                parsedResult.status_label = 'Normal';
-                parsedResult.tx_data = 'Local';
-
-            } catch (e) {
-                console.error(`[Normarc Parser] Gagal mengekstrak offset:`, e.message);
+            if (this._buf.length > 131072) {
+                let ls = 0;
+                for (let i = this._buf.length - 4; i >= 0; i--) {
+                    if (isPktCSync(this._buf, i)) { ls = i; break; }
+                }
+                this._buf = ls > 0 ? this._buf.slice(ls) : Buffer.alloc(0);
             }
 
-            // Hapus paket yang sudah diproses dari buffer
-            this.buffer = this.buffer.subarray(startIndex + frameSize);
-            
-            console.log(`[Normarc] Raw Frame [${frameSize}]: ${parsedResult.raw_hex}`);
-            const alarmResult = this.checkAlarms(parsedResult);
-            return {
-                success: true,
-                data: parsedResult,
-                status: alarmResult.status,
-                alarms: alarmResult.alarms,
-                warnings: alarmResult.warnings
-            };
-        }
+            const now = Date.now();
+            if (now - this._lastDataTime > PASSIVE_TIMEOUT && this._mode === 'PASSIVE') {
+                this._mode = 'ACTIVE';
+            }
 
-        // Cegah memory leak jika buffer tidak berisi frame yang dikenali
-        if (this.buffer.length > 2048) {
-            this.buffer = Buffer.alloc(0);
-        }
+            const frames = extractFrames(this._buf);
+            if (frames.length === 0) {
+                // Prevent buffer accumulation CPU spike
+                if (this._buf.length > 1024) {
+                    this._buf = this._buf.slice(this._buf.length - 512);
+                }
+                return { success: false, error: 'No valid LLZ frames', status: 'Waiting',
+                         _mode: this._mode,
+                         data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
+            }
 
-        return { success: false, error: 'Tunggu data lengkap...' };
+            const latest = frames[frames.length - 1];
+            this._lastDecoded = latest.decoded;
+            this._lastDataTime = now;
+            if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
+            this._buf = this._buf.slice(latest.pos + PKT_C_SIZE);
+
+            return this._buildOutput(latest.decoded, false);
+        } catch (err) {
+            return { success: false, error: err.message, status: 'Error', timestamp: new Date().toISOString() };
+        }
     }
+
+    _buildOutput(d, isStale) {
+        const alarms = checkAlarms(d.params);
+        return {
+            success: true,
+            data: {
+                _mode: this._mode, _stale: isStale,
+                tx_main: d.tx_main, tx_stby: d.tx_stby,
+                subtype: d.subtype,
+                status_label:  'Normal',
+                tx_main_label: `${d.tx_main} MAIN`,
+                tx_stby_label: `${d.tx_stby} STBY`,
+                ...d.params,
+            },
+            status: alarms.length > 0 ? 'Alarm' : 'Normal',
+            alarms, warnings: [], triggeredParams: alarms,
+            timestamp: new Date().toISOString(),
+        };
+    }
+
+    getPollRequests() {
+        const mode = this.getMode();
+        console.log(`[LLZ-DEBUG] getPollRequests called. Mode is: ${mode}`);
+        if (mode === 'ACTIVE') {
+            console.log(`[LLZ-DEBUG] Sending POLL_TRIGGER 00 00 F9 06 because ADRACS is offline`);
+            const TRIGGER_POLL = Buffer.from([0x00, 0x00, 0xF9, 0x06]);
+            return [{ bytes: TRIGGER_POLL, label: 'POLL_TRIGGER' }];
+        }
+        return [];
+    }
+
+    /**
+     * Cek apakah chunk yang diterima adalah heartbeat dari device.
+     * Jika ya, caller harus membalas dengan TRIGGER_SEND.
+     */
+    isHeartbeat(chunk) {
+        return chunk && chunk.length >= 4 && chunk.slice(0, 4).equals(HBEAT_RECV);
+    }
+
+    getHeartbeatReply() { return TRIGGER_SEND; }
+    getMode() {
+        if (Date.now() - this._lastDataTime > PASSIVE_TIMEOUT && this._mode === 'PASSIVE') {
+            this._mode = 'ACTIVE';
+        }
+        return this._mode;
+    }
+    getLastData()       { return this._lastDecoded ? this._lastDecoded.params : {}; }
+    reset()             { this._buf = Buffer.alloc(0); }
 }
 
 module.exports = IlsLlzThales421Parser;
+module.exports.PARAM_OFFSETS = PARAM_OFFSETS;
+module.exports.LIMITS        = LIMITS;
+module.exports.PARAM_LABELS  = PARAM_LABELS;
