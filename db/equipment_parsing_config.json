@@ -126,5 +126,13 @@
     "category": "Navigation",
     "files": "/src/parsers/ils_gp_normac.js",
     "createdAt": "2026-07-08T00:00:00.000Z"
+  },
+  {
+    "id": "ils_llz_normac",
+    "name": "ILS Localizer Normarc 7000",
+    "description": "Parser untuk LLZ Normarc 7000 via Moxa NPort TCP",
+    "category": "Navigation",
+    "files": "/src/parsers/ils_llz_normac.js",
+    "createdAt": "2026-07-09T00:00:00.000Z"
   }
 ]
