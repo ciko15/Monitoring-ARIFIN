@@ -160,9 +160,12 @@ const MessagingTopology = {
         'branch.health.responded': 'RSP.BRANCH'
     }
 };
+let connectPromise = null;
 
 async function connect() {
     if (connection && channel) return channel;
+    if (connectPromise) return connectPromise;
+
     if (!isEmsEnabled()) {
         throw makeEmsError('EMS_DISABLED', 'EMS publishing disabled');
     }
@@ -172,59 +175,68 @@ async function connect() {
         throw makeEmsError('EMS_BACKOFF', `RabbitMQ reconnect backoff active for ${Math.ceil((nextConnectAttemptAt - now) / 1000)}s`);
     }
 
-    try {
-        connection = await withTimeout(amqp.connect(RabbitConfig), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ connect');
-        
-        connection.on('error', error => {
-            if (shouldLog(`connection-error:${error.message}`)) {
-                console.error('❌ [EMS] RabbitMQ connection error:', error.message);
+    connectPromise = (async () => {
+        try {
+            connection = await withTimeout(amqp.connect(RabbitConfig), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ connect');
+            
+            connection.on('error', error => {
+                if (shouldLog(`connection-error:${error.message}`)) {
+                    console.error('❌ [EMS] RabbitMQ connection error:', error.message);
+                }
+                connection = null;
+                channel = null;
+                connectPromise = null;
+                assertedQueues.clear();
+            });
+
+            connection.on('close', () => {
+                if (shouldLog('connection-closed')) {
+                    console.warn('⚠️ [EMS] RabbitMQ connection closed');
+                }
+                connection = null;
+                channel = null;
+                connectPromise = null;
+                assertedQueues.clear();
+            });
+
+            channel = await withTimeout(connection.createChannel(), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ channel');
+            
+            channel.on('error', error => {
+                if (shouldLog(`channel-error:${error.message}`)) {
+                    console.error('❌ [EMS] RabbitMQ channel error:', error.message);
+                }
+                channel = null;
+                connectPromise = null;
+            });
+
+            channel.on('close', () => {
+                if (shouldLog('channel-closed')) {
+                    console.warn('⚠️ [EMS] RabbitMQ channel closed');
+                }
+                channel = null;
+                connectPromise = null;
+            });
+
+            currentBackoffMs = 0;
+            nextConnectAttemptAt = 0;
+            console.log('✅ [EMS] Berhasil terhubung ke RabbitMQ menggunakan amqplib');
+
+            return channel;
+        } catch (error) {
+            connectPromise = null;
+            currentBackoffMs = currentBackoffMs
+                ? Math.min(currentBackoffMs * 2, EMS_MAX_BACKOFF_MS)
+                : EMS_RETRY_BACKOFF_MS;
+            nextConnectAttemptAt = Date.now() + currentBackoffMs;
+
+            if (shouldLog(`connect-failed:${error.code || error.message}`)) {
+                console.error(`❌ [EMS] Gagal terhubung ke RabbitMQ: ${error.message}. Retry in ${Math.round(currentBackoffMs / 1000)}s`);
             }
-            connection = null;
-            channel = null;
-            assertedQueues.clear();
-        });
-
-        connection.on('close', () => {
-            if (shouldLog('connection-closed')) {
-                console.warn('⚠️ [EMS] RabbitMQ connection closed');
-            }
-            connection = null;
-            channel = null;
-            assertedQueues.clear();
-        });
-
-        channel = await withTimeout(connection.createChannel(), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ channel');
-        
-        channel.on('error', error => {
-            if (shouldLog(`channel-error:${error.message}`)) {
-                console.error('❌ [EMS] RabbitMQ channel error:', error.message);
-            }
-            channel = null;
-        });
-
-        channel.on('close', () => {
-            if (shouldLog('channel-closed')) {
-                console.warn('⚠️ [EMS] RabbitMQ channel closed');
-            }
-            channel = null;
-        });
-
-        currentBackoffMs = 0;
-        nextConnectAttemptAt = 0;
-        console.log('✅ [EMS] Berhasil terhubung ke RabbitMQ menggunakan amqplib');
-
-        return channel;
-    } catch (error) {
-        currentBackoffMs = currentBackoffMs
-            ? Math.min(currentBackoffMs * 2, EMS_MAX_BACKOFF_MS)
-            : EMS_RETRY_BACKOFF_MS;
-        nextConnectAttemptAt = Date.now() + currentBackoffMs;
-
-        if (shouldLog(`connect-failed:${error.code || error.message}`)) {
-            console.error(`❌ [EMS] Gagal terhubung ke RabbitMQ: ${error.message}. Retry in ${Math.round(currentBackoffMs / 1000)}s`);
+            throw error;
         }
-        throw error;
-    }
+    })();
+
+    return connectPromise;
 }
 
 async function assertQueue(queue) {
