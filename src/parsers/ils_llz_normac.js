@@ -66,14 +66,14 @@ class IlsLlzNormacParser extends BaseParser {
         
         let validPacket = null;
         let startIndex = -1;
-        let frameSize = 104; // Asumsi mayoritas paket utama panjangnya 104 bytes
+        let frameSize = 204; // Untuk LLZ Normarc, paket HDLC utamanya berukuran 204 bytes
 
         if (hdlcIndex !== -1 && this.buffer.length >= hdlcIndex + frameSize) {
             startIndex = hdlcIndex;
             validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
         } else if (start01Index !== -1 && this.buffer.length >= start01Index + 95) {
             startIndex = start01Index;
-            frameSize = 95; // Paket format lain yang sering muncul (95 byte)
+            frameSize = 95;
             validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
         }
 
@@ -81,19 +81,17 @@ class IlsLlzNormacParser extends BaseParser {
             parsedResult.frame_type = `NORMARC_${frameSize}`;
             parsedResult.raw_hex = validPacket.toString('hex').toUpperCase();
 
-            // Ekstrak parameter penting berdasarkan struktur umum paket 16-bit Little Endian
-            // Offset diambil dari analisa paket Normarc 7000 series
+            // Ekstrak parameter penting
             try {
-                // Posisi offset bersifat estimasi berdasarkan payload hex (little-endian)
-                let offset = frameSize === 104 ? 32 : 24; 
+                // Posisi offset disesuaikan dengan struktur payload 204 byte
+                let offset = frameSize === 204 ? 40 : 24; 
                 
-                // DDM & SDM Course & Clearance
+                // DDM & SDM Course & Clearance (Little Endian)
                 const rawCrsDdm = validPacket.readInt16LE(offset); 
                 const rawCrsSdm = validPacket.readInt16LE(offset + 4); 
                 const rawClrDdm = validPacket.readInt16LE(offset + 12); 
                 const rawClrSdm = validPacket.readInt16LE(offset + 16);
                 
-                // Konversi mentah ke format persentase/desimal yang masuk akal
                 parsedResult.DDM_COURSE = parseFloat((rawCrsDdm / 10000).toFixed(2));
                 parsedResult.SDM_COURSE = parseFloat((Math.abs(rawCrsSdm) / 100).toFixed(1));
                 parsedResult.DDM_CLR = parseFloat((rawClrDdm / 10000).toFixed(2));
