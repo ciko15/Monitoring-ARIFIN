@@ -553,10 +553,16 @@ const app = new Elysia()
     })
 
     // Public Airports Data (Required for Public Dashboard)
-    .get('/api/airports', async () => {
+    .get('/api/airports', async ({ set }) => {
         const airports = await db.getAllAirports();
         const allEquipment = await db.getAllEquipment({ limit: 10000, isActive: 'all' });
         const equipmentData = allEquipment.data || allEquipment;
+        
+        set.headers = {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        };
 
         return (airports || []).map((airport: any) => {
             const airportId = airport.id;
@@ -743,6 +749,12 @@ const app = new Elysia()
                         limit: parseInt(limit as string),
                         includeData: includeData === 'true'
                     });
+                    
+                    set.headers = {
+                        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    };
 
                     return result;
                 } catch (error: any) {

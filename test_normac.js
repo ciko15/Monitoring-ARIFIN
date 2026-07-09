@@ -1,0 +1,5 @@
+const IlsGpNormacParser = require('./src/parsers/ils_gp_normac.js');
+const parser = new IlsGpNormacParser({});
+const rawData = Buffer.from('7E7E7E7E08C10003F202D1011300DA04CFFF36010000000038005E04E7FF8C012E04FFFF6B001C00FFFF9404FFFF1C041801FFFF0000FFFF0000FFFFFEFF3101FFFF0000FFFFA504849A8E070A00000000000000000000000000000000000000000000000004F102', 'hex');
+const result = parser.parse(rawData);
+console.log(JSON.stringify(result, null, 2));

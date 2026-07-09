@@ -414,21 +414,27 @@ const IPC_STATE_PATH = path.join(process.cwd(), 'data', 'ipc_state.json');
 let lastIpcSyncTime = 0;
 
 function syncIpcStateForWeb() {
-  if (process.env.SERVICE_ROLE === 'web') {
+  if (process.env.SERVICE_ROLE === 'web' || !process.env.SERVICE_ROLE) {
     try {
       if (fs.existsSync(IPC_STATE_PATH)) {
         const stats = fs.statSync(IPC_STATE_PATH);
+        // Only read if file has been modified to save CPU
         if (stats.mtimeMs > lastIpcSyncTime) {
-          const stateStr = fs.readFileSync(IPC_STATE_PATH, 'utf-8');
-          const stateObj = JSON.parse(stateStr);
-          for (const [k, v] of Object.entries(stateObj)) {
-            latestEquipmentDataBySource.set(k, v);
+          const content = fs.readFileSync(IPC_STATE_PATH, 'utf8');
+          const stateObj = JSON.parse(content);
+          
+          // Clear and rebuild to avoid stale data from equipment_logs.json persisting indefinitely
+          latestEquipmentDataBySource.clear();
+          
+          for (const key of Object.keys(stateObj)) {
+            latestEquipmentDataBySource.set(key, stateObj[key]);
           }
+          
           lastIpcSyncTime = stats.mtimeMs;
         }
       }
     } catch (e) {
-      console.error('[IPC] Failed to sync state:', e.message);
+      console.error('[DB] Error reading/parsing IPC_STATE_PATH:', e.message);
     }
   }
 }
