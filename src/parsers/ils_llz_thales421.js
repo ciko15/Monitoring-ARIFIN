@@ -9,7 +9,7 @@ const BaseParser = require('./base');
 // Hex trigger from sniffing
 const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // Adjust if Normarc needs a different trigger
 
-class IlsGpNormacParser extends BaseParser {
+class IlsLlzThales421Parser extends BaseParser {
     constructor(config) {
         super(config);
         
@@ -135,4 +135,4 @@ class IlsGpNormacParser extends BaseParser {
     }
 }
 
-module.exports = IlsGpNormacParser;
+module.exports = IlsLlzThales421Parser;
