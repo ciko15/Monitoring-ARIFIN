@@ -311,6 +311,8 @@ function rebuildLatestEquipmentData() {
   for (const log of equipmentLogsDB) {
     upsertLatestEquipmentData(log);
   }
+  // Paksa IPC sync untuk membaca ulang file state karena memory baru saja di-wipe
+  lastIpcSyncTime = 0;
 }
 
 // Load logs from file on startup
@@ -423,8 +425,8 @@ function syncIpcStateForWeb() {
           const content = fs.readFileSync(IPC_STATE_PATH, 'utf8');
           const stateObj = JSON.parse(content);
           
-          // Clear and rebuild to avoid stale data from equipment_logs.json persisting indefinitely
-          latestEquipmentDataBySource.clear();
+          // JANGAN .clear() karena akan menghapus data dari syncEquipmentLogsFromDisk!
+          // latestEquipmentDataBySource.clear();
           
           for (const key of Object.keys(stateObj)) {
             latestEquipmentDataBySource.set(key, stateObj[key]);
@@ -434,7 +436,7 @@ function syncIpcStateForWeb() {
         }
       }
     } catch (e) {
-      console.error('[DB] Error reading/parsing IPC_STATE_PATH:', e.message);
+      // console.error('[DB] Error reading/parsing IPC_STATE_PATH:', e.message);
     }
   }
 }
