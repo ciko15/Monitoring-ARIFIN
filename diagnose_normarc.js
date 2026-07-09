@@ -1,8 +1,8 @@
 const net = require('net');
 
 const CONFIG = {
-    LLZ: { ip: '192.168.127.20', port: 4003, name: 'Localizer (LLZ)' },
-    GP: { ip: '192.168.127.30', port: 4005, name: 'GlidePath (GP)' }
+    LLZ: { ip: '192.168.127.20', port: 4001, name: 'Localizer (LLZ)' },
+    GP: { ip: '192.168.127.30', port: 4001, name: 'GlidePath (GP)' }
 };
 
 // Trigger command commonly used for Normarc 7000 series (RMM polling)
