@@ -5,7 +5,7 @@
 
 const ParserFactory = require('../parsers/factory');
 const connectionManager = require('../connection/manager');
-const { produceInternalMessage, AirNavServiceQueue } = require('../connection/ems');
+const { produceInternalMessage } = require('../connection/ems');
 const {
     publishEquipmentTelemetry,
     publishEquipmentStatusChanged
@@ -323,11 +323,11 @@ class EquipmentService {
                 }
             }
 
-            const { produceInternalMessage, AirNavServiceQueue } = require('../connection/ems');
+            const { produceInternalMessage } = require('../connection/ems');
             
-            // Send to TOC queue as requested/default
+            // Send to Q.SUP queue
             await produceInternalMessage(
-                AirNavServiceQueue.TOC,
+                'Q.SUP',
                 { REQUEST_TYPE: 'EQUIPMENT_LIST' },
                 grouped
             );

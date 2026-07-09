@@ -104,11 +104,6 @@ const RabbitConfig = {
     vhost: process.env.RABBITMQ_VHOST || branchRabbit.vhost || 'dev-smart'
 };
 
-const AirNavServiceQueue = {
-    TOC: 'Q.TOC',
-    TEST: 'Q.TEST',
-    GOLOG: 'Q.GOLOG'
-};
 
 const EquipmentCategoryQueue = {
     Communication: 'Q.COM',
@@ -443,7 +438,6 @@ module.exports = {
     isEmsEnabled,
     EquipmentCategoryQueue,
     EquipmentCategoryCode,
-    AirNavServiceQueue,
     MessagingTopology,
     LogType
 };
