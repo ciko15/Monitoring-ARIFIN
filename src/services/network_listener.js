@@ -20,7 +20,7 @@ class NetworkListenerService {
         this.statusGate = new SourceStatusGate();
         this.pipelineMode = process.env.PIPELINE_MODE || 'inline';
         this.serviceRole = process.env.SERVICE_ROLE || 'all';
-        this.rawEventQueue = null; // [BYPASS] Tidak menggunakan rawEventQueue lagi untuk Stateless Forwarder
+        this.rawEventQueue = new RawEventQueue();
 
         // Auto-reload listeners when auth config changes
         const fs = require('fs');

@@ -5,7 +5,7 @@ const RawEventQueue = require('./raw_event_queue');
 
 class QueuedDataProcessor {
     constructor(options = {}) {
-        this.queue = options.queue || null; // [BYPASS] Tidak menggunakan RawEventQueue lagi
+        this.queue = options.queue || new RawEventQueue(); 
         this.equipmentService = options.equipmentService || new EquipmentService(db);
         this.parserCache = new Map();
         this.warningTimestamps = new Map();
