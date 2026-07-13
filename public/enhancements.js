@@ -1371,7 +1371,35 @@
                 }
             }
 
-            if (tmpl && tmpl.parameters && tmpl.parameters.length > 0) {
+            if (parserId === 'ups_netagent_snmp') {
+                const inputParams = [];
+                const outputParams = [];
+                const batteryParams = [];
+                const otherParams = [];
+
+                Object.entries(data)
+                    .filter(([k]) => !k.startsWith('_') && k !== 'connectivity' && k !== 'sys_descr' && k !== 'sys_name')
+                    .forEach(([k, v]) => {
+                        const label = k.replace(/_/g,' ').toUpperCase();
+                        const displayValue = formatSnmpMetricValue(k, v);
+                        const item = [label, displayValue, getLimitColor(supCategory, label, v)];
+                        
+                        if (k.startsWith('input_')) inputParams.push(item);
+                        else if (k.startsWith('output_')) outputParams.push(item);
+                        else if (k.startsWith('battery_')) batteryParams.push(item);
+                        else otherParams.push(item);
+                    });
+
+                const generalParams = Object.entries(data)
+                    .filter(([k]) => ['connectivity', 'sys_descr', 'sys_name'].includes(k))
+                    .map(([k, v]) => [k.replace(/_/g,' ').toUpperCase(), v, getLimitColor(supCategory, k, v)]);
+                
+                if (generalParams.length > 0 || otherParams.length > 0) sections.push({ title: 'SYSTEM INFO', params: [...generalParams, ...otherParams] });
+                if (inputParams.length > 0) sections.push({ title: 'INPUT', params: inputParams });
+                if (outputParams.length > 0) sections.push({ title: 'OUTPUT', params: outputParams });
+                if (batteryParams.length > 0) sections.push({ title: 'BATTERY', params: batteryParams });
+
+            } else if (tmpl && tmpl.parameters && tmpl.parameters.length > 0) {
                 const params = tmpl.parameters.map(p => {
                     const key = p.name || p.label;
                     const val = data[key] !== undefined ? data[key] : '—';
