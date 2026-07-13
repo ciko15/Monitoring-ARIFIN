@@ -134,5 +134,13 @@
     "category": "Navigation",
     "files": "/src/parsers/ils_llz_normac.js",
     "createdAt": "2026-07-09T00:00:00.000Z"
+  },
+  {
+    "id": "ups_netagent_snmp",
+    "name": "UPS NetAgent Monitor",
+    "description": "SNMP v2c UPS MIB (RFC 1628). Battery, Voltage, Load via snmpwalk/snmpget.",
+    "category": "Support",
+    "files": "/src/parsers/ups_netagent_snmp.js",
+    "createdAt": "2026-07-13T00:00:00.000Z"
   }
 ]

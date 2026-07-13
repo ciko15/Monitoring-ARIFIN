@@ -147,7 +147,7 @@ class NetworkListenerService {
             console.log(`[NetworkListener] Found ${sources.length} total sources`);
 
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal)
-            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic'];
+            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp'];
             const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 10;
             const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 3000;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -580,6 +580,45 @@ class NetworkListenerService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // UPS NETAGENT SNMP MONITOR
+    // ─────────────────────────────────────────────────────────────────────────
+    startUpsNetagentListener(source) {
+        const { id, equipt_id, ip_address, name, community, poll_interval, snmp_port, snmp_version } = source;
+        const pollSec = parseInt(poll_interval) || 10;
+        const comm    = community || 'public';
+        const port    = parseInt(snmp_port) || 161;
+        const version = snmp_version || '2c';
+
+        const { pollUPSNetagent } = require('../parsers/ups_netagent_snmp');
+
+        this.activeListeners.add(id);
+        console.log(`[UPS SNMP] Listener started: ${name} (${ip_address}:${port}, v${version})`);
+
+        const doPoll = async () => {
+            try {
+                const result = await pollUPSNetagent(ip_address, comm, { port, version });
+                await this._handleLogOutput(
+                    source,
+                    { data: result.data, source: name, _ip: ip_address },
+                    'ups_netagent_snmp',
+                    result.status || 'Disconnect'
+                );
+            } catch (err) {
+                console.error(`[UPS SNMP] Poll error ${name}:`, err.message);
+            }
+        };
+
+        const initialDelay = 1000 + Math.floor(Math.random() * 5000);
+        setTimeout(() => {
+            doPoll();
+            const timer = setInterval(doPoll, pollSec * 1000);
+            
+            if (!this._upsNetagentTimers) this._upsNetagentTimers = new Map();
+            this._upsNetagentTimers.set(id, timer);
+        }, initialDelay);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // ASTERIX UDP MULTICAST (Radar CAT034 + ADS-B CAT021)
     // ─────────────────────────────────────────────────────────────────────────
     startAsterixListener(source, parserId) {
@@ -808,6 +847,12 @@ class NetworkListenerService {
         // SNMP System Monitor (Server/Workstation/Switch)
         if (moduleName === 'snmp_system' || moduleName === 'snmp_host_resources_01' || moduleName === 'snmp_network_basic') {
             this.startSnmpSystemListener(source);
+            return;
+        }
+
+        // UPS SNMP Monitor
+        if (moduleName === 'ups_netagent_snmp') {
+            this.startUpsNetagentListener(source);
             return;
         }
 
