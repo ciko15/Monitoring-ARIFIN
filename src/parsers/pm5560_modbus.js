@@ -107,22 +107,24 @@ class Pm5560ModbusParser extends BaseParser {
 
             if (this._buf.length > 65536) this._buf = this._buf.slice(-4096);
 
-            // Scan buffer: cari frame [01][03][04][4-byte float][00][TID][00][00][00][07]
-            // Minimal 13 bytes per frame, tapi kita hanya butuh 9 bytes untuk decode
+            // Cek frame Modbus TCP: 
+            // [TID_HI][TID_LO][PROT=00 00][LEN=00 07][UNIT][FC=03][BC=04][FLOAT 4 bytes]
+            // Minimal 13 bytes per frame
             let i = 0;
-            while (i <= this._buf.length - 9) {
-                const unit = this._buf[i];
-                const fc   = this._buf[i + 1];
-                const bc   = this._buf[i + 2];
+            while (i <= this._buf.length - 13) {
+                const prot = this._buf.readUInt16BE(i + 2);
+                const len  = this._buf.readUInt16BE(i + 4);
+                const fc   = this._buf[i + 7];
+                const bc   = this._buf[i + 8];
 
-                if (unit !== 0x01 || fc !== 0x03 || bc !== 0x04) {
+                // Modbus TCP header: Protocol ID 0, Length 7 (untuk float 4 byte), FC 03, BC 04
+                if (prot !== 0 || len !== 7 || fc !== 0x03 || bc !== 0x04) {
                     i++;
                     continue;
                 }
 
-                // Ambil float dan TID
-                const val = this._buf.readFloatBE(i + 3);
-                const tid = (this._buf[i + 7] << 8) | this._buf[i + 8]; // bytes 7-8 = TID
+                const tid = this._buf.readUInt16BE(i);
+                const val = this._buf.readFloatBE(i + 9);
                 const key = TID_MAP[tid];
 
                 if (key) {
@@ -130,7 +132,7 @@ class Pm5560ModbusParser extends BaseParser {
                     if (v !== null) this._last[key] = v;
                 }
 
-                // Maju 13 bytes (konsumsi 1 frame penuh)
+                // Maju 13 bytes (konsumsi 1 frame Modbus TCP penuh)
                 i += 13;
             }
 
