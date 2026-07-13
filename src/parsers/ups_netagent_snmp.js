@@ -17,13 +17,25 @@ const OID = {
     upsEstimatedChargeRemaining: [1, 3, 6, 1, 2, 1, 33, 1, 2, 4, 0], // Kapasitas baterai %
     upsBatteryVoltage: [1, 3, 6, 1, 2, 1, 33, 1, 2, 5, 0], // Tegangan baterai (0.1 Volt DC, kadang butuh /10)
     
-    // Input
-    upsInputVoltage: [1, 3, 6, 1, 2, 1, 33, 1, 3, 3, 1, 3, 1], // Tegangan input (Phase 1)
+    // Input (3 Phase)
+    upsInputVoltageR: [1, 3, 6, 1, 2, 1, 33, 1, 3, 3, 1, 3, 1],
+    upsInputVoltageS: [1, 3, 6, 1, 2, 1, 33, 1, 3, 3, 1, 3, 2],
+    upsInputVoltageT: [1, 3, 6, 1, 2, 1, 33, 1, 3, 3, 1, 3, 3],
     
-    // Output
-    upsOutputVoltage: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 2, 1], // Tegangan output (Phase 1)
-    upsOutputCurrent: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 3, 1], // Arus output (0.1 Ampere, kadang butuh /10)
-    upsOutputPercentLoad: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 5, 1], // Persentase beban %
+    // Output (3 Phase)
+    upsOutputVoltageR: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 2, 1],
+    upsOutputVoltageS: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 2, 2],
+    upsOutputVoltageT: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 2, 3],
+    
+    upsOutputCurrentR: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 3, 1],
+    upsOutputCurrentS: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 3, 2],
+    upsOutputCurrentT: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 3, 3],
+    
+    upsOutputPercentLoadR: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 5, 1],
+    upsOutputPercentLoadS: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 5, 2],
+    upsOutputPercentLoadT: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 5, 3],
+    
+    upsBatteryTemp: [1, 3, 6, 1, 2, 1, 33, 1, 2, 7, 0], // Suhu Baterai
 };
 
 function normalizeSnmpOptions(options = {}) {
@@ -64,11 +76,11 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
     try {
         const [
             sysDescr, sysName,
-            batteryStatusRaw, 
-            minutesRemaining, chargeRemaining, 
-            batteryVoltageRaw,
-            inputVoltage,
-            outputVoltage, outputCurrentRaw, outputPercentLoad
+            batteryStatusRaw, minutesRemaining, chargeRemaining, batteryVoltageRaw, batteryTemp,
+            inputVoltageR, inputVoltageS, inputVoltageT,
+            outputVoltageR, outputVoltageS, outputVoltageT,
+            outputCurrentRawR, outputCurrentRawS, outputCurrentRawT,
+            outputPercentLoadR, outputPercentLoadS, outputPercentLoadT
         ] = await Promise.all([
             snmpGet(session, OID.sysDescr),
             snmpGet(session, OID.sysName),
@@ -76,13 +88,22 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             snmpGet(session, OID.upsEstimatedMinutesRemaining),
             snmpGet(session, OID.upsEstimatedChargeRemaining),
             snmpGet(session, OID.upsBatteryVoltage),
-            snmpGet(session, OID.upsInputVoltage),
-            snmpGet(session, OID.upsOutputVoltage),
-            snmpGet(session, OID.upsOutputCurrent),
-            snmpGet(session, OID.upsOutputPercentLoad)
+            snmpGet(session, OID.upsBatteryTemp),
+            snmpGet(session, OID.upsInputVoltageR),
+            snmpGet(session, OID.upsInputVoltageS),
+            snmpGet(session, OID.upsInputVoltageT),
+            snmpGet(session, OID.upsOutputVoltageR),
+            snmpGet(session, OID.upsOutputVoltageS),
+            snmpGet(session, OID.upsOutputVoltageT),
+            snmpGet(session, OID.upsOutputCurrentR),
+            snmpGet(session, OID.upsOutputCurrentS),
+            snmpGet(session, OID.upsOutputCurrentT),
+            snmpGet(session, OID.upsOutputPercentLoadR),
+            snmpGet(session, OID.upsOutputPercentLoadS),
+            snmpGet(session, OID.upsOutputPercentLoadT)
         ]);
 
-        if (sysDescr === null && inputVoltage === null && outputVoltage === null) {
+        if (sysDescr === null && inputVoltageR === null && outputVoltageR === null) {
             throw new Error('No SNMP response from UPS');
         }
 
@@ -112,23 +133,23 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         }
 
         // Evaluasi Input Tegangan (asumsi mati lampu jika input < 150V)
-        if (inputVoltage !== null && inputVoltage < 150) {
+        const avgInputVoltage = (inputVoltageR !== null) ? inputVoltageR : 0; // Deteksi drop di Phase R
+        if (inputVoltageR !== null && inputVoltageR < 150) {
             status = 'Alarm';
             alarms.push('Listrik Input Mati / Drop (On Battery)');
-            triggeredParams.push('input_voltage');
+            triggeredParams.push('input_voltage_r');
         }
 
         // Evaluasi Load Beban
-        if (outputPercentLoad !== null) {
-            if (outputPercentLoad > 90) {
-                status = 'Alarm';
-                alarms.push('Beban UPS Overload (>90%)');
-                triggeredParams.push('output_load_percent');
-            } else if (outputPercentLoad > 80) {
-                if (status !== 'Alarm') status = 'Warning';
-                warnings.push('Beban UPS Tinggi (>80%)');
-                triggeredParams.push('output_load_percent');
-            }
+        const maxLoad = Math.max(outputPercentLoadR || 0, outputPercentLoadS || 0, outputPercentLoadT || 0);
+        if (maxLoad > 90) {
+            status = 'Alarm';
+            alarms.push('Beban UPS Overload (>90%)');
+            triggeredParams.push('output_load_percent');
+        } else if (maxLoad > 80) {
+            if (status !== 'Alarm') status = 'Warning';
+            warnings.push('Beban UPS Tinggi (>80%)');
+            triggeredParams.push('output_load_percent');
         }
 
         // Map status baterai ke teks string
@@ -151,12 +172,29 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 battery_capacity_pct: chargeRemaining !== null ? String(chargeRemaining) : '—',
                 battery_minutes_remaining: minutesRemaining !== null ? String(minutesRemaining) : '—',
                 battery_voltage: batteryVoltageRaw !== null ? String(batteryVoltageRaw / 10) : '—', // biasanya satuan 0.1v
+                battery_temp_c: batteryTemp !== null ? String(batteryTemp) : '—',
                 
-                input_voltage: inputVoltage !== null ? String(inputVoltage) : '—',
+                input_voltage_r: inputVoltageR !== null ? String(inputVoltageR) : '—',
+                input_voltage_s: inputVoltageS !== null ? String(inputVoltageS) : '—',
+                input_voltage_t: inputVoltageT !== null ? String(inputVoltageT) : '—',
                 
-                output_voltage: outputVoltage !== null ? String(outputVoltage) : '—',
-                output_current_ampere: outputCurrentRaw !== null ? String(outputCurrentRaw / 10) : '—', // biasanya satuan 0.1A
-                output_load_pct: outputPercentLoad !== null ? String(outputPercentLoad) : '—'
+                output_voltage_r: outputVoltageR !== null ? String(outputVoltageR) : '—',
+                output_voltage_s: outputVoltageS !== null ? String(outputVoltageS) : '—',
+                output_voltage_t: outputVoltageT !== null ? String(outputVoltageT) : '—',
+                
+                output_current_r: outputCurrentRawR !== null ? String(outputCurrentRawR / 10) : '—',
+                output_current_s: outputCurrentRawS !== null ? String(outputCurrentRawS / 10) : '—',
+                output_current_t: outputCurrentRawT !== null ? String(outputCurrentRawT / 10) : '—',
+                
+                output_load_pct_r: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—',
+                output_load_pct_s: outputPercentLoadS !== null ? String(outputPercentLoadS) : '—',
+                output_load_pct_t: outputPercentLoadT !== null ? String(outputPercentLoadT) : '—',
+                
+                // Compatibility untuk Frontend yg mungkin cuma pakai 1 parameter general
+                input_voltage: inputVoltageR !== null ? String(inputVoltageR) : '—',
+                output_voltage: outputVoltageR !== null ? String(outputVoltageR) : '—',
+                output_current_ampere: outputCurrentRawR !== null ? String(outputCurrentRawR / 10) : '—',
+                output_load_pct: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—'
             },
             alarms,
             warnings,
