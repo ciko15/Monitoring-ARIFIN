@@ -1,12 +1,14 @@
-{
-  "id": 1,
-  "code": "WRRR",
-  "siteId": "WRRR",
-  "name": "AirNav Pusat",
-  "city": "Tangerang",
-  "lat": -2.57213,
-  "lng": 140.51482,
-  "ipBranch": "172.19.16.1",
-  "status": "Normal",
-  "totalEquipment": 2
-}
+[
+  {
+    "id": 1,
+    "code": "WRRR",
+    "siteId": "WRRR",
+    "name": "AirNav Pusat",
+    "city": "Tangerang",
+    "lat": -6.860985,
+    "lng": 107.227443,
+    "ipBranch": "172.19.16.1",
+    "status": "Normal",
+    "totalEquipment": 2
+  }
+]

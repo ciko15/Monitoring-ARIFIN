@@ -30,5 +30,21 @@
     "isActive": true,
     "dataSources": [],
     "branchId": 1
+  },
+  {
+    "id": "1784019928572",
+    "name": "Server",
+    "category": "Data Processing",
+    "sup_category": "ASMGCS",
+    "merk": "-",
+    "type": "-",
+    "status": "Normal",
+    "airportId": 1,
+    "lat": null,
+    "lng": null,
+    "description": "",
+    "isActive": true,
+    "dataSources": [],
+    "branchId": 1
   }
 ]

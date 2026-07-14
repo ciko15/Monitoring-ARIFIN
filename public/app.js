@@ -298,8 +298,31 @@ window.enableMapPick = function (type) {
   const valLat = document.getElementById(prefix + (type === 'dataSource' ? 'Latitude' : 'Lat'))?.value;
   const valLng = document.getElementById(prefix + (type === 'dataSource' ? 'Longitude' : 'Lng'))?.value;
 
-  if (valLat && !isNaN(parseFloat(valLat))) currentLat = parseFloat(valLat);
-  if (valLng && !isNaN(parseFloat(valLng))) currentLng = parseFloat(valLng);
+  if (valLat && !isNaN(parseFloat(valLat))) {
+    currentLat = parseFloat(valLat);
+  } else if (type === 'equipment') {
+    // If equipment location is empty, fallback to the selected airport's location
+    const selectedAirportId = document.getElementById('equipmentAirport')?.value;
+    if (selectedAirportId) {
+      const apt = (window.airportsData || []).find(a => String(a.id) === String(selectedAirportId));
+      if (apt && apt.lat !== undefined) {
+        currentLat = apt.lat;
+      }
+    }
+  }
+
+  if (valLng && !isNaN(parseFloat(valLng))) {
+    currentLng = parseFloat(valLng);
+  } else if (type === 'equipment') {
+    // If equipment location is empty, fallback to the selected airport's location
+    const selectedAirportId = document.getElementById('equipmentAirport')?.value;
+    if (selectedAirportId) {
+      const apt = (window.airportsData || []).find(a => String(a.id) === String(selectedAirportId));
+      if (apt && apt.lng !== undefined) {
+        currentLng = apt.lng;
+      }
+    }
+  }
 
   // Initialize Map in Picker if needed
   if (!window.pickerMap) {
@@ -1660,8 +1683,14 @@ async function handleAirportSubmit(e) {
       document.getElementById('airportModal').classList.add('hidden');
       loadAirports();
       loadStats();
+      showToast('Lokasi airport berhasil disimpan!', 'success');
+    } else {
+      showToast('Gagal menyimpan lokasi airport', 'error');
     }
-  } catch (err) { console.error('Airport save error:', err); }
+  } catch (err) { 
+    console.error('Airport save error:', err);
+    showToast('Terjadi kesalahan saat menyimpan lokasi airport', 'error');
+  }
 }
 
 window.editAirport = function (id) {

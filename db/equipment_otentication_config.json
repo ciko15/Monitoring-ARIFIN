@@ -32,5 +32,23 @@
     "sup_category": "DME",
     "latitude": -6.1768,
     "longitude": 106.6314
+  },
+  {
+    "id": 1784020021225,
+    "name": "Server 1",
+    "equipt_id": "1784019928572",
+    "ip_address": "172.20.8.68",
+    "tcp_port": null,
+    "udp_port": null,
+    "parsing_id": "snmp_system",
+    "sup_category": "ASMGCS",
+    "latitude": "",
+    "longitude": "",
+    "extra_config": null,
+    "protocol": "snmp",
+    "community": "itnav",
+    "snmp_version": "2c",
+    "snmp_port": 161,
+    "poll_interval": 60
   }
 ]

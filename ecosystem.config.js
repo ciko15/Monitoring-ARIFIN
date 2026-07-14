@@ -1,6 +1,18 @@
 const os = require('os');
 const path = require('path');
 
+let defaultSiteId = 'WAJJ';
+try {
+  const airportConfig = require('./db/airport_config.json');
+  if (Array.isArray(airportConfig) && airportConfig.length > 0 && airportConfig[0].siteId) {
+    defaultSiteId = airportConfig[0].siteId;
+  } else if (airportConfig && !Array.isArray(airportConfig) && airportConfig.siteId) {
+    defaultSiteId = airportConfig.siteId;
+  }
+} catch (e) {
+  console.warn('Gagal membaca db/airport_config.json, menggunakan default SITE_ID =', defaultSiteId);
+}
+
 // Deteksi OS dan tentukan interpreter path
 let interpreterPath = 'bun'; // default, gunakan bun dari PATH
 
@@ -44,8 +56,8 @@ module.exports = {
     env: {
       NODE_ENV: 'production',
       PORT: process.env.PORT || 3100,
-      SITE_ID: process.env.SITE_ID || 'WAJJ',
-      AIRPORT_SITE_ID: process.env.AIRPORT_SITE_ID || process.env.SITE_ID || 'WAJJ',
+      SITE_ID: process.env.SITE_ID || defaultSiteId,
+      AIRPORT_SITE_ID: process.env.AIRPORT_SITE_ID || process.env.SITE_ID || defaultSiteId,
       MESSAGE_SERVICE_NAME: process.env.MESSAGE_SERVICE_NAME || 'MONITORING_ARIFIN_BRANCH',
       CENTRAL_SERVICE_NAME: process.env.CENTRAL_SERVICE_NAME || 'EMS',
       TARGET_SERVICE_NAME: process.env.TARGET_SERVICE_NAME || 'EMS',
@@ -60,8 +72,8 @@ module.exports = {
     env_production: {
       NODE_ENV: 'production',
       PORT: process.env.PORT || 3100,
-      SITE_ID: process.env.SITE_ID || 'WAJJ',
-      AIRPORT_SITE_ID: process.env.AIRPORT_SITE_ID || process.env.SITE_ID || 'WAJJ',
+      SITE_ID: process.env.SITE_ID || defaultSiteId,
+      AIRPORT_SITE_ID: process.env.AIRPORT_SITE_ID || process.env.SITE_ID || defaultSiteId,
       MESSAGE_SERVICE_NAME: process.env.MESSAGE_SERVICE_NAME || 'MONITORING_ARIFIN_BRANCH',
       CENTRAL_SERVICE_NAME: process.env.CENTRAL_SERVICE_NAME || 'EMS',
       TARGET_SERVICE_NAME: process.env.TARGET_SERVICE_NAME || 'EMS',

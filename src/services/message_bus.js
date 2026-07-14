@@ -16,8 +16,9 @@ async function getLocalSiteId() {
 
 async function getAirportCode() {
     try {
-        const airport = await db.readAirportConfig();
-        return airport?.code || await getLocalSiteId();
+        const airportConfig = await db.readAirportConfig();
+        const airport = Array.isArray(airportConfig) && airportConfig.length > 0 ? airportConfig[0] : airportConfig;
+        return airport?.code || airport?.siteId || await getLocalSiteId();
     } catch (_) {
         return await getLocalSiteId();
     }
