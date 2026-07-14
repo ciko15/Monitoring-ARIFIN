@@ -1,6 +1,6 @@
 const snmp = require('snmp-native');
 
-const targetIP = process.argv[2] || '192.168.13.11';
+const targetIP = process.argv[2] || '192.168.26.102';
 const community = process.argv[3] || 'public'; // Coba ganti jika di Web UI bukan 'public'
 
 console.log(`[+] Testing SNMP poll UPS to ${targetIP} with community '${community}'...`);
@@ -33,7 +33,7 @@ let completed = 0;
 OIDs.forEach(item => {
     session.get({ oid: item.oid }, (err, varbinds) => {
         completed++;
-        
+
         if (err) {
             results[item.name] = `ERROR: ${err.message}`;
         } else if (varbinds && varbinds[0]) {
