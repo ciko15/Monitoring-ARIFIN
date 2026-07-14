@@ -8,7 +8,7 @@
     <array>
         <string>/usr/local/bin/pm2</string>
         <string>start</string>
-        <string>/Users/vickra/Development/Monitoring-ARIFIN-main/ecosystem.config.js</string>
+        <string>/Users/ahqmb-tt017/Development/Monitoring-ARIFIN-main/ecosystem.config.js</string>
         <string>--env</string>
         <string>production</string>
     </array>
@@ -17,11 +17,11 @@
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/vickra/Development/Monitoring-ARIFIN-main/logs/launchd-out.log</string>
+    <string>/Users/ahqmb-tt017/Development/Monitoring-ARIFIN-main/logs/launchd-out.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/vickra/Development/Monitoring-ARIFIN-main/logs/launchd-error.log</string>
+    <string>/Users/ahqmb-tt017/Development/Monitoring-ARIFIN-main/logs/launchd-error.log</string>
     <key>WorkingDirectory</key>
-    <string>/Users/vickra/Development/Monitoring-ARIFIN-main</string>
+    <string>/Users/ahqmb-tt017/Development/Monitoring-ARIFIN-main</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>

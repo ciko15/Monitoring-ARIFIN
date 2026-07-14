@@ -3,6 +3,9 @@
 # PM2 Setup Script for Monitoring ARIFIN (Dynamic Version)
 # This script automatically detects its location and sets up PM2
 
+# Add Node.js and Bun to PATH in case they are not in the current shell context
+export PATH="$HOME/.nodejs/bin:$HOME/.bun/bin:$PATH"
+
 echo "=========================================="
 echo "   PM2 Dynamic Setup for Monitoring ARIFIN"
 echo "=========================================="
@@ -18,7 +21,7 @@ PLIST_DEST="$LAUNCH_AGENTS_DIR/com.monitoring.arifin.plist"
 # 2. Update the plist file dynamically with the current path
 # We use a temporary file to avoid corrupting the original if interrupted
 echo "[1/4] Updating configuration paths..."
-sed -i '' "s|/Users/vickra/Development/Monitoring-ARIFIN-main|$PROJECT_DIR|g" "$PROJECT_TEMPLATE" 2>/dev/null || true
+sed -i '' "s|/Users/vickra/Development/Monitoring-ARIFIN-main|$PROJECT_DIR|g" "$PLIST_TEMPLATE" 2>/dev/null || true
 # Alternatively, if we use a placeholder like {{PROJECT_PATH}}, it would be cleaner, 
 # but let's just make it replace whatever was there with the current PWD.
 
@@ -39,9 +42,16 @@ pm2 save
 echo "[4/4] Configuring OS startup service..."
 cp "$PLIST_TEMPLATE" "$PLIST_DEST"
 
+# Dynamically resolve binary paths
+PM2_PATH=$(which pm2 2>/dev/null || echo "$HOME/.nodejs/bin/pm2")
+BUN_DIR=$(dirname "$(which bun 2>/dev/null || echo "$HOME/.bun/bin/bun")")
+NODE_DIR=$(dirname "$(which node 2>/dev/null || echo "$HOME/.nodejs/bin/node")")
+
 # Update paths in the destination plist specifically
 sed -i '' "s|/Users/vickra/Development/Monitoring-ARIFIN-main|$PROJECT_DIR|g" "$PLIST_DEST"
 sed -i '' "s|/Volumes/MUSIC CAR/Monitoring-ARIFIN-main|$PROJECT_DIR|g" "$PLIST_DEST"
+sed -i '' "s|/usr/local/bin/pm2|$PM2_PATH|g" "$PLIST_DEST"
+sed -i '' "s|/Users/vickra/.bun/bin|$BUN_DIR:$NODE_DIR|g" "$PLIST_DEST"
 
 launchctl unload "$PLIST_DEST" 2>/dev/null || true
 launchctl load "$PLIST_DEST"

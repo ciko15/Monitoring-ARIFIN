@@ -306,6 +306,9 @@ const latestEquipmentDataBySource = new Map();
 const lastPersistedAtBySource = new Map();
 const LOG_PERSIST_INTERVAL_MS = 60 * 1000;
 
+const IPC_STATE_PATH = path.join(process.cwd(), 'data', 'ipc_state.json');
+let lastIpcSyncTime = 0;
+
 function rebuildLatestEquipmentData() {
   latestEquipmentDataBySource.clear();
   for (const log of equipmentLogsDB) {
@@ -412,8 +415,7 @@ function buildEquipmentSourceKey(equipmentId, sourceName) {
   return `${equipmentId}_${sourceName || 'default'}`;
 }
 
-const IPC_STATE_PATH = path.join(process.cwd(), 'data', 'ipc_state.json');
-let lastIpcSyncTime = 0;
+
 
 function syncIpcStateForWeb() {
   if (process.env.SERVICE_ROLE === 'web' || !process.env.SERVICE_ROLE) {

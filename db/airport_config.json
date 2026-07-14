@@ -1,12 +1,12 @@
 {
   "id": 1,
-  "code": "WAJJ",
-  "siteId": "WAJJ",
-  "name": "Bandara Sentani",
-  "city": "Jayapura Edit",
+  "code": "WRRR",
+  "siteId": "WRRR",
+  "name": "AirNav Pusat",
+  "city": "Tangerang",
   "lat": -2.57213,
   "lng": 140.51482,
   "ipBranch": "172.19.16.1",
   "status": "Normal",
-  "totalEquipment": 3
+  "totalEquipment": 2
 }
