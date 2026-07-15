@@ -142,6 +142,19 @@ function snmpGet(session, oid) {
         });
     });
 }
+function snmpGetAll(session, oids) {
+    return new Promise(resolve => {
+        session.getAll({ oids }, (err, vbs) => {
+            if (err || !vbs) return resolve(oids.map(() => null));
+            const result = oids.map(oid => {
+                const oidStr = oid.join('.');
+                const match = vbs.find(vb => vb.oid.join('.') === oidStr);
+                return match && match.type !== 128 && match.type !== 129 ? match.value : null;
+            });
+            resolve(result);
+        });
+    });
+}
 function snmpWalk(session, oid) {
     return new Promise(resolve => {
         session.getSubtree({ oid, combinedTimeout: 12000 }, (err, vbs) => {
@@ -171,17 +184,13 @@ async function readDeviceTemperature(session, sysObjectID) {
 async function pollSNMP(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     try {
-        // Menggunakan sequential requests (berurutan) agar tidak mengebom buffer UDP target
+        // Menggunakan getAll (Satu paket UDP untuk semua OID) agar cepat dan bebas thundering herd
         const oidsToFetch = [
             OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation,
             OID.sysUpTime, OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal,
             OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached
         ];
-        const sysInfo = [];
-        for (const oid of oidsToFetch) {
-            sysInfo.push(await snmpGet(session, oid));
-        }
-        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw, memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = sysInfo;
+        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw, memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await snmpGetAll(session, oidsToFetch);
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
@@ -355,7 +364,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 }
 
 // Wrapper dengan hard timeout — mencegah hang di Bun runtime
-async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 20000) {
+async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 40000) {
     if (typeof options === 'number') {
         timeoutMs = options;
         options = {};
