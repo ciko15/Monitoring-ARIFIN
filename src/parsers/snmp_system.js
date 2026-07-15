@@ -132,7 +132,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [4000, 4000],
+        timeouts: [3000, 4000, 5000],
     });
 }
 function snmpGet(session, oid) {
@@ -184,13 +184,12 @@ async function readDeviceTemperature(session, sysObjectID) {
 async function pollSNMP(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     try {
-        // Menggunakan getAll (Satu paket UDP untuk semua OID) agar cepat dan bebas thundering herd
-        const oidsToFetch = [
-            OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation,
-            OID.sysUpTime, OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal,
-            OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached
-        ];
-        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw, memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await snmpGetAll(session, oidsToFetch);
+        // Memecah menjadi dua batch agar paket UDP tidak terlalu besar dan di-drop oleh network switch
+        const oids1 = [OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation, OID.sysUpTime];
+        const oids2 = [OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal, OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached];
+        
+        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw] = await snmpGetAll(session, oids1);
+        const [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await snmpGetAll(session, oids2);
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
