@@ -42,3 +42,6 @@ port.on('data', function (data) {
 port.on('error', function(err) {
     console.log(`\n[-] ERROR SERIAL: ${err.message}`);
 });
+
+// Agar Bun tidak langsung close
+setInterval(() => {}, 60000);
