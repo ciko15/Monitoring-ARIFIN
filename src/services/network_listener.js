@@ -647,17 +647,21 @@ class NetworkListenerService {
         if (!this._asterixParsers)  this._asterixParsers  = new Map();
         if (!this._asterixTimers)   this._asterixTimers   = new Map();
 
-        if (!this._asterixParsers.has(port)) this._asterixParsers.set(port, new Map());
-        this._asterixParsers.get(port).set(id, { parser, source, parserId });
+        const socketKey = `asterix_udp_${mcastIp}_${port}`;
+        if (!this._asterixParsers.has(socketKey)) this._asterixParsers.set(socketKey, new Map());
+        this._asterixParsers.get(socketKey).set(id, { parser, source, parserId });
 
-        const socketKey = `asterix_udp_${port}`;
         if (!this._asterixSockets.has(socketKey)) {
             const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 
             sock.on('message', async (msg, rinfo) => {
-                const parsersOnPort = this._asterixParsers.get(port);
-                if (!parsersOnPort) return;
-                for (const [srcId, entry] of parsersOnPort) {
+                const parsersOnSocket = this._asterixParsers.get(socketKey);
+                if (!parsersOnSocket) return;
+                for (const [srcId, entry] of parsersOnSocket) {
+                    // Filter berdasarkan source IP jika ada, agar data tidak nyasar ke radar lain
+                    if (entry.source.ip_address && entry.source.ip_address !== rinfo.address) {
+                        continue;
+                    }
                     const result = entry.parser.parse(msg);
                     if (!result) continue;
                     try {
