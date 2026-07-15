@@ -169,6 +169,16 @@ class AsterixRadarParser extends BaseParser {
         const decoded = decodeCat034(rawData, this._name, this._lat, this._lon);
         if (!decoded) return this._buildResult();
 
+        // Latching (Menyimpan) data yang jarang muncul (seperti Antenna Rotation)
+        // agar tidak tertimpa menjadi kosong ('—') oleh pesan Sector Marker
+        if (this._lastData) {
+            if (decoded.antenna_rotation === '—') decoded.antenna_rotation = this._lastData.antenna_rotation;
+            if (decoded.msg_type === '—') decoded.msg_type = this._lastData.msg_type;
+            if (decoded.time_of_day === '—') decoded.time_of_day = this._lastData.time_of_day;
+            if (decoded.sector_number === '—') decoded.sector_number = this._lastData.sector_number;
+            if (decoded.system_config === '—') decoded.system_config = this._lastData.system_config;
+        }
+
         this._lastData  = decoded;
         this._connected = true;
 
