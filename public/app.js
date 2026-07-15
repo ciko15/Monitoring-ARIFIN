@@ -696,6 +696,12 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     });
 
     templateSelect.innerHTML = '<option value="">Pilih Template</option>' + options.join('');
+    
+    // WAJIB set value secara eksplisit agar event change membaca value yang benar
+    if (editSource && editSource.parsing_id) {
+        templateSelect.value = editSource.parsing_id;
+    }
+
     console.log(`[UI] Populated ${options.length} options into template selector`);
     // Ensure initial UI state follows current template selection (important for edit mode)
     templateSelect.dispatchEvent(new Event('change'));
