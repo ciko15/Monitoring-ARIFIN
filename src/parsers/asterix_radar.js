@@ -21,20 +21,107 @@ function decodeCat034(data, radarName, radarLat, radarLon) {
         if (!data || data[0] !== 34) return null;
         if (data.length < 6) return null;
 
-        const sac = data[4];
-        const sic = data[5];
-
-        return {
-            radar:        radarName,
-            category:     34,
-            sac,
-            sic,
-            radar_id:     `${String(sac).padStart(3,'0')}/${String(sic).padStart(3,'0')}`,
-            lat:          radarLat,
-            lon:          radarLon,
-            last_cat034:  new Date().toISOString(),
-            data_source:  'asterix_cat034',
+        let offset = 3; // FSPEC starts at byte 3 (0-indexed)
+        const fspec = [];
+        let hasNext = true;
+        
+        while (hasNext && offset < data.length) {
+            const byte = data[offset];
+            fspec.push(byte);
+            offset++;
+            hasNext = (byte & 0x01) !== 0; // Check FX bit
+        }
+        
+        const items = [];
+        const bitMap = [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02];
+        fspec.forEach((byte, byteIndex) => {
+            for (let i = 0; i < 7; i++) {
+                if (byte & bitMap[i]) {
+                    items.push((byteIndex * 7) + i + 1); // 1-based index (e.g. 1 = I034/010)
+                }
+            }
+        });
+        
+        const result = {
+            radar: radarName,
+            category: 34,
+            lat: radarLat,
+            lon: radarLon,
+            last_cat034: new Date().toISOString(),
+            data_source: 'asterix_cat034',
+            sac: null, sic: null, radar_id: '—',
+            msg_type: '—',
+            time_of_day: '—',
+            sector_number: '—',
+            antenna_rotation: '—',
+            system_config: '—'
         };
+
+        // Read fields based on FSPEC
+        for (const item of items) {
+            if (offset >= data.length) break;
+            
+            if (item === 1) {
+                // I034/010 - Data Source Identifier (2 bytes)
+                result.sac = data[offset];
+                result.sic = data[offset + 1];
+                result.radar_id = `${String(result.sac).padStart(3, '0')}/${String(result.sic).padStart(3, '0')}`;
+                offset += 2;
+            } else if (item === 2) {
+                // I034/000 - Message Type (1 byte)
+                const types = { 1: 'North Marker', 2: 'Sector Marker', 3: 'Geographical Filtering Message', 4: 'Jamming Strobe Message' };
+                const val = data[offset];
+                result.msg_type = types[val] || `Unknown (${val})`;
+                offset += 1;
+            } else if (item === 3) {
+                // I034/030 - Time of Day (3 bytes)
+                const todRaw = (data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2];
+                result.time_of_day = (todRaw / 128).toFixed(2) + ' s';
+                offset += 3;
+            } else if (item === 4) {
+                // I034/020 - Sector Number (1 byte)
+                result.sector_number = data[offset];
+                offset += 1;
+            } else if (item === 5) {
+                // I034/041 - Antenna Rotation Period (2 bytes)
+                const rotRaw = (data[offset] << 8) | data[offset + 1];
+                result.antenna_rotation = (rotRaw / 128).toFixed(2) + ' s';
+                offset += 2;
+            } else if (item === 6) {
+                // I034/050 - System Configuration and Status (Variable)
+                let ext = true;
+                let statusVal = [];
+                while (ext && offset < data.length) {
+                    statusVal.push(data[offset].toString(16).padStart(2,'0'));
+                    ext = (data[offset] & 0x01) !== 0;
+                    offset += 1;
+                }
+                result.system_config = `0x${statusVal.join('')}`;
+            } else if (item === 7) {
+                // I034/060 - System Processing Mode (Variable)
+                let ext = true;
+                while (ext && offset < data.length) {
+                    ext = (data[offset] & 0x01) !== 0;
+                    offset += 1;
+                }
+            } else if (item === 9) {
+                // I034/070 - Message Volume (Variable)
+                let ext = true;
+                while (ext && offset < data.length) {
+                    ext = (data[offset] & 0x01) !== 0;
+                    offset += 1;
+                }
+            } else if (item === 10 || item === 11 || item === 12) {
+                // Collimation Error, Generic Polar Window, 3D-Radar Altimeter (Variable)
+                let ext = true;
+                while (ext && offset < data.length) {
+                    ext = (data[offset] & 0x01) !== 0;
+                    offset += 1;
+                }
+            }
+        }
+        
+        return result;
     } catch (e) {
         return null;
     }
@@ -102,13 +189,18 @@ class AsterixRadarParser extends BaseParser {
             data: {
                 connectivity:  this._connected ? 'Connected' : 'Disconnected',
                 radar_name:    this._name,
-                sac:           this._lastData ? String(this._lastData.sac) : '—',
-                sic:           this._lastData ? String(this._lastData.sic) : '—',
+                sac:           this._lastData && this._lastData.sac !== null ? String(this._lastData.sac) : '—',
+                sic:           this._lastData && this._lastData.sic !== null ? String(this._lastData.sic) : '—',
                 radar_id:      this._lastData ? this._lastData.radar_id    : '—',
+                msg_type:      this._lastData ? this._lastData.msg_type    : '—',
+                time_of_day:   this._lastData ? this._lastData.time_of_day : '—',
+                sector_number: this._lastData && this._lastData.sector_number !== null ? String(this._lastData.sector_number) : '—',
+                antenna_rotation: this._lastData ? this._lastData.antenna_rotation : '—',
+                system_config: this._lastData ? this._lastData.system_config : '—',
                 lat:           String(this._lat),
                 lon:           String(this._lon),
                 last_cat034:   this._lastData ? this._lastData.last_cat034 : '—',
-                data_source:   'asterix_cat034',
+                data_source:   this._lastData ? this._lastData.data_source : '—'
             },
             alarms:          [],
             warnings:        [],

@@ -50,7 +50,7 @@ const PARSER_TEMPLATES = {
   'pm5560_modbus': ['VL1N', 'VL2N', 'VL3N', 'VL12', 'VL23', 'VL31', 'IL1', 'IL2', 'IL3', 'KW', 'KVAR', 'KVA', 'PF', 'HZ', 'KWH'],
   'vhf_marc_rse': ['frequency_mhz', 'mode', 'status', 'supply_voltage', 'pa_temp_c', 'fwd_power_w', 'refl_power_w', 'modulation_pct', 'sensitivity_dbm', 'squelch_dbm', 'rx_supply_voltage'],
   'temp_humidity_modbus': ['temperature_c', 'humidity_pct', 'location'],
-  'asterix_radar': ['connectivity', 'radar_name', 'sac', 'sic', 'radar_id', 'last_cat034'],
+  'asterix_radar': ['connectivity', 'radar_name', 'sac', 'sic', 'radar_id', 'last_cat034', 'msg_type', 'time_of_day', 'sector_number', 'antenna_rotation', 'system_config'],
   'asterix_adsb': ['connectivity', 'station', 'sac', 'sic', 'radar_id', 'multicast_ip', 'last_cat021'],
   'snmp_system': [
     'connectivity',
