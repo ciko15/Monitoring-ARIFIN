@@ -74,6 +74,18 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     
     try {
+        const oidsToFetch = [
+            OID.sysDescr, OID.sysName, OID.upsBatteryStatus, OID.upsEstimatedMinutesRemaining,
+            OID.upsEstimatedChargeRemaining, OID.upsBatteryVoltage, OID.upsBatteryTemp,
+            OID.upsInputVoltageR, OID.upsInputVoltageS, OID.upsInputVoltageT,
+            OID.upsOutputVoltageR, OID.upsOutputVoltageS, OID.upsOutputVoltageT,
+            OID.upsOutputCurrentR, OID.upsOutputCurrentS, OID.upsOutputCurrentT,
+            OID.upsOutputPercentLoadR, OID.upsOutputPercentLoadS, OID.upsOutputPercentLoadT
+        ];
+        const results = [];
+        for (const oid of oidsToFetch) {
+            results.push(await snmpGet(session, oid));
+        }
         const [
             sysDescr, sysName,
             batteryStatusRaw, minutesRemaining, chargeRemaining, batteryVoltageRaw, batteryTemp,
@@ -81,27 +93,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             outputVoltageR, outputVoltageS, outputVoltageT,
             outputCurrentRawR, outputCurrentRawS, outputCurrentRawT,
             outputPercentLoadR, outputPercentLoadS, outputPercentLoadT
-        ] = await Promise.all([
-            snmpGet(session, OID.sysDescr),
-            snmpGet(session, OID.sysName),
-            snmpGet(session, OID.upsBatteryStatus),
-            snmpGet(session, OID.upsEstimatedMinutesRemaining),
-            snmpGet(session, OID.upsEstimatedChargeRemaining),
-            snmpGet(session, OID.upsBatteryVoltage),
-            snmpGet(session, OID.upsBatteryTemp),
-            snmpGet(session, OID.upsInputVoltageR),
-            snmpGet(session, OID.upsInputVoltageS),
-            snmpGet(session, OID.upsInputVoltageT),
-            snmpGet(session, OID.upsOutputVoltageR),
-            snmpGet(session, OID.upsOutputVoltageS),
-            snmpGet(session, OID.upsOutputVoltageT),
-            snmpGet(session, OID.upsOutputCurrentR),
-            snmpGet(session, OID.upsOutputCurrentS),
-            snmpGet(session, OID.upsOutputCurrentT),
-            snmpGet(session, OID.upsOutputPercentLoadR),
-            snmpGet(session, OID.upsOutputPercentLoadS),
-            snmpGet(session, OID.upsOutputPercentLoadT)
-        ]);
+        ] = results;
 
         if (sysDescr === null && inputVoltageR === null && outputVoltageR === null) {
             throw new Error('No SNMP response from UPS');

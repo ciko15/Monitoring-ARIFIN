@@ -171,22 +171,17 @@ async function readDeviceTemperature(session, sysObjectID) {
 async function pollSNMP(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     try {
-        // System info
-        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw, memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await Promise.all([
-            snmpGet(session, OID.sysName),
-            snmpGet(session, OID.sysDescr),
-            snmpGet(session, OID.sysObjectID),
-            snmpGet(session, OID.sysContact),
-            snmpGet(session, OID.sysLocation),
-            snmpGet(session, OID.sysUpTime),
-            snmpGet(session, OID.memTotalSwap),
-            snmpGet(session, OID.memAvailSwap),
-            snmpGet(session, OID.memTotalReal),
-            snmpGet(session, OID.memAvailReal),
-            snmpGet(session, OID.memShared),
-            snmpGet(session, OID.memBuffer),
-            snmpGet(session, OID.memCached),
-        ]);
+        // Menggunakan sequential requests (berurutan) agar tidak mengebom buffer UDP target
+        const oidsToFetch = [
+            OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation,
+            OID.sysUpTime, OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal,
+            OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached
+        ];
+        const sysInfo = [];
+        for (const oid of oidsToFetch) {
+            sysInfo.push(await snmpGet(session, oid));
+        }
+        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw, memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = sysInfo;
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
@@ -200,13 +195,12 @@ async function pollSNMP(host, community = 'public', options = {}) {
             if (vals.length) cpu_pct = vals.reduce((a, b) => a + b, 0) / vals.length;
         }
 
-        // Storage walks
-        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.all([
-            snmpWalk(session, OID.hrStorageType),
-            snmpWalk(session, OID.hrStorageSize),
-            snmpWalk(session, OID.hrStorageUsed),
-            snmpWalk(session, OID.hrStorageAlloc),
-        ]);
+        const walkOids = [OID.hrStorageType, OID.hrStorageSize, OID.hrStorageUsed, OID.hrStorageAlloc];
+        const walkResults = [];
+        for (const oid of walkOids) {
+            walkResults.push(await snmpWalk(session, oid));
+        }
+        const [typeVbs, sizeVbs, usedVbs, allocVbs] = walkResults;
 
         // Build index maps
         // NOTE: hrStorageType value dikembalikan snmp-native sebagai Array OID
