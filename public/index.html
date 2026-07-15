@@ -407,6 +407,22 @@
                 <span style="color:#e8a000;">TX ports (4-9):</span> frequency, mode, fwd power, PA temp
               </div>
             </div>
+
+            <!-- ASTERIX Extra Fields — shown only when template = asterix_adsb or asterix_radar -->
+            <div id="asterixExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">📡 ASTERIX — SAC / SIC</div>
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Kode area untuk identifikasi stasiun ADS-B / Radar (Misal: SAC 255, SIC 129)</div>
+              <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">SAC (System Area Code)</label>
+                  <input type="number" id="asterixSac" placeholder="0 - 255" min="0" max="255" style="width:100%; box-sizing:border-box;">
+                </div>
+                <div style="flex:1;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">SIC (System ID Code)</label>
+                  <input type="number" id="asterixSic" placeholder="0 - 255" min="0" max="255" style="width:100%; box-sizing:border-box;">
+                </div>
+              </div>
+            </div>
           </div>
           <div class="form-row">
             <div class="form-group">
