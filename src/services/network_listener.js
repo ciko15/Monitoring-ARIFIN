@@ -678,9 +678,25 @@ class NetworkListenerService {
             sock.bind(port, () => {
                 try {
                     sock.addMembership(mcastIp);
-                    console.log(`[Asterix] Joined multicast ${mcastIp}:${port}`);
+                    console.log(`[Asterix] Joined multicast ${mcastIp}:${port} on default interface`);
                 } catch (e) {
-                    console.warn(`[Asterix] Multicast join failed ${mcastIp}:${port}: ${e.message}`);
+                    console.warn(`[Asterix] Multicast join failed on default interface ${mcastIp}:${port}: ${e.message}`);
+                }
+                
+                // Attempt to bind to all active IPv4 interfaces
+                const os = require('os');
+                const interfaces = os.networkInterfaces();
+                for (const name of Object.keys(interfaces)) {
+                    for (const iface of interfaces[name]) {
+                        if (iface.family === 'IPv4' && !iface.internal) {
+                            try {
+                                sock.addMembership(mcastIp, iface.address);
+                                console.log(`[Asterix] Joined multicast ${mcastIp}:${port} on interface ${iface.address}`);
+                            } catch (e) {
+                                // Ignore failure on secondary interfaces
+                            }
+                        }
+                    }
                 }
             });
 
