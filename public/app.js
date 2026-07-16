@@ -601,6 +601,18 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       resetSnmpFields();
     }
 
+    // Populate ASTERIX extra fields if editing
+    const astDiv = document.getElementById('asterixExtraFields');
+    if ((editSource.parsing_id === 'asterix_adsb' || editSource.parsing_id === 'asterix_radar') && astDiv) {
+      astDiv.style.display = 'block';
+      if (document.getElementById('asterixSac')) document.getElementById('asterixSac').value = editSource.sac !== undefined ? editSource.sac : '';
+      if (document.getElementById('asterixSic')) document.getElementById('asterixSic').value = editSource.sic !== undefined ? editSource.sic : '';
+    } else if (astDiv) {
+      astDiv.style.display = 'none';
+      if (document.getElementById('asterixSac')) document.getElementById('asterixSac').value = '';
+      if (document.getElementById('asterixSic')) document.getElementById('asterixSic').value = '';
+    }
+
     // Populate T6TV extra fields if editing
     const extra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? JSON.parse(editSource.extra_config) : editSource.extra_config) : {};
     const t6tvDiv = document.getElementById('t6tvExtraFields');
@@ -661,11 +673,14 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const extra = document.getElementById('t6tvExtraFields');
       const marcExtra = document.getElementById('marcExtraFields');
       const snmpExtra = document.getElementById('snmpExtraFields');
+      const astExtra = document.getElementById('asterixExtraFields');
       const portField = document.getElementById('dataSourceUdpPort');
       const isSnmp = isSnmpParsingId(templateSelect.value);
+      const isAsterix = templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar';
       if (extra) extra.style.display = templateSelect.value === 'vhf_t6tv' ? 'block' : 'none';
       if (marcExtra) marcExtra.style.display = templateSelect.value === 'vhf_marc_rse' ? 'block' : 'none';
       if (snmpExtra) snmpExtra.style.display = isSnmp ? 'block' : 'none';
+      if (astExtra) astExtra.style.display = isAsterix ? 'block' : 'none';
       if (tcpPortGroup) tcpPortGroup.style.display = isSnmp ? 'none' : '';
       if (portField) {
         portField.required = templateSelect.value !== 'vhf_t6tv' && !isSnmp;
@@ -696,6 +711,12 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     });
 
     templateSelect.innerHTML = '<option value="">Pilih Template</option>' + options.join('');
+    
+    // WAJIB set value secara eksplisit agar event change membaca value yang benar
+    if (editSource && editSource.parsing_id) {
+        templateSelect.value = editSource.parsing_id;
+    }
+
     console.log(`[UI] Populated ${options.length} options into template selector`);
     // Ensure initial UI state follows current template selection (important for edit mode)
     templateSelect.dispatchEvent(new Event('change'));
@@ -741,6 +762,14 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       // MARC RSE: simpan marc_ports langsung di root object (bukan extra_config)
       ...(templateSelect.value === 'vhf_marc_rse' ? { marc_ports: getMarcPortsFromCheckboxes() } : {}),
       ...(templateSelect.value === 'vhf_marc_rse' ? { poll_interval: 30 } : {}),
+      
+      // ASTERIX SAC & SIC
+      ...((templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar') ? {
+          sac: document.getElementById('asterixSac') && document.getElementById('asterixSac').value ? parseInt(document.getElementById('asterixSac').value, 10) : 0,
+          sic: document.getElementById('asterixSic') && document.getElementById('asterixSic').value ? parseInt(document.getElementById('asterixSic').value, 10) : 0,
+          protocol: 'udp'
+      } : {}),
+
       // SNMP: simpan parameter komunikasi dari form.
       ...(isSnmpTemplate ? {
         protocol: 'snmp',
@@ -2629,13 +2658,79 @@ window.renderConfigFields = function (type, item, container) {
     if (!item) setTimeout(() => updateSubCategoryDropdown('Communication', 'modalSubCat'), 100);
   } else if (type === 'authentication') {
     container.innerHTML = `
-      <div class="form-group-ux">
-        <label>Component Name</label>
-        <input type="text" name="name" value="${item?.name || ''}" required>
+      <div class="form-row-ux">
+        <div class="form-group-ux">
+          <label>Component Name</label>
+          <input type="text" name="name" value="${item?.name || ''}" required>
+        </div>
+        <div class="form-group-ux">
+          <label>Parsing ID</label>
+          <input type="text" name="parsing_id" value="${item?.parsing_id || ''}" placeholder="e.g. vhf_t6tv">
+        </div>
+      </div>
+      <div class="form-row-ux">
+        <div class="form-group-ux">
+          <label>IP Address</label>
+          <input type="text" name="ip_address" value="${item?.ip_address || ''}" placeholder="192.168.x.x">
+        </div>
+        <div class="form-group-ux">
+          <label>Multicast IP</label>
+          <input type="text" name="multicast_ip" value="${item?.multicast_ip || ''}" placeholder="239.x.x.x">
+        </div>
+      </div>
+      <div class="form-row-ux">
+        <div class="form-group-ux">
+          <label>TCP Port</label>
+          <input type="number" name="tcp_port" value="${item?.tcp_port || ''}">
+        </div>
+        <div class="form-group-ux">
+          <label>UDP / Multicast Port</label>
+          <input type="number" name="udp_port" value="${item?.udp_port || item?.multicast_port || ''}">
+        </div>
+      </div>
+      <div class="form-row-ux">
+        <div class="form-group-ux">
+          <label>SNMP Port</label>
+          <input type="number" name="snmp_port" value="${item?.snmp_port || ''}" placeholder="161">
+        </div>
+        <div class="form-group-ux">
+          <label>SNMP Version</label>
+          <input type="text" name="snmp_version" value="${item?.snmp_version || ''}" placeholder="2c">
+        </div>
+      </div>
+      <div class="form-row-ux">
+        <div class="form-group-ux">
+          <label>Username / Community</label>
+          <input type="text" name="username" value="${item?.username || item?.community || ''}">
+        </div>
+        <div class="form-group-ux">
+          <label>Password</label>
+          <input type="text" name="password" value="${item?.password || ''}">
+        </div>
+      </div>
+      <div class="form-row-ux">
+        <div class="form-group-ux">
+          <label>Latitude</label>
+          <input type="number" step="any" name="latitude" value="${item?.latitude || item?.lat || ''}">
+        </div>
+        <div class="form-group-ux">
+          <label>Longitude</label>
+          <input type="number" step="any" name="longitude" value="${item?.longitude || item?.lon || ''}">
+        </div>
+      </div>
+      <div class="form-row-ux">
+        <div class="form-group-ux">
+          <label>SAC (Asterix)</label>
+          <input type="number" name="sac" value="${item?.sac || ''}">
+        </div>
+        <div class="form-group-ux">
+          <label>SIC (Asterix)</label>
+          <input type="number" name="sic" value="${item?.sic || ''}">
+        </div>
       </div>
       <div class="form-group-ux">
-        <label>IP Address</label>
-        <input type="text" name="ip_address" value="${item?.ip_address || ''}" required placeholder="192.168.x.x">
+        <label>Extra Config (JSON format)</label>
+        <textarea name="extra_config" rows="3" placeholder='{"key": "value"}'>${item?.extra_config ? (typeof item.extra_config === 'object' ? JSON.stringify(item.extra_config) : item.extra_config) : ''}</textarea>
       </div>
     `;
   } else if (type === 'sup-category') {

@@ -659,8 +659,13 @@ class NetworkListenerService {
                 if (!parsersOnSocket) return;
                 for (const [srcId, entry] of parsersOnSocket) {
                     // Filter berdasarkan source IP jika ada, agar data tidak nyasar ke radar lain
+                    // KECUALI jika IP tersebut adalah IP Multicast (dimulai dengan 224-239)
                     if (entry.source.ip_address && entry.source.ip_address !== rinfo.address) {
-                        continue;
+                        const firstOctet = parseInt(entry.source.ip_address.split('.')[0] || '0', 10);
+                        const isMulticast = firstOctet >= 224 && firstOctet <= 239;
+                        if (!isMulticast && entry.source.ip_address !== '0.0.0.0') {
+                            continue;
+                        }
                     }
                     const result = entry.parser.parse(msg);
                     if (!result) continue;

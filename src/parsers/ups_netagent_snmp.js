@@ -69,11 +69,33 @@ function snmpGet(session, oid) {
         });
     });
 }
+function snmpGetAll(session, oids) {
+    return new Promise(resolve => {
+        session.getAll({ oids }, (err, vbs) => {
+            if (err || !vbs) return resolve(oids.map(() => null));
+            const result = oids.map(oid => {
+                const oidStr = oid.join('.');
+                const match = vbs.find(vb => vb.oid.join('.') === oidStr);
+                return match && match.type !== 128 && match.type !== 129 ? match.value : null;
+            });
+            resolve(result);
+        });
+    });
+}
 
 async function pollUPSNetagent(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     
     try {
+        // Menggunakan getAll (Satu paket UDP)
+        const oidsToFetch = [
+            OID.sysDescr, OID.sysName, OID.upsBatteryStatus, OID.upsEstimatedMinutesRemaining,
+            OID.upsEstimatedChargeRemaining, OID.upsBatteryVoltage, OID.upsBatteryTemp,
+            OID.upsInputVoltageR, OID.upsInputVoltageS, OID.upsInputVoltageT,
+            OID.upsOutputVoltageR, OID.upsOutputVoltageS, OID.upsOutputVoltageT,
+            OID.upsOutputCurrentR, OID.upsOutputCurrentS, OID.upsOutputCurrentT,
+            OID.upsOutputPercentLoadR, OID.upsOutputPercentLoadS, OID.upsOutputPercentLoadT
+        ];
         const [
             sysDescr, sysName,
             batteryStatusRaw, minutesRemaining, chargeRemaining, batteryVoltageRaw, batteryTemp,
@@ -81,27 +103,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             outputVoltageR, outputVoltageS, outputVoltageT,
             outputCurrentRawR, outputCurrentRawS, outputCurrentRawT,
             outputPercentLoadR, outputPercentLoadS, outputPercentLoadT
-        ] = await Promise.all([
-            snmpGet(session, OID.sysDescr),
-            snmpGet(session, OID.sysName),
-            snmpGet(session, OID.upsBatteryStatus),
-            snmpGet(session, OID.upsEstimatedMinutesRemaining),
-            snmpGet(session, OID.upsEstimatedChargeRemaining),
-            snmpGet(session, OID.upsBatteryVoltage),
-            snmpGet(session, OID.upsBatteryTemp),
-            snmpGet(session, OID.upsInputVoltageR),
-            snmpGet(session, OID.upsInputVoltageS),
-            snmpGet(session, OID.upsInputVoltageT),
-            snmpGet(session, OID.upsOutputVoltageR),
-            snmpGet(session, OID.upsOutputVoltageS),
-            snmpGet(session, OID.upsOutputVoltageT),
-            snmpGet(session, OID.upsOutputCurrentR),
-            snmpGet(session, OID.upsOutputCurrentS),
-            snmpGet(session, OID.upsOutputCurrentT),
-            snmpGet(session, OID.upsOutputPercentLoadR),
-            snmpGet(session, OID.upsOutputPercentLoadS),
-            snmpGet(session, OID.upsOutputPercentLoadT)
-        ]);
+        ] = await snmpGetAll(session, oidsToFetch);
 
         if (sysDescr === null && inputVoltageR === null && outputVoltageR === null) {
             throw new Error('No SNMP response from UPS');
@@ -230,7 +232,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
 }
 
 // Wrapper dengan timeout untuk mencegah hang
-async function pollUPSNetagentWithTimeout(host, community = 'public', options = {}, timeoutMs = 20000) {
+async function pollUPSNetagentWithTimeout(host, community = 'public', options = {}, timeoutMs = 40000) {
     if (typeof options === 'number') {
         timeoutMs = options;
         options = {};

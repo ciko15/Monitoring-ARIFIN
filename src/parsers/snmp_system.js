@@ -132,13 +132,26 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [4000, 4000],
+        timeouts: [3000, 4000, 5000],
     });
 }
 function snmpGet(session, oid) {
     return new Promise(resolve => {
         session.get({ oid }, (err, vbs) => {
             resolve((!err && vbs && vbs[0]) ? vbs[0].value : null);
+        });
+    });
+}
+function snmpGetAll(session, oids) {
+    return new Promise(resolve => {
+        session.getAll({ oids }, (err, vbs) => {
+            if (err || !vbs) return resolve(oids.map(() => null));
+            const result = oids.map(oid => {
+                const oidStr = oid.join('.');
+                const match = vbs.find(vb => vb.oid.join('.') === oidStr);
+                return match && match.type !== 128 && match.type !== 129 ? match.value : null;
+            });
+            resolve(result);
         });
     });
 }
@@ -171,22 +184,12 @@ async function readDeviceTemperature(session, sysObjectID) {
 async function pollSNMP(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     try {
-        // System info
-        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw, memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await Promise.all([
-            snmpGet(session, OID.sysName),
-            snmpGet(session, OID.sysDescr),
-            snmpGet(session, OID.sysObjectID),
-            snmpGet(session, OID.sysContact),
-            snmpGet(session, OID.sysLocation),
-            snmpGet(session, OID.sysUpTime),
-            snmpGet(session, OID.memTotalSwap),
-            snmpGet(session, OID.memAvailSwap),
-            snmpGet(session, OID.memTotalReal),
-            snmpGet(session, OID.memAvailReal),
-            snmpGet(session, OID.memShared),
-            snmpGet(session, OID.memBuffer),
-            snmpGet(session, OID.memCached),
-        ]);
+        // Memecah menjadi dua batch agar paket UDP tidak terlalu besar dan di-drop oleh network switch
+        const oids1 = [OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation, OID.sysUpTime];
+        const oids2 = [OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal, OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached];
+        
+        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw] = await snmpGetAll(session, oids1);
+        const [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await snmpGetAll(session, oids2);
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
@@ -200,13 +203,12 @@ async function pollSNMP(host, community = 'public', options = {}) {
             if (vals.length) cpu_pct = vals.reduce((a, b) => a + b, 0) / vals.length;
         }
 
-        // Storage walks
-        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.all([
-            snmpWalk(session, OID.hrStorageType),
-            snmpWalk(session, OID.hrStorageSize),
-            snmpWalk(session, OID.hrStorageUsed),
-            snmpWalk(session, OID.hrStorageAlloc),
-        ]);
+        const walkOids = [OID.hrStorageType, OID.hrStorageSize, OID.hrStorageUsed, OID.hrStorageAlloc];
+        const walkResults = [];
+        for (const oid of walkOids) {
+            walkResults.push(await snmpWalk(session, oid));
+        }
+        const [typeVbs, sizeVbs, usedVbs, allocVbs] = walkResults;
 
         // Build index maps
         // NOTE: hrStorageType value dikembalikan snmp-native sebagai Array OID
@@ -361,7 +363,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 }
 
 // Wrapper dengan hard timeout — mencegah hang di Bun runtime
-async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 20000) {
+async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 40000) {
     if (typeof options === 'number') {
         timeoutMs = options;
         options = {};
