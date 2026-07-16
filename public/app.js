@@ -1058,12 +1058,15 @@ function normalizeEquipmentSearchValue(value) {
 function getFilteredEquipmentData() {
   const searchInput = document.getElementById('searchEquipment');
   const categorySelect = document.getElementById('filterCategory');
+  const airportSelect = document.getElementById('airportFilter');
 
   const searchTerm = normalizeEquipmentSearchValue(searchInput?.value);
   const selectedCategory = normalizeEquipmentSearchValue(categorySelect?.value);
+  const selectedAirport = String(airportSelect?.value || '');
 
   return (Array.isArray(equipmentData) ? equipmentData : []).filter(item => {
-    const airport = (window.airportsData || []).find(a => String(a.id) === String(item.airportId || item.branch_id));
+    const airportIdStr = String(item.airportId || item.branch_id);
+    const airport = (window.airportsData || []).find(a => String(a.id) === airportIdStr);
     const airportName = airport ? airport.name : '';
     const searchableText = [
       item.name,
@@ -1079,8 +1082,9 @@ function getFilteredEquipmentData() {
 
     const matchesSearch = !searchTerm || searchableText.includes(searchTerm);
     const matchesCategory = !selectedCategory || normalizeEquipmentSearchValue(item.category) === selectedCategory;
+    const matchesAirport = !selectedAirport || airportIdStr === selectedAirport;
 
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesAirport;
   });
 }
 
@@ -1651,6 +1655,14 @@ async function loadAirports() {
       }
     }
 
+    const filterAirportSelect = document.getElementById('airportFilter');
+    if (filterAirportSelect) {
+      const currentVal = filterAirportSelect.value;
+      filterAirportSelect.innerHTML = '<option value="">All Airports</option>' +
+        airportsData.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+      if (currentVal) filterAirportSelect.value = currentVal;
+    }
+
     if (equipmentData.length > 0) {
       applyEquipmentFilters();
     }
@@ -2000,6 +2012,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const filterCategorySelect = document.getElementById('filterCategory');
   if (filterCategorySelect) {
     filterCategorySelect.addEventListener('change', applyEquipmentFilters);
+  }
+
+  const filterAirportSelect = document.getElementById('airportFilter');
+  if (filterAirportSelect) {
+    filterAirportSelect.addEventListener('change', applyEquipmentFilters);
   }
 
   // Registration Logic
