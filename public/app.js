@@ -1708,6 +1708,8 @@ async function handleAirportSubmit(e) {
   const data = {
     name: document.getElementById('airportName').value,
     city: document.getElementById('airportCity').value,
+    code: document.getElementById('airportCode').value,
+    siteId: document.getElementById('airportSiteId').value,
     lat: latVal ? parseFloat(latVal) : null,
     lng: lngVal ? parseFloat(lngVal) : null,
     ipBranch: document.getElementById('airportIpBranch').value
@@ -1741,6 +1743,8 @@ window.editAirport = function (id) {
   document.getElementById('airportId').value = airport.id;
   document.getElementById('airportName').value = airport.name;
   document.getElementById('airportCity').value = airport.city;
+  document.getElementById('airportCode').value = airport.code || '';
+  document.getElementById('airportSiteId').value = airport.siteId || '';
   document.getElementById('airportLat').value = airport.lat;
   document.getElementById('airportLng').value = airport.lng;
   document.getElementById('airportIpBranch').value = airport.ipBranch || '';
