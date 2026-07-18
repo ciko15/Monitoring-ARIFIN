@@ -34,7 +34,20 @@ async function getCentralServiceName() {
     return process.env.CENTRAL_SERVICE_NAME || process.env.TARGET_SERVICE_NAME || profile.services?.target || 'EMS';
 }
 
+const telemetryThrottleCache = new Map();
+const THROTTLE_INTERVAL_MS = 60 * 1000; // 60 seconds
+
 async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) {
+    const cacheKey = `${datalog.equipmentId || ''}-${datalog.source || ''}`;
+    const payloadHash = JSON.stringify(datalog.data || {}) + '|' + (datalog.status || '');
+    const now = Date.now();
+    const lastSent = telemetryThrottleCache.get(cacheKey);
+
+    // Delta-sync logic: skip if data is identical and 60 seconds haven't passed
+    if (lastSent && lastSent.hash === payloadHash && (now - lastSent.time < THROTTLE_INTERVAL_MS)) {
+        return Promise.resolve(null);
+    }
+    telemetryThrottleCache.set(cacheKey, { hash: payloadHash, time: now });
     const airportCode = await getAirportCode();
     
     const payload = {

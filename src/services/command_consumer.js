@@ -1,4 +1,5 @@
 const db = require('../../db/database');
+const { exec } = require('child_process');
 const { connect, normalizeSiteId, isEmsEnabled } = require('../connection/ems');
 const {
     getLocalSiteId,
@@ -72,7 +73,9 @@ class CommandConsumer {
             'Q.NAV',
             'Q.SUR',
             'Q.DAT',
-            'Q.SUP'
+            'Q.SUP',
+            `CMD.SYSTEM.${this.siteId}`,
+            `CMD.CONFIG.${this.siteId}`
         ];
     }
 
@@ -140,6 +143,15 @@ class CommandConsumer {
         }
 
         switch (messageName) {
+            case 'system.restart_pc':
+                await this._handleRestartPC(header, body);
+                return;
+            case 'system.restart_app':
+                await this._handleRestartApp(header, body);
+                return;
+            case 'configuration.equipment.upsert':
+                await this._handleEquipmentUpsert(header, body);
+                return;
             case 'configuration.threshold.apply':
                 await this._handleThresholdApply(body, correlationId, targetSiteId);
                 return;
@@ -161,6 +173,57 @@ class CommandConsumer {
                 return;
             default:
                 console.warn(`[CMD] Unsupported message ${messageName} from ${queue}`);
+        }
+    }
+
+    async _verifySecurityToken(header) {
+        const token = header.security_token;
+        const expectedToken = process.env.SYSTEM_COMMAND_TOKEN || 'default-secure-token-123';
+        if (token !== expectedToken) {
+            console.warn('[CMD] Security token mismatch. Command rejected.');
+            throw new Error('Unauthorized');
+        }
+    }
+
+    async _handleRestartPC(header, body) {
+        console.log('[CMD] Received system.restart_pc command');
+        await this._verifySecurityToken(header);
+        
+        let command = 'shutdown /r /t 0'; // Windows
+        if (process.platform === 'darwin' || process.platform === 'linux') {
+            command = 'sudo reboot';
+        }
+        
+        console.log(`[CMD] Executing PC restart: ${command}`);
+        exec(command, (error, stdout, stderr) => {
+            if (error) console.error(`[CMD] Restart PC error: ${error.message}`);
+        });
+    }
+
+    async _handleRestartApp(header, body) {
+        console.log('[CMD] Received system.restart_app command');
+        await this._verifySecurityToken(header);
+        
+        console.log('[CMD] Executing App restart via PM2');
+        exec('pm2 restart all', (error, stdout, stderr) => {
+            if (error) console.error(`[CMD] Restart App error: ${error.message}`);
+        });
+    }
+
+    async _handleEquipmentUpsert(header, body) {
+        console.log('[CMD] Received configuration.equipment.upsert command');
+        try {
+            const equipmentData = body;
+            const existing = await db.getEquipmentById(equipmentData.id);
+            if (existing) {
+                await db.updateEquipment(equipmentData.id, equipmentData);
+                console.log(`[CMD] Updated equipment ${equipmentData.id}`);
+            } else {
+                await db.createEquipment(equipmentData);
+                console.log(`[CMD] Created equipment ${equipmentData.id}`);
+            }
+        } catch (err) {
+            console.error('[CMD] Equipment upsert failed:', err.message);
         }
     }
 
