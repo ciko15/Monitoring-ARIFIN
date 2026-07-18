@@ -6,45 +6,56 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 }
 
 Write-Host "===============================================" -ForegroundColor Cyan
-Write-Host " MENAMBAHKAN NODE.JS KE WINDOWS FIREWALL" -ForegroundColor Cyan
+Write-Host " MENAMBAHKAN NODE.JS / BUN KE WINDOWS FIREWALL" -ForegroundColor Cyan
 Write-Host "===============================================`n" -ForegroundColor Cyan
 
-# Mencari lokasi node.exe dari environment variabel PATH
-$nodePaths = @()
+# Mencari lokasi node.exe dan bun.exe dari environment variabel PATH
+$exePaths = @()
 $envPaths = ($env:PATH -split ';')
+$targets = @("node.exe", "bun.exe")
+
 foreach ($path in $envPaths) {
     if ([string]::IsNullOrWhiteSpace($path)) { continue }
     try {
-        $nodeExe = Join-Path -Path $path -ChildPath "node.exe"
-        if (Test-Path $nodeExe) {
-            if ($nodePaths -notcontains $nodeExe) {
-                $nodePaths += $nodeExe
+        foreach ($target in $targets) {
+            $exe = Join-Path -Path $path -ChildPath $target
+            if (Test-Path $exe) {
+                if ($exePaths -notcontains $exe) {
+                    $exePaths += $exe
+                }
             }
         }
     } catch {}
 }
 
 # Jika tidak ditemukan di PATH, coba lokasi default
-if ($nodePaths.Count -eq 0) {
-    $defaultPath1 = "C:\Program Files\nodejs\node.exe"
-    $defaultPath2 = "C:\Program Files (x86)\nodejs\node.exe"
+if ($exePaths.Count -eq 0) {
+    $defaultPaths = @(
+        "C:\Program Files\nodejs\node.exe",
+        "C:\Program Files (x86)\nodejs\node.exe",
+        "$env:USERPROFILE\.bun\bin\bun.exe"
+    )
     
-    if (Test-Path $defaultPath1) { $nodePaths += $defaultPath1 }
-    if (Test-Path $defaultPath2) { $nodePaths += $defaultPath2 }
+    foreach ($dp in $defaultPaths) {
+        if (Test-Path $dp) { $exePaths += $dp }
+    }
 }
 
-if ($nodePaths.Count -eq 0) {
-    Write-Host "[-] GAGAL: Node.js (node.exe) tidak ditemukan di komputer ini." -ForegroundColor Red
-    Write-Host "[-] Silakan masukkan aturan Firewall secara manual." -ForegroundColor Red
+if ($exePaths.Count -eq 0) {
+    Write-Host "[-] GAGAL: Node.js (node.exe) atau Bun (bun.exe) tidak ditemukan." -ForegroundColor Red
+    Write-Host "[-] Silakan masukkan aturan Firewall secara manual lewat Windows Defender Firewall." -ForegroundColor Red
     Read-Host "Tekan Enter untuk keluar..."
     exit
 }
 
 $added = 0
-foreach ($path in $nodePaths) {
+foreach ($path in $exePaths) {
     Write-Host "[*] Menambahkan pengecualian Firewall untuk: $path" -ForegroundColor Yellow
-    $ruleNameTCP = "Node.js ARIFIN Allow (TCP) - $path"
-    $ruleNameUDP = "Node.js ARIFIN Allow (UDP) - $path"
+    
+    # Nama rule tergantung programnya
+    $progName = if ($path -match "bun.exe") { "Bun" } else { "Node.js" }
+    $ruleNameTCP = "$progName ARIFIN Allow (TCP) - $path"
+    $ruleNameUDP = "$progName ARIFIN Allow (UDP) - $path"
     
     # Hapus rule lama jika sudah ada (agar bersih)
     Remove-NetFirewallRule -DisplayName $ruleNameTCP -ErrorAction SilentlyContinue | Out-Null
@@ -57,8 +68,8 @@ foreach ($path in $nodePaths) {
 }
 
 if ($added -gt 0) {
-    Write-Host "`n[+] BERHASIL! Windows Firewall sudah membuka jalur (TCP/UDP) untuk Node.js." -ForegroundColor Green
-    Write-Host "    Aplikasi ARIFIN (Node.js) sekarang sudah bisa menerima data Multicast ADSB." -ForegroundColor Green
+    Write-Host "`n[+] BERHASIL! Windows Firewall sudah membuka jalur (TCP/UDP) untuk Node.js / Bun." -ForegroundColor Green
+    Write-Host "    Aplikasi ARIFIN sekarang sudah bisa menerima data Multicast ADSB." -ForegroundColor Green
 }
 
 Write-Host "`n===============================================" -ForegroundColor Cyan
