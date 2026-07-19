@@ -19,7 +19,8 @@ class CommandConsumer {
         this.state = options.state || {};
         this.serviceRole = options.serviceRole || process.env.SERVICE_ROLE || 'all';
         this.pipelineMode = options.pipelineMode || process.env.PIPELINE_MODE || 'inline';
-        this.channel = null;
+        this.connection = null;
+        this.receivers = [];
         this.siteId = null;
         this.isRunning = false;
         this._restartTimer = null;
@@ -28,52 +29,49 @@ class CommandConsumer {
     }
 
     async start() {
-        if (this.isRunning) return;
-        if (!isEmsEnabled()) {
-            console.log('[CMD] EMS command consumer disabled');
-            return;
-        }
-        this.isRunning = true;
-        await this._initialize().catch(error => {
-            console.error('[CMD] Failed to start consumer:', error.message);
-            this._scheduleRestart();
-        });
+        console.log('[CMD] Aplikasi Cabang (Branch) HANYA bertugas mem-publish pesan ke broker.');
+        console.log('[CMD] Consumer EMS/Solace DINONAKTIFKAN secara permanen sesuai instruksi.');
+        this.isRunning = false;
+        return;
     }
 
     stop() {
         this.isRunning = false;
         if (this._restartTimer) clearTimeout(this._restartTimer);
         this._restartTimer = null;
-        if (this.channel) {
-            try {
-                this.channel.close();
-            } catch (_) {}
+        if (this.receivers) {
+            for (const r of this.receivers) {
+                try { r.close(); } catch (_) {}
+            }
         }
-        this.channel = null;
+        this.receivers = [];
+        this.connection = null;
     }
 
     async _initialize() {
         this.siteId = await getLocalSiteId();
-        const ch = await connect();
-        this.channel = ch;
-        await ch.prefetch(10);
-
+        this.connection = await connect();
+        
+        this.receivers = [];
         const queues = this._getQueues();
+        
         for (const queue of queues) {
-            await ch.assertQueue(queue, { durable: true });
-            await ch.consume(queue, msg => this._onMessage(queue, msg), { noAck: false });
-            console.log(`[CMD] Listening on ${queue}`);
+            const receiver = await this.connection.createReceiver({
+                source: { address: queue },
+                credit_window: 10
+            });
+            
+            receiver.on('message', (context) => this._onMessage(queue, context));
+            this.receivers.push(receiver);
+            console.log(`[CMD] Listening on ${queue} via AMQP 1.0`);
         }
         this._restartDelayMs = parseInt(process.env.EMS_RETRY_BACKOFF_MS || '', 10) || 30000;
     }
 
     _getQueues() {
+        // Cabang HANYA mendengarkan antrean perintah khusus (Command) dari pusat
+        // dan tidak boleh menarik antrean global telemetri (Q.COM, Q.SUR, dll)
         return [
-            'Q.COM',
-            'Q.NAV',
-            'Q.SUR',
-            'Q.DAT',
-            'Q.SUP',
             `CMD.SYSTEM.${this.siteId}`,
             `CMD.CONFIG.${this.siteId}`
         ];
@@ -93,11 +91,16 @@ class CommandConsumer {
         }, delayMs);
     }
 
-    async _onMessage(queue, msg) {
-        if (!msg) return;
+    async _onMessage(queue, context) {
+        if (!context || !context.message) return;
 
         try {
-            const envelope = JSON.parse(msg.content.toString('utf8'));
+            let payload = context.message.body;
+            if (Buffer.isBuffer(payload)) {
+                payload = payload.toString('utf8');
+            }
+            const envelope = typeof payload === 'string' ? JSON.parse(payload) : payload;
+            
             const header = envelope.header || {};
             const body = envelope.body || {};
             const targetSiteId = normalizeSiteId(header.target_site_id || this.siteId);
@@ -105,15 +108,17 @@ class CommandConsumer {
             const isTelemetry = header.message_name === 'equipment.telemetry.received' || header.message_name === 'equipment.status.changed';
             if (!isTelemetry && targetSiteId !== this.siteId) {
                 console.log(`[CMD] Ignored ${header.message_name || 'unknown'} for target ${targetSiteId}`);
-                this.channel.ack(msg);
+                context.delivery.accept();
                 return;
             }
 
             await this._dispatch(queue, header, body);
-            this.channel.ack(msg);
+            context.delivery.accept();
         } catch (error) {
             console.error(`[CMD] Failed processing message from ${queue}:`, error.message);
-            this.channel.ack(msg);
+            if (context.delivery) {
+                context.delivery.accept(); // Accept anyway to avoid poison messages looping
+            }
         }
     }
 

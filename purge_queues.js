@@ -1,16 +1,10 @@
-const amqp = require('amqplib');
-async function purge() {
-  const conn = await amqp.connect('amqp://smart-toc-hq:smarthq123!@172.20.17.104:5672/dev-smart');
-  const ch = await conn.createChannel();
-  const queues = ['Q.NAV', 'Q.COM', 'Q.SUR', 'Q.DAT', 'Q.SUP'];
-  for (const q of queues) {
-    try {
-      const res = await ch.purgeQueue(q);
-      console.log(`Purged ${q}: ${res.messageCount} messages`);
-    } catch (e) {
-      console.log(`Failed to purge ${q}: ${e.message}`);
-    }
-  }
-  await conn.close();
-}
-purge().catch(console.error);
+/* 
+  Solace AMQP 1.0 Migration:
+  Script purge_queues ini sebelumnya menggunakan fungsi khusus amqplib (RabbitMQ).
+  Di Solace (AMQP 1.0), purge queue biasanya dilakukan lewat Solace PubSub+ Manager (GUI) 
+  atau SEMP API.
+*/
+
+console.warn("⚠️ PERINGATAN: Fitur purge queue tidak didukung secara natif melalui standar protokol AMQP 1.0.");
+console.log("Silakan gunakan Dashboard Solace PubSub+ Manager untuk melakukan 'Purge Queue'.");
+

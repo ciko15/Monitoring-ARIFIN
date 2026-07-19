@@ -28,7 +28,7 @@ if (os.platform() === 'win32') {
 
 const stabilityEnv = {
   EMS_ENABLED: process.env.EMS_ENABLED || 'true',
-  EMS_PUBLISH_TIMEOUT_MS: process.env.EMS_PUBLISH_TIMEOUT_MS || 2000,
+  EMS_PUBLISH_TIMEOUT_MS: process.env.EMS_PUBLISH_TIMEOUT_MS || 10000,
   EMS_RETRY_BACKOFF_MS: process.env.EMS_RETRY_BACKOFF_MS || 30000,
   EMS_MAX_BACKOFF_MS: process.env.EMS_MAX_BACKOFF_MS || 300000,
   FAIL_COUNT_TO_DISCONNECT: process.env.FAIL_COUNT_TO_DISCONNECT || 10,
@@ -61,12 +61,21 @@ module.exports = {
       MESSAGE_SERVICE_NAME: process.env.MESSAGE_SERVICE_NAME || 'MONITORING_ARIFIN_BRANCH',
       CENTRAL_SERVICE_NAME: process.env.CENTRAL_SERVICE_NAME || 'EMS',
       TARGET_SERVICE_NAME: process.env.TARGET_SERVICE_NAME || 'EMS',
+      /* === RABBITMQ (LAMA) ===
       RABBITMQ_PROTOCOL: process.env.RABBITMQ_PROTOCOL || 'amqp',
       RABBITMQ_HOST: process.env.RABBITMQ_HOST || '172.20.17.104',
       RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
       RABBITMQ_USERNAME: process.env.RABBITMQ_USERNAME || 'smart-toc-hq',
       RABBITMQ_PASSWORD: process.env.RABBITMQ_PASSWORD || 'smarthq123!',
       RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || 'dev-smart',
+      */
+      // === SOLACE (BARU) ===
+      RABBITMQ_PROTOCOL: process.env.RABBITMQ_PROTOCOL || 'amqp',
+      RABBITMQ_HOST: process.env.RABBITMQ_HOST || '172.20.16.123',
+      RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
+      RABBITMQ_USERNAME: process.env.RABBITMQ_USERNAME || 'dce-wajj',
+      RABBITMQ_PASSWORD: process.env.RABBITMQ_PASSWORD || 'dce-wajj',
+      RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || '/',
       ...stabilityEnv
     },
     env_production: {
@@ -77,12 +86,21 @@ module.exports = {
       MESSAGE_SERVICE_NAME: process.env.MESSAGE_SERVICE_NAME || 'MONITORING_ARIFIN_BRANCH',
       CENTRAL_SERVICE_NAME: process.env.CENTRAL_SERVICE_NAME || 'EMS',
       TARGET_SERVICE_NAME: process.env.TARGET_SERVICE_NAME || 'EMS',
+      /* === RABBITMQ (LAMA) ===
       RABBITMQ_PROTOCOL: process.env.RABBITMQ_PROTOCOL || 'amqp',
       RABBITMQ_HOST: process.env.RABBITMQ_HOST || '172.20.17.104',
       RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
       RABBITMQ_USERNAME: process.env.RABBITMQ_USERNAME || 'smart-toc-hq',
       RABBITMQ_PASSWORD: process.env.RABBITMQ_PASSWORD || 'smarthq123!',
       RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || 'dev-smart',
+      */
+      // === SOLACE (BARU) ===
+      RABBITMQ_PROTOCOL: process.env.RABBITMQ_PROTOCOL || 'amqp',
+      RABBITMQ_HOST: process.env.RABBITMQ_HOST || '172.20.16.123',
+      RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
+      RABBITMQ_USERNAME: process.env.RABBITMQ_USERNAME || 'dce-wajj',
+      RABBITMQ_PASSWORD: process.env.RABBITMQ_PASSWORD || 'dce-wajj',
+      RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || '/',
       ...stabilityEnv
     },
     error_file: './logs/pm2-error.log',

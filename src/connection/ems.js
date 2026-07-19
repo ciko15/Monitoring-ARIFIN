@@ -1,11 +1,10 @@
-const amqp = require('amqplib');
+const { Connection } = require('rhea-promise');
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 let connection = null;
-let channel = null;
-const assertedQueues = new Set();
+const senders = new Map();
 let nextConnectAttemptAt = 0;
 let currentBackoffMs = 0;
 const logTimestamps = new Map();
@@ -95,15 +94,15 @@ const DEFAULT_SOURCE_SERVICE = airportConfig.siteId || airportConfig.code || 'UN
 const branchRabbit = branchProfile.rabbitmq || {};
 const branchServices = branchProfile.services || {};
 
-const RabbitConfig = {
-    protocol: process.env.RABBITMQ_PROTOCOL || branchRabbit.protocol || 'amqp',
-    hostname: process.env.RABBITMQ_HOST || branchRabbit.host || '172.20.17.104',
+// === KONFIGURASI SOLACE (BARU - AMQP 1.0) ===
+const SolaceConfig = {
+    host: process.env.RABBITMQ_HOST || branchRabbit.host || '172.20.16.123',
     port: parseInt(process.env.RABBITMQ_PORT || branchRabbit.port || '5672', 10),
-    username: process.env.RABBITMQ_USERNAME || branchRabbit.username || 'smart-toc-hq',
-    password: process.env.RABBITMQ_PASSWORD || branchRabbit.password || 'smarthq123!',
-    vhost: process.env.RABBITMQ_VHOST || branchRabbit.vhost || 'dev-smart'
+    username: process.env.RABBITMQ_USERNAME || branchRabbit.username || 'dce-wajj',
+    password: process.env.RABBITMQ_PASSWORD || branchRabbit.password || 'dce-wajj',
+    transport: 'tcp',
+    reconnect: false // We handle reconnection backoff manually
 };
-
 
 const EquipmentCategoryQueue = {
     Communication: 'Q.COM',
@@ -158,7 +157,7 @@ const MessagingTopology = {
 let connectPromise = null;
 
 async function connect() {
-    if (connection && channel) return channel;
+    if (connection && connection.isOpen()) return connection;
     if (connectPromise) return connectPromise;
 
     if (!isEmsEnabled()) {
@@ -167,56 +166,38 @@ async function connect() {
 
     const now = Date.now();
     if (nextConnectAttemptAt && now < nextConnectAttemptAt) {
-        throw makeEmsError('EMS_BACKOFF', `RabbitMQ reconnect backoff active for ${Math.ceil((nextConnectAttemptAt - now) / 1000)}s`);
+        throw makeEmsError('EMS_BACKOFF', `Broker reconnect backoff active for ${Math.ceil((nextConnectAttemptAt - now) / 1000)}s`);
     }
 
     connectPromise = (async () => {
         try {
-            connection = await withTimeout(amqp.connect(RabbitConfig), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ connect');
+            connection = new Connection(SolaceConfig);
             
-            connection.on('error', error => {
-                if (shouldLog(`connection-error:${error.message}`)) {
-                    console.error('❌ [EMS] RabbitMQ connection error:', error.message);
+            await withTimeout(connection.open(), EMS_PUBLISH_TIMEOUT_MS, 'Solace AMQP 1.0 connect');
+            
+            connection.on('connection_error', (context) => {
+                if (shouldLog(`connection-error:${context.connection.error?.description}`)) {
+                    console.error('❌ [EMS] Solace connection error:', context.connection.error?.description || 'Unknown error');
                 }
                 connection = null;
-                channel = null;
                 connectPromise = null;
-                assertedQueues.clear();
+                senders.clear();
             });
 
-            connection.on('close', () => {
+            connection.on('connection_close', () => {
                 if (shouldLog('connection-closed')) {
-                    console.warn('⚠️ [EMS] RabbitMQ connection closed');
+                    console.warn('⚠️ [EMS] Solace connection closed');
                 }
                 connection = null;
-                channel = null;
                 connectPromise = null;
-                assertedQueues.clear();
-            });
-
-            channel = await withTimeout(connection.createChannel(), EMS_PUBLISH_TIMEOUT_MS, 'RabbitMQ channel');
-            
-            channel.on('error', error => {
-                if (shouldLog(`channel-error:${error.message}`)) {
-                    console.error('❌ [EMS] RabbitMQ channel error:', error.message);
-                }
-                channel = null;
-                connectPromise = null;
-            });
-
-            channel.on('close', () => {
-                if (shouldLog('channel-closed')) {
-                    console.warn('⚠️ [EMS] RabbitMQ channel closed');
-                }
-                channel = null;
-                connectPromise = null;
+                senders.clear();
             });
 
             currentBackoffMs = 0;
             nextConnectAttemptAt = 0;
-            console.log('✅ [EMS] Berhasil terhubung ke RabbitMQ menggunakan amqplib');
+            console.log('✅ [EMS] Berhasil terhubung ke Solace menggunakan rhea-promise (AMQP 1.0)');
 
-            return channel;
+            return connection;
         } catch (error) {
             connectPromise = null;
             currentBackoffMs = currentBackoffMs
@@ -225,7 +206,7 @@ async function connect() {
             nextConnectAttemptAt = Date.now() + currentBackoffMs;
 
             if (shouldLog(`connect-failed:${error.code || error.message}`)) {
-                console.error(`❌ [EMS] Gagal terhubung ke RabbitMQ: ${error.message}. Retry in ${Math.round(currentBackoffMs / 1000)}s`);
+                console.error(`❌ [EMS] Gagal terhubung ke Solace broker: ${error.message}. Retry in ${Math.round(currentBackoffMs / 1000)}s`);
             }
             throw error;
         }
@@ -234,18 +215,10 @@ async function connect() {
     return connectPromise;
 }
 
+// In AMQP 1.0 we don't need to explicitly "assert" queues like in 0-9-1.
+// They must be provisioned on Solace, or it connects to a topic/queue address directly.
 async function assertQueue(queue) {
-    if (!queue) {
-        throw new Error('Queue name is required');
-    }
-
-    if (assertedQueues.has(queue)) {
-        return;
-    }
-
-    const ch = await connect();
-    await ch.assertQueue(queue, { durable: true });
-    assertedQueues.add(queue);
+    return; // No-op for AMQP 1.0
 }
 
 function getQueueByCategory(category) {
@@ -304,26 +277,30 @@ async function sendToQueue(queue, message) {
         };
     }
 
-    const ch = await connect();
-    await assertQueue(queue);
+    const conn = await connect();
+    
+    let sender = senders.get(queue);
+    if (!sender || !sender.isOpen()) {
+        const targetAddress = queue.startsWith('queue://') ? queue : `queue://${queue}`;
+        sender = await conn.createSender({
+            target: { address: targetAddress }
+        });
+        senders.set(queue, sender);
+    }
 
     const requestType = message?.header?.REQUEST_TYPE || message?.header?.message_name || 'UNKNOWN';
     const sourceService = process.env.SOURCE_SERVICE || DEFAULT_SOURCE_SERVICE;
     const timestamp = message?.header?.TIMESTAMP || message?.header?.sent_at || new Date().toISOString();
 
-    ch.sendToQueue(
-        queue,
-        Buffer.from(JSON.stringify(message)),
-        {
-            persistent: true,
-            contentType: 'application/json',
-            headers: {
-                REQUEST_TYPE: requestType,
-                SOURCE_SERVICE: sourceService,
-                TIMESTAMP: timestamp
-            }
+    sender.send({
+        durable: true, // WAJIB untuk Guaranteed Delivery di Solace
+        body: JSON.stringify(message),
+        message_annotations: {
+            REQUEST_TYPE: requestType,
+            SOURCE_SERVICE: sourceService,
+            TIMESTAMP: timestamp
         }
-    );
+    });
 
     return {
         queue,
