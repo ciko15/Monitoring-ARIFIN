@@ -35,7 +35,8 @@ async function getCentralServiceName() {
 }
 
 const telemetryThrottleCache = new Map();
-const THROTTLE_INTERVAL_MS = 60 * 1000; // 60 seconds
+const THROTTLE_INTERVAL_MS = 60 * 1000; // 60 seconds (Delta sync)
+const HARD_THROTTLE_INTERVAL_MS = 5 * 1000; // 5 seconds (Hard limit)
 
 async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) {
     const cacheKey = `${datalog.equipmentId || ''}-${datalog.source || ''}`;
@@ -43,10 +44,18 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
     const now = Date.now();
     const lastSent = telemetryThrottleCache.get(cacheKey);
 
-    // Delta-sync logic: skip if data is identical and 60 seconds haven't passed
-    if (lastSent && lastSent.hash === payloadHash && (now - lastSent.time < THROTTLE_INTERVAL_MS)) {
-        return Promise.resolve(null);
+    if (lastSent) {
+        const timeSinceLastSent = now - lastSent.time;
+        // Hard throttle: Never publish more often than every 5 seconds, even if data changes
+        if (timeSinceLastSent < HARD_THROTTLE_INTERVAL_MS) {
+            return Promise.resolve(null);
+        }
+        // Delta-sync: skip if data is identical and 60 seconds haven't passed
+        if (lastSent.hash === payloadHash && timeSinceLastSent < THROTTLE_INTERVAL_MS) {
+            return Promise.resolve(null);
+        }
     }
+    
     telemetryThrottleCache.set(cacheKey, { hash: payloadHash, time: now });
     const airportCode = await getAirportCode();
     
