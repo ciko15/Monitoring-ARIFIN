@@ -266,24 +266,56 @@ class EquipmentService {
 
             const finalStatus = gateDecision.status;
 
-            // 1. JSON-line file logging (DISABLED for Stateless Forwarder mode)
-            // No file creation to save disk space and I/O.
+            // --- GLOBAL TELEMETRY MERGER & DEBOUNCER ---
+            if (!this.telemetryCache) {
+                this.telemetryCache = new Map();
+            }
 
-            // 2. Database logging (in-memory/JSON store)
-            const datalog = {
-                equipmentId,
-                equipment_name: equipName,
-                status: finalStatus,
-                data: parsedData.data || {},
-                source: sourceName,
-                connection_type: connectionType,
-                airport_name: airport ? airport.name : 'Unknown',
-                airport_city: airport ? airport.city : 'Unknown',
-                logged_at: new Date().toISOString()
-            };
-            await this.db.createEquipmentLog(datalog);
+            const cacheKey = `${equipmentId}:${sourceName}`;
+            let cache = this.telemetryCache.get(cacheKey);
+            if (!cache) {
+                cache = {
+                    mergedData: {},
+                    timer: null,
+                    lastPublishedString: null
+                };
+                this.telemetryCache.set(cacheKey, cache);
+            }
 
-            this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(datalog, equipment));
+            // Jika alat Disconnect/Kosong, bersihkan cache agar frontend tahu data benar-benar hilang
+            if (finalStatus === 'Disconnect' || finalStatus === 'Error') {
+                cache.mergedData = {};
+            } else {
+                // Merge data baru ke data lama (Saling Mengisi)
+                cache.mergedData = { ...cache.mergedData, ...(parsedData.data || {}) };
+            }
+
+            // Reset timer (Tunggu 1 detik untuk mengumpulkan sisa potongan data)
+            if (cache.timer) {
+                clearTimeout(cache.timer);
+            }
+
+            cache.timer = setTimeout(async () => {
+                cache.timer = null;
+
+                // 2. Database logging & Publish
+                const datalog = {
+                    equipmentId,
+                    equipment_name: equipName,
+                    status: finalStatus,
+                    data: { ...cache.mergedData },
+                    source: sourceName,
+                    connection_type: connectionType,
+                    airport_name: airport ? airport.name : 'Unknown',
+                    airport_city: airport ? airport.city : 'Unknown',
+                    logged_at: new Date().toISOString()
+                };
+
+                await this.db.createEquipmentLog(datalog);
+                this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(datalog, equipment));
+                
+            }, 1000); // 1000ms debounce
+            
         } catch (error) {
             console.error('[EquipmentService] Error saving to logs:', error);
         }

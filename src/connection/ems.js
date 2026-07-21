@@ -98,8 +98,8 @@ const branchServices = branchProfile.services || {};
 const SolaceConfig = {
     host: process.env.RABBITMQ_HOST || branchRabbit.host || '172.20.16.123',
     port: parseInt(process.env.RABBITMQ_PORT || branchRabbit.port || '5672', 10),
-    username: process.env.RABBITMQ_USERNAME || branchRabbit.username || 'dce-wajj',
-    password: process.env.RABBITMQ_PASSWORD || branchRabbit.password || 'dce-wajj',
+    username: process.env.RABBITMQ_USERNAME || branchRabbit.username || 'dce-warr',
+    password: process.env.RABBITMQ_PASSWORD || branchRabbit.password || 'dce-warr',
     transport: 'tcp',
     reconnect: false // We handle reconnection backoff manually
 };
@@ -172,9 +172,9 @@ async function connect() {
     connectPromise = (async () => {
         try {
             connection = new Connection(SolaceConfig);
-            
+
             await withTimeout(connection.open(), EMS_PUBLISH_TIMEOUT_MS, 'Solace AMQP 1.0 connect');
-            
+
             connection.on('connection_error', (context) => {
                 if (shouldLog(`connection-error:${context.connection.error?.description}`)) {
                     console.error('❌ [EMS] Solace connection error:', context.connection.error?.description || 'Unknown error');
@@ -278,7 +278,7 @@ async function sendToQueue(queue, message) {
     }
 
     const conn = await connect();
-    
+
     let sender = senders.get(queue);
     if (!sender || !sender.isOpen()) {
         const targetAddress = queue.startsWith('queue://') ? queue : `queue://${queue}`;
@@ -330,7 +330,7 @@ async function publishCategorizedEvent(category, messageName, payload = {}, opti
     try {
         const normalizedCategory = EquipmentCategoryQueue[category] ? category : 'Support';
         const queue = getQueueByCategory(normalizedCategory);
-        
+
         const envelope = buildMessageEnvelope('EVENT', messageName, payload, options);
 
         const result = await sendToQueue(queue, envelope);
