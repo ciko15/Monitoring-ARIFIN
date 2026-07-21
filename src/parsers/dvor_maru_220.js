@@ -147,62 +147,23 @@ function decodeAll(sections) {
         }
     }
 
-    function mapStatus(val) {
-        if (val === '1') return 'Normal';
-        if (val === '0') return 'Alarm/Off';
-        return val;
-    }
-
-    // LCU (LC) — Full mapping for voltages and currents
+    // LCU (LC) — v2 mapping: S25=dc_28v, S26=dc_5v, S27=dc_7v, S28=dc_15v, S47=ac_28v
     const lc = sections['LC'] || {};
     if (Object.keys(lc).length > 0) {
         r.lcu = {
-            dcdc1_5v_v:  fi(lc,'S1', 100),
-            dcdc1_5v_i:  fi(lc,'S2', 100),
-            dcdc1_7v_v:  fi(lc,'S3', 100),
-            dcdc1_7v_i:  fi(lc,'S4', 100),
-            dcdc1_15v_v: fi(lc,'S5', 100),
-            dcdc1_15v_i: fi(lc,'S6', 100),
-            dcdc1_n15v_v:fi(lc,'S7', 100),
-            dcdc1_n15v_i:fi(lc,'S8', 100),
-            dcdc1_28v_v: fi(lc,'S9', 100),
-            dcdc1_28v_i: fi(lc,'S10', 100),
-
-            dcdc2_5v_v:  fi(lc,'S37', 100),
-            dcdc2_5v_i:  fi(lc,'S38', 100),
-            dcdc2_7v_v:  fi(lc,'S39', 100),
-            dcdc2_7v_i:  fi(lc,'S40', 100),
-            dcdc2_15v_v: fi(lc,'S41', 100),
-            dcdc2_15v_i: fi(lc,'S42', 100),
-            dcdc2_n15v_v:fi(lc,'S43', 100),
-            dcdc2_n15v_i:fi(lc,'S44', 100),
-            dcdc2_28v_v: fi(lc,'S45', 100),
-            dcdc2_28v_i: fi(lc,'S46', 100),
-
-            acdc1_v:     fi(lc,'S13', 100),
-            acdc1_i:     fi(lc,'S14', 100),
-            acdc1_temp:  fi(lc,'S25', 10),
-            acdc2_v:     fi(lc,'S15', 100),
-            acdc2_i:     fi(lc,'S16', 100),
-            acdc2_temp:  fi(lc,'S26', 10),
-
-            bat1_v:      fi(lc,'S17', 100),
-            bat1_i:      fi(lc,'S18', 100),
-            bat1_temp:   fi(lc,'S27', 10),
-            bat2_v:      fi(lc,'S19', 100),
-            bat2_i:      fi(lc,'S20', 100),
-            bat2_temp:   fi(lc,'S28', 10),
-
-            ac_in_v:     fi(lc,'S47', 10),
-            ac_in_freq:  fi(lc,'S48', 1),
+            dc_5v:     fi(lc,'S26', 10),
+            dc_7v:     fi(lc,'S27', 10),
+            dc_15v:    fi(lc,'S28', 10),
+            dc_28v:    fi(lc,'S25', 10),
+            ac_28v:    fi(lc,'S47', 10),
             msg1_comm: fs(lc,'B9'),
             msg2_comm: fs(lc,'B10'),
             mon1_comm: fs(lc,'B11'),
             mon2_comm: fs(lc,'B12'),
-            battery1:  mapStatus(fs(lc,'B20')),
-            battery2:  mapStatus(fs(lc,'B21')),
-            acdc1:     mapStatus(fs(lc,'B22')),
-            acdc2:     mapStatus(fs(lc,'B23')),
+            battery1:  fs(lc,'B20'),
+            battery2:  fs(lc,'B21'),
+            acdc1:     fs(lc,'B22'),
+            acdc2:     fs(lc,'B23'),
         };
     }
 
@@ -254,7 +215,6 @@ class DvorMaru220Parser extends BaseParser {
             }
 
             // Try to parse current buffer
-            console.log(`[DVOR Maru 220] RAW ASCII:`, this._passiveBuf.toString('ascii'));
             const sections = extractSections(this._passiveBuf);
 
             if (Object.keys(sections).length < 2) {
