@@ -147,6 +147,12 @@ function decodeAll(sections) {
         }
     }
 
+    function mapStatus(val) {
+        if (val === '1') return 'Normal';
+        if (val === '0') return 'Alarm/Off';
+        return val;
+    }
+
     // LCU (LC) — v2 mapping: S25=dc_28v, S26=dc_5v, S27=dc_7v, S28=dc_15v, S47=ac_28v
     const lc = sections['LC'] || {};
     if (Object.keys(lc).length > 0) {
@@ -160,10 +166,10 @@ function decodeAll(sections) {
             msg2_comm: fs(lc,'B10'),
             mon1_comm: fs(lc,'B11'),
             mon2_comm: fs(lc,'B12'),
-            battery1:  fs(lc,'B20'),
-            battery2:  fs(lc,'B21'),
-            acdc1:     fs(lc,'B22'),
-            acdc2:     fs(lc,'B23'),
+            battery1:  mapStatus(fs(lc,'B20')),
+            battery2:  mapStatus(fs(lc,'B21')),
+            acdc1:     mapStatus(fs(lc,'B22')),
+            acdc2:     mapStatus(fs(lc,'B23')),
         };
     }
 
