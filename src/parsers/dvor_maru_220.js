@@ -215,6 +215,7 @@ class DvorMaru220Parser extends BaseParser {
             }
 
             // Try to parse current buffer
+            console.log(`[DVOR Maru 220] RAW ASCII:`, this._passiveBuf.toString('ascii'));
             const sections = extractSections(this._passiveBuf);
 
             if (Object.keys(sections).length < 2) {
