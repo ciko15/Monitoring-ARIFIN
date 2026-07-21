@@ -291,30 +291,29 @@ class EquipmentService {
             }
 
             // Reset timer (Tunggu 1 detik untuk mengumpulkan sisa potongan data)
-            if (cache.timer) {
-                clearTimeout(cache.timer);
+            // BUGFIX: Gunakan Throttle (jangan reset timer jika sudah jalan) agar data yang mengalir deras tidak menahan timer selamanya!
+            if (!cache.timer) {
+                cache.timer = setTimeout(async () => {
+                    cache.timer = null;
+
+                    // 2. Database logging & Publish
+                    const datalog = {
+                        equipmentId,
+                        equipment_name: equipName,
+                        status: finalStatus,
+                        data: { ...cache.mergedData },
+                        source: sourceName,
+                        connection_type: connectionType,
+                        airport_name: airport ? airport.name : 'Unknown',
+                        airport_city: airport ? airport.city : 'Unknown',
+                        logged_at: new Date().toISOString()
+                    };
+
+                    await this.db.createEquipmentLog(datalog);
+                    this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(datalog, equipment));
+                    
+                }, 1000); // 1000ms throttle
             }
-
-            cache.timer = setTimeout(async () => {
-                cache.timer = null;
-
-                // 2. Database logging & Publish
-                const datalog = {
-                    equipmentId,
-                    equipment_name: equipName,
-                    status: finalStatus,
-                    data: { ...cache.mergedData },
-                    source: sourceName,
-                    connection_type: connectionType,
-                    airport_name: airport ? airport.name : 'Unknown',
-                    airport_city: airport ? airport.city : 'Unknown',
-                    logged_at: new Date().toISOString()
-                };
-
-                await this.db.createEquipmentLog(datalog);
-                this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(datalog, equipment));
-                
-            }, 1000); // 1000ms debounce
             
         } catch (error) {
             console.error('[EquipmentService] Error saving to logs:', error);
