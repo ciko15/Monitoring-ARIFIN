@@ -279,6 +279,43 @@ function generateUniqueCode(length = 8) {
 }
 
 // Global "Pick Location" logic
+window.getCurrentLocation = function(type) {
+  if (navigator.geolocation) {
+    showToast('Mengambil lokasi saat ini...', 'info');
+    navigator.geolocation.getCurrentPosition(
+      function(position) {
+        let prefix = 'equipment';
+        if (type === 'airport') prefix = 'airport';
+        if (type === 'dataSource') prefix = 'dataSource';
+
+        const latInput = document.getElementById(prefix + (type === 'dataSource' ? 'Latitude' : 'Lat'));
+        const lngInput = document.getElementById(prefix + (type === 'dataSource' ? 'Longitude' : 'Lng'));
+
+        if (latInput && lngInput) {
+          latInput.value = position.coords.latitude.toFixed(6);
+          lngInput.value = position.coords.longitude.toFixed(6);
+          showToast('Lokasi berhasil didapatkan!', 'success');
+        }
+      },
+      function(error) {
+        console.error('Error fetching location:', error);
+        let errorMessage = 'Gagal mendapatkan lokasi.';
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMessage = 'Izin akses lokasi ditolak oleh pengguna.';
+        }
+        showToast(errorMessage, 'error');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  } else {
+    showToast('Geolocation tidak didukung di browser ini.', 'error');
+  }
+};
+
 window.enableMapPick = function (type) {
   window.activeMapPicker = type;
   const modal = document.getElementById('mapPickerModal');

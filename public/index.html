@@ -578,10 +578,14 @@
                 placeholder="e.g., 140.5164">
             </div>
           </div>
-          <div class="form-group-ux" style="margin-top: -10px; margin-bottom: 20px;">
+          <div class="form-group-ux" style="margin-top: -10px; margin-bottom: 20px; display: flex; gap: 10px;">
             <button type="button" class="btn btn-secondary btn-sm" onclick="enableMapPick('airport')"
               title="Pick location from map">
               <i class="fas fa-map-marker-alt"></i> Pick from Map
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="getCurrentLocation('airport')"
+              title="Get my current location">
+              <i class="fas fa-location-arrow"></i> My Location
             </button>
           </div>
           <div class="form-group-ux">
