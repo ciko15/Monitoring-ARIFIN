@@ -79,7 +79,7 @@ class EquipmentService {
     async getAllActiveEquipment() {
         try {
             const equipmentResult = await this.db.getAllEquipment();
-            
+
             // Defensif: Pastikan equipmentResult tidak null/undefined
             if (!equipmentResult) {
                 console.warn('[EquipmentService] No result from getAllEquipment');
@@ -88,21 +88,21 @@ class EquipmentService {
 
             // Ambil data array (handle paginated object atau array langsung)
             const equipmentList = equipmentResult.data || (Array.isArray(equipmentResult) ? equipmentResult : []);
-            
+
             if (!Array.isArray(equipmentList)) {
                 console.error('[EquipmentService] Equipment list is not an array:', typeof equipmentList);
                 return [];
             }
 
             const activeList = equipmentList.filter(e => e.isActive);
-            
+
             // Resolve config for each
             const resolvedList = [];
             for (const e of activeList) {
                 const resolved = await this.getEquipmentWithConfig(e.id);
                 if (resolved) resolvedList.push(resolved);
             }
-            
+
             return resolvedList;
         } catch (error) {
             console.error('[EquipmentService] Error getting active equipment:', error);
@@ -164,7 +164,7 @@ class EquipmentService {
      */
     async collectFromEquipment(equipmentId) {
         const equipment = await this.getEquipmentWithConfig(equipmentId);
-        
+
         if (!equipment) {
             return { success: false, error: 'Equipment not found or inactive' };
         }
@@ -188,7 +188,7 @@ class EquipmentService {
 
             // Test direct equipment connection (Ping/Port test)
             const connTest = await connectionManager.testConnection(host, port);
-            
+
             if (!connTest.success) {
                 await this.updateEquipmentStatus(equipmentId, 'Disconnect', connTest.message);
                 return { success: false, error: connTest.message, connectionStatus: 'Disconnect' };
@@ -198,7 +198,7 @@ class EquipmentService {
             await this.updateEquipmentStatus(equipmentId, 'Normal', null, 'Connected');
 
             // TODO: Actual SNMP polling would happen here using the resolved template
-            
+
             return {
                 success: true,
                 connectionStatus: 'Connected',
@@ -218,7 +218,7 @@ class EquipmentService {
     async updateEquipmentStatus(equipmentId, status, error = null, connectionStatus = 'Disconnect') {
         try {
             await this.db.updateEquipmentStatus(equipmentId, status);
-            
+
             const equipment = await this.db.getEquipmentById(equipmentId);
             if (equipment) {
                 this._publishAsync('equipment.status.changed', () => publishEquipmentStatusChanged(
@@ -311,10 +311,10 @@ class EquipmentService {
 
                     await this.db.createEquipmentLog(datalog);
                     this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(datalog, equipment));
-                    
+
                 }, 1000); // 1000ms throttle
             }
-            
+
         } catch (error) {
             console.error('[EquipmentService] Error saving to logs:', error);
         }
@@ -327,7 +327,7 @@ class EquipmentService {
         try {
             const equipmentResult = await this.db.getAllEquipment();
             const equipmentList = equipmentResult.data || (Array.isArray(equipmentResult) ? equipmentResult : []);
-            
+
             const grouped = {
                 Communication: [],
                 Navigation: [],
@@ -355,14 +355,14 @@ class EquipmentService {
             }
 
             const { produceInternalMessage } = require('../connection/ems');
-            
+
             // Send to Q.SUP queue
             await produceInternalMessage(
                 'Q.SUP',
                 { REQUEST_TYPE: 'EQUIPMENT_LIST' },
                 grouped
             );
-            
+
             console.log('[EquipmentService] Sent grouped equipment list to EMS');
             return { success: true, data: grouped };
         } catch (error) {

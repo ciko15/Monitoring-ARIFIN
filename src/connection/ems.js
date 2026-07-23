@@ -193,6 +193,15 @@ async function connect() {
                 senders.clear();
             });
 
+            connection.on('disconnected', (context) => {
+                if (shouldLog('disconnected', 10000)) {
+                    console.warn(`⚠️ [EMS] Solace connection disconnected: ${context?.error?.description || 'Unknown reason'}`);
+                }
+                connection = null;
+                connectPromise = null;
+                senders.clear();
+            });
+
             currentBackoffMs = 0;
             nextConnectAttemptAt = 0;
             console.log('✅ [EMS] Berhasil terhubung ke Solace menggunakan rhea-promise (AMQP 1.0)');
@@ -282,25 +291,47 @@ async function sendToQueue(queue, message) {
     let sender = senders.get(queue);
     if (!sender || !sender.isOpen()) {
         const targetAddress = queue.startsWith('queue://') ? queue : `queue://${queue}`;
-        sender = await conn.createSender({
-            target: { address: targetAddress }
-        });
-        senders.set(queue, sender);
+        try {
+            sender = await conn.createSender({
+                target: { address: targetAddress }
+            });
+            senders.set(queue, sender);
+        } catch (error) {
+            if (connection === conn) {
+                console.warn(`[EMS] Gagal membuat sender (kemungkinan koneksi nyangkut/timeout). Memaksa reset koneksi AMQP: ${error.message}`);
+                try { await conn.close(); } catch (e) {}
+                connection = null;
+                connectPromise = null;
+                senders.clear();
+            }
+            throw error;
+        }
     }
 
     const requestType = message?.header?.REQUEST_TYPE || message?.header?.message_name || 'UNKNOWN';
     const sourceService = process.env.SOURCE_SERVICE || DEFAULT_SOURCE_SERVICE;
     const timestamp = message?.header?.TIMESTAMP || message?.header?.sent_at || new Date().toISOString();
 
-    sender.send({
-        durable: true, // WAJIB untuk Guaranteed Delivery di Solace
-        body: JSON.stringify(message),
-        message_annotations: {
-            REQUEST_TYPE: requestType,
-            SOURCE_SERVICE: sourceService,
-            TIMESTAMP: timestamp
+    try {
+        await sender.send({
+            durable: true, // WAJIB untuk Guaranteed Delivery di Solace
+            body: JSON.stringify(message),
+            message_annotations: {
+                REQUEST_TYPE: requestType,
+                SOURCE_SERVICE: sourceService,
+                TIMESTAMP: timestamp
+            }
+        });
+    } catch (error) {
+        if (connection === conn) {
+            console.warn(`[EMS] Gagal mengirim pesan. Memaksa reset koneksi AMQP: ${error.message}`);
+            try { await conn.close(); } catch (e) {}
+            connection = null;
+            connectPromise = null;
+            senders.clear();
         }
-    });
+        throw error;
+    }
 
     return {
         queue,
