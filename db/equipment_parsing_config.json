@@ -150,5 +150,13 @@
     "category": "Navigation",
     "files": "/src/parsers/dvor_maru_binary.js",
     "createdAt": "2026-07-24T10:00:00.000Z"
+  },
+  {
+    "id": "dme_mopah_binary",
+    "name": "DME MOPAH Binary (Merauke)",
+    "description": "Parser Binary Skeleton untuk DME Mopah",
+    "category": "Navigation",
+    "files": "/src/parsers/dme_mopah_binary.js",
+    "createdAt": "2026-07-24T10:45:00.000Z"
   }
 ]
