@@ -96,6 +96,3 @@ class DmeMopahBinaryParser extends BaseParser {
 }
 
 module.exports = DmeMopahBinaryParser;
-module.exports.POLL_REQUESTS  = POLL_REQUESTS;
-module.exports.POLL_INTERVAL  = POLL_INTERVAL;
-module.exports.POLL_REQ_DELAY = POLL_REQ_DELAY;
