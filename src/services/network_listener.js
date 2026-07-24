@@ -898,7 +898,7 @@ class NetworkListenerService {
             return;
         }
 
-        console.log(`[NetworkListener] Starting ${protocol.toUpperCase()} listener for ${source.name} on port ${port}...`);
+        console.log(`[NetworkListener] Starting listener for ${source.name} on port ${port} (parser: ${parsing_id})...`);
 
         // 1. Create Parser
         let parser = null;
@@ -936,7 +936,12 @@ class NetworkListenerService {
         };
 
         let success = false;
-        if (protocol === 'udp') {
+        
+        if (parsing_id === 'dme_mopah_binary') {
+            // Sniffing Mode
+            const interfaceName = process.env.SNIFFER_INTERFACE || 'Ethernet 8';
+            success = await connectionManager.connectSniffer(id, ip_address || '0.0.0.0', port, interfaceName, onData, onError);
+        } else if (protocol === 'udp') {
             success = connectionManager.connectUDP(id, ip_address || '0.0.0.0', port, onData, onError);
         } else {
             success = await connectionManager.connectTCP(id, ip_address || '0.0.0.0', port, onData, onError);
@@ -944,7 +949,7 @@ class NetworkListenerService {
 
         if (success) {
             this.activeListeners.add(id);
-            console.log(`[NetworkListener] ${protocol.toUpperCase()} listener active for ${source.name} on port ${port}`);
+            console.log(`[NetworkListener] Listener active for ${source.name} on port ${port}`);
 
             // Start ACTIVE polling loop for TCP parsers that support it (e.g. DVOR Maru 220)
             if (protocol === 'tcp' && parser && typeof parser.getPollRequests === 'function') {

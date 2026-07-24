@@ -5,6 +5,7 @@
 
 const net = require('net');
 const dgram = require('dgram');
+const { spawn } = require('child_process');
 
 class ConnectionManager {
     constructor() {
@@ -134,6 +135,84 @@ class ConnectionManager {
     }
 
     /**
+     * Start passive sniffer using TShark
+     * @param {number} equipmentId - Equipment ID
+     * @param {string} host - Equipment IP to sniff
+     * @param {number} port - Equipment port to sniff
+     * @param {string} interfaceName - Network interface name (e.g., 'Ethernet 8')
+     * @param {Function} onData - Callback for received data buffer
+     * @param {Function} onError - Callback for errors
+     * @returns {Promise<boolean>} Sniffer started successfully
+     */
+    async connectSniffer(equipmentId, host, port, interfaceName, onData, onError) {
+        return new Promise((resolve, reject) => {
+            this.disconnect(equipmentId);
+
+            console.log(`[Connection] Starting Sniffer on ${interfaceName} for ${host}:${port} (equipment: ${equipmentId})`);
+            
+            // Spawn TShark
+            const tsharkArgs = [
+                '-i', interfaceName,
+                '-f', `tcp src port ${port} and src host ${host}`,
+                '-T', 'fields',
+                '-e', 'tcp.payload',
+                '-l' // line buffered
+            ];
+
+            const sniffer = spawn('C:\\Program Files\\Wireshark\\tshark.exe', tsharkArgs);
+
+            this.connections.set(equipmentId, { 
+                socket: sniffer, 
+                type: 'sniffer', 
+                host, 
+                port,
+                destroy: () => sniffer.kill() // Add destroy method for consistency
+            });
+            
+            resolve(true);
+
+            sniffer.stdout.on('data', (data) => {
+                const output = data.toString().trim();
+                if (!output) return;
+
+                const lines = output.split('\n');
+                
+                for (let line of lines) {
+                    line = line.trim();
+                    if (!line) continue;
+                    
+                    const payloads = line.split(',');
+                    for (let hexStr of payloads) {
+                        hexStr = hexStr.replace(/:/g, ''); 
+                        
+                        if (hexStr.length > 0 && hexStr.length % 2 === 0) {
+                            const buf = Buffer.from(hexStr, 'hex');
+                            if (onData) onData(buf);
+                        }
+                    }
+                }
+            });
+
+            sniffer.stderr.on('data', (data) => {
+                const msg = data.toString();
+                if (!msg.includes('Capturing on')) {
+                    // console.error(`[Sniffer Error/Info]: ${msg.trim()}`);
+                }
+            });
+
+            sniffer.on('close', (code) => {
+                console.log(`[Connection] Sniffer disconnected for equipment ${equipmentId} with code ${code}`);
+                this.connections.delete(equipmentId);
+            });
+
+            sniffer.on('error', (error) => {
+                console.error(`[Connection] Sniffer spawn error for equipment ${equipmentId}:`, error.message);
+                if (onError) onError(error);
+            });
+        });
+    }
+
+    /**
      * Connect to equipment via UDP
      * @param {number} equipmentId - Equipment ID
      * @param {string} host - Equipment IP (or multicast IP)
@@ -235,17 +314,22 @@ class ConnectionManager {
     disconnect(equipmentId) {
         const conn = this.connections.get(equipmentId);
         if (conn) {
-            try {
-                if (conn.type === 'tcp') {
-                    conn.socket.destroy();
-                } else if (conn.type === 'udp') {
+            if (conn.type === 'udp') {
+                try {
                     conn.socket.close();
-                }
-            } catch (e) {
-                // Ignore close errors
+                } catch(e) {}
+            } else if (conn.type === 'sniffer') {
+                try {
+                    conn.destroy();
+                } catch(e) {}
+            } else {
+                try {
+                    conn.socket.destroy();
+                } catch(e) {}
             }
             this.connections.delete(equipmentId);
-            console.log(`[Connection] Disconnected equipment ${equipmentId}`);
+            this.listeners.delete(equipmentId);
+            console.log(`[Connection] Disconnected equipment ${equipmentId} (${conn.type})`);
         }
     }
 

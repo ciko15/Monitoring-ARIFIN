@@ -10,19 +10,12 @@ const SOH = 0x01;
 const STX = 0x02;
 const ETX = 0x03;
 
-// Active polling request bytes based on Wireshark captures (DME Trigger - 17 bytes)
-const POLL_REQUESTS = [
-    { bytes: Buffer.from([0x01, 0x02, 0x1D, 0x39, 0x08, 0x8F, 0x06, 0x09, 0xE4, 0x1D, 0x4F, 0x01, 0x01, 0x01, 0x03, 0xF0, 0x2B]), tag: 'PAGE_A' }
-];
-
-const PASSIVE_TIMEOUT  = 30000;
-const POLL_INTERVAL    = 2000;
-const POLL_REQ_DELAY   = 200;
+// This parser is purely PASSIVE (sniffing mode only).
+// We rely on TShark network sniffing to feed data.
 
 class DmeMopahBinaryParser extends BaseParser {
     constructor(opts = {}) {
         super(opts);
-        this._lastDataTime = Date.now();
         this._mode = 'PASSIVE';
         this._buffer = Buffer.alloc(0);
     }
@@ -36,13 +29,6 @@ class DmeMopahBinaryParser extends BaseParser {
             if (this._buffer.length > 65536) {
                 this._buffer = this._buffer.slice(-32768);
             }
-
-            const now = Date.now();
-            if (now - this._lastDataTime > PASSIVE_TIMEOUT && this._mode === 'PASSIVE') {
-                this._mode = 'ACTIVE';
-                console.log('[DME Mopah Binary] No data for 30s — switching to ACTIVE polling mode');
-            }
-
             let dataFound = false;
             let flatData = { _mode: this._mode };
             
@@ -92,28 +78,20 @@ class DmeMopahBinaryParser extends BaseParser {
                 this._buffer = this._buffer.slice(packetLength);
             }
 
-            if (!dataFound) {
-                return { success: false, error: 'Waiting for complete binary packet', status: 'Waiting', _mode: this._mode };
-            }
-
-            return {
-                success: true,
-                data: flatData,
-                status: 'Normal'
-            };
-
+            return dataFound ? [flatData] : [];
         } catch (error) {
-            console.error(`[DME Mopah Binary] Parse error: ${error.message}`);
-            return { success: false, error: error.message, status: 'Error', _mode: this._mode };
+            console.error('[DME Mopah Binary] Parsing Error:', error.message);
+            return [];
         }
     }
 
-    getMode() { return this._mode; }
-    getPollRequests() { return POLL_REQUESTS; }
+    getMode() {
+        return this._mode;
+    }
+
     reset() {
         this._buffer = Buffer.alloc(0);
-        this._mode = 'ACTIVE';
-        this._lastDataTime = 0;
+        this._mode = 'PASSIVE';
     }
 }
 
