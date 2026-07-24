@@ -1721,7 +1721,7 @@ const app = new Elysia()
     });
 
 if (SHOULD_START_WEB) {
-    app.listen(PORT);
+    app.listen({ port: PORT, hostname: '0.0.0.0' });
     console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
 } else {
     console.log(`[SYSTEM] SERVICE_ROLE=${SERVICE_ROLE} running without web server`);
