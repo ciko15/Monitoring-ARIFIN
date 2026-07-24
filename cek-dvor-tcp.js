@@ -23,11 +23,10 @@ client.connect(TARGET_PORT, TARGET_IP, function() {
     console.log(`✅ BERHASIL: Terhubung ke perangkat ${TARGET_IP}:${TARGET_PORT}`);
     console.log(`⏳ Menunggu data masuk...\n`);
     
-    // Jika perangkat membutuhkan trigger/pertanyaan agar membalas,
-    // kita bisa uncomment dan ubah isi buffer di bawah ini:
-    // const triggerCommand = Buffer.from([0x01, 0x02, 0x03]);
-    // console.log(`-> Mengirim trigger command:`, triggerCommand.toString('hex'));
-    // client.write(triggerCommand);
+    // Mengirim trigger command (12 bytes) sesuai tangkapan Wireshark
+    const triggerCommand = Buffer.from([0x01, 0x02, 0xc5, 0x35, 0x17, 0x8b, 0x1a, 0x0e, 0x01, 0x03, 0xab, 0x39]);
+    console.log(`-> Mengirim trigger command:`, triggerCommand.toString('hex').toUpperCase());
+    client.write(triggerCommand);
 });
 
 client.on('data', function(data) {
