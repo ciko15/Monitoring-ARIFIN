@@ -556,7 +556,7 @@ class PacketSniffer {
                     '-e', 'frame.len', '-e', '_ws.col.Info'];
       const tsharkPath = this.tsharkPath || 'tshark';
       console.log(`[Packet Sniffer] Spawning Tshark: ${tsharkPath} ${args.join(' ')}`);
-      this.tsharkProcess = spawn(tsharkPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      this.tsharkProcess = spawn(tsharkPath, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 
       let buffer = '';
       this.tsharkProcess.stdout.setEncoding('utf8');
