@@ -7,8 +7,9 @@ console.log("Pastikan aplikasi PMDT sedang terbuka dan terkoneksi ke DME.");
 console.log("Menunggu data lewat...\n");
 
 // Jalankan TShark secara background tanpa mengubah konfigurasi sistem
-// Kita hanya menyadap paket TCP dari port 38317 (DME)
+// Kita menyadap paket TCP dari port 38317 di interface "Ethernet 8"
 const tshark = spawn('C:\\Program Files\\Wireshark\\tshark.exe', [
+    '-i', 'Ethernet 8',
     '-f', 'tcp src port 38317 and src host 62.17.8.116',
     '-T', 'fields',
     '-e', 'tcp.payload',
