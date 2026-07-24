@@ -29,6 +29,7 @@ class DmeMopahBinaryParser extends BaseParser {
             if (this._buffer.length > 65536) {
                 this._buffer = this._buffer.slice(-32768);
             }
+            let dataFound = false;
             let flatData = { 
                 _mode: this._mode,
                 overall_status: 'Normal',
@@ -79,7 +80,6 @@ class DmeMopahBinaryParser extends BaseParser {
                 // if (cmdId === 'e3') { flatData.some_param = packet.readUInt16BE(4); }
                 
                 dataFound = true;
-                this._lastDataTime = now;
                 
                 if (this._mode === 'ACTIVE') {
                     this._mode = 'PASSIVE';
