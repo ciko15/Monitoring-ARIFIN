@@ -18,6 +18,7 @@ class DmeMopahBinaryParser extends BaseParser {
         super(opts);
         this._mode = 'PASSIVE';
         this._buffer = Buffer.alloc(0);
+        this._cachedRows = [];
     }
 
     parse(rawData) {
@@ -37,7 +38,7 @@ class DmeMopahBinaryParser extends BaseParser {
                 reply_efficiency: '94',
                 time_delay: '49.95',
                 tx_active: 'TX1',
-                _amv_txs_rows: []
+                _amv_txs_rows: [...this._cachedRows]
             };
             
             // Mencari pola SOH(0x01) ... ETX(0x03) + 2 Bytes Checksum
@@ -76,12 +77,20 @@ class DmeMopahBinaryParser extends BaseParser {
                     if (packet.length > 8) {
                         const rawVal = packet.readUInt16BE(7);
                         // Tampilkan sensor apapun (maksimal 12)
-                        if (flatData._amv_txs_rows.length < 12) {
-                            let exist = flatData._amv_txs_rows.find(r => r[0] === `Sensor Cmd ${cmdId}`);
+                        if (this._cachedRows.length < 12) {
+                            let exist = this._cachedRows.find(r => r[0] === `Sensor Cmd ${cmdId}`);
                             if (!exist) {
-                                flatData._amv_txs_rows.push([`Sensor Cmd ${cmdId}`, rawVal.toString()]);
+                                this._cachedRows.push([`Sensor Cmd ${cmdId}`, rawVal.toString()]);
+                            } else {
+                                exist[1] = rawVal.toString(); // Update value
                             }
+                        } else {
+                            // Update existing without pushing new if full
+                            let exist = this._cachedRows.find(r => r[0] === `Sensor Cmd ${cmdId}`);
+                            if (exist) exist[1] = rawVal.toString();
                         }
+                        
+                        flatData._amv_txs_rows = [...this._cachedRows];
                     }
                 }
                 
