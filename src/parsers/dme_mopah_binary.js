@@ -36,11 +36,8 @@ class DmeMopahBinaryParser extends BaseParser {
                 power_watts: '1024',
                 reply_efficiency: '94',
                 time_delay: '49.95',
-                _amv_txs_rows: [
-                    ["Power Output (W)", "1024"],
-                    ["Reply Efficiency (%)", "94"],
-                    ["Time Delay (us)", "49.95"]
-                ]
+                tx_active: 'TX1',
+                _amv_txs_rows: []
             };
             
             // Mencari pola SOH(0x01) ... ETX(0x03) + 2 Bytes Checksum

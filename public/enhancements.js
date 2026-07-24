@@ -1048,6 +1048,7 @@
             
             sections.push({ title: 'DME STATUS', params: [
                 ['Overall Status', data.overall_status || '—', data.overall_status === 'Normal' ? ok : warn],
+                ['TX Active', data.tx_active || '—', '#00ffcc'],
                 ['Power Output (W)', data.power_watts || '—', '#e8f4ff'],
                 ['Reply Efficiency (%)', data.reply_efficiency || '—', '#00d4ff'],
                 ['Time Delay (us)', data.time_delay || '—', '#e8f4ff']

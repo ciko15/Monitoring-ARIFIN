@@ -1,51 +1,26 @@
 const fs = require('fs');
+const hexDump = `01021137068394068c01010103ab65
+01023a3706839404e20001033cae0102df370683940a060501032ca9010270370683940b8c020103f6b801022c370683940fcc0601035e8201022237068394087b02010342a001029d370683940d520101010320240102813706839413510101010321f601027737068394118e01010103b6ec0102453706839415c902010336ce0102a43706839417e2000103e20d010267370683941ad306010384e301023537068394169b02010336670102b53908819634247e0e46010330ca010220370683941bea0201036b240102743908819637647d0e460103e4e201026a37068394196701010103390c01028837068394180301010103f51e01026e360582938601010103a6f801021b380780953403cf0601039bdd010223370683942fe2000103effb010225370683942e00010101031a5a
+01023d35178b1a0e0103fc6a
+01023337068394256f01010103544101023237068394246f01010103bddc0102de370683942b64010101038d610102dd370683942a6401010103d75c01026f370683942989010101031f5e01026b37068394288901010103f84a01024c370683840c19030103a9c20102113a098e5705434f4646450103181001027b37068354217c0001037542`.replace(/\s+/g, '');
 
-const gpBuffer = Buffer.from('7e7e7e08c10003f102d0010000d304ceff3601000000003a005e04d7fe9a019c04ffff8e000d00ffff9304ffff15041901ffff0000ffff0000ffff04fed8fdffff0000ffff5402922da8070a0000008c000000000000008c00000000000000000000000004f202db', 'hex');
-
-const llzBuffer = Buffer.from('7e7e7e08c10003000000000005002c0001f80100000001f80600b7ff8b01d504ffff00000000ffff0300ffff000001f8ffff0100ffff0100ffff000001f8ffff0100ffff5a0252d927280a0000000006c000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f93fffefffff73f93fffef0000000000000000000000d9882f49', 'hex');
-
-function findMatches(buffer, targets, name) {
-    console.log(`\n=== Analyzing ${name} ===`);
-    for (const [key, target] of Object.entries(targets)) {
-        let found = false;
-        for (let i = 0; i < buffer.length - 1; i += 1) { // try every byte offset
-            const valLE = buffer.readInt16LE(i);
-            const valBE = buffer.readInt16BE(i);
-            
-            const checks = [
-                { val: valLE, type: 'LE', scales: [1, 10, 100, 1000, 10000] },
-                { val: valBE, type: 'BE', scales: [1, 10, 100, 1000, 10000] }
-            ];
-
-            for (const check of checks) {
-                for (const scale of check.scales) {
-                    const scaled = check.val / scale;
-                    if (Math.abs(scaled - target) <= 0.1) {
-                        console.log(`Match for ${key} (${target}) -> Offset: ${i} | Endian: ${check.type} | Raw: ${check.val} | Scale: ${scale} | Computed: ${scaled}`);
-                        found = true;
-                    }
-                }
-            }
-        }
-        if (!found) {
-            console.log(`No match for ${key} (${target})`);
-        }
+const logLoc = (str) => {
+    let idx = hexDump.indexOf(str);
+    while (idx !== -1) {
+        console.log(`Found '${str}' at hex char index ${idx}`);
+        const start = Math.max(0, idx - 10);
+        const end = Math.min(hexDump.length, idx + str.length + 10);
+        console.log(`Context: ${hexDump.slice(start, end)}`);
+        idx = hexDump.indexOf(str, idx + 1);
     }
 }
 
-const gpTargets = {
-    'CL DDM': -1.7,
-    'CL SDM': 79.5,
-    'CL RF': 3.13,
-    'DS DDM': 0.0,
-    'DS SDM': 71.0,
-    'DS RF': 2.83,
-    'NF DDM': -10.3,
-    'NF SDM': 82.8,
-    'NF RF': 2.95,
-    'CLR DDM': 35.3,
-    'CLR SDM': 78.6,
-    'CLR RF': 2.97
-};
+logLoc('040b'); // 1035
+logLoc('0b04'); // 1035
+logLoc('0407'); // 1031
+logLoc('0704'); // 1031
+logLoc('5b'); // 91
+logLoc('5a'); // 90
+logLoc('1383'); // 4995
+logLoc('8313'); // 4995
 
-findMatches(gpBuffer, gpTargets, 'GlidePath');
