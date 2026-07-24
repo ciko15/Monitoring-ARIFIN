@@ -70,11 +70,19 @@ class DmeMopahBinaryParser extends BaseParser {
                 let hexStr = packet.toString('hex').match(/.{1,2}/g).join(' ').toUpperCase();
                 console.log(`\n[DME Mopah Binary] Packet (Len=${packet.length}):`, hexStr);
                 
-                // Coba tebak beberapa ID yang sering muncul di Wireshark
-                const cmdId = packet.length >= 4 ? packet.toString('hex', 2, 3) : '';
-                
-                // Ini hanya skeleton. Kita bisa tambahkan logika:
-                // if (cmdId === 'e3') { flatData.some_param = packet.readUInt16BE(4); }
+                if (packet.length >= 10 && packet[0] === 0x01 && packet[1] === 0x02) {
+                    const cmdId = packet[2].toString(16).toUpperCase().padStart(2, '0');
+                    
+                    if (packet.length > 8) {
+                        const rawVal = packet.readUInt16BE(7);
+                        if (['11', '3A', 'DF', '70', '2C', '22'].includes(cmdId)) {
+                            let exist = flatData._amv_txs_rows.find(r => r[0] === `Sensor Cmd ${cmdId}`);
+                            if (!exist) {
+                                flatData._amv_txs_rows.push([`Sensor Cmd ${cmdId}`, rawVal.toString()]);
+                            }
+                        }
+                    }
+                }
                 
                 dataFound = true;
                 
