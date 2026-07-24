@@ -16,6 +16,7 @@ const IlsGpThales421Parser = require('./ils_gp_thales421');
 const IlsLlzThales421Parser = require('./ils_llz_thales421');
 const IlsGpNormacParser = require('./ils_gp_normac');
 const IlsLlzNormacParser = require('./ils_llz_normac');
+const DvorMaruBinaryParser = require('./dvor_maru_binary');
 
 class ParserFactory {
     /**
@@ -90,6 +91,9 @@ class ParserFactory {
 
             case 'dvor_maru_220':
                 return new DvorMaru220Parser(config);
+
+            case 'dvor_maru_binary':
+                return new DvorMaruBinaryParser(config);
                 
             case 'dme_maru_310_320':
                 return new DmeMaru310320Parser(config);
@@ -154,6 +158,7 @@ class ParserFactory {
             'tcp',
             'udp',
             'dvor_maru_220',
+            'dvor_maru_binary',
             'dme_maru_310_320',
             'pm5560_modbus',
             'temp_humidity_modbus',
