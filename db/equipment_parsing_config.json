@@ -142,5 +142,13 @@
     "category": "Support",
     "files": "/src/parsers/ups_netagent_snmp.js",
     "createdAt": "2026-07-13T00:00:00.000Z"
+  },
+  {
+    "id": "dvor_maru_binary",
+    "name": "DVOR MARU Binary (Merauke)",
+    "description": "Parser Binary Skeleton untuk DVOR Maru di Merauke",
+    "category": "Navigation",
+    "files": "/src/parsers/dvor_maru_binary.js",
+    "createdAt": "2026-07-24T10:00:00.000Z"
   }
 ]
