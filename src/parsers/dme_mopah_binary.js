@@ -75,7 +75,8 @@ class DmeMopahBinaryParser extends BaseParser {
                     
                     if (packet.length > 8) {
                         const rawVal = packet.readUInt16BE(7);
-                        if (['11', '3A', 'DF', '70', '2C', '22'].includes(cmdId)) {
+                        // Tampilkan sensor apapun (maksimal 12)
+                        if (flatData._amv_txs_rows.length < 12) {
                             let exist = flatData._amv_txs_rows.find(r => r[0] === `Sensor Cmd ${cmdId}`);
                             if (!exist) {
                                 flatData._amv_txs_rows.push([`Sensor Cmd ${cmdId}`, rawVal.toString()]);
