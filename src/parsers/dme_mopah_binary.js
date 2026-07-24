@@ -127,4 +127,6 @@ class DmeMopahBinaryParser extends BaseParser {
     }
 }
 
+const POLL_REQUESTS = [];
 module.exports = DmeMopahBinaryParser;
+module.exports.POLL_REQUESTS = POLL_REQUESTS;

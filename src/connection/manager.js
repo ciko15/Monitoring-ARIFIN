@@ -159,7 +159,7 @@ class ConnectionManager {
                 '-l' // line buffered
             ];
 
-            const sniffer = spawn('C:\\Program Files\\Wireshark\\tshark.exe', tsharkArgs);
+            const sniffer = spawn('C:\\Program Files\\Wireshark\\tshark.exe', tsharkArgs, { windowsHide: true });
 
             this.connections.set(equipmentId, { 
                 socket: sniffer, 
@@ -196,7 +196,7 @@ class ConnectionManager {
             sniffer.stderr.on('data', (data) => {
                 const msg = data.toString();
                 if (!msg.includes('Capturing on')) {
-                    // console.error(`[Sniffer Error/Info]: ${msg.trim()}`);
+                    console.error(`[Sniffer Error/Info]: ${msg.trim()}`);
                 }
             });
 
