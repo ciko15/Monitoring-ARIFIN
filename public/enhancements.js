@@ -1043,6 +1043,23 @@
                 ['Decay B',     data.txp2_m2_decay_b,    vc(data.txp2_m2_decay_b, 1.5, 2.5)],
                 ['Spacing',     data.txp2_m2_spacing,    vc(data.txp2_m2_spacing, 11.5, 12.5)],
             ]});
+        } else if (parserId === 'dme_mopah_binary') {
+            const ok = '#00ff88', warn = '#ffcc00', err = '#ff3355', info = '#e8f4ff';
+            
+            sections.push({ title: 'DME STATUS', params: [
+                ['Overall Status', data.overall_status || '—', data.overall_status === 'Normal' ? ok : warn],
+                ['Power Output (W)', data.power_watts || '—', '#e8f4ff'],
+                ['Reply Efficiency (%)', data.reply_efficiency || '—', '#00d4ff'],
+                ['Time Delay (us)', data.time_delay || '—', '#e8f4ff']
+            ]});
+            
+            // Tampilkan baris raw dari Hex dump jika ada (seperti _amv_txs_rows)
+            const dmeRows = data._amv_txs_rows || [];
+            if (dmeRows.length > 0) {
+                sections.push({ title: 'HEX DUMP VALUES', params:
+                    dmeRows.map(r => [r[0], r[1], info])
+                });
+            }
         } else if (parserId === 'vhf_t6tv') {
             const ok = '#00ff88', warn = '#ffcc00', err = '#ff3355', info = '#e8f4ff', accent = '#00d4ff';
             const pwr = (v) => !v || v === '—' ? '#4a7a9a' : (v.includes('Not') || v === 'OFF' || v === '0') ? err : ok;
