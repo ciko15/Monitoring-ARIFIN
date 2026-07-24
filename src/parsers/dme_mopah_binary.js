@@ -87,11 +87,18 @@ class DmeMopahBinaryParser extends BaseParser {
 
                 this._buffer = this._buffer.slice(packetLength);
             }
+            if (!dataFound) {
+                return { success: false, error: 'Waiting for complete binary packet', status: 'Waiting', _mode: this._mode };
+            }
 
-            return dataFound ? [flatData] : [];
+            return {
+                success: true,
+                data: flatData,
+                status: 'Normal'
+            };
         } catch (error) {
             console.error('[DME Mopah Binary] Parsing Error:', error.message);
-            return [];
+            return { success: false, error: error.message, status: 'Error', _mode: this._mode };
         }
     }
 
