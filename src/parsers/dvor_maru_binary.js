@@ -4,31 +4,22 @@ const BaseParser = require('./base');
  * DVOR Maru Binary Parser (Skeleton / Reverse Engineering)
  * Location: Merauke
  * 
- * Note: This equipment uses a binary protocol with SOH(0x01) + STX(0x02) + [7 byte payload] + ETX(0x03) + [2 byte CRC]
+ * Note: This equipment uses a binary protocol with SOH(0x01) + STX(0x02) + [payload] + ETX(0x03) + [2 byte CRC]
  */
 
 const SOH = 0x01;
 const STX = 0x02;
 const ETX = 0x03;
 
-// Active polling request bytes based on Wireshark captures
-const POLL_REQUESTS = [
-    // Trigger 1 (e.g., Request Page A)
-    { bytes: Buffer.from([0x01, 0x02, 0xC5, 0x35, 0x17, 0x8B, 0x1A, 0x0E, 0x01, 0x03, 0xAB, 0x39]), tag: 'PAGE_A' },
-    // Trigger 2 (e.g., Request Page B)
-    { bytes: Buffer.from([0x01, 0x02, 0xA6, 0x35, 0x17, 0x8B, 0x1A, 0x0E, 0x01, 0x03, 0x66, 0x7C]), tag: 'PAGE_B' },
-];
-
-const PASSIVE_TIMEOUT  = 30000;
-const POLL_INTERVAL    = 2000;
-const POLL_REQ_DELAY   = 200;
+// This parser is purely PASSIVE (sniffing mode only).
+// We rely on TShark network sniffing to feed data.
 
 class DvorMaruBinaryParser extends BaseParser {
     constructor(opts = {}) {
         super(opts);
-        this._lastDataTime = Date.now();
         this._mode = 'PASSIVE';
         this._buffer = Buffer.alloc(0);
+        this._cachedRows = [];
     }
 
     parse(rawData) {
@@ -40,37 +31,31 @@ class DvorMaruBinaryParser extends BaseParser {
             if (this._buffer.length > 65536) {
                 this._buffer = this._buffer.slice(-32768);
             }
-
-            const now = Date.now();
-            if (now - this._lastDataTime > PASSIVE_TIMEOUT && this._mode === 'PASSIVE') {
-                this._mode = 'ACTIVE';
-                console.log('[DVOR Maru Binary] No data for 30s — switching to ACTIVE polling mode');
-            }
-
-            // --- Packet Extraction Logic (Skeleton) ---
             let dataFound = false;
-            let flatData = { _mode: this._mode };
+            let flatData = { 
+                _mode: this._mode,
+                overall_status: 'Normal',
+                tx_active: 'TX1',
+                _amv_txs_rows: [...this._cachedRows]
+            };
             
             // Mencari pola SOH(0x01) ... ETX(0x03) + 2 Bytes Checksum
-            while (this._buffer.length >= 12) { // Minimal ukuran paket
+            while (this._buffer.length >= 12) { 
                 const startIdx = this._buffer.indexOf(SOH);
                 if (startIdx === -1) {
-                    this._buffer = Buffer.alloc(0); // Buang jika tidak ada awalan
+                    this._buffer = Buffer.alloc(0); 
                     break;
                 }
                 
-                // Buang sampah di depan SOH
                 if (startIdx > 0) {
                     this._buffer = this._buffer.slice(startIdx);
                 }
 
                 const etxIdx = this._buffer.indexOf(ETX);
                 if (etxIdx === -1) {
-                    // Paket belum lengkap, tunggu chunk berikutnya
-                    break;
+                    break; // Tunggu chunk berikutnya
                 }
 
-                // Kita butuh 2 byte lagi setelah ETX untuk Checksum
                 if (this._buffer.length < etxIdx + 3) {
                     break; // Tunggu sisa checksum
                 }
@@ -79,36 +64,42 @@ class DvorMaruBinaryParser extends BaseParser {
                 const packet = this._buffer.slice(0, packetLength);
                 
                 // ==========================================
-                // TODO: Lakukan Parsing di sini
+                // REVERSE ENGINEERING (MARU DVOR)
                 // ==========================================
-                console.log(`\n[DVOR Maru Binary] Ditemukan Paket (Len=${packet.length}):`, packet.toString('hex').toUpperCase());
+                let hexStr = packet.toString('hex').match(/.{1,2}/g).join(' ').toUpperCase();
+                console.log(`\n[DVOR Maru Binary] Packet (Len=${packet.length}):`, hexStr);
                 
-                if (packet.length === 17) {
-                    console.log('-> Ini kemungkinan balasan status/ACK (17 bytes)');
-                    flatData.last_ack_hex = packet.toString('hex');
-                } else if (packet.length > 100) {
-                    console.log(`-> Ini kemungkinan data parameter (${packet.length} bytes)`);
+                if (packet.length >= 10 && packet[0] === 0x01 && packet[1] === 0x02) {
+                    const cmdId = packet[2].toString(16).toUpperCase().padStart(2, '0');
                     
-                    // Contoh Extract Data (Ini hanya simulasi, harus dicocokkan dengan manual!)
-                    // flatData.rf_power = packet.readUInt16BE(10) / 100;
-                    // flatData.azimuth  = packet.readUInt16BE(12) / 100;
+                    if (packet.length > 8) {
+                        const rawVal = packet.readUInt16BE(7);
+                        // Tampilkan sensor apapun (maksimal 12)
+                        if (this._cachedRows.length < 12) {
+                            let exist = this._cachedRows.find(r => r[0] === `Sensor Cmd ${cmdId}`);
+                            if (!exist) {
+                                this._cachedRows.push([`Sensor Cmd ${cmdId}`, rawVal.toString()]);
+                            } else {
+                                exist[1] = rawVal.toString(); // Update value
+                            }
+                        } else {
+                            // Update existing without pushing new if full
+                            let exist = this._cachedRows.find(r => r[0] === `Sensor Cmd ${cmdId}`);
+                            if (exist) exist[1] = rawVal.toString();
+                        }
+                        
+                        flatData._amv_txs_rows = [...this._cachedRows];
+                    }
                 }
                 
-                // ==========================================
-
                 dataFound = true;
-                this._lastDataTime = now;
                 
-                // Switch kembali ke mode pasif jika mendapat data
                 if (this._mode === 'ACTIVE') {
                     this._mode = 'PASSIVE';
-                    console.log('[DVOR Maru Binary] Data diterima — switching back to PASSIVE mode');
                 }
 
-                // Majukan buffer
                 this._buffer = this._buffer.slice(packetLength);
             }
-
             if (!dataFound) {
                 return { success: false, error: 'Waiting for complete binary packet', status: 'Waiting', _mode: this._mode };
             }
@@ -118,23 +109,22 @@ class DvorMaruBinaryParser extends BaseParser {
                 data: flatData,
                 status: 'Normal'
             };
-
         } catch (error) {
-            console.error(`[DVOR Maru Binary] Parse error: ${error.message}`);
+            console.error('[DVOR Maru Binary] Parsing Error:', error.message);
             return { success: false, error: error.message, status: 'Error', _mode: this._mode };
         }
     }
 
-    getMode() { return this._mode; }
-    getPollRequests() { return POLL_REQUESTS; }
+    getMode() {
+        return this._mode;
+    }
+
     reset() {
         this._buffer = Buffer.alloc(0);
-        this._mode = 'ACTIVE';
-        this._lastDataTime = 0;
+        this._mode = 'PASSIVE';
     }
 }
 
+const POLL_REQUESTS = [];
 module.exports = DvorMaruBinaryParser;
-module.exports.POLL_REQUESTS  = POLL_REQUESTS;
-module.exports.POLL_INTERVAL  = POLL_INTERVAL;
-module.exports.POLL_REQ_DELAY = POLL_REQ_DELAY;
+module.exports.POLL_REQUESTS = POLL_REQUESTS;

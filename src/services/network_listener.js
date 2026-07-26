@@ -26,7 +26,7 @@ class NetworkListenerService {
         const fs = require('fs');
         const path = require('path');
         const authPath = path.join(__dirname, '../../db/equipment_otentication_config.json');
-        
+
         let debounceTimer = null;
         fs.watchFile(authPath, { interval: 3000 }, (curr, prev) => {
             if (curr.mtime > prev.mtime) {
@@ -140,7 +140,7 @@ class NetworkListenerService {
     async initialize() {
         console.log('[NetworkListener] Initializing listeners...');
         this.stopAll();
-        
+
         try {
             // Fetch all equipment sources (authentications)
             const sources = await db.getAllOtentication();
@@ -178,12 +178,12 @@ class NetworkListenerService {
      */
     async startT6tvListener(source) {
         const { id, equipt_id, ip_address, tcp_port, extra_config } = source;
-        const extra    = extra_config ? (typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config) : {};
-        const port     = parseInt(tcp_port) || 80;
-        const wsPath   = extra.ws_path  || '/ws';
+        const extra = extra_config ? (typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config) : {};
+        const port = parseInt(tcp_port) || 80;
+        const wsPath = extra.ws_path || '/ws';
         const username = extra.username || 'admin';
         const password = extra.password || 'admin';
-        const pollMs   = (extra.interval || 5) * 1000;
+        const pollMs = (extra.interval || 5) * 1000;
         const configuredFallbackPorts = Array.isArray(extra.fallback_ports)
             ? extra.fallback_ports
             : (Array.isArray(extra.fallbackPorts) ? extra.fallbackPorts : []);
@@ -277,7 +277,7 @@ class NetworkListenerService {
 
         // Polling loop: kirim semua FC03 request tiap POLL_INTERVAL
         const Pm5560Module = require('../parsers/pm5560_modbus');
-        const POLL_INTERVAL  = Pm5560Module.POLL_INTERVAL;
+        const POLL_INTERVAL = Pm5560Module.POLL_INTERVAL;
         const POLL_REQ_DELAY = Pm5560Module.POLL_REQ_DELAY;
         const sleep = ms => new Promise(r => setTimeout(r, ms));
         let pollTimer = null;
@@ -338,7 +338,7 @@ class NetworkListenerService {
 
         // Cek apakah parser support protokol trigger+heartbeat (Thales 421)
         const hasTriggerProtocol = typeof parser.isHeartbeat === 'function' &&
-                                   typeof parser.getHeartbeatReply === 'function';
+            typeof parser.getHeartbeatReply === 'function';
 
         console.log(`[LLZ-TRACE] startBinaryTcpListener called for ${name} (${ip_address}:${port}), hasTriggerProtocol=${hasTriggerProtocol}`);
 
@@ -377,7 +377,7 @@ class NetworkListenerService {
             });
 
             if (!this._lastHeartbeatReply) this._lastHeartbeatReply = new Map();
-            
+
             socket.on('data', async (chunk) => {
                 // Balas heartbeat dari device agar stream tetap hidup tanpa RCMS (max 1x per 5 detik untuk mencegah ping-pong storm)
                 if (hasTriggerProtocol && parser.isHeartbeat(chunk)) {
@@ -436,7 +436,7 @@ class NetworkListenerService {
         const port = parseInt(tcp_port) || 502;
 
         const TempHumidityParser = require('../parsers/temp_humidity_modbus');
-        const POLL_INTERVAL  = TempHumidityParser.POLL_INTERVAL;
+        const POLL_INTERVAL = TempHumidityParser.POLL_INTERVAL;
         const parser = new TempHumidityParser({ equipt_id, location: location || name });
 
         let socket = null;
@@ -533,8 +533,8 @@ class NetworkListenerService {
     startSnmpSystemListener(source) {
         const { id, equipt_id, ip_address, name, community, poll_interval, snmp_port, snmp_version } = source;
         const pollSec = parseInt(poll_interval) || 60;
-        const comm    = community || 'public';
-        const port    = parseInt(snmp_port) || 161;
+        const comm = community || 'public';
+        const port = parseInt(snmp_port) || 161;
         const version = snmp_version || '2c';
 
         const parserFile = source.parsing_id === 'snmp_network_basic' ? 'snmp_network_basic' : 'snmp_system';
@@ -547,7 +547,7 @@ class NetworkListenerService {
             console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
             try {
                 const result = await pollSNMP(ip_address, comm, { port, version });
-                const logLine = `[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error||'none'}`;
+                const logLine = `[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error || 'none'}`;
                 if (String(result.status || '').toLowerCase() === 'disconnect') {
                     this._logThrottled('log', `snmp-system:disconnect:${id}`, logLine);
                 } else {
@@ -569,11 +569,11 @@ class NetworkListenerService {
         // UDP packet terbuang (drop) oleh switch/buffer.
         const jitterMs = Math.floor(Math.random() * 15000);
         const initialDelay = 2000 + jitterMs;
-        
+
         setTimeout(() => {
             doPoll();
             const timer = setInterval(doPoll, pollSec * 1000);
-            
+
             if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
             this._snmpSystemTimers.set(id, timer);
         }, initialDelay);
@@ -585,8 +585,8 @@ class NetworkListenerService {
     startUpsNetagentListener(source) {
         const { id, equipt_id, ip_address, name, community, poll_interval, snmp_port, snmp_version } = source;
         const pollSec = parseInt(poll_interval) || 10;
-        const comm    = community || 'public';
-        const port    = parseInt(snmp_port) || 161;
+        const comm = community || 'public';
+        const port = parseInt(snmp_port) || 161;
         const version = snmp_version || '2c';
 
         const { pollUPSNetagent } = require('../parsers/ups_netagent_snmp');
@@ -612,7 +612,7 @@ class NetworkListenerService {
         setTimeout(() => {
             doPoll();
             const timer = setInterval(doPoll, pollSec * 1000);
-            
+
             if (!this._upsNetagentTimers) this._upsNetagentTimers = new Map();
             this._upsNetagentTimers.set(id, timer);
         }, initialDelay);
@@ -624,28 +624,28 @@ class NetworkListenerService {
     startAsterixListener(source, parserId) {
         const dgram = require('dgram');
         const { id, equipt_id, name, ip_address, udp_port,
-                lat, lon, location, sac, sic,
-                multicast_ip, multicast_port, timeout_ms } = source;
+            lat, lon, location, sac, sic,
+            multicast_ip, multicast_port, timeout_ms } = source;
 
-        const port    = parseInt(udp_port) || (parserId === 'asterix_adsb' ? 50000 : 4001);
+        const port = parseInt(udp_port) || (parserId === 'asterix_adsb' ? 50000 : 4001);
         const mcastIp = multicast_ip || ip_address;
 
         const ParserClass = require('../parsers/' + parserId);
         const parser = new ParserClass({
             equipt_id,
-            name:           location || name,
-            lat:            lat   || 0,
-            lon:            lon   || 0,
-            sac:            sac   || 0,
-            sic:            sic   || 0,
-            multicast_ip:   mcastIp,
+            name: location || name,
+            lat: lat || 0,
+            lon: lon || 0,
+            sac: sac || 0,
+            sic: sic || 0,
+            multicast_ip: mcastIp,
             multicast_port: multicast_port || port,
-            timeout_ms:     timeout_ms || 5000,
+            timeout_ms: timeout_ms || 5000,
         });
 
-        if (!this._asterixSockets)  this._asterixSockets  = new Map();
-        if (!this._asterixParsers)  this._asterixParsers  = new Map();
-        if (!this._asterixTimers)   this._asterixTimers   = new Map();
+        if (!this._asterixSockets) this._asterixSockets = new Map();
+        if (!this._asterixParsers) this._asterixParsers = new Map();
+        if (!this._asterixTimers) this._asterixTimers = new Map();
 
         const socketKey = `asterix_udp_${mcastIp}_${port}`;
         if (!this._asterixParsers.has(socketKey)) this._asterixParsers.set(socketKey, new Map());
@@ -691,7 +691,7 @@ class NetworkListenerService {
                 } catch (e) {
                     console.warn(`[Asterix] Multicast join failed on default interface ${mcastIp}:${port}: ${e.message}`);
                 }
-                
+
                 // Attempt to bind to all active IPv4 interfaces
                 const os = require('os');
                 const interfaces = os.networkInterfaces();
@@ -724,7 +724,7 @@ class NetworkListenerService {
                         parserId,
                         'Disconnect'
                     );
-                } catch (err) {}
+                } catch (err) { }
             }
         }, 5000);
 
@@ -734,8 +734,8 @@ class NetworkListenerService {
 
     startMarcRseListener(source) {
         const { id, equipt_id, ip_address, tcp_port, marc_ports, poll_interval, name } = source;
-        const port    = parseInt(tcp_port) || 950;
-        const ports   = Array.isArray(marc_ports) ? marc_ports : [];
+        const port = parseInt(tcp_port) || 950;
+        const ports = Array.isArray(marc_ports) ? marc_ports : [];
         const pollSec = parseInt(poll_interval) || 30;
 
         const VhfMarcRseParser = require('../parsers/vhf_marc_rse');
@@ -747,9 +747,9 @@ class NetworkListenerService {
         // Buat parser dengan marc_ports equipment ini
         const parser = new VhfMarcRseParser({
             equipt_id,
-            host:          ip_address,
-            port:          port,
-            marc_ports:    ports,
+            host: ip_address,
+            port: port,
+            marc_ports: ports,
             poll_interval: pollSec,
         });
 
@@ -768,19 +768,19 @@ class NetworkListenerService {
                 // Karena 1 source = 1 marc_port, ambil radio untuk port ini saja
                 for (const [portStr, radioState] of Object.entries(radios)) {
                     const radioData = {
-                        frequency_mhz:      radioState.frequency_mhz,
-                        mode:               radioState.mode,
-                        status:             radioState.status,
-                        supply_voltage:     radioState.supply_voltage,
-                        pa_temp_c:          radioState.pa_temp_c,
-                        fwd_power_w:        radioState.fwd_power_w,
-                        refl_power_w:       radioState.refl_power_w,
-                        modulation_pct:     radioState.modulation_pct,
-                        sensitivity_dbm:    radioState.sensitivity_dbm,
-                        squelch_dbm:        radioState.squelch_dbm,
-                        rx_supply_voltage:  radioState.rx_supply_voltage,
-                        radio_type:         radioState.radio_type,
-                        is_rx:              radioState.is_rx,
+                        frequency_mhz: radioState.frequency_mhz,
+                        mode: radioState.mode,
+                        status: radioState.status,
+                        supply_voltage: radioState.supply_voltage,
+                        pa_temp_c: radioState.pa_temp_c,
+                        fwd_power_w: radioState.fwd_power_w,
+                        refl_power_w: radioState.refl_power_w,
+                        modulation_pct: radioState.modulation_pct,
+                        sensitivity_dbm: radioState.sensitivity_dbm,
+                        squelch_dbm: radioState.squelch_dbm,
+                        rx_supply_voltage: radioState.rx_supply_voltage,
+                        radio_type: radioState.radio_type,
+                        is_rx: radioState.is_rx,
                     };
 
                     const radioStatus = radioState.connected
@@ -825,7 +825,7 @@ class NetworkListenerService {
                 }
                 return basename;
             }
-        } catch(e) {
+        } catch (e) {
             console.warn(`[NetworkListener] Error resolving custom parser ${parsing_id}:`, e.message);
         }
         return parsing_id;
@@ -922,7 +922,7 @@ class NetworkListenerService {
 
         const onError = (error) => {
             console.error(`[NetworkListener] Error for source ${source.name} (${id}):`, error.message);
-            
+
             // Auto-reconnect for TCP after 10s
             if (protocol === 'tcp') {
                 // Hapus dari activeListeners agar loop generasi ini berhenti
@@ -936,7 +936,7 @@ class NetworkListenerService {
         };
 
         let success = false;
-        
+
         // Force Sniffing Mode for ANY DME parser to prevent blocking the built-in PMDT app
         if (parsing_id.includes('dme') || (source.name && source.name.toLowerCase().includes('dme'))) {
             // Sniffing Mode
@@ -960,9 +960,9 @@ class NetworkListenerService {
                 let POLL_INTERVAL = 2000, POLL_REQ_DELAY = 150;
                 try {
                     const parserModule = require('../parsers/' + parsing_id);
-                    if (parserModule.POLL_INTERVAL)  POLL_INTERVAL  = parserModule.POLL_INTERVAL;
+                    if (parserModule.POLL_INTERVAL) POLL_INTERVAL = parserModule.POLL_INTERVAL;
                     if (parserModule.POLL_REQ_DELAY) POLL_REQ_DELAY = parserModule.POLL_REQ_DELAY;
-                } catch(e) { /* gunakan default */ }
+                } catch (e) { /* gunakan default */ }
                 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
                 const pollLoop = async () => {
@@ -976,7 +976,7 @@ class NetworkListenerService {
                         if (conn && conn.socket && !conn.socket.destroyed) {
                             const requests = parser.getPollRequests();
                             for (const req of requests) {
-                                try { conn.socket.write(req.bytes); await sleep(POLL_REQ_DELAY); } catch(e) {}
+                                try { conn.socket.write(req.bytes); await sleep(POLL_REQ_DELAY); } catch (e) { }
                             }
                             console.log(`[NetworkListener] Kick-start poll sent for ${source.name}`);
                         }
@@ -992,7 +992,7 @@ class NetworkListenerService {
                                     try {
                                         conn.socket.write(req.bytes);
                                         await sleep(POLL_REQ_DELAY);
-                                    } catch(e) {
+                                    } catch (e) {
                                         console.warn(`[NetworkListener] Poll write error for ${source.name}: ${e.message}`);
                                     }
                                 }
@@ -1017,7 +1017,7 @@ class NetworkListenerService {
         const { id, equipt_id, name } = source;
         if (RAW_DEBUG) {
             console.log(`[NetworkListener] Received data from ${name} (${rawData.length} bytes)`);
-            console.log(`[NetworkListener] Raw[${name}]: ${rawData.slice(0,200).toString("hex")}`);
+            console.log(`[NetworkListener] Raw[${name}]: ${rawData.slice(0, 200).toString("hex")}`);
         }
 
         try {
@@ -1067,11 +1067,11 @@ class NetworkListenerService {
                 source: name, // Set the source name (e.g., "TX 1")
                 _ip: source.ip_address || 'unknown' // For FileLogger
             };
-            
+
             await this._handleLogOutput(
                 source,
-                logData, 
-                source.parsing_id || 'raw', 
+                logData,
+                source.parsing_id || 'raw',
                 parsedResult.status || 'Normal'
             );
 
