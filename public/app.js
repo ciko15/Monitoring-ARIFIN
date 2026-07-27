@@ -1695,19 +1695,38 @@ async function loadAirports() {
     const result = await res.json();
     airportsData = result.data || result;
 
-    const tableBody = document.getElementById('airportsTableBody');
-    if (tableBody) {
-      tableBody.innerHTML = airportsData.map(a => `
-        <tr>
-          <td>${a.name}</td>
-          <td>${a.city}</td>
-          <td>${a.ipBranch || '-'}</td>
-          <td>${a.totalEquipment || 0}</td>
-          <td>
-            <button class="btn-edit" onclick="editAirport(${a.id})" title="Edit Airport"><i class="fas fa-edit"></i></button>
-          </td>
-        </tr>
-      `).join('');
+    const detailView = document.getElementById('singleAirportDetailView');
+    const editBtn = document.getElementById('editSingleAirportBtn');
+    if (detailView) {
+      if (airportsData.length > 0) {
+        const a = airportsData[0];
+        if (editBtn) {
+          editBtn.style.display = 'inline-block';
+          editBtn.onclick = () => editAirport(a.id);
+        }
+        detailView.innerHTML = `
+          <div class="airport-detail-card" style="padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div>
+                <h3 style="color: var(--accent-primary); margin-bottom: 15px; font-size: 1.2rem;">${a.name} (${a.code || '-'})</h3>
+                <p style="margin-bottom: 10px;"><strong><i class="fas fa-map-marker-alt" style="width: 20px;"></i> City:</strong> ${a.city}</p>
+                <p style="margin-bottom: 10px;"><strong><i class="fas fa-id-badge" style="width: 20px;"></i> Site ID:</strong> ${a.siteId || '-'}</p>
+                <p style="margin-bottom: 10px;"><strong><i class="fas fa-network-wired" style="width: 20px;"></i> IP Gateway:</strong> ${a.ipBranch || '-'}</p>
+                <p style="margin-bottom: 10px;"><strong><i class="fas fa-server" style="width: 20px;"></i> Total Equipment:</strong> ${a.totalEquipment || 0}</p>
+              </div>
+              <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 6px; border: 1px dashed var(--border-color);">
+                <h4 style="color: var(--text-primary); margin-bottom: 10px;"><i class="fas fa-lock" style="width: 20px;"></i> Solace AMQP Configuration</h4>
+                <p style="margin-bottom: 5px; font-size: 0.9rem;"><strong>Host:</strong> ${a.solaceHost || '<span style="color:var(--text-muted);">172.20.16.123 (Default)</span>'}</p>
+                <p style="margin-bottom: 5px; font-size: 0.9rem;"><strong>Username:</strong> ${a.solaceUsername || '<span style="color:var(--text-muted);">dce-warr (Default)</span>'}</p>
+                <p style="margin-bottom: 5px; font-size: 0.9rem;"><strong>Password:</strong> ${a.solacePassword ? '********' : '<span style="color:var(--text-muted);">dce-warr (Default)</span>'}</p>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        if (editBtn) editBtn.style.display = 'none';
+        detailView.innerHTML = '<div class="empty-state">No airport data available.</div>';
+      }
     }
 
     const airportSelect = document.getElementById('equipmentAirport');
@@ -1749,7 +1768,10 @@ async function handleAirportSubmit(e) {
     siteId: document.getElementById('airportSiteId').value,
     lat: latVal ? parseFloat(latVal) : null,
     lng: lngVal ? parseFloat(lngVal) : null,
-    ipBranch: document.getElementById('airportIpBranch').value
+    ipBranch: document.getElementById('airportIpBranch').value,
+    solaceHost: document.getElementById('airportSolaceHost').value,
+    solaceUsername: document.getElementById('airportSolaceUsername').value,
+    solacePassword: document.getElementById('airportSolacePassword').value
   };
 
   try {
@@ -1785,6 +1807,9 @@ window.editAirport = function (id) {
   document.getElementById('airportLat').value = airport.lat;
   document.getElementById('airportLng').value = airport.lng;
   document.getElementById('airportIpBranch').value = airport.ipBranch || '';
+  document.getElementById('airportSolaceHost').value = airport.solaceHost || '';
+  document.getElementById('airportSolaceUsername').value = airport.solaceUsername || '';
+  document.getElementById('airportSolacePassword').value = airport.solacePassword || '';
 
   document.getElementById('airportModalFormTitle').textContent = 'Edit Airport Configuration';
   document.getElementById('airportModal').classList.remove('hidden');

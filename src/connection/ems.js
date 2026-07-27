@@ -80,7 +80,9 @@ function readAirportConfigSync() {
     try {
         const configPath = path.resolve(process.cwd(), 'db', 'airport_config.json');
         if (!fs.existsSync(configPath)) return {};
-        return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        // Jika formatnya array, ambil elemen pertama
+        return Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : (parsed || {});
     } catch (error) {
         console.warn('[EMS] Failed to read airport_config.json:', error.message);
         return {};
@@ -96,10 +98,10 @@ const branchServices = branchProfile.services || {};
 
 // === KONFIGURASI SOLACE (BARU - AMQP 1.0) ===
 const SolaceConfig = {
-    host: process.env.RABBITMQ_HOST || branchRabbit.host || '172.20.16.123',
-    port: parseInt(process.env.RABBITMQ_PORT || branchRabbit.port || '5672', 10),
-    username: process.env.RABBITMQ_USERNAME || branchRabbit.username || 'dce-warr',
-    password: process.env.RABBITMQ_PASSWORD || branchRabbit.password || 'dce-warr',
+    host: process.env.RABBITMQ_HOST || branchRabbit.host || airportConfig.solaceHost || '172.20.16.123',
+    port: parseInt(process.env.RABBITMQ_PORT || branchRabbit.port || airportConfig.solacePort || '5672', 10),
+    username: process.env.RABBITMQ_USERNAME || branchRabbit.username || airportConfig.solaceUsername || 'dce-warr',
+    password: process.env.RABBITMQ_PASSWORD || branchRabbit.password || airportConfig.solacePassword || 'dce-warr',
     transport: 'tcp',
     reconnect: false // We handle reconnection backoff manually
 };

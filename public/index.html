@@ -593,6 +593,29 @@
             <input type="text" id="airportIpBranch" name="airportIpBranch" autocomplete="off"
               placeholder="e.g., 192.168.1.1">
           </div>
+          
+          <!-- Solace AMQP Connection Settings -->
+          <div style="border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; margin-bottom: 15px; background: var(--bg-secondary);">
+            <div style="font-size: 12px; font-weight: 600; color: var(--accent-primary); margin-bottom: 10px; letter-spacing: 0.5px;">
+              <i class="fas fa-network-wired"></i> SOLACE / AMQP SETTINGS
+            </div>
+            <div class="form-row-ux">
+              <div class="form-group-ux">
+                <label for="airportSolaceHost">Solace Host (IP)</label>
+                <input type="text" id="airportSolaceHost" name="airportSolaceHost" autocomplete="off" placeholder="e.g., 172.20.16.123">
+              </div>
+            </div>
+            <div class="form-row-ux">
+              <div class="form-group-ux">
+                <label for="airportSolaceUsername">Username</label>
+                <input type="text" id="airportSolaceUsername" name="airportSolaceUsername" autocomplete="off" placeholder="e.g., dce-wadd">
+              </div>
+              <div class="form-group-ux">
+                <label for="airportSolacePassword">Password</label>
+                <input type="password" id="airportSolacePassword" name="airportSolacePassword" autocomplete="new-password" placeholder="Password">
+              </div>
+            </div>
+          </div>
           <div class="form-row-ux">
             <div class="form-group-ux">
               <label for="airportParent">Airport Cabang</label>
@@ -1285,32 +1308,13 @@
             <div class="card-header">
               <h2><i class="fas fa-plane"></i> Airports</h2>
               <div class="header-actions">
-                <div class="search-box">
-                  <label for="searchAirports" class="visually-hidden">Search airports</label>
-                  <i class="fas fa-search"></i>
-                  <input type="text" id="searchAirports" placeholder="Search airports..." aria-label="Search airports">
-                </div>
+                <button class="btn btn-primary btn-sm" id="editSingleAirportBtn" style="display:none;">
+                  <i class="fas fa-edit"></i> Edit Configuration
+                </button>
               </div>
             </div>
-            <div class="card-body">
-              <div class="table-responsive">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Location</th>
-                      <th>IP Gateway</th>
-                      <th>Total Equipment</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="airportsTableBody">
-                    <tr>
-                      <td colspan="5" class="empty-state">Loading airports...</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div class="card-body" id="singleAirportDetailView">
+              <div class="empty-state">Loading airport details...</div>
             </div>
           </div>
         </div>
