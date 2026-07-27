@@ -159,8 +159,8 @@ class ConnectionManager {
                 '-l' // line buffered
             ];
 
-            const sniffer = spawn('C:\\Program Files\\Wireshark\\tshark.exe', tsharkArgs, { windowsHide: true });
-
+            // Use 'tshark' from PATH or fallback to hardcoded if needed. By default, rely on PATH.
+            const sniffer = spawn('tshark', tsharkArgs, { windowsHide: true });
             this.connections.set(equipmentId, { 
                 socket: sniffer, 
                 type: 'sniffer', 
