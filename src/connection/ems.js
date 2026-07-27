@@ -98,10 +98,10 @@ const branchServices = branchProfile.services || {};
 
 // === KONFIGURASI SOLACE (BARU - AMQP 1.0) ===
 const SolaceConfig = {
-    host: process.env.RABBITMQ_HOST || branchRabbit.host || airportConfig.solaceHost || '172.20.16.123',
-    port: parseInt(process.env.RABBITMQ_PORT || branchRabbit.port || airportConfig.solacePort || '5672', 10),
-    username: process.env.RABBITMQ_USERNAME || branchRabbit.username || airportConfig.solaceUsername || 'dce-warr',
-    password: process.env.RABBITMQ_PASSWORD || branchRabbit.password || airportConfig.solacePassword || 'dce-warr',
+    host: process.env.RABBITMQ_HOST || airportConfig.solaceHost || branchRabbit.host || '172.20.16.123',
+    port: parseInt(process.env.RABBITMQ_PORT || airportConfig.solacePort || branchRabbit.port || '5672', 10),
+    username: process.env.RABBITMQ_USERNAME || airportConfig.solaceUsername || branchRabbit.username || 'dce-warr',
+    password: process.env.RABBITMQ_PASSWORD || airportConfig.solacePassword || branchRabbit.password || 'dce-warr',
     transport: 'tcp',
     reconnect: false // We handle reconnection backoff manually
 };
