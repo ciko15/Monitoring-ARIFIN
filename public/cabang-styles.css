@@ -2099,15 +2099,17 @@
   color: var(--monitoring-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.2;
 }
 
 .sp-preview-value {
   font-size: 12px;
   font-weight: 700;
   color: var(--monitoring-text);
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 /* No data state inside card */

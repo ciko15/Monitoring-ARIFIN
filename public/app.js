@@ -583,18 +583,45 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   // Populate equipmentSelect
   if (equipmentSelect) {
     const sortedEquip = (equipmentData || []).sort((a, b) => a.name.localeCompare(b.name));
-    equipmentSelect.innerHTML = '<option value="">Pilih Equipment</option>' +
+    
+    // Check if equipmentId is in sortedEquip
+    const equipExists = sortedEquip.find(e => String(e.id) === String(equipmentId));
+    let extraOption = '';
+    if (!equipExists && equipmentId) {
+      const unsavedName = document.getElementById('equipmentName')?.value || 'New Equipment';
+      const unsavedCode = document.getElementById('equipmentCode')?.value || equipmentId;
+      extraOption = `<option value="${equipmentId}">${unsavedName} (${unsavedCode})</option>`;
+    }
+
+    equipmentSelect.innerHTML = '<option value="">Pilih Equipment</option>' + extraOption +
       sortedEquip.map(e => `<option value="${e.id}">${e.name} (${e.code || e.id})</option>`).join('');
     equipmentSelect.value = equipmentId;
 
     // Auto-update sup_category when equipment changes
     equipmentSelect.addEventListener('change', () => {
       const selectedId = equipmentSelect.value;
-      const equip = (equipmentData || []).find(e => String(e.id) === String(selectedId));
+      let equip = (equipmentData || []).find(e => String(e.id) === String(selectedId));
+      if (!equip && selectedId && document.getElementById('equipmentId')?.value === String(selectedId)) {
+        equip = {
+          id: selectedId,
+          sup_category: document.getElementById('equipmentSupCategory')?.value,
+        };
+      }
       if (equip && equip.sup_category && supCategorySelect) {
         supCategorySelect.value = equip.sup_category;
       }
     });
+  }
+
+  let equipment = (equipmentData || []).find(e => String(e.id) === String(equipmentId));
+  if (!equipment && equipmentId && document.getElementById('equipmentId')?.value === String(equipmentId)) {
+    equipment = {
+      id: equipmentId,
+      sup_category: document.getElementById('equipmentSupCategory')?.value,
+      lat: document.getElementById('equipmentLat')?.value,
+      lng: document.getElementById('equipmentLng')?.value,
+      name: document.getElementById('equipmentName')?.value
+    };
   }
 
   // Populate supCategorySelect with all possible sub categories
@@ -605,7 +632,6 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     });
 
     // Ensure the current equipment's sup_category is also in the list
-    const equipment = (equipmentData || []).find(e => String(e.id) === String(equipmentId));
     if (equipment && equipment.sup_category) {
       allSubs.add(equipment.sup_category);
     }
@@ -682,10 +708,9 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     if (dataSourceIdInput) dataSourceIdInput.value = generateUniqueCode(8);
 
     // Default Lat/Lng from Equipment
-    const equipment = (equipmentData || []).find(e => String(e.id) === String(equipmentId));
     if (equipment) {
-      if (latInput) latInput.value = equipment.latitude || '';
-      if (lngInput) lngInput.value = equipment.longitude || '';
+      if (latInput) latInput.value = equipment.lat || equipment.latitude || '';
+      if (lngInput) lngInput.value = equipment.lng || equipment.longitude || '';
     }
   }
 
@@ -969,7 +994,7 @@ window.addNewSupCategory = async function () {
   if (!group.sub_categories.includes(newSub)) {
     group.sub_categories.push(newSub);
     try {
-      await fetch(`${API_URL}/config/sup-categories/${category}`, {
+      await fetch(`${API_URL}/sup-categories/${category}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ sub_categories: group.sub_categories })
@@ -2617,6 +2642,13 @@ window.renderConfigTable = function (tab, data, tbody) {
 }
 
 window.showAddConfigModal = function (type) {
+  if (type === 'authentication') {
+    if (typeof window.showAddDataSourceForm === 'function') {
+      window.showAddDataSourceForm('');
+      return;
+    }
+  }
+
   const modal = document.getElementById('configModal');
   const form = document.getElementById('configForm');
   const title = document.getElementById('configModalTitle');
@@ -2642,6 +2674,13 @@ window.editConfig = async function (type, id) {
     const item = Array.isArray(list) ? list.find(i => i.id == id || (type === 'sup-category' && i.category == id)) : list;
 
     if (!item) return showToast('Item not found', 'error');
+
+    if (type === 'authentication') {
+      if (typeof window.showAddDataSourceForm === 'function') {
+        window.showAddDataSourceForm(item.equipt_id || '', item);
+        return;
+      }
+    }
 
     const modal = document.getElementById('configModal');
     const title = document.getElementById('configModalTitle');

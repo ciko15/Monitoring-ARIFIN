@@ -20,106 +20,6 @@
 </head>
 
 <body>
-  <!-- Login Modal -->
-  <div class="login-modal hidden" id="loginModal">
-    <div class="login-container">
-      <button class="modal-close" onclick="document.getElementById('loginModal').classList.add('hidden')" style="position: absolute; top: 15px; right: 15px;">
-        <i class="fas fa-times"></i>
-      </button>
-      <div class="login-header">
-        <img src="icon.png" alt="Logo" class="login-logo">
-        <h2>Monitoring ARIFIN</h2>
-        <p>Silakan login untuk mengakses fitur konfigurasi</p>
-      </div>
-      <form id="loginForm" autocomplete="off">
-        <div class="form-group">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username" autocomplete="username" required
-            placeholder="Username">
-        </div>
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" autocomplete="current-password" required
-            placeholder="Password">
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">
-          <i class="fas fa-sign-in-alt"></i> Login
-        </button>
-      </form>
-      <div class="auth-footer" style="margin-top: 15px; text-align: center;">
-        <p style="color: var(--text-secondary); font-size: 0.9rem;">
-          Belum punya akun? <a href="#" id="showRegisterLink" style="color: var(--accent-primary); font-weight: 600; text-decoration: none;">Daftar sekarang</a>
-        </p>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Register Modal -->
-  <div class="login-modal hidden" id="registerModal">
-    <div class="login-container">
-      <button class="modal-close" onclick="document.getElementById('registerModal').classList.add('hidden')" style="position: absolute; top: 15px; right: 15px;">
-        <i class="fas fa-times"></i>
-      </button>
-      <div class="login-header">
-        <img src="icon.png" alt="Logo" class="login-logo">
-        <h2>Daftar Akun Baru</h2>
-        <p>Lengkapi data untuk mendaftar sebagai personil</p>
-      </div>
-      <form id="registerForm" autocomplete="off">
-        <div class="form-group">
-          <label for="regName">Nama Lengkap</label>
-          <input type="text" id="regName" name="name" required placeholder="Nama Lengkap">
-        </div>
-        <div class="form-group">
-          <label for="regUsername">Username</label>
-          <input type="text" id="regUsername" name="username" required placeholder="Username">
-        </div>
-        <div class="form-group">
-          <label for="regPassword">Password</label>
-          <input type="password" id="regPassword" name="password" required placeholder="Password">
-        </div>
-        <!-- Role is forced to 'user' -->
-        <div class="form-group">
-          <label>Level Akun</label>
-          <input type="text" value="user" disabled style="background: var(--bg-secondary); cursor: not-allowed;">
-          <input type="hidden" name="role" value="user">
-        </div>
-        
-        <button type="submit" class="btn btn-primary btn-block">
-          <i class="fas fa-user-plus"></i> Daftar Sekarang
-        </button>
-      </form>
-      <div class="auth-footer" style="margin-top: 15px; text-align: center;">
-        <p style="color: var(--text-secondary); font-size: 0.9rem;">
-          Sudah punya akun? <a href="#" id="showLoginLink" style="color: var(--accent-primary); font-weight: 600; text-decoration: none;">Login di sini</a>
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Public Dashboard (No Login) -->
-  <!-- Removed public dashboard - direct to app -->
-
-  <!-- Logout Confirmation Modal -->
-  <div class="modal-overlay hidden" id="logoutModal">
-    <div class="modal-container logout-modal-container">
-      <div class="modal-header logout-modal-header">
-        <h3><i class="fas fa-sign-out-alt"></i> Confirm Logout</h3>
-      </div>
-      <div class="modal-body logout-modal-body">
-        <p>Are you sure you want to logout?</p>
-      </div>
-      <div class="modal-footer logout-modal-footer">
-        <button class="btn btn-secondary logout-modal-btn" id="cancelLogout">
-          <i class="fas fa-times"></i> Cancel
-        </button>
-        <button class="btn btn-danger logout-modal-btn" id="confirmLogout">
-          <i class="fas fa-sign-out-alt"></i> Logout
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- Equipment Modal (Add/Edit) -->
   <div class="modal-overlay hidden" id="equipmentModal">
@@ -454,81 +354,7 @@
     </div>
   </div>
 
-  <!-- User Modal (Add/Edit) -->
-  <div class="modal-overlay hidden" id="userModal">
-    <div class="modal-container">
-      <div class="modal-header">
-        <h3><i class="fas fa-user-plus"></i> <span id="userModalFormTitle">Add New User</span></h3>
-        <button class="modal-close" id="closeUserModal">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      <div class="modal-body">
-        <form id="userForm" autocomplete="off">
-          <input type="hidden" id="userId">
-          <div class="form-row-ux">
-            <div class="form-group-ux">
-              <label for="userName">Name</label>
-              <input type="text" id="userName" name="userName" autocomplete="name" required placeholder="Enter name">
-            </div>
-            <div class="form-group-ux">
-              <label for="userUsername">Username</label>
-              <input type="text" id="userUsername" name="userUsername" autocomplete="username" required
-                placeholder="Enter username">
-            </div>
-          </div>
-          <div class="form-row-ux">
-            <div class="form-group-ux">
-              <label for="userPassword">Password <span class="required-indicator">*</span></label>
-              <input type="password" id="userPassword" name="userPassword" autocomplete="new-password"
-                placeholder="Enter password" required>
-            </div>
-            <div class="form-group-ux">
-              <label for="branch">Branch</label>
-              <div class="custom-select-wrapper" style="flex: 1;">
-                <select id="branch" class="form-control" style="width: 100%;">
-                  <option value="">Pilih Cabang</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group-ux">
-              <label for="userRole">Role</label>
-              <div class="custom-select-wrapper" style="flex: 1;">
-                <select id="userRole" name="userRole" required style="width: 100%;">
-                  <option value="user">User</option>
-                  <option value="teknisi">Teknisi</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="form-actions-ux">
-            <button type="submit" class="btn btn-primary">
-              <i class="fas fa-save"></i> Save User
-            </button>
-            <button type="button" class="btn btn-danger" id="cancelUserEdit">
-              <i class="fas fa-times"></i> Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
 
-  <!-- User Detail Modal -->
-  <div class="modal-overlay hidden" id="userDetailModal">
-    <div class="modal-container">
-      <div class="modal-header">
-        <h3><i class="fas fa-user"></i> User Details</h3>
-        <button class="modal-close" id="closeUserDetailModal">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      <div class="modal-body" id="userDetailContent">
-        <!-- Content will be populated by JavaScript -->
-      </div>
-    </div>
-  </div>
 
   <!-- Airport Modal (Add/Edit) -->
   <div class="modal-overlay hidden" id="airportModal">
@@ -1026,14 +852,7 @@
         <!-- Surveillance - RADAR & ADS-B -->
 
 
-        <a href="#" class="nav-item hidden-initial" data-section="equipment-logs" id="equipmentLogsNavItem">
-          <i class="fas fa-history"></i>
-          <span>History Logs</span>
-        </a>
-        <a href="#" class="nav-item hidden-initial" data-section="users" id="usersNavItem">
-          <i class="fas fa-users"></i>
-          <span>User Management</span>
-        </a>
+
         <!-- Configuration - Configure Sub-menu (Limitation, Otentication, Parsing, Sup/Category) -->
         <a href="#" class="nav-item hidden-initial" data-section="configure" id="configureNavItem">
           <i class="fas fa-sliders-h"></i>
@@ -1052,21 +871,7 @@
         </a> -->
       </nav>
       <div class="sidebar-footer">
-        <!-- Sidebar Login Button (Shown when not logged in) -->
-        <button id="sidebarLoginBtn" class="sidebar-login-btn">
-          <i class="fas fa-sign-in-alt"></i>
-          <span>Login</span>
-        </button>
 
-        <!-- User Panel (Shown when logged in) -->
-        <div class="sidebar-user-panel hidden" id="sidebarUserPanel">
-          <i class="fas fa-user-circle"></i>
-          <span id="sidebarUserName">User</span>
-        </div>
-        <button class="sidebar-logout-btn hidden" id="sidebarLogoutBtn">
-          <i class="fas fa-sign-out-alt"></i>
-          <span>Logout</span>
-        </button>
         <button id="themeToggle" class="theme-toggle">
           <i class="fas fa-moon"></i>
           <span>Dark Mode</span>
@@ -1822,120 +1627,9 @@
         </div>
       </section>
 
-      <!-- Equipment Logs Section -->
-      <section class="content-section hidden" id="equipment-logsSection">
-        <div class="crud-container">
-          <div class="card">
-            <div class="card-header">
-              <h2><i class="fas fa-history"></i> History Logs</h2>
-              <div class="header-actions">
-                <select id="logsPageSize" class="filter-select" style="width: 100px;">
-                  <option value="10">10 rows</option>
-                  <option value="25">25 rows</option>
-                  <option value="50" selected>50 rows</option>
-                  <option value="100">100 rows</option>
-                </select>
-                <select id="filterLogEquipment" class="filter-select">
-                  <option value="">All Equipment</option>
-                </select>
-                <select id="filterLogSource" class="filter-select">
-                  <option value="">All Sources</option>
-                  <option value="snmp">System</option>
-                  <option value="json">JSON</option>
-                  <option value="mqtt">MQTT</option>
-                  <option value="modbus">Modbus</option>
-                  <option value="manual">Manual</option>
-                </select>
-                <div class="filter-group" style="display: flex; align-items: center; gap: 8px;">
-                  <label for="filterLogStartDate" style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">From:</label>
-                  <input type="date" id="filterLogStartDate" class="filter-select" style="width: 140px; padding: 4px 8px;">
-                  <label for="filterLogEndDate" style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">To:</label>
-                  <input type="date" id="filterLogEndDate" class="filter-select" style="width: 140px; padding: 4px 8px;">
-                </div>
-                <button class="btn btn-secondary" id="refreshLogsBtn">
-                  <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="table-responsive">
-                <table>
-                  <thead>
-                    <tr>
-                      <th class="sortable" data-sort="Waktu Update" onclick="sortLogsTable('Waktu Update')">Time <i
-                          class="fas fa-sort"></i></th>
-                      <th class="sortable" data-sort="Nama Alat" onclick="sortLogsTable('Nama Alat')">Equipment <i
-                          class="fas fa-sort"></i></th>
-                      <th class="sortable" data-sort="source" onclick="sortLogsTable('source')">Source <i
-                          class="fas fa-sort"></i></th>
-                      <th>Data</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="equipmentLogsTableBody">
-                    <tr>
-                      <td colspan="5" class="empty-state">Loading logs...</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div id="logsPagination" class="pagination-container"></div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- Users Section -->
-      <section class="content-section hidden" id="usersSection">
-        <div class="crud-container">
-          <div class="card">
-            <div class="card-header">
-              <div class="header-actions">
-                <div class="search-box">
-                  <label for="searchUsers" class="visually-hidden">Search users</label>
-                  <i class="fas fa-search"></i>
-                  <input type="text" id="searchUsers" placeholder="Search users..." aria-label="Search users">
-                </div>
-                <select id="filterRole" class="filter-select">
-                  <option value="">All Roles</option>
-                  <option value="admin">Admin</option>
-                  <option value="teknisi">Teknisi</option>
-                  <option value="user">User</option>
-                </select>
-                <button class="btn btn-primary" id="addUserBtn">
-                  <i class="fas fa-plus"></i> Add User
-                </button>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="table-responsive">
-                <table>
-                  <thead>
-                    <tr>
-                      <th class="sortable" data-sort="id" onclick="sortUsersTable('id')">ID <i class="fas fa-sort"></i>
-                      </th>
-                      <th class="sortable" data-sort="name" onclick="sortUsersTable('name')">Name <i
-                          class="fas fa-sort"></i></th>
-                      <th class="sortable" data-sort="username" onclick="sortUsersTable('username')">Username <i
-                          class="fas fa-sort"></i></th>
-                      <th class="sortable" data-sort="role" onclick="sortUsersTable('role')">Role <i
-                          class="fas fa-sort"></i></th>
-                      <th class="sortable" data-sort="branch" onclick="sortUsersTable('branch')">Branch <i
-                          class="fas fa-sort"></i></th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="userTableBody">
-                    <tr>
-                      <td colspan="5" class="empty-state">Loading users...</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+
+
 
       <!-- Network Tools Section (Wireshark-like) -->
       <section class="content-section hidden" id="network-toolsSection">
