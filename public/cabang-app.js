@@ -282,13 +282,16 @@ const cabangModule = (function () {
   function renderCabangGrid() {
     if (!cabangGrid) return;
 
-    function normalizeSourceStatus(rawStatus) {
-      const s = String(rawStatus || '').toLowerCase();
-      if (s === 'alarm' || s === 'alert' || s === 'fail' || s === 'critical') return 'alarm';
-      if (s === 'warning') return 'warning';
-      if (s === 'disconnect' || s === 'offline') return 'offline';
-      return 'normal';
+    if (!window.normalizeSourceStatus) {
+      window.normalizeSourceStatus = function(rawStatus) {
+        const s = String(rawStatus || '').toLowerCase();
+        if (s === 'alarm' || s === 'alert' || s === 'fail' || s === 'critical') return 'Alarm';
+        if (s === 'warning') return 'Warning';
+        if (s === 'disconnect' || s === 'offline') return 'Disconnect';
+        return 'Normal';
+      };
     }
+    const normalizeSourceStatus = window.normalizeSourceStatus;
 
     function deriveEquipmentStatus(item) {
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
@@ -389,13 +392,14 @@ const cabangModule = (function () {
               : '-';
             // Map status to color
             let dotColor = '#10b981'; // normal
-            let statusClass = normalizeSourceStatus(srcStatus);
+            let statusClass = normalizeSourceStatus(srcStatus).toLowerCase();
             if (statusClass === 'alarm') {
               dotColor = '#ef4444';
             } else if (statusClass === 'warning') {
               dotColor = '#f59e0b';
-            } else if (statusClass === 'offline') {
+            } else if (statusClass === 'offline' || statusClass === 'disconnect') {
               dotColor = '#94a3b8';
+              statusClass = 'offline';
             } else {
               statusClass = 'normal';
             }

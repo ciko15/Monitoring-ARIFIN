@@ -691,17 +691,21 @@
     }
 
     function getSourceStatus(src) {
+        let rawStatus = 'Disconnect';
         if (window.equipmentDataCache) {
             const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
             if (eq && eq.lastData) {
                 const srcData = resolveSourceData(eq, src);
-                if (srcData) return srcData._status || 'Normal';
-                // Fallback: try first available
-                const first = Object.values(eq.lastData)[0];
-                if (first) return first._status || 'Normal';
+                if (srcData) {
+                    rawStatus = srcData._status || 'Normal';
+                } else {
+                    // Fallback: try first available
+                    const first = Object.values(eq.lastData)[0];
+                    if (first) rawStatus = first._status || 'Normal';
+                }
             }
         }
-        return 'Disconnect';
+        return window.normalizeSourceStatus ? window.normalizeSourceStatus(rawStatus) : rawStatus;
     }
 
     // ── Source Detail Modal ───────────────────────────────────────────────────
