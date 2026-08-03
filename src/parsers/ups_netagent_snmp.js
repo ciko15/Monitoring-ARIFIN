@@ -58,7 +58,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [4000, 4000],
+        timeouts: [5000, 5000, 5000], // Increased timeouts and retries for WAN/VSAT stability
     });
 }
 
@@ -83,11 +83,22 @@ function snmpGetAll(session, oids) {
     });
 }
 
+// Tambahan fungsi untuk melakukan chunking OID agar paket UDP tidak terlalu besar
+async function snmpGetAllChunked(session, oids, chunkSize = 5) {
+    const results = [];
+    for (let i = 0; i < oids.length; i += chunkSize) {
+        const chunk = oids.slice(i, i + chunkSize);
+        const chunkResults = await snmpGetAll(session, chunk);
+        results.push(...chunkResults);
+    }
+    return results;
+}
+
 async function pollUPSNetagent(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     
     try {
-        // Menggunakan getAll (Satu paket UDP)
+        // Menggunakan getAll dengan chunking agar UDP packet size tidak terlalu besar (mencegah packet drop di WAN/VSAT)
         const oidsToFetch = [
             OID.sysDescr, OID.sysName, OID.upsBatteryStatus, OID.upsEstimatedMinutesRemaining,
             OID.upsEstimatedChargeRemaining, OID.upsBatteryVoltage, OID.upsBatteryTemp,
@@ -103,7 +114,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             outputVoltageR, outputVoltageS, outputVoltageT,
             outputCurrentRawR, outputCurrentRawS, outputCurrentRawT,
             outputPercentLoadR, outputPercentLoadS, outputPercentLoadT
-        ] = await snmpGetAll(session, oidsToFetch);
+        ] = await snmpGetAllChunked(session, oidsToFetch, 5); // Ambil per 5 OID
 
         if (sysDescr === null && inputVoltageR === null && outputVoltageR === null) {
             throw new Error('No SNMP response from UPS');
