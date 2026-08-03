@@ -158,5 +158,13 @@
     "category": "Navigation",
     "files": "/src/parsers/dme_mopah_binary.js",
     "createdAt": "2026-07-24T10:45:00.000Z"
+  },
+  {
+    "id": "pm5350_modbus",
+    "name": "PM5350 Modbus TCP",
+    "description": "Parser untuk Schneider PowerLogic PM5350 — Voltage, Current, Power, PF, Hz via Modbus RTU-over-TCP",
+    "files": "/src/parsers/pm5350_modbus.js",
+    "category": "Support",
+    "createdAt": "2026-08-03T13:12:04.082Z"
   }
 ]

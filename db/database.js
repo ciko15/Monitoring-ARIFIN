@@ -48,6 +48,7 @@ const PARSER_TEMPLATES = {
   'ils_llz_thales421': ['tx_main', 'tx_stby', 'M1_CRS_RF', 'M1_CRS_DDM', 'M1_CRS_SDM', 'M1_IDENT_AM', 'M1_WIDTH_RF', 'M1_WIDTH_DDM', 'M1_WIDTH_SDM', 'M1_CLR_RF', 'M1_CLR_DDM', 'M1_CLR_SDM', 'M1_NF_RF', 'M1_NF_DDM', 'M1_NF_SDM', 'M1_FREQ_DEV', 'M2_CRS_RF', 'M2_CRS_DDM', 'M2_CRS_SDM', 'M2_IDENT_AM', 'M2_WIDTH_RF', 'M2_WIDTH_DDM', 'M2_WIDTH_SDM', 'M2_CLR_RF', 'M2_CLR_DDM', 'M2_CLR_SDM', 'M2_NF_RF', 'M2_NF_DDM', 'M2_NF_SDM', 'M2_FREQ_DEV'],
   'ils_gp_thales421': ['tx_main', 'tx_stby', 'GP_ANGLE', 'RF_POWER', 'DDM_COURSE', 'CARRIER_PWR', 'CSB_POWER', 'DDM_CLR', 'SBO_POWER', 'CLR_POWER', 'CLR_DDM', 'CLR_SDM', 'RF_OUT', 'DDM_MON', 'MON_POWER'],
   'pm5560_modbus': ['VL1N', 'VL2N', 'VL3N', 'VL12', 'VL23', 'VL31', 'IL1', 'IL2', 'IL3', 'KW', 'KVAR', 'KVA', 'PF', 'HZ', 'KWH'],
+  'pm5350_modbus': ['connectivity', 'V_RN', 'V_SN', 'V_TN', 'V_RS', 'V_ST', 'V_TR', 'I_R', 'I_S', 'I_T', 'FREQ', 'KW', 'KVA', 'PF'],
   'vhf_marc_rse': ['frequency_mhz', 'mode', 'status', 'supply_voltage', 'pa_temp_c', 'fwd_power_w', 'refl_power_w', 'modulation_pct', 'sensitivity_dbm', 'squelch_dbm', 'rx_supply_voltage'],
   'temp_humidity_modbus': ['temperature_c', 'humidity_pct', 'location'],
   'asterix_radar': ['connectivity', 'radar_name', 'sac', 'sic', 'radar_id', 'last_cat034', 'msg_type', 'time_of_day', 'sector_number', 'antenna_rotation', 'system_config'],
@@ -161,7 +162,7 @@ async function writeJson(filePath, data) {
             if (retries === 0) {
               // Final fallback
               await fs.promises.copyFile(tempPath, filePath);
-              await fs.promises.unlink(tempPath).catch(() => {});
+              await fs.promises.unlink(tempPath).catch(() => { });
               renameSuccess = true;
             } else {
               await new Promise(r => setTimeout(r, 100)); // wait 100ms before retry
@@ -196,7 +197,7 @@ async function writeJson(filePath, data) {
 async function readAirportConfig() {
   const data = await readJson(AIRPORT_CONFIG_PATH, null);
   if (Array.isArray(data)) return data;
-  
+
   // Backward compatibility: If it's a single object, convert to array
   if (data && typeof data === 'object') {
     return [data];
@@ -368,12 +369,12 @@ async function syncEquipmentLogsFromDisk(force = false) {
     }
 
     try {
-        equipmentLogsDB = JSON.parse(data);
-        rebuildLatestEquipmentData();
+      equipmentLogsDB = JSON.parse(data);
+      rebuildLatestEquipmentData();
     } catch (parseErr) {
-        console.error(`[DB] JSON Parse error in equipment_logs.json: ${parseErr.message}`);
-        // Jika file corrupt (misal terputus tengah jalan), reset array kosong
-        equipmentLogsDB = [];
+      console.error(`[DB] JSON Parse error in equipment_logs.json: ${parseErr.message}`);
+      // Jika file corrupt (misal terputus tengah jalan), reset array kosong
+      equipmentLogsDB = [];
     }
     logsFileMtimeMs = mtimeMs;
   } catch (err) {
@@ -426,14 +427,14 @@ function syncIpcStateForWeb() {
         if (stats.mtimeMs > lastIpcSyncTime) {
           const content = fs.readFileSync(IPC_STATE_PATH, 'utf8');
           const stateObj = JSON.parse(content);
-          
+
           // JANGAN .clear() karena akan menghapus data dari syncEquipmentLogsFromDisk!
           // latestEquipmentDataBySource.clear();
-          
+
           for (const key of Object.keys(stateObj)) {
             latestEquipmentDataBySource.set(key, stateObj[key]);
           }
-          
+
           lastIpcSyncTime = stats.mtimeMs;
         }
       }
@@ -446,7 +447,7 @@ function syncIpcStateForWeb() {
 function upsertLatestEquipmentData(log) {
   const key = buildEquipmentSourceKey(log.equipmentId, log.source);
   latestEquipmentDataBySource.set(key, log);
-  
+
   // Update lightweight IPC file so Web process can read it
   if (process.env.SERVICE_ROLE === 'collector' || !process.env.SERVICE_ROLE) {
     try {
@@ -467,7 +468,7 @@ function upsertLatestEquipmentData(log) {
 
 function getLatestLogsBySource(equipmentId) {
   syncIpcStateForWeb(); // Sync memory before serving UI
-  
+
   const result = [];
   for (const [key, log] of latestEquipmentDataBySource.entries()) {
     if (String(log.equipmentId) === String(equipmentId)) {
@@ -577,7 +578,7 @@ async function getAllEquipment(filters = {}) {
     for (const item of resultData) {
       // 1. Dapatkan log terakhir dari memori (untuk kecepatan)
       const latestLogs = getLatestLogsBySource(item.id);
-      
+
       // 2. Jika log memori kosong, scan folder /data/ secara mundur
       let latestTimeFromFile = null;
       if (latestLogs.length === 0) {
@@ -661,11 +662,11 @@ async function getAllEquipment(filters = {}) {
       // Only keep sources that are explicitly configured
       const finalMergedData = {};
       const configSourceNames = configSources.map(s => s.name);
-      
+
       for (const src of configSources) {
         // Ambil data yang sudah ada (mungkin isi placeholder '-')
         const sourceLog = mergedData[src.name] || {};
-        
+
         // JIKA waktu log kosong, paksa gunakan waktu dari scan history /data/
         if (!sourceLog._logged_at) {
           sourceLog._logged_at = latestTimeFromFile;
@@ -760,7 +761,7 @@ async function getEquipmentById(id) {
 
   const latestLogs = getLatestLogsBySource(id);
   const mergedData = {};
-  
+
   // Fill with configured sources first
   for (const src of configSources) {
     const template = PARSER_TEMPLATES[src.parsing_id] || PARSER_TEMPLATES['default'];
@@ -778,21 +779,21 @@ async function getEquipmentById(id) {
       const isTimedOut = (now - logTime) > (4 * 60 * 1000); // 4 minutes
 
       if (isTimedOut) {
-        mergedData[sourceName] = { 
-          ...mergedData[sourceName], 
-          _status: 'Disconnect', 
+        mergedData[sourceName] = {
+          ...mergedData[sourceName],
+          _status: 'Disconnect',
           _stale: true,
-          _logged_at: log.logged_at, 
-          _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id 
+          _logged_at: log.logged_at,
+          _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id
         };
       } else {
-        mergedData[sourceName] = { 
-          ...mergedData[sourceName], 
-          ...log.data, 
-          _status: log.status, 
+        mergedData[sourceName] = {
+          ...mergedData[sourceName],
+          ...log.data,
+          _status: log.status,
           _stale: false,
-          _logged_at: log.logged_at, 
-          _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id 
+          _logged_at: log.logged_at,
+          _parsing_id: log.parsing_id || mergedData[sourceName]._parsing_id
         };
       }
     }
@@ -1177,16 +1178,16 @@ async function getUserByUsername(username) {
 
 async function createUser(data) {
   let users = await readJson(USERS_CONFIG_PATH);
-  
+
   // Hash password before saving
   const hashedPassword = await (globalThis.Bun ? globalThis.Bun.password.hash(data.password) : data.password);
-  
-  const newUser = { 
-    ...data, 
+
+  const newUser = {
+    ...data,
     password: hashedPassword,
-    id: Date.now() 
+    id: Date.now()
   };
-  
+
   users.push(newUser);
   await writeJson(USERS_CONFIG_PATH, users);
   return newUser;
@@ -1197,12 +1198,12 @@ async function updateUser(id, data) {
   const index = users.findIndex(u => u.id == id);
   if (index !== -1) {
     const updatedData = { ...data };
-    
+
     // Hash password if it's being updated
     if (data.password) {
       updatedData.password = await (globalThis.Bun ? globalThis.Bun.password.hash(data.password) : data.password);
     }
-    
+
     users[index] = { ...users[index], ...updatedData, id: Number(id) };
     await writeJson(USERS_CONFIG_PATH, users);
     return users[index];
@@ -1213,7 +1214,7 @@ async function updateUser(id, data) {
 async function verifyUser(username, password) {
   const user = await getUserByUsername(username);
   if (!user) return null;
-  
+
   if (globalThis.Bun) {
     try {
       const isMatch = await globalThis.Bun.password.verify(password, user.password);
@@ -1230,7 +1231,7 @@ async function verifyUser(username, password) {
     }
     return null;
   }
-  
+
   return user.password === password ? user : null;
 }
 
@@ -1253,7 +1254,7 @@ async function getAllCategories() {
 // --- EQUIPMENT LOGS ---
 async function createEquipmentLog(data) {
   const log = { ...data, id: Date.now(), logged_at: data.logged_at || new Date().toISOString() };
-  
+
   if (data.source === 'TX 1 APP' || data.equipment_name === 'VHF Primary APP') {
     console.log('[DB-DEBUG] createEquipmentLog called for TX 1 APP! Data:', JSON.stringify(log));
   }
@@ -1263,7 +1264,7 @@ async function createEquipmentLog(data) {
   // We NO LONGER persist history to `equipment_logs.json`.
   // We ONLY keep 1 latest snapshot in memory for the live dashboard.
   upsertLatestEquipmentData(log);
-  
+
   return log;
 }
 
@@ -1395,7 +1396,7 @@ module.exports = {
   readJson,
   writeJson,
   setConfigUpdateHook,
-  
+
   // Analytics/History scan
   getLatestTimestampFromHistory,
   query,

@@ -619,6 +619,53 @@ class NetworkListenerService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // PM5350 Modbus RTU-over-TCP Poller
+    // ─────────────────────────────────────────────────────────────────────────
+    startPm5350Listener(source) {
+        const { id, equipt_id, ip_address, tcp_port, name, poll_interval, extra_config } = source;
+        const pollSec = parseInt(poll_interval) || 60; // Default 60 detik
+        const port = parseInt(tcp_port) || 26;
+
+        let slaveId = 5;
+        if (extra_config) {
+            try {
+                const config = typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config;
+                if (config.modbus_slave_id) slaveId = parseInt(config.modbus_slave_id);
+            } catch (e) {
+                console.warn(`[PM5350] Invalid extra_config for ${name}`);
+            }
+        }
+
+        const { pollPM5350 } = require('../parsers/pm5350_modbus');
+
+        this.activeListeners.add(id);
+        console.log(`[PM5350] Listener started: ${name} (${ip_address}:${port}, Slave ID: ${slaveId}, Poll: ${pollSec}s)`);
+
+        const doPoll = async () => {
+            try {
+                const result = await pollPM5350(ip_address, port, slaveId);
+                await this._handleLogOutput(
+                    source,
+                    { data: result.data, source: name, _ip: ip_address },
+                    'pm5350_modbus',
+                    result.status || 'Disconnect'
+                );
+            } catch (err) {
+                console.error(`[PM5350] Poll error ${name}:`, err.message);
+            }
+        };
+
+        const initialDelay = 1000 + Math.floor(Math.random() * 5000);
+        setTimeout(() => {
+            doPoll();
+            const timer = setInterval(doPoll, pollSec * 1000);
+
+            if (!this._pm5350Timers) this._pm5350Timers = new Map();
+            this._pm5350Timers.set(id, timer);
+        }, initialDelay);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // ASTERIX UDP MULTICAST (Radar CAT034 + ADS-B CAT021)
     // ─────────────────────────────────────────────────────────────────────────
     startAsterixListener(source, parserId) {
@@ -878,6 +925,12 @@ class NetworkListenerService {
         // UPS SNMP Monitor
         if (moduleName === 'ups_netagent_snmp') {
             this.startUpsNetagentListener(source);
+            return;
+        }
+
+        // PM5350 Modbus Monitor
+        if (moduleName === 'pm5350_modbus') {
+            this.startPm5350Listener(source);
             return;
         }
 

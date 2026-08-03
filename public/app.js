@@ -700,6 +700,18 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       marcDiv.style.display = 'none';
       clearMarcPortsCheckboxes();
     }
+
+    // Populate PM5350 extra fields if editing
+    const pm5350Div = document.getElementById('pm5350ExtraFields');
+    if (editSource.parsing_id === 'pm5350_modbus' && pm5350Div) {
+      pm5350Div.style.display = 'block';
+      const pm5350Extra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? JSON.parse(editSource.extra_config) : editSource.extra_config) : {};
+      if (document.getElementById('pm5350SlaveId')) document.getElementById('pm5350SlaveId').value = pm5350Extra.modbus_slave_id || 5;
+      if (document.getElementById('pm5350PollInterval')) document.getElementById('pm5350PollInterval').value = editSource.poll_interval || 60;
+      if (portInput && !portInput.value) portInput.value = '26';
+    } else if (pm5350Div) {
+      pm5350Div.style.display = 'none';
+    }
   } else {
     form.reset();
     clearMarcPortsCheckboxes();
@@ -736,13 +748,16 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const marcExtra = document.getElementById('marcExtraFields');
       const snmpExtra = document.getElementById('snmpExtraFields');
       const astExtra = document.getElementById('asterixExtraFields');
+      const pm5350Extra = document.getElementById('pm5350ExtraFields');
       const portField = document.getElementById('dataSourceUdpPort');
       const isSnmp = isSnmpParsingId(templateSelect.value);
       const isAsterix = templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar';
+      const isPm5350 = templateSelect.value === 'pm5350_modbus';
       if (extra) extra.style.display = templateSelect.value === 'vhf_t6tv' ? 'block' : 'none';
       if (marcExtra) marcExtra.style.display = templateSelect.value === 'vhf_marc_rse' ? 'block' : 'none';
       if (snmpExtra) snmpExtra.style.display = isSnmp ? 'block' : 'none';
       if (astExtra) astExtra.style.display = isAsterix ? 'block' : 'none';
+      if (pm5350Extra) pm5350Extra.style.display = isPm5350 ? 'block' : 'none';
       if (tcpPortGroup) tcpPortGroup.style.display = isSnmp ? 'none' : '';
       if (portField) {
         portField.required = templateSelect.value !== 'vhf_t6tv' && !isSnmp;
@@ -820,7 +835,13 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         interval: document.getElementById('t6tvInterval') ? parseInt(document.getElementById('t6tvInterval').value) || 5 : 5,
         username: document.getElementById('t6tvUsername') ? document.getElementById('t6tvUsername').value : 'admin',
         password: document.getElementById('t6tvPassword') ? document.getElementById('t6tvPassword').value : 'admin',
+      }) : templateSelect.value === 'pm5350_modbus' ? JSON.stringify({
+        modbus_slave_id: document.getElementById('pm5350SlaveId') ? parseInt(document.getElementById('pm5350SlaveId').value) || 5 : 5,
       }) : null,
+      // PM5350: simpan poll_interval
+      ...(templateSelect.value === 'pm5350_modbus' ? {
+        poll_interval: document.getElementById('pm5350PollInterval') ? parseInt(document.getElementById('pm5350PollInterval').value) || 60 : 60
+      } : {}),
       // MARC RSE: simpan marc_ports langsung di root object (bukan extra_config)
       ...(templateSelect.value === 'vhf_marc_rse' ? { marc_ports: getMarcPortsFromCheckboxes() } : {}),
       ...(templateSelect.value === 'vhf_marc_rse' ? { poll_interval: 30 } : {}),
