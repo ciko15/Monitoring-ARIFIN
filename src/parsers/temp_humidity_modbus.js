@@ -19,10 +19,11 @@ async function pollTempHumidity(host, port = 502, slaveId = 1, timeoutMs = 4000)
         
         client.setID(slaveId);
 
-        // Dari hasil analisa:
-        // Register 0 = Suhu (misal 220 -> 22.0 °C)
-        // Register 1 = Kelembapan (misal 425 -> 42.5 %)
-        const res = await client.readInputRegisters(0, 2);
+        // Dari hasil analisa dan screenshot Modbus Poll:
+        // Function = 03 (Holding Registers)
+        // Register 0 = Suhu (misal 252 -> 25.2 °C)
+        // Register 1 = Kelembapan (misal 352 -> 35.2 %)
+        const res = await client.readHoldingRegisters(0, 2);
         
         const tempC = (res.data[0] / 10.0);
         const humiP = (res.data[1] / 10.0);
