@@ -431,88 +431,60 @@ class NetworkListenerService {
      * Pola sama dengan PM5560 — 1 koneksi TCP per sensor, polling FC03 tiap interval.
      */
     startTempHumidityListener(source) {
-        const net = require('net');
-        const { id, equipt_id, ip_address, tcp_port, name, location } = source;
+        const { id, equipt_id, ip_address, tcp_port, name, poll_interval, extra_config, location } = source;
+        const pollSec = parseInt(poll_interval) || 60; // Default 60 detik
         const port = parseInt(tcp_port) || 502;
 
-        const TempHumidityParser = require('../parsers/temp_humidity_modbus');
-        const POLL_INTERVAL = TempHumidityParser.POLL_INTERVAL;
-        const parser = new TempHumidityParser({ equipt_id, location: location || name });
+        let slaveId = 1;
+        if (extra_config) {
+            try {
+                const config = typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config;
+                if (config.modbus_slave_id) slaveId = parseInt(config.modbus_slave_id);
+            } catch (e) {
+                console.warn(`[TempHumidity] Invalid extra_config for ${name}`);
+            }
+        }
 
-        let socket = null;
-        let pollTimer = null;
-        let reconnectTimer = null;
-        let stopped = false;
-        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const { pollTempHumidity } = require('../parsers/temp_humidity_modbus');
+
+        this.activeListeners.add(id);
+        console.log(`[TempHumidity] Listener started: ${name} (${ip_address}:${port}, Slave ID: ${slaveId}, Poll: ${pollSec}s)`);
 
         const doPoll = async () => {
-            const s = socket;
-            if (!s || s.destroyed) return;
-            const req = parser.getPollRequest();
             try {
-                s.write(req.bytes);
-            } catch (e) {
-                console.warn(`[TempHumidity] Write error ${name}: ${e.message}`);
-            }
-        };
-
-        const connect = () => {
-            if (stopped) return;
-            socket = new net.Socket();
-            socket.setTimeout(15000);
-
-            socket.connect(port, ip_address, () => {
-                console.log(`[TempHumidity] Connected: ${name} (${ip_address}:${port})`);
-                this.activeListeners.add(id);
-                // Kirim langsung saat connect, lalu ulangi tiap POLL_INTERVAL
-                doPoll();
-                pollTimer = setInterval(doPoll, POLL_INTERVAL);
-            });
-
-            socket.on('data', async (chunk) => {
-                const result = parser.parse(chunk);
-                if (!result) return;
-                const logStatus = result.status || 'Normal';
+                const result = await pollTempHumidity(ip_address, port, slaveId);
+                const logStatus = result.status || 'Disconnect';
+                
                 await this._handleLogOutput(
                     source,
-                    {
+                    { 
                         data: {
                             ...result.data,
-                            location: location || name,
-                        },
-                        source: name,
-                        _ip: ip_address,
+                            location: location || name
+                        }, 
+                        source: name, 
+                        _ip: ip_address 
                     },
                     'temp_humidity_modbus',
                     logStatus
                 );
-                console.log(`[TempHumidity] ${name}: ${result.data.temperature_c}°C ${result.data.humidity_pct}% [${logStatus}]`);
-            });
-
-            socket.on('error', (err) => {
-                this._logThrottled('error', `temp-humidity:error:${id}:${err.message}`, `[TempHumidity] Error ${name}: ${err.message}`);
-            });
-
-            socket.on('timeout', () => {
-                this._logThrottled('warn', `temp-humidity:timeout:${id}`, `[TempHumidity] Timeout ${name}, reconnecting...`);
-                socket.destroy();
-            });
-
-            socket.on('close', () => {
-                this._logThrottled('log', `temp-humidity:close:${id}`, `[TempHumidity] Disconnected ${name}, retry in 15s`);
-                this.activeListeners.delete(id);
-                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-                parser.reset();
-                if (!stopped) reconnectTimer = setTimeout(connect, 15000);
-            });
+            } catch (err) {
+                console.error(`[TempHumidity] Poll error ${name}:`, err.message);
+            }
         };
 
-        connect();
+        const initialDelay = 1000 + Math.floor(Math.random() * 5000);
+        setTimeout(() => {
+            doPoll();
+            const timer = setInterval(doPoll, pollSec * 1000);
+
+            if (!this._tempHumidityTimers) this._tempHumidityTimers = new Map();
+            this._tempHumidityTimers.set(id, timer);
+        }, initialDelay);
 
         // Cleanup handle
         this._tempHumidityCleanup = this._tempHumidityCleanup || new Map();
         this._tempHumidityCleanup.set(id, () => {
-            stopped = true;
             if (reconnectTimer) clearTimeout(reconnectTimer);
             if (pollTimer) clearInterval(pollTimer);
             if (socket) socket.destroy();
