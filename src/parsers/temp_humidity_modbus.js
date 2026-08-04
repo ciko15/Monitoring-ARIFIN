@@ -19,13 +19,25 @@ async function pollTempHumidity(host, port = 502, slaveId = 1, timeoutMs = 4000)
         
         client.setID(slaveId);
 
-        // test-humidity berhasil membaca FC04 (Input Registers) di alamat 1-2
-        const res = await client.readInputRegisters(1, 2);
+        // Dari hasil analisa:
+        // Register 0 = Suhu (misal 220 -> 22.0 °C)
+        // Register 1 = Kelembapan (misal 425 -> 42.5 %)
+        const res = await client.readInputRegisters(0, 2);
         
         const tempC = (res.data[0] / 10.0);
         const humiP = (res.data[1] / 10.0);
         
         client.close();
+
+        // --- PROTEKSI & VALIDASI DATA (SANITY CHECK) ---
+        // Jika terjadi tabrakan data di kabel RS485, angka yang didapat akan ngawur.
+        // Kita cegah angka ngawur tersebut masuk ke database/UI.
+        if (tempC < -50 || tempC > 150) {
+            throw new Error(`Data Suhu tidak masuk akal (${tempC}°C). Kemungkinan tabrakan data (Collision).`);
+        }
+        if (humiP < 0 || humiP > 100) {
+            throw new Error(`Data Kelembapan tidak masuk akal (${humiP}%). Kemungkinan tabrakan data (Collision).`);
+        }
 
         let status = 'Normal';
         const alarms = [];
