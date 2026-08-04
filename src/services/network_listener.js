@@ -16,6 +16,7 @@ class NetworkListenerService {
     constructor() {
         this.equipmentService = new EquipmentService(db);
         this.activeListeners = new Set(); // source_id -> true
+        this.parsers = new Map(); // source_id -> parser instance
         this._parseWarningTimestamps = new Map();
         this.statusGate = new SourceStatusGate();
         this.pipelineMode = process.env.PIPELINE_MODE || 'inline';
@@ -925,10 +926,11 @@ class NetworkListenerService {
 
         console.log(`[NetworkListener] Starting listener for ${source.name} on port ${port} (parser: ${parsing_id})...`);
 
-        // 1. Create Parser
-        let parser = null;
-        if (parsing_id) {
+        // 1. Create Parser (or reuse existing one to preserve _lastData across TCP drops)
+        let parser = this.parsers.get(id);
+        if (!parser && parsing_id) {
             parser = ParserFactory.createParser(parsing_id, { equipt_id });
+            if (parser) this.parsers.set(id, parser);
         }
 
         if (!parser) {

@@ -28,20 +28,7 @@
       "severity": "alarm",
       "message": "RF Input High"
     },
-    {
-      "parameter": "azimuth",
-      "operator": "lt",
-      "value": 116.2,
-      "severity": "alarm",
-      "message": "Azimuth Low"
-    },
-    {
-      "parameter": "azimuth",
-      "operator": "gt",
-      "value": 118.2,
-      "severity": "alarm",
-      "message": "Azimuth High"
-    },
+
     {
       "parameter": "fm_index",
       "operator": "lt",
