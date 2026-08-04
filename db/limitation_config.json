@@ -26,11 +26,7 @@
     "name": "Azimuth",
     "category": "Navigation",
     "sup_category": "DVOR",
-    "value_type": "numeric",
-    "min_alarm_limit": "116.2",
-    "max_alarm_limit": "118.2",
-    "alv": "116.2",
-    "ahv": "118.2"
+    "value_type": "numeric"
   },
   {
     "id": 1004,
