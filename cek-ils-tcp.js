@@ -19,11 +19,11 @@ let connectTimeout = setTimeout(() => {
 client.connect(TARGET_PORT, TARGET_IP, function() {
     clearTimeout(connectTimeout);
     console.log(`✅ BERHASIL: Terhubung ke perangkat ${TARGET_IP}:${TARGET_PORT}`);
-    console.log(`⏳ Mode UJI COBA HALUS: Mengirim 1x pertanyaan (trigger) sangat pelan untuk melihat apakah alat bisa melayani 2 aplikasi sekaligus tanpa error...`);
+    console.log(`⏳ Menunggu data masuk...\n`);
     
-    // Kirim Trigger Normarc
-    const triggerCommand = Buffer.from([0x0B, 0x00, 0xF9, 0x06]);
-    console.log(`-> Mengirim perintah (Normarc):`, triggerCommand.toString('hex').toUpperCase());
+    // Mengirim trigger command persis seperti cek-dvor-tcp.js
+    const triggerCommand = Buffer.from([0x01, 0x02, 0xc5, 0x35, 0x17, 0x8b, 0x1a, 0x0e, 0x01, 0x03, 0xab, 0x39]);
+    console.log(`-> Mengirim trigger command (DVOR style):`, triggerCommand.toString('hex').toUpperCase());
     client.write(triggerCommand);
 });
 
