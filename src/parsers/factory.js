@@ -120,6 +120,10 @@ class ParserFactory {
 
             case 'pm5560_modbus':
                 return new Pm5560ModbusParser(config);
+                
+            case 'iologik_modbus':
+                const IoLogikModbusParser = require('./iologik_modbus');
+                return new IoLogikModbusParser(config);
 
             case 'ils_gp_thales421':
                 return new IlsGpThales421Parser(config);
