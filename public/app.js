@@ -3432,7 +3432,7 @@ function addIoParam(deviceId, key = '', pin = '') {
       </select>
       <input type="text" class="io-param-custom-key" placeholder="Kunci Kustom" value="${key}" onchange="syncIologikBuilderToJson()" style="display:${key && !optionsHtml.includes(`value="${key}"`) ? 'block' : 'none'}; background:#0a1628; color:#fff; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:2;">
       <input type="number" class="io-param-pin" placeholder="PIN (0-47)" value="${pinVal}" min="0" max="47" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:1;">
-      <select class="io-param-logic" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; width:55px;">
+      <select class="io-param-logic" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; width:65px;">
         <option value="NO" ${logicVal === 'NO' ? 'selected' : ''}>NO</option>
         <option value="NC" ${logicVal === 'NC' ? 'selected' : ''}>NC</option>
       </select>
