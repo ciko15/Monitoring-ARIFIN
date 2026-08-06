@@ -3412,10 +3412,10 @@ function addIoParam(deviceId, key = '', pin = '') {
   const paramId = `io_param_${Math.random().toString(36).substring(2, 9)}`;
   
   let pinVal = pin;
-  let logicVal = 'NO';
+  let logicVal = 'NC';
   if (pin !== null && typeof pin === 'object') {
     pinVal = pin.pin;
-    logicVal = pin.logic || 'NO';
+    logicVal = pin.logic || 'NC';
   }
 
   const optionsHtml = [
@@ -3433,8 +3433,8 @@ function addIoParam(deviceId, key = '', pin = '') {
       <input type="text" class="io-param-custom-key" placeholder="Kunci Kustom" value="${key}" onchange="syncIologikBuilderToJson()" style="display:${key && !optionsHtml.includes(`value="${key}"`) ? 'block' : 'none'}; background:#0a1628; color:#fff; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:2;">
       <input type="number" class="io-param-pin" placeholder="PIN (0-47)" value="${pinVal}" min="0" max="47" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:1;">
       <select class="io-param-logic" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; width:65px;">
-        <option value="NO" ${logicVal === 'NO' ? 'selected' : ''}>NO</option>
         <option value="NC" ${logicVal === 'NC' ? 'selected' : ''}>NC</option>
+        <option value="NO" ${logicVal === 'NO' ? 'selected' : ''}>NO</option>
       </select>
       <button type="button" class="btn btn-secondary btn-sm" onclick="removeIoParam('${paramId}')" style="padding:4px; background:transparent; border:none; color:#ff3355;">
         <i class="fas fa-times"></i>

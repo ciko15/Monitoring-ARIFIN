@@ -52,6 +52,7 @@ module.exports = {
     instances: 1,
     autorestart: true,
     watch: false,
+    ignore_watch: ["data", "logs", "db", "*.sqlite", "*.log", "node_modules"],
     max_memory_restart: '1G',
     env: {
       NODE_ENV: 'production',
