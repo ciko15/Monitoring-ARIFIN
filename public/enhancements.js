@@ -409,13 +409,14 @@
     function getSourceDetailPayload(src) {
         let latestData = null;
         let eqSup = '';
+        const effParserId = resolveEffectiveParserId(src);
 
         if (window.equipmentDataCache) {
             const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
             eqSup = eq ? eq.sup_category : '';
 
             if (eq && eq.lastData) {
-                if (src.parsing_id === 'vhf_marc_rse') {
+                if (effParserId === 'vhf_marc_rse') {
                     const radioData = resolveSourceData(eq, src);
                     latestData = radioData ? { _isMarcMulti: true, radios: { [src.name]: radioData } } : null;
                 } else {
@@ -576,6 +577,19 @@
         }
     }
 
+    function resolveEffectiveParserId(src) {
+        if (!src || !src.parsing_id) return '';
+        let id = src.parsing_id;
+        if (id.startsWith('custom_')) {
+            const tmpl = window.templatesCache?.find(t => t.id === id);
+            if (tmpl && tmpl.files) {
+                if (tmpl.files.includes('iologik_modbus')) return 'iologik_modbus';
+                if (tmpl.files.includes('pm5560_modbus')) return 'pm5560_modbus';
+            }
+        }
+        return id;
+    }
+
     function renderSourcePanel(sources, body, equipmentId) {
         if (sources.length === 0) {
             body.innerHTML = `
@@ -615,8 +629,10 @@
                     keysToShow = tmpl.parameters.slice(0, 6).map(p => p.name || p.label);
                 }
 
+                const effParserId = resolveEffectiveParserId(src);
+
                 // KHUSUS: iologik_modbus (dinamis dari extra_config)
-                if (src.parsing_id === 'iologik_modbus') {
+                if (effParserId === 'iologik_modbus') {
                     keysToShow = []; // reset
                     try {
                         if (src.extra_config) {
@@ -636,7 +652,7 @@
                 }
 
                 // Fallback to first 6 keys if still empty and we have data
-                if (keysToShow.length === 0 && src.parsing_id !== 'iologik_modbus' && srcData) {
+                if (keysToShow.length === 0 && effParserId !== 'iologik_modbus' && srcData) {
                     keysToShow = Object.keys(srcData)
                         .filter(k => !k.startsWith('_') && k !== 'error' && k !== 'cached' && k !== 'status' && k !== 'success' && k !== 'timestamp')
                         .slice(0, 6);
@@ -645,7 +661,7 @@
                 if (keysToShow.length > 0) {
                     previewHtml = `<div class="sp-card-preview-grid">
                         ${keysToShow.map(k => {
-                        const resolvedVal = resolvePreviewValue(srcData, src.parsing_id, k);
+                        const resolvedVal = resolvePreviewValue(srcData, effParserId, k);
                         const valObj = resolvedVal;
                         const isObj = valObj !== null && typeof valObj === 'object';
 
