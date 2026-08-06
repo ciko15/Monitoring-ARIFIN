@@ -639,6 +639,55 @@ class NetworkListenerService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Moxa ioLogik 4000 (Modbus TCP)
+    // ─────────────────────────────────────────────────────────────────────────
+    startIologikModbusListener(source) {
+        const { id, name, ip_address, tcp_port, extra_config } = source;
+        const pollSec = 5;
+        const port = parseInt(tcp_port) || 502;
+        let slaveId = 1;
+        let devicesConfig = null;
+        
+        if (extra_config) {
+            try {
+                const config = typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config;
+                if (config.modbus_slave_id) slaveId = parseInt(config.modbus_slave_id);
+                if (config.devices) devicesConfig = config.devices;
+            } catch (e) { }
+        }
+
+        const { pollIoLogik } = require('../parsers/iologik_modbus');
+
+        this.activeListeners.add(id);
+        console.log(`[ioLogik] Listener started: ${name} (${ip_address}:${port})`);
+
+        const doPoll = async () => {
+            try {
+                const result = await pollIoLogik(ip_address, port, slaveId, devicesConfig);
+                if (result.error && result.data) {
+                    result.data.error = result.error;
+                }
+                await this._handleLogOutput(
+                    source,
+                    { data: result.data, source: name, _ip: ip_address },
+                    'iologik_modbus',
+                    result.status || 'Disconnect'
+                );
+            } catch (err) {
+                console.error(`[ioLogik] Poll error ${name}:`, err.message);
+            }
+        };
+
+        const initialDelay = 1000 + Math.floor(Math.random() * 2000);
+        setTimeout(() => {
+            doPoll();
+            const timer = setInterval(doPoll, pollSec * 1000);
+            if (!this._iologikTimers) this._iologikTimers = new Map();
+            this._iologikTimers.set(id, timer);
+        }, initialDelay);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // ASTERIX UDP MULTICAST (Radar CAT034 + ADS-B CAT021)
     // ─────────────────────────────────────────────────────────────────────────
     startAsterixListener(source, parserId) {
@@ -904,6 +953,12 @@ class NetworkListenerService {
         // PM5350 Modbus Monitor
         if (moduleName === 'pm5350_modbus') {
             this.startPm5350Listener(source);
+            return;
+        }
+
+        // Moxa ioLogik 4000 Modbus
+        if (moduleName === 'iologik_modbus') {
+            this.startIologikModbusListener(source);
             return;
         }
 

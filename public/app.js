@@ -712,6 +712,29 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     } else if (pm5350Div) {
       pm5350Div.style.display = 'none';
     }
+
+    // Populate ioLogik extra fields if editing
+    const iologikDiv = document.getElementById('iologikExtraFields');
+    const parserId = editSource.parsing_id || editSource.parser;
+    if (parserId === 'iologik_modbus' && iologikDiv) {
+      iologikDiv.style.display = 'block';
+      let ioExtraStr = '';
+      if (editSource.extra_config && editSource.extra_config !== 'null') {
+          ioExtraStr = typeof editSource.extra_config === 'string' ? editSource.extra_config : JSON.stringify(editSource.extra_config, null, 2);
+      }
+      if (document.getElementById('iologikExtraConfigJson')) {
+          document.getElementById('iologikExtraConfigJson').value = ioExtraStr;
+      }
+      // Render the UI builder
+      if (typeof renderIologikBuilderFromJson === 'function') {
+        renderIologikBuilderFromJson(ioExtraStr);
+      }
+    } else if (iologikDiv) {
+      iologikDiv.style.display = 'none';
+      if (typeof renderIologikBuilderFromJson === 'function') {
+        renderIologikBuilderFromJson('');
+      }
+    }
   } else {
     form.reset();
     clearMarcPortsCheckboxes();
@@ -749,20 +772,34 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const snmpExtra = document.getElementById('snmpExtraFields');
       const astExtra = document.getElementById('asterixExtraFields');
       const pm5350Extra = document.getElementById('pm5350ExtraFields');
+      const iologikExtra = document.getElementById('iologikExtraFields');
       const portField = document.getElementById('dataSourceUdpPort');
       const isSnmp = isSnmpParsingId(templateSelect.value);
       const isAsterix = templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar';
       const isPm5350 = templateSelect.value === 'pm5350_modbus';
+      const isIologik = templateSelect.value === 'iologik_modbus';
       if (extra) extra.style.display = templateSelect.value === 'vhf_t6tv' ? 'block' : 'none';
       if (marcExtra) marcExtra.style.display = templateSelect.value === 'vhf_marc_rse' ? 'block' : 'none';
       if (snmpExtra) snmpExtra.style.display = isSnmp ? 'block' : 'none';
       if (astExtra) astExtra.style.display = isAsterix ? 'block' : 'none';
       if (pm5350Extra) pm5350Extra.style.display = isPm5350 ? 'block' : 'none';
+      if (iologikExtra) {
+          iologikExtra.style.display = isIologik ? 'block' : 'none';
+          if (isIologik && typeof renderIologikBuilderFromJson === 'function') {
+              const hiddenInput = document.getElementById('iologikExtraConfigJson');
+              if (hiddenInput && hiddenInput.value) {
+                  renderIologikBuilderFromJson(hiddenInput.value);
+              } else {
+                  renderIologikBuilderFromJson('');
+              }
+          }
+      }
       if (tcpPortGroup) tcpPortGroup.style.display = isSnmp ? 'none' : '';
       if (portField) {
         portField.required = templateSelect.value !== 'vhf_t6tv' && !isSnmp;
         if (templateSelect.value === 'vhf_t6tv' && !portField.value) portField.value = '80';
         if (templateSelect.value === 'vhf_marc_rse' && !portField.value) portField.value = '950';
+        if (isIologik && !portField.value) portField.value = '502';
         if (isSnmp) {
           portField.value = '';
           portField.placeholder = 'Tidak diperlukan untuk SNMP';
@@ -837,7 +874,11 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         password: document.getElementById('t6tvPassword') ? document.getElementById('t6tvPassword').value : 'admin',
       }) : templateSelect.value === 'pm5350_modbus' ? JSON.stringify({
         modbus_slave_id: document.getElementById('pm5350SlaveId') ? parseInt(document.getElementById('pm5350SlaveId').value) || 5 : 5,
-      }) : null,
+      }) : templateSelect.value === 'iologik_modbus' ? (
+        document.getElementById('iologikExtraConfigJson') && document.getElementById('iologikExtraConfigJson').value.trim() !== ''
+          ? document.getElementById('iologikExtraConfigJson').value.trim()
+          : null
+      ) : null,
       // PM5350: simpan poll_interval
       ...(templateSelect.value === 'pm5350_modbus' ? {
         poll_interval: document.getElementById('pm5350PollInterval') ? parseInt(document.getElementById('pm5350PollInterval').value) || 60 : 60
@@ -3321,3 +3362,163 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closeFilePickerModalBtn) closeFilePickerModalBtn.onclick = closePicker;
   if (cancelFilePickerBtn) cancelFilePickerBtn.onclick = closePicker;
 });
+
+// --- IOLOGIK DYNAMIC FORM BUILDER ---
+
+let ioDeviceCounter = 0;
+
+function addIoDevice(deviceName = '', params = {}) {
+  ioDeviceCounter++;
+  const builder = document.getElementById('iologikDynamicBuilder');
+  if (!builder) return;
+
+  const deviceId = `io_device_${ioDeviceCounter}`;
+  
+  const deviceHtml = `
+    <div id="${deviceId}" class="io-device-block" style="border:1px solid #1a3a5c; border-radius:4px; padding:8px; background:#112238;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        <input type="text" class="io-device-name" placeholder="Nama Alat (Cth: DME)" value="${deviceName}" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px 8px; font-size:11px; flex:1; margin-right:8px;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="removeIoDevice('${deviceId}')" style="padding:4px 8px; font-size:10px; background:#ff3355; color:white; border:none;">
+          <i class="fas fa-trash"></i> Hapus Alat
+        </button>
+      </div>
+      <div id="${deviceId}_params" style="display:flex; flex-direction:column; gap:4px;"></div>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="addIoParam('${deviceId}')" style="padding:4px 8px; font-size:10px; margin-top:8px;">
+        <i class="fas fa-plus"></i> Tambah Parameter
+      </button>
+    </div>
+  `;
+  
+  builder.insertAdjacentHTML('beforeend', deviceHtml);
+
+  // Add initial params if provided
+  for (const [key, pin] of Object.entries(params)) {
+    addIoParam(deviceId, key, pin);
+  }
+  
+  syncIologikBuilderToJson();
+}
+
+function removeIoDevice(deviceId) {
+  const el = document.getElementById(deviceId);
+  if (el) el.remove();
+  syncIologikBuilderToJson();
+}
+
+function addIoParam(deviceId, key = '', pin = '') {
+  const container = document.getElementById(`${deviceId}_params`);
+  if (!container) return;
+  
+  const paramId = `io_param_${Math.random().toString(36).substring(2, 9)}`;
+  
+  const optionsHtml = [
+    'status_normal', 'status_transfer', 'status_shutdown', 'status_maintenance',
+    'tx1', 'tx2', 'desc_primary', 'desc_secondary', 'desc_monitor'
+  ].map(opt => `<option value="${opt}" ${key === opt ? 'selected' : ''}>${opt}</option>`).join('');
+
+  const paramHtml = `
+    <div id="${paramId}" class="io-param-row" style="display:flex; gap:4px; align-items:center;">
+      <select class="io-param-key" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#fff; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:2;">
+        <option value="">Pilih Fungsi Parameter</option>
+        <option value="custom" ${key && !optionsHtml.includes(`value="${key}"`) ? 'selected' : ''}>Kustom...</option>
+        ${optionsHtml}
+      </select>
+      <input type="text" class="io-param-custom-key" placeholder="Kunci Kustom" value="${key}" onchange="syncIologikBuilderToJson()" style="display:${key && !optionsHtml.includes(`value="${key}"`) ? 'block' : 'none'}; background:#0a1628; color:#fff; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:2;">
+      <input type="number" class="io-param-pin" placeholder="PIN (0-47)" value="${pin}" min="0" max="47" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:1;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="removeIoParam('${paramId}')" style="padding:4px; background:transparent; border:none; color:#ff3355;">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `;
+  
+  container.insertAdjacentHTML('beforeend', paramHtml);
+  
+  // Attach event listener to select to toggle custom key input
+  const row = document.getElementById(paramId);
+  const select = row.querySelector('.io-param-key');
+  const customInput = row.querySelector('.io-param-custom-key');
+  
+  select.addEventListener('change', (e) => {
+    if (e.target.value === 'custom') {
+      customInput.style.display = 'block';
+      customInput.focus();
+    } else {
+      customInput.style.display = 'none';
+      customInput.value = e.target.value; // sync value
+    }
+  });
+
+  syncIologikBuilderToJson();
+}
+
+function removeIoParam(paramId) {
+  const el = document.getElementById(paramId);
+  if (el) el.remove();
+  syncIologikBuilderToJson();
+}
+
+function syncIologikBuilderToJson() {
+  const builder = document.getElementById('iologikDynamicBuilder');
+  const hiddenInput = document.getElementById('iologikExtraConfigJson');
+  if (!builder || !hiddenInput) return;
+
+  const devices = {};
+  
+  builder.querySelectorAll('.io-device-block').forEach(deviceBlock => {
+    const deviceName = deviceBlock.querySelector('.io-device-name').value.trim();
+    if (!deviceName) return; // Skip if no name
+    
+    devices[deviceName] = {};
+    
+    deviceBlock.querySelectorAll('.io-param-row').forEach(paramRow => {
+      const selectVal = paramRow.querySelector('.io-param-key').value;
+      const customVal = paramRow.querySelector('.io-param-custom-key').value.trim();
+      const key = selectVal === 'custom' ? customVal : selectVal;
+      
+      let pin = paramRow.querySelector('.io-param-pin').value;
+      
+      if (key && pin !== '') {
+        devices[deviceName][key] = parseInt(pin, 10);
+      }
+    });
+  });
+
+  // If no devices, set to empty string instead of empty devices object
+  if (Object.keys(devices).length === 0) {
+    hiddenInput.value = '';
+  } else {
+    hiddenInput.value = JSON.stringify({ devices: devices }, null, 2);
+  }
+}
+
+function renderIologikBuilderFromJson(jsonStr) {
+  const builder = document.getElementById('iologikDynamicBuilder');
+  if (!builder) return;
+  
+  builder.innerHTML = ''; // Clear existing
+  ioDeviceCounter = 0;
+  
+  if (!jsonStr || jsonStr.trim() === '' || jsonStr === 'null') {
+    return; // Leave empty
+  }
+  
+  try {
+    const config = JSON.parse(jsonStr);
+    if (config && config.devices) {
+      for (const [deviceName, params] of Object.entries(config.devices)) {
+        addIoDevice(deviceName, params);
+      }
+    }
+  } catch (e) {
+    console.error("Failed to parse iologik JSON for builder", e);
+    // If parse fails, fallback to something or do nothing
+  }
+}
+
+// Expose ioLogik functions to global window to prevent ReferenceError
+window.addIoDevice = addIoDevice;
+window.removeIoDevice = removeIoDevice;
+window.addIoParam = addIoParam;
+window.removeIoParam = removeIoParam;
+window.syncIologikBuilderToJson = syncIologikBuilderToJson;
+window.renderIologikBuilderFromJson = renderIologikBuilderFromJson;

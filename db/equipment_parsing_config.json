@@ -169,10 +169,18 @@
   },
   {
     "id": "temp_humidity_modbus",
-    "name": "Temp/Humidity Modbus",
-    "description": "Parser untuk Sensor Suhu & Kelembapan via Modbus TCP (Bisa custom port/slave id)",
+    "name": "Temperature & Humidity Modbus",
+    "description": "Parser Modbus TCP untuk Sensor Suhu dan Kelembapan (Slave ID custom, Holding Register base-0).",
+    "category": "Environment",
     "files": "/src/parsers/temp_humidity_modbus.js",
-    "category": "Support",
-    "createdAt": "2026-08-04T07:30:00.000Z"
+    "createdAt": "2026-08-04T01:24:00.000Z"
+  },
+  {
+    "id": "iologik_modbus",
+    "name": "Moxa ioLogik 4000",
+    "description": "Parser Modbus TCP untuk Moxa ioLogik 4000 (32 Digital Inputs). 1 = Normal, 0 = Alarm.",
+    "category": "Data Processing",
+    "files": "/src/parsers/iologik_modbus.js",
+    "createdAt": "2026-08-06T00:00:00.000Z"
   }
 ]

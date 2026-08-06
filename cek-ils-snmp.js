@@ -1,6 +1,6 @@
 const dgram = require('dgram');
 
-const TARGET_IP = '172.19.7.181';
+const TARGET_IP = '10.62.3.20';
 const TARGET_PORT = 161; // Port standar SNMP
 const SNMP_COMMUNITY = 'public'; // Password default SNMP yang paling umum
 
@@ -31,7 +31,7 @@ client.on('message', (msg, rinfo) => {
 // Ini adalah pertanyaan "Siapa namamu?" dalam bahasa SNMP
 const buildSnmpPacket = (community) => {
     const commBuf = Buffer.from(community, 'ascii');
-    
+
     // Header ASN.1 sederhana (hanya untuk pengujian cepat)
     const packet = Buffer.concat([
         Buffer.from([0x30, 0x29 + commBuf.length]), // Sequence + Total Length

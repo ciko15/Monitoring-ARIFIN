@@ -167,6 +167,7 @@ class ParserFactory {
             'dme_maru_310_320',
             'pm5560_modbus',
             'pm5350_modbus',
+            'iologik_modbus',
             'temp_humidity_modbus',
             'ils_gp_thales421',
             'ils_llz_thales421',

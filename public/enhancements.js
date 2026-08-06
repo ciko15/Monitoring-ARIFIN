@@ -136,6 +136,26 @@
 
     function resolvePreviewValue(srcData, parserId, key) {
         if (!srcData) return null;
+
+        // Custom resolution untuk ioLogik dynamic pins dari sidebar preview
+        if (parserId === 'iologik_modbus' && key.startsWith('iologik_pin_')) {
+            // key format: iologik_pin_DeviceName_pinName
+            const parts = key.replace('iologik_pin_', '').split('_');
+            if (parts.length >= 2) {
+                // Device name bisa saja mengandung underscore, jadi kita harus rekonstruksi
+                // Tapi lebih aman kita iterasi saja:
+                if (srcData.devices) {
+                    for (const [dName, dData] of Object.entries(srcData.devices)) {
+                        if (key.startsWith(`iologik_pin_${dName}_`)) {
+                            const pName = key.replace(`iologik_pin_${dName}_`, '');
+                            if (dData[pName] !== undefined) return dData[pName];
+                        }
+                    }
+                }
+            }
+            return '-'; // Fallback jika belum ada data dari backend
+        }
+
         if (srcData[key] !== undefined && srcData[key] !== null && srcData[key] !== '-') {
             return srcData[key];
         }
@@ -595,10 +615,30 @@
                     keysToShow = tmpl.parameters.slice(0, 6).map(p => p.name || p.label);
                 }
 
+                // KHUSUS: iologik_modbus (dinamis dari extra_config)
+                if (src.parsing_id === 'iologik_modbus') {
+                    keysToShow = []; // reset
+                    try {
+                        if (src.extra_config) {
+                            const cfg = JSON.parse(src.extra_config);
+                            if (cfg && cfg.devices) {
+                                // Ambil 6 pin pertama dari seluruh device untuk preview
+                                for (const [dName, mapping] of Object.entries(cfg.devices)) {
+                                    for (const pinName of Object.keys(mapping)) {
+                                        if (keysToShow.length < 6) {
+                                            keysToShow.push(`iologik_pin_${dName}_${pinName}`);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+
                 // Fallback to first 6 keys if still empty and we have data
-                if (keysToShow.length === 0 && srcData) {
+                if (keysToShow.length === 0 && src.parsing_id !== 'iologik_modbus' && srcData) {
                     keysToShow = Object.keys(srcData)
-                        .filter(k => !k.startsWith('_') && k !== 'error' && k !== 'cached')
+                        .filter(k => !k.startsWith('_') && k !== 'error' && k !== 'cached' && k !== 'status' && k !== 'success' && k !== 'timestamp')
                         .slice(0, 6);
                 }
 
@@ -611,6 +651,13 @@
 
                         // Try to get label from template if available
                         let label = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        
+                        if (k.startsWith('iologik_pin_')) {
+                            const pName = k.split('_').slice(3).join(' ');
+                            const dName = k.split('_')[2];
+                            label = `${dName}: ${pName.replace(/\b\w/g, l => l.toUpperCase())}`;
+                        }
+
                         if (tmpl && tmpl.parameters) {
                             const param = tmpl.parameters.find(p => p.name === k || p.label === k);
                             if (param) label = param.label || param.name;
@@ -738,6 +785,9 @@
         // Build modal
         const modal = document.getElementById('dataSourceDetailModal');
         if (!modal) { createDetailModal(); }
+        
+        window._activeSourceDetail = src; // Set ini DULU sebelum memanggil showDetailModal agar fallback UI bisa baca extra_config
+
         const { latestData, eqSup } = getSourceDetailPayload(src);
         showDetailModal(src, latestData, eqSup);
         _sourceDetailSignature = buildSourceDetailSignature(src, latestData, eqSup);
@@ -877,6 +927,18 @@
     function getDetailSections(parserId, data, supCategory) {
         const sections = [];
 
+        // Global Error Handling: if data has error (e.g. disconnected)
+        if (data && data.error) {
+            sections.push({
+                title: 'Connection Error',
+                params: [
+                    ['Status', 'Disconnect', '#ff3355'],
+                    ['Detail', data.error, '#ffcc00']
+                ]
+            });
+            // Tidak me-return agar layout fallback (dengan '-') tetap di-render di bawahnya
+        }
+
         // Helper: value color berdasarkan range min-max
         const vc = (v, min, max) => {
             const n = parseFloat(v);
@@ -998,6 +1060,53 @@
                     ['ACDC 2', unflattenedData.lcu?.acdc2, '#e8f4ff'],
                 ]
             });
+        }
+        
+        if (parserId === 'iologik_modbus') {
+            
+            const renderDevice = (title, deviceData) => {
+                if (!deviceData) return [];
+                const params = [];
+                
+                for (const [key, val] of Object.entries(deviceData)) {
+                    let color = '#4a7a9a'; // Default abu-abu gelap (Tidak Aktif)
+                    if (val === 'Aktif' || val === 'TX 1' || val === 'TX 2' || val === 'Normal') color = '#00ffcc'; // Hijau nyala
+                    params.push([key, val, color]);
+                }
+                
+                return params;
+            };
+
+            let devicesToRender = data.devices;
+
+            // Jika backend belum mengirim data (misal karena offline sejak server nyala)
+            // maka kita buatkan struktur '—' dari extra_config agar UI tetap tergambar
+            if (!devicesToRender || Object.keys(devicesToRender).length === 0) {
+                devicesToRender = {};
+                if (window._activeSourceDetail && window._activeSourceDetail.extra_config) {
+                    try {
+                        const cfg = JSON.parse(window._activeSourceDetail.extra_config);
+                        if (cfg && cfg.devices) {
+                            for (const [dName, mapping] of Object.entries(cfg.devices)) {
+                                const dummy = {};
+                                for (const key of Object.keys(mapping)) {
+                                    dummy[key] = '-';
+                                }
+                                devicesToRender[dName] = dummy;
+                            }
+                        }
+                    } catch(e) {}
+                }
+            }
+
+            if (devicesToRender) {
+                for (const [deviceName, deviceData] of Object.entries(devicesToRender)) {
+                    sections.push({
+                        title: deviceName, params: renderDevice(deviceName, deviceData)
+                    });
+                }
+            }
+
         } else if (parserId === 'dme_maru_310_320') {
             const sup = 'DME';
             sections.push({

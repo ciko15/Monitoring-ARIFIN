@@ -1713,6 +1713,8 @@ const app = new Elysia()
     .use(staticPlugin({ assets: 'public', prefix: '' }))
 
     // Root Dashboard Serving (Direct Bun file serving via Response)
+    .get('/', () => (globalThis as any).Bun?.file('public/index.html'))
+    .get('/index.html', () => (globalThis as any).Bun?.file('public/index.html'))
     .get('/favicon.ico', () => (globalThis as any).Bun?.file('public/icon.png'))
 
     .get('/api/test-chain', () => {
