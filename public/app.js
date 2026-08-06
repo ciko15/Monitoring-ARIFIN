@@ -3411,6 +3411,13 @@ function addIoParam(deviceId, key = '', pin = '') {
   
   const paramId = `io_param_${Math.random().toString(36).substring(2, 9)}`;
   
+  let pinVal = pin;
+  let logicVal = 'NO';
+  if (pin !== null && typeof pin === 'object') {
+    pinVal = pin.pin;
+    logicVal = pin.logic || 'NO';
+  }
+
   const optionsHtml = [
     'status_normal', 'status_transfer', 'status_shutdown', 'status_maintenance',
     'tx1', 'tx2', 'desc_primary', 'desc_secondary', 'desc_monitor'
@@ -3424,7 +3431,11 @@ function addIoParam(deviceId, key = '', pin = '') {
         ${optionsHtml}
       </select>
       <input type="text" class="io-param-custom-key" placeholder="Kunci Kustom" value="${key}" onchange="syncIologikBuilderToJson()" style="display:${key && !optionsHtml.includes(`value="${key}"`) ? 'block' : 'none'}; background:#0a1628; color:#fff; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:2;">
-      <input type="number" class="io-param-pin" placeholder="PIN (0-47)" value="${pin}" min="0" max="47" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:1;">
+      <input type="number" class="io-param-pin" placeholder="PIN (0-47)" value="${pinVal}" min="0" max="47" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:1;">
+      <select class="io-param-logic" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; width:55px;">
+        <option value="NO" ${logicVal === 'NO' ? 'selected' : ''}>NO</option>
+        <option value="NC" ${logicVal === 'NC' ? 'selected' : ''}>NC</option>
+      </select>
       <button type="button" class="btn btn-secondary btn-sm" onclick="removeIoParam('${paramId}')" style="padding:4px; background:transparent; border:none; color:#ff3355;">
         <i class="fas fa-times"></i>
       </button>
@@ -3476,9 +3487,10 @@ function syncIologikBuilderToJson() {
       const key = selectVal === 'custom' ? customVal : selectVal;
       
       let pin = paramRow.querySelector('.io-param-pin').value;
+      let logic = paramRow.querySelector('.io-param-logic').value;
       
       if (key && pin !== '') {
-        devices[deviceName][key] = parseInt(pin, 10);
+        devices[deviceName][key] = { pin: parseInt(pin, 10), logic: logic };
       }
     });
   });

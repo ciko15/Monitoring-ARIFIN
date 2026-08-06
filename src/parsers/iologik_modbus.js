@@ -49,9 +49,29 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
                 };
 
                 // Dynamic Logic
-                for (const [key, pin] of Object.entries(mapping)) {
-                    if (pin !== null && pin !== undefined) {
-                        out[key] = checkBit(pin) ? 'Aktif' : 'Tidak Aktif';
+                for (const [key, pinConfig] of Object.entries(mapping)) {
+                    if (pinConfig === null || pinConfig === undefined) continue;
+                    
+                    let pinIndex;
+                    let logic = 'NO';
+                    
+                    if (typeof pinConfig === 'object') {
+                        pinIndex = pinConfig.pin;
+                        logic = pinConfig.logic || 'NO';
+                    } else {
+                        pinIndex = pinConfig;
+                    }
+
+                    if (pinIndex !== null && pinIndex !== undefined) {
+                        const bitVal = bitArray[pinIndex];
+                        let isActive = false;
+                        if (logic === 'NC') {
+                            isActive = (bitVal === 0);
+                        } else {
+                            isActive = (bitVal === 1);
+                        }
+                        
+                        out[key] = isActive ? 'Aktif' : 'Tidak Aktif';
                     }
                 }
 
