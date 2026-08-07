@@ -876,6 +876,97 @@ class NetworkListenerService {
 
     }
 
+    startMarcPaeListener(source) {
+        const { id, equipt_id, ip_address, tcp_port, poll_interval, name, extra_config } = source;
+        const port = parseInt(tcp_port) || 950;
+        const pollSec = parseInt(poll_interval) || 30;
+
+        let rseConfigs = [];
+        if (typeof extra_config === 'string') {
+            try {
+                const parsed = JSON.parse(extra_config);
+                if (parsed.rse_configs) rseConfigs = parsed.rse_configs;
+            } catch(e) {}
+        } else if (extra_config && extra_config.rse_configs) {
+            rseConfigs = extra_config.rse_configs;
+        }
+
+        const MarcPaeParser = require('../parsers/marc_pae');
+        const { getOrCreateClient } = MarcPaeParser._internal;
+
+        // Pastikan shared client berjalan
+        const client = getOrCreateClient(ip_address, port, pollSec);
+
+        // Buat parser
+        const parser = new MarcPaeParser({
+            equipt_id,
+            host: ip_address,
+            port: port,
+            rse_configs: rseConfigs,
+            poll_interval: pollSec,
+        });
+
+        this.activeListeners.add(id);
+
+        const pollMs = pollSec * 1000;
+        const pollTimer = setInterval(async () => {
+            try {
+                const result = parser.parse(null);
+                if (!result.success || !result.data || !result.data.rses) return;
+
+                const rses = result.data.rses;
+
+                for (const rse of rses) {
+                    const rseId = rse.rse_id;
+                    const radios = rse.radios;
+                    
+                    for (const [portStr, radioState] of Object.entries(radios)) {
+                        const radioData = {
+                            frequency_mhz: radioState.frequency_mhz,
+                            mode: radioState.mode,
+                            status: radioState.status,
+                            supply_voltage: radioState.supply_voltage,
+                            pa_temp_c: radioState.pa_temp_c,
+                            fwd_power_w: radioState.fwd_power_w,
+                            refl_power_w: radioState.refl_power_w,
+                            modulation_pct: radioState.modulation_pct,
+                            sensitivity_dbm: radioState.sensitivity_dbm,
+                            squelch_dbm: radioState.squelch_dbm,
+                            rx_supply_voltage: radioState.rx_supply_voltage,
+                            rse_id: rseId,
+                            port: parseInt(portStr, 10),
+                            name: radioState.name
+                        };
+    
+                        const flatData = {
+                            ...result.data,
+                            radio: radioData,
+                            marc_port: parseInt(portStr, 10),
+                            rse_id: rseId
+                        };
+                        delete flatData.rses; // Clean up
+    
+                        // Simulate push
+                        await this.handleIncomingData(source, Buffer.from([]), {
+                            parse: () => ({
+                                success: true,
+                                data: flatData,
+                                status: radioState.status === 'ALARM' ? 'Alarm' : 'Normal',
+                                alarms: radioState.status === 'ALARM' ? ['Radio ALARM'] : [],
+                                warnings: [],
+                                timestamp: new Date().toISOString()
+                            })
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error(`[NetworkListener] MARC PAE Error ${name}:`, err.message);
+            }
+        }, pollMs);
+        this._marcPaeTimers = this._marcPaeTimers || new Map();
+        this._marcPaeTimers.set(id, pollTimer);
+    }
+
     _getParserModule(parsing_id) {
         if (!parsing_id || !parsing_id.startsWith('custom_')) return parsing_id;
         try {
@@ -920,7 +1011,7 @@ class NetworkListenerService {
         }
 
         // ILS GP / LLZ — binary streaming TCP, bypass SOH/STX/ETX buffering
-        if (moduleName === 'ils_gp_thales421' || moduleName === 'ils_llz_thales421' || moduleName === 'ils_gp_normac' || moduleName === 'ils_gp_normac7030' || moduleName === 'ils_llz_normac' || moduleName === 'ils_llz_normac7030') {
+        if (moduleName === 'ils_gp_thales421' || moduleName === 'ils_llz_thales421' || moduleName === 'ils_gp_normac' || moduleName === 'ils_gp_normac7030' || moduleName === 'ils_llz_normac' || moduleName === 'ils_llz_normac7030' || moduleName === 'diris_a20') {
             console.log(`[LLZ-TRACE] Routing ${source.name} to startBinaryTcpListener`);
             this.startBinaryTcpListener(source);
             return;
@@ -935,6 +1026,12 @@ class NetworkListenerService {
         // MARC RSE — shared TCP client, binary SLIP protocol
         if (moduleName === 'vhf_marc_rse') {
             this.startMarcRseListener(source);
+            return;
+        }
+
+        // MARC PAE
+        if (moduleName === 'marc_pae') {
+            this.startMarcPaeListener(source);
             return;
         }
 

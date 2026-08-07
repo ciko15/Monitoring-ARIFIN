@@ -773,6 +773,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const astExtra = document.getElementById('asterixExtraFields');
       const pm5350Extra = document.getElementById('pm5350ExtraFields');
       const iologikExtra = document.getElementById('iologikExtraFields');
+      const marcPaeExtra = document.getElementById('marcPaeExtraFields');
       const portField = document.getElementById('dataSourceUdpPort');
       const isSnmp = isSnmpParsingId(templateSelect.value);
       const isAsterix = templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar';
@@ -780,6 +781,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const isIologik = templateSelect.value === 'iologik_modbus';
       if (extra) extra.style.display = templateSelect.value === 'vhf_t6tv' ? 'block' : 'none';
       if (marcExtra) marcExtra.style.display = templateSelect.value === 'vhf_marc_rse' ? 'block' : 'none';
+      if (marcPaeExtra) marcPaeExtra.style.display = templateSelect.value === 'marc_pae' ? 'block' : 'none';
       if (snmpExtra) snmpExtra.style.display = isSnmp ? 'block' : 'none';
       if (astExtra) astExtra.style.display = isAsterix ? 'block' : 'none';
       if (pm5350Extra) pm5350Extra.style.display = isPm5350 ? 'block' : 'none';
@@ -799,6 +801,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         portField.required = templateSelect.value !== 'vhf_t6tv' && !isSnmp;
         if (templateSelect.value === 'vhf_t6tv' && !portField.value) portField.value = '80';
         if (templateSelect.value === 'vhf_marc_rse' && !portField.value) portField.value = '950';
+        if (templateSelect.value === 'marc_pae' && !portField.value) portField.value = '950';
+        if (templateSelect.value === 'diris_a20' && !portField.value) portField.value = '502';
         if (isIologik && !portField.value) portField.value = '502';
         if (isSnmp) {
           portField.value = '';
@@ -814,6 +818,19 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         if (snmpPollIntervalInput && !snmpPollIntervalInput.value) snmpPollIntervalInput.value = '60';
       }
       if (templateSelect.value !== 'vhf_marc_rse') clearMarcPortsCheckboxes();
+      
+      // Load existing marc_pae config if editing
+      if (templateSelect.value === 'marc_pae' && editSource && typeof editSource.extra_config === 'string') {
+          try {
+              const cfg = JSON.parse(editSource.extra_config);
+              if (cfg && cfg.rse_configs) {
+                  renderMarcPaeCheckboxes(cfg.rse_configs, true);
+              }
+          } catch(e) {}
+      } else if (templateSelect.value !== 'marc_pae') {
+          const resDiv = document.getElementById('marcPaeDiscoveryResults');
+          if (resDiv) resDiv.innerHTML = '';
+      }
     });
   }
 
@@ -874,6 +891,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         password: document.getElementById('t6tvPassword') ? document.getElementById('t6tvPassword').value : 'admin',
       }) : templateSelect.value === 'pm5350_modbus' ? JSON.stringify({
         modbus_slave_id: document.getElementById('pm5350SlaveId') ? parseInt(document.getElementById('pm5350SlaveId').value) || 5 : 5,
+      }) : templateSelect.value === 'marc_pae' ? JSON.stringify({
+        rse_configs: getMarcPaeConfigsFromCheckboxes(),
       }) : templateSelect.value === 'iologik_modbus' ? (
         document.getElementById('iologikExtraConfigJson') && document.getElementById('iologikExtraConfigJson').value.trim() !== ''
           ? document.getElementById('iologikExtraConfigJson').value.trim()
@@ -3546,3 +3565,104 @@ window.addIoParam = addIoParam;
 window.removeIoParam = removeIoParam;
 window.syncIologikBuilderToJson = syncIologikBuilderToJson;
 window.renderIologikBuilderFromJson = renderIologikBuilderFromJson;
+
+// ── MARC PAE UI FUNCTIONS ───────────────────────────────────────────
+
+document.getElementById('btnDiscoverMarcPae')?.addEventListener('click', async () => {
+  const ip = document.getElementById('dataSourceIp')?.value;
+  const port = document.getElementById('dataSourceUdpPort')?.value || 950;
+  const range = document.getElementById('marcPaeRange')?.value || '1-127';
+  
+  if (!ip) {
+      showToast('Masukkan IP Address terlebih dahulu', 'error');
+      return;
+  }
+
+  const resDiv = document.getElementById('marcPaeDiscoveryResults');
+  const icon = document.getElementById('marcPaeSearchIcon');
+  
+  if (resDiv) {
+      resDiv.style.display = 'block';
+      resDiv.innerHTML = '<div style="color:#00d4ff;">Mencari RSE aktif... Mohon tunggu.</div>';
+  }
+  if (icon) icon.className = 'fas fa-spinner fa-spin';
+
+  try {
+      const res = await fetch(`${API_URL}/equipment/discover-marc?ip=${ip}&port=${port}&rse_range=${range}`, {
+          headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+          if (data.data.length === 0) {
+              if (resDiv) resDiv.innerHTML = '<div style="color:#f59e0b;">Tidak ada RSE yang ditemukan.</div>';
+          } else {
+              renderMarcPaeCheckboxes(data.data, false);
+          }
+      } else {
+          if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${data.message || 'Gagal melakukan discovery'}</div>`;
+      }
+  } catch(e) {
+      if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${e.message}</div>`;
+  } finally {
+      if (icon) icon.className = 'fas fa-search';
+  }
+});
+
+function renderMarcPaeCheckboxes(rseList, isEdit = false) {
+    const resDiv = document.getElementById('marcPaeDiscoveryResults');
+    if (!resDiv) return;
+    
+    resDiv.style.display = 'block';
+    if (rseList.length === 0 && !isEdit) {
+        resDiv.innerHTML = '<div style="color:#f59e0b;">Tidak ada RSE yang ditemukan.</div>';
+        return;
+    }
+
+    let html = `<div style="margin-bottom:8px; font-weight:bold; color:#a3e635;">RSE Ditemukan (Pilih yang ingin dimonitor):</div>`;
+    
+    // rseList format: [ { rse_id: 90, ports: [2,3] } ]
+    rseList.forEach((rse, rseIdx) => {
+        html += `<div style="margin-bottom:6px; padding:6px; background:rgba(0,0,0,0.2); border-radius:4px;">
+                    <div style="font-weight:bold; margin-bottom:4px; color:#60a5fa;">RSE ID: ${rse.rse_id}</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">`;
+        rse.ports.forEach((port) => {
+            const chkId = `chk_marcPae_${rse.rse_id}_${port}`;
+            // If edit mode, assume existing is selected. If discovery mode, select all by default.
+            html += `<label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+                        <input type="checkbox" class="marcPae-port-chk" data-rse="${rse.rse_id}" value="${port}" checked>
+                        <span>Port ${port}</span>
+                     </label>`;
+        });
+        html += `   </div>
+                 </div>`;
+    });
+    
+    resDiv.innerHTML = html;
+}
+
+function getMarcPaeConfigsFromCheckboxes() {
+    const checkboxes = document.querySelectorAll('.marcPae-port-chk');
+    const rseMap = {};
+    
+    checkboxes.forEach(chk => {
+        if (chk.checked) {
+            const rseId = parseInt(chk.getAttribute('data-rse'), 10);
+            const port = parseInt(chk.value, 10);
+            if (!rseMap[rseId]) rseMap[rseId] = [];
+            rseMap[rseId].push(port);
+        }
+    });
+    
+    const configs = [];
+    for (const [rseId, ports] of Object.entries(rseMap)) {
+        configs.push({
+            rse_id: parseInt(rseId, 10),
+            ports: ports.sort((a,b) => a-b)
+        });
+    }
+    return configs;
+}
+
+window.renderMarcPaeCheckboxes = renderMarcPaeCheckboxes;
+window.getMarcPaeConfigsFromCheckboxes = getMarcPaeConfigsFromCheckboxes;

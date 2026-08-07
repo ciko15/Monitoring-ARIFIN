@@ -249,6 +249,24 @@
               </div>
             </div>
 
+            <!-- MARC PAE Extra Fields -->
+            <div id="marcPaeExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">MARC PAE DISCOVERY</div>
+              <div style="display:flex; gap:8px; align-items:flex-end;">
+                <div style="flex:1;">
+                  <label style="font-size:11px;" for="marcPaeRange">RSE Scan Range</label>
+                  <input type="text" id="marcPaeRange" value="1-127" placeholder="e.g., 90-100" style="width:100%; box-sizing:border-box;">
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" id="btnDiscoverMarcPae" style="padding:8px 12px; height:32px;">
+                  <i class="fas fa-search" id="marcPaeSearchIcon"></i> Discover
+                </button>
+              </div>
+              <div id="marcPaeDiscoveryResults" style="margin-top:10px; font-size:12px; color:#fff; display:none; max-height:200px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:8px;">
+                <!-- Results rendered here by app.js -->
+              </div>
+            </div>
+
+
             <!-- T6TV Extra Fields — shown only when template = vhf_t6tv -->
             <div id="t6tvExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
               <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">⚡ WEBSOCKET / DIGEST AUTH</div>

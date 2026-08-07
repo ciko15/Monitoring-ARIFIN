@@ -855,6 +855,44 @@ const app = new Elysia()
                     return { message: error.message };
                 }
             }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
+            // Discover MARC
+            .get('/discover-marc', async ({ query, set }) => {
+                const host = query.ip as string;
+                const portStr = query.port as string;
+                const rangeStr = query.rse_range as string;
+                
+                if (!host) {
+                    set.status = 400;
+                    return { success: false, message: 'IP address required' };
+                }
+                
+                let port = 950;
+                if (portStr) port = parseInt(portStr) || 950;
+                
+                let startRse = 1;
+                let endRse = 100;
+                if (rangeStr) {
+                    const parts = rangeStr.split('-');
+                    if (parts.length === 2) {
+                        startRse = parseInt(parts[0]) || 1;
+                        endRse = parseInt(parts[1]) || 100;
+                    }
+                }
+                
+                try {
+                    const marcParser = require('./parsers/marc_pae');
+                    const { discoverMarcRSEs } = marcParser._internal;
+                    if (!discoverMarcRSEs) {
+                        set.status = 500;
+                        return { success: false, message: 'discoverMarcRSEs not found in marc_pae.js' };
+                    }
+                    const result = await discoverMarcRSEs(host, port, startRse, endRse, 1500);
+                    return result;
+                } catch (e: any) {
+                    set.status = 500;
+                    return { success: false, message: e.message };
+                }
+            })
             // Ping Equipment (Multi-tier)
             .get('/:id/ping', async ({ params, set }) => {
                 const { pingTiered } = require('./utils/network');

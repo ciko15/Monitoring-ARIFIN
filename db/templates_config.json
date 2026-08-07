@@ -176,5 +176,51 @@
     ],
     "isDefault": true,
     "isSystem": true
+  },
+  {
+    "id": "tpl_marc_pae_1786092226892",
+    "name": "MARC PAE Template",
+    "parsing_id": "marc_pae",
+    "variables": [
+      {
+        "name": "frequency_mhz",
+        "type": "float",
+        "label": "Frequency",
+        "unit": "MHz",
+        "color": "#1d4ed8"
+      },
+      {
+        "name": "mode",
+        "type": "string",
+        "label": "Mode",
+        "unit": "",
+        "color": "#f59e0b"
+      }
+    ],
+    "widgets": [
+      {
+        "id": "w_marc_pae_freq",
+        "type": "number",
+        "title": "Frequency",
+        "source": "frequency_mhz",
+        "icon": "fa-wave-square",
+        "grid_area": "span 3 / span 3"
+      },
+      {
+        "id": "w_marc_pae_mode",
+        "type": "string",
+        "title": "Operating Mode",
+        "source": "mode",
+        "icon": "fa-info-circle",
+        "grid_area": "span 3 / span 3"
+      },
+      {
+        "id": "w_marc_pae_radios",
+        "type": "custom_pae_radios",
+        "title": "Active Radios",
+        "source": "rses",
+        "grid_area": "span 12 / span 6"
+      }
+    ]
   }
 ]

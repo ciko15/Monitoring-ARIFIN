@@ -49,6 +49,7 @@ const PARSER_TEMPLATES = {
   'ils_gp_thales421': ['tx_main', 'tx_stby', 'GP_ANGLE', 'RF_POWER', 'DDM_COURSE', 'CARRIER_PWR', 'CSB_POWER', 'DDM_CLR', 'SBO_POWER', 'CLR_POWER', 'CLR_DDM', 'CLR_SDM', 'RF_OUT', 'DDM_MON', 'MON_POWER'],
   'pm5560_modbus': ['VL1N', 'VL2N', 'VL3N', 'VL12', 'VL23', 'VL31', 'IL1', 'IL2', 'IL3', 'KW', 'KVAR', 'KVA', 'PF', 'HZ', 'KWH'],
   'pm5350_modbus': ['connectivity', 'V_RN', 'V_SN', 'V_TN', 'V_RS', 'V_ST', 'V_TR', 'I_R', 'I_S', 'I_T', 'FREQ', 'KW', 'KVA', 'PF'],
+  'diris_a20': ['const_id', 'VLL_RS', 'VLL_ST', 'VLL_TR', 'VLN_R', 'VLN_S', 'VLN_T', 'Freq', 'ArusR', 'ArusS', 'ArusT', 'reg11', 'reg12', 'reg13', 'reg14', 'PF'],
   'vhf_marc_rse': ['frequency_mhz', 'mode', 'status', 'supply_voltage', 'pa_temp_c', 'fwd_power_w', 'refl_power_w', 'modulation_pct', 'sensitivity_dbm', 'squelch_dbm', 'rx_supply_voltage'],
   'temp_humidity_modbus': ['temperature_c', 'humidity_pct', 'location'],
   'asterix_radar': ['connectivity', 'radar_name', 'sac', 'sic', 'radar_id', 'last_cat034', 'msg_type', 'time_of_day', 'sector_number', 'antenna_rotation', 'system_config'],

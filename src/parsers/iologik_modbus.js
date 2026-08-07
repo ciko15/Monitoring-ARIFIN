@@ -84,14 +84,6 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
                 }
 
                 data.devices[deviceName] = out;
-
-                // Simple Alarm Logic: If it contains words like 'alarm' or 'shutdown' and it's active.
-                // We'll leave it generic for now to avoid false positives.
-                for (const [key, val] of Object.entries(out)) {
-                    if (val === 'Aktif' && (key.toLowerCase().includes('alarm') || key.toLowerCase().includes('shutdown') || key.toLowerCase().includes('maintenance'))) {
-                        alarms.push(`${deviceName} - ${key} Aktif`);
-                    }
-                }
             }
         } else {
             // Fallback (Hardcoded DME, DVOR 1, DVOR 2) jika config tidak dideklarasi

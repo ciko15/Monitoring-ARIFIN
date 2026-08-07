@@ -182,5 +182,19 @@
     "category": "Data Processing",
     "files": "/src/parsers/iologik_modbus.js",
     "createdAt": "2026-08-06T00:00:00.000Z"
+  },
+  {
+    "id": "diris_a20",
+    "name": "DIRIS A20 Power Meter",
+    "description": "Parser Modbus RTU TCP pasif untuk DIRIS A20",
+    "category": "Support",
+    "files": "/src/parsers/diris_a20.js",
+    "createdAt": "2026-08-07T00:00:00.000Z"
+  },
+  {
+    "id": "marc_pae",
+    "name": "MARC PAE",
+    "type": "binary_tcp",
+    "has_snmp": false
   }
 ]
