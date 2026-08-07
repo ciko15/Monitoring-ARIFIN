@@ -146,7 +146,7 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
         return {
             success: true,
             data: data,
-            status: alarms.length > 0 ? 'Alarm' : 'Normal',
+            status: alarms.length > 0 ? 'Alarm' : (warnings.length > 0 ? 'Warning' : 'Normal'),
             alarms: alarms,
             warnings: warnings,
             triggeredParams: triggeredParams,
