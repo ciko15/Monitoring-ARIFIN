@@ -5,8 +5,9 @@
  */
 
 // Global state
-let authToken = localStorage.getItem('authToken');
-const API_URL = '/api';
+authToken = localStorage.getItem('authToken');
+currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+// API_URL already declared in app.js
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {

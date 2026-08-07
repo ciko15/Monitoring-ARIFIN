@@ -1,7 +1,7 @@
 // SNMP Tools and Threshold Settings JavaScript Functions
 
 var liveDataTimer = window.liveDataTimer;
-const API_URL = '/api';
+// API_URL already declared in app.js
 
 function parseSnmpMetricNumber(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;

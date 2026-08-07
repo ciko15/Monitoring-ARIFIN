@@ -54,10 +54,12 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
                     
                     let pinIndex;
                     let logic = 'NO';
+                    let type = 'normal';
                     
                     if (typeof pinConfig === 'object') {
                         pinIndex = pinConfig.pin;
                         logic = pinConfig.logic || 'NO';
+                        type = pinConfig.type || 'normal';
                     } else {
                         pinIndex = pinConfig;
                     }
@@ -72,6 +74,12 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
                         }
                         
                         out[key] = isActive ? 'Aktif' : 'Tidak Aktif';
+                        
+                        if (type === 'alarm' && isActive) {
+                            alarms.push(key);
+                        } else if (type === 'warning' && isActive) {
+                            warnings.push(key);
+                        }
                     }
                 }
 

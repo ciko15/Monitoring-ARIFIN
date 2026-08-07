@@ -1084,9 +1084,28 @@
                 if (!deviceData) return [];
                 const params = [];
                 
+                let cfg = null;
+                if (window._activeSourceDetail && window._activeSourceDetail.extra_config) {
+                    try {
+                        cfg = JSON.parse(window._activeSourceDetail.extra_config);
+                    } catch(e) {}
+                }
+                
                 for (const [key, val] of Object.entries(deviceData)) {
+                    let type = 'normal';
+                    if (cfg && cfg.devices && cfg.devices[title] && cfg.devices[title][key]) {
+                        type = cfg.devices[title][key].type || 'normal';
+                    }
+                    
                     let color = '#4a7a9a'; // Default abu-abu gelap (Tidak Aktif)
-                    if (val === 'Aktif' || val === 'TX 1' || val === 'TX 2' || val === 'Normal') color = '#00ffcc'; // Hijau nyala
+                    if (type === 'alarm') {
+                        color = (val === 'Aktif') ? '#ff3355' : '#00ffcc';
+                    } else if (type === 'warning') {
+                        color = (val === 'Aktif') ? '#ffcc00' : '#00ffcc';
+                    } else {
+                        if (val === 'Aktif' || val === 'TX 1' || val === 'TX 2' || val === 'Normal') color = '#00ffcc';
+                    }
+                    
                     params.push([key, val, color]);
                 }
                 

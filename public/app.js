@@ -3413,9 +3413,11 @@ function addIoParam(deviceId, key = '', pin = '') {
   
   let pinVal = pin;
   let logicVal = 'NC';
+  let typeVal = 'normal';
   if (pin !== null && typeof pin === 'object') {
     pinVal = pin.pin;
     logicVal = pin.logic || 'NC';
+    typeVal = pin.type || 'normal';
   }
 
   const optionsHtml = [
@@ -3432,6 +3434,11 @@ function addIoParam(deviceId, key = '', pin = '') {
       </select>
       <input type="text" class="io-param-custom-key" placeholder="Kunci Kustom" value="${key}" onchange="syncIologikBuilderToJson()" style="display:${key && !optionsHtml.includes(`value="${key}"`) ? 'block' : 'none'}; background:#0a1628; color:#fff; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:2;">
       <input type="number" class="io-param-pin" placeholder="PIN (0-47)" value="${pinVal}" min="0" max="47" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:1;">
+      <select class="io-param-type" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; width:75px;">
+        <option value="normal" ${typeVal === 'normal' ? 'selected' : ''}>Status</option>
+        <option value="alarm" ${typeVal === 'alarm' ? 'selected' : ''}>Alarm</option>
+        <option value="warning" ${typeVal === 'warning' ? 'selected' : ''}>Warning</option>
+      </select>
       <select class="io-param-logic" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; width:65px;">
         <option value="NC" ${logicVal === 'NC' ? 'selected' : ''}>NC</option>
         <option value="NO" ${logicVal === 'NO' ? 'selected' : ''}>NO</option>
@@ -3488,9 +3495,14 @@ function syncIologikBuilderToJson() {
       
       let pin = paramRow.querySelector('.io-param-pin').value;
       let logic = paramRow.querySelector('.io-param-logic').value;
+      let type = paramRow.querySelector('.io-param-type').value;
       
       if (key && pin !== '') {
-        devices[deviceName][key] = { pin: parseInt(pin, 10), logic: logic };
+        devices[deviceName][key] = {
+            pin: parseInt(pin, 10),
+            logic: logic,
+            type: type
+        };
       }
     });
   });
