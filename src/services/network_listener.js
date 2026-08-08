@@ -965,6 +965,57 @@ class NetworkListenerService {
         this._marcPaeTimers.set(id, pollTimer);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // DATAKOM D700 Poller
+    // ─────────────────────────────────────────────────────────────────────────
+    startDatakomListener(source) {
+        const { id, equipt_id, ip_address, tcp_port, name, poll_interval } = source;
+        const pollSec = parseInt(poll_interval) || 5;
+        const port = parseInt(tcp_port) || 502;
+        let slaveId = 1; // Default Datakom
+
+        const { pollDatakomD700 } = require('../parsers/datakom_d700_modbus');
+
+        this.activeListeners.add(id);
+        console.log(`[Datakom D700] Listener started: ${name} (${ip_address}:${port}, Slave ID: ${slaveId})`);
+
+        const doPoll = async () => {
+            try {
+                const result = await pollDatakomD700(ip_address, port, slaveId);
+                const logLine = `[Datakom D700] ${name}: status=${result.status}`;
+                
+                if (String(result.status || '').toLowerCase() === 'disconnect') {
+                    this._logThrottled('log', `datakom:disconnect:${id}`, logLine);
+                }
+
+                // LogData HARUS berisi semua metadata (success, status, alarms, dll)
+                const logData = {
+                    ...result,
+                    source: name,
+                    _ip: ip_address
+                };
+
+                await this._handleLogOutput(
+                    source,
+                    logData,
+                    'datakom_d700_modbus',
+                    result.status || 'Disconnect'
+                );
+            } catch (err) {
+                console.error(`[Datakom D700] Poll error ${name}:`, err.message);
+            }
+        };
+
+        const initialDelay = 1000 + Math.floor(Math.random() * 2000);
+        setTimeout(() => {
+            doPoll();
+            const timer = setInterval(doPoll, pollSec * 1000);
+
+            if (!this._datakomTimers) this._datakomTimers = new Map();
+            this._datakomTimers.set(id, timer);
+        }, initialDelay);
+    }
+
     _getParserModule(parsing_id) {
         if (!parsing_id || !parsing_id.startsWith('custom_')) return parsing_id;
         try {
