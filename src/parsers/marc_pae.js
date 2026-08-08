@@ -396,13 +396,7 @@ class MarcRseClient {
 
             if (wasConnected && this.onDisconnected) this.onDisconnected();
 
-            // Mark all radios stale
-            for (const state of Object.values(this.states)) {
-                if (state.connected) {
-                    state.connected = false;
-                    state.status    = 'NO DATA';
-                }
-            }
+            // Do not wipe state here. Let staleThreshold logic handle it.
 
             if (this._running) {
                 console.log('[MARC] Reconnecting in 5s...');
@@ -462,19 +456,7 @@ class MarcRseClient {
             }
         }
 
-        // Tandai radio stale jika tidak ada data > 3× poll interval + cycle time
-        const numRadios = Object.keys(this.states).length;
-        const cycleDurationMs = numRadios * PORT_DELAY_MS * 3; // 3 commands per port worst case
-        const staleThreshold = cycleDurationMs * 2 + (this.pollInterval * 3 * 1000) + 10000;
-        for (const state of Object.values(this.states)) {
-            if (state.last_seen && (Date.now() - state.last_seen) > staleThreshold) {
-                if (state.connected) {
-                    state.connected = false;
-                    state.status    = 'NO DATA';
-                    if (this.onDataUpdated) this.onDataUpdated(state.port);
-                }
-            }
-        }
+        // staleThreshold logic has been moved to parse()
 
         // Schedule poll berikutnya (setelah seluruh cycle selesai)
         this._schedulePoll(this.pollInterval * 1000);
@@ -562,30 +544,26 @@ class MarcPaeParser extends BaseParser {
      */
     parse(_rawData) {
         try {
-            if (!this._client.isConnected) {
-                return {
-                    success: false,
-                    error:   'MARC client not connected',
-                    status:  'Disconnect',
-                    timestamp: new Date().toISOString(),
-                };
-            }
-
-            if (this._rseConfigs.length === 0) {
-                return {
-                    success: false,
-                    error:   'No rse_configs configured',
-                    status:  'Error',
-                    timestamp: new Date().toISOString(),
-                };
-            }
-
-            // Kumpulkan snapshot per radio
             const rses = [];
             let anyConnected = false;
             let anyAlarm     = false;
 
             const flat_radios = {};
+            
+            // Tandai radio stale jika tidak ada data > 3× poll interval + cycle time
+            const numRadios = Object.keys(this._client.states).length;
+            const cycleDurationMs = numRadios * 150 * 3; 
+            const staleThreshold = cycleDurationMs * 2 + (this._pollInterval * 3 * 1000) + 10000;
+
+            for (const state of Object.values(this._client.states)) {
+                if (state.last_seen && (Date.now() - state.last_seen) > staleThreshold) {
+                    if (state.connected) {
+                        state.connected = false;
+                        state.status    = 'NO DATA';
+                    }
+                }
+            }
+
             for (const rse of this._rseConfigs) {
                 const rseId = rse.rse_id;
                 const radios = {};
@@ -603,12 +581,13 @@ class MarcPaeParser extends BaseParser {
                 });
             }
 
-            if (!anyConnected) {
+            if (!this._client.isConnected || !anyConnected) {
                 return {
                     success: false,
-                    error:   'No radio data received',
+                    error:   !this._client.isConnected ? 'MARC client not connected' : 'No radio data received',
                     status:  'Disconnect',
-                    data:    {
+                    timestamp: new Date().toISOString(),
+                    data: {
                         rses,
                         _isMarcMulti: true,
                         radios: flat_radios,
@@ -617,8 +596,7 @@ class MarcPaeParser extends BaseParser {
                         status_text: '—',
                         marc_host: this._host,
                         marc_tcp_port: this._tcpPort,
-                    },
-                    timestamp: new Date().toISOString(),
+                    }
                 };
             }
 
