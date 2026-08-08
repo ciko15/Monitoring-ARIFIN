@@ -18,6 +18,7 @@ const IlsGpNormacParser = require('./ils_gp_normac');
 const IlsLlzNormacParser = require('./ils_llz_normac');
 const DvorMaruBinaryParser = require('./dvor_maru_binary');
 const DmeMopahBinaryParser = require('./dme_mopah_binary');
+const DatakomD700Parser = require('./datakom_d700_modbus');
 
 class ParserFactory {
     /**
@@ -120,6 +121,9 @@ class ParserFactory {
 
             case 'pm5560_modbus':
                 return new Pm5560ModbusParser(config);
+
+            case 'datakom_d700_modbus':
+                return new DatakomD700Parser(config);
                 
             case 'iologik_modbus':
                 const IoLogikModbusParser = require('./iologik_modbus');
@@ -181,7 +185,8 @@ class ParserFactory {
             'ils_llz_normac7030',
             'custom_1783483057654',
             'vhf_t6tv',
-            'vhf_marc_rse'
+            'vhf_marc_rse',
+            'datakom_d700_modbus'
         ];
     }
 }

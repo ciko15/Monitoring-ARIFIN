@@ -13,31 +13,31 @@
 
 'use strict';
 
-const net  = require('net');
+const net = require('net');
 const BaseParser = require('./base');
 
 // ── SLIP constants ────────────────────────────────────────────────────────────
-const SLIP_END     = 0xC0;
-const SLIP_ESC     = 0xDB;
+const SLIP_END = 0xC0;
+const SLIP_ESC = 0xDB;
 const SLIP_ESC_END = 0xDC;
 const SLIP_ESC_ESC = 0xDD;
 
 // ── Protocol constants ────────────────────────────────────────────────────────
-const VER_BYTE  = 0x30;
-const SRC_H     = 0x10;
-const SRC_L     = 0x00;
+const VER_BYTE = 0x30;
+const SRC_H = 0x10;
+const SRC_L = 0x00;
 const T6_PREFIX = 0x53;
 
 // Commands
 const CMD_SETTINGS1 = 0xEB;
 const CMD_SETTINGS2 = 0xE9;
-const CMD_TX_BITE   = 0xEF;
-const CMD_RX_BITE   = 0xED;
+const CMD_TX_BITE = 0xEF;
+const CMD_RX_BITE = 0xED;
 
 const RPL_SETTINGS1 = 0xEA;
 const RPL_SETTINGS2 = 0xE8;
-const RPL_TX_BITE   = 0xEE;
-const RPL_RX_BITE   = 0xEC;
+const RPL_TX_BITE = 0xEE;
+const RPL_RX_BITE = 0xEC;
 
 // RX ports
 const RX_PORTS = new Set([2, 3]);
@@ -158,13 +158,13 @@ function decodeFrame(frame) {
 
     const dataCrc = frame.slice(1, -2);
     const expected = (frame[frame.length - 2] << 8) | frame[frame.length - 1];
-    const actual   = crc16(dataCrc);
+    const actual = crc16(dataCrc);
     if (actual !== expected) return null;
 
     return {
-        dest:    (frame[1] << 8) | frame[2],
-        src:     (frame[3] << 8) | frame[4],
-        seq:     frame[5],
+        dest: (frame[1] << 8) | frame[2],
+        src: (frame[3] << 8) | frame[4],
+        seq: frame[5],
         payload: frame.slice(6, -2),
     };
 }
@@ -173,25 +173,25 @@ function decodeFrame(frame) {
 
 function makeRadioState(rseId, port, name, radioType, isRx) {
     return {
-        rse_id:     rseId,
+        rse_id: rseId,
         port,
         name,
         radio_type: radioType,
-        is_rx:      isRx,
-        connected:  false,
-        last_seen:  null,
+        is_rx: isRx,
+        connected: false,
+        last_seen: null,
         // Settings 1
         frequency_mhz: '—',
-        mode:          '—',
+        mode: '—',
         // TX BITE
         supply_voltage: '—',
-        pa_temp_c:      '—',
-        fwd_power_w:    '—',
-        refl_power_w:   '—',
+        pa_temp_c: '—',
+        fwd_power_w: '—',
+        refl_power_w: '—',
         modulation_pct: '—',
         // RX BITE
         rx_supply_voltage: '—',
-        sensitivity_dbm:   '—',
+        sensitivity_dbm: '—',
         // Settings 2
         squelch_dbm: '—',
         // Overall
@@ -201,14 +201,14 @@ function makeRadioState(rseId, port, name, radioType, isRx) {
 
 // Default radio mapping — RSE 90 WAJJ Sentani
 const MARC_RADIO_DEFAULTS = [
-    { port: 2, name: 'VHF ADC SEC RX',    radioType: 'T6R',    isRx: true  },
-    { port: 3, name: 'VHF ADC SEC RX_2',  radioType: 'T6R',    isRx: true  },
-    { port: 4, name: 'VHF ER TX 1',       radioType: 'T6T100', isRx: false },
-    { port: 5, name: 'VHF ER TX 2',       radioType: 'T6T',    isRx: false },
-    { port: 6, name: 'VHF APP TMA TX',    radioType: 'T6T100', isRx: false },
-    { port: 7, name: 'VHF APP TMA TX_2',  radioType: 'T6T100', isRx: false },
-    { port: 8, name: 'VHF ADC TX',        radioType: 'T6T',    isRx: false },
-    { port: 9, name: 'VHF ADC TX_2',      radioType: 'T6T',    isRx: false },
+    { port: 2, name: 'VHF ADC SEC RX', radioType: 'T6R', isRx: true },
+    { port: 3, name: 'VHF ADC SEC RX_2', radioType: 'T6R', isRx: true },
+    { port: 4, name: 'VHF ER TX 1', radioType: 'T6T100', isRx: false },
+    { port: 5, name: 'VHF ER TX 2', radioType: 'T6T', isRx: false },
+    { port: 6, name: 'VHF APP TMA TX', radioType: 'T6T100', isRx: false },
+    { port: 7, name: 'VHF APP TMA TX_2', radioType: 'T6T100', isRx: false },
+    { port: 8, name: 'VHF ADC TX', radioType: 'T6T', isRx: false },
+    { port: 9, name: 'VHF ADC TX_2', radioType: 'T6T', isRx: false },
 ];
 
 // ── T6 reply decoder ──────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ function decodeT6Reply(payload, srcId, states) {
     if (payload[0] !== T6_PREFIX) return false;
 
     const port = payload[1];
-    const cmd  = payload[2];
+    const cmd = payload[2];
     const stateKey = `${srcId}:${port}`;
     if (!states[stateKey]) return false;
 
@@ -229,8 +229,8 @@ function decodeT6Reply(payload, srcId, states) {
 
     if (cmd === RPL_SETTINGS1 && data.length >= 8) {
         // Frequency: BCD encoded bytes 0-2
-        const bcd = `${data[0].toString(16).padStart(2,'0')}${data[1].toString(16).padStart(2,'0')}${data[2].toString(16).padStart(2,'0')}`;
-        const freqMhz = `${bcd.slice(0,3)}.${bcd.slice(3,6)}`;
+        const bcd = `${data[0].toString(16).padStart(2, '0')}${data[1].toString(16).padStart(2, '0')}${data[2].toString(16).padStart(2, '0')}`;
+        const freqMhz = `${bcd.slice(0, 3)}.${bcd.slice(3, 6)}`;
         const freqVal = parseFloat(freqMhz);
         if (freqVal >= 100.0 && freqVal <= 200.0) {
             state.frequency_mhz = freqMhz;
@@ -244,10 +244,10 @@ function decodeT6Reply(payload, srcId, states) {
         const statusByte = data[0];
         if (statusByte === 0x20) {
             state.status = 'READY';
-            state.mode   = 'Main';
+            state.mode = 'Main';
         } else if (statusByte === 0x40) {
             state.status = 'READY';
-            state.mode   = 'Standby';
+            state.mode = 'Standby';
         } else {
             state.status = 'READY';
         }
@@ -258,7 +258,7 @@ function decodeT6Reply(payload, srcId, states) {
         if (paTemp > 127) paTemp -= 256;
         state.pa_temp_c = String(paTemp);
         // [6] = fwd power W
-        state.fwd_power_w  = String(data[6]);
+        state.fwd_power_w = String(data[6]);
         // [7] = refl power W
         state.refl_power_w = String(data[7]);
         // [8] = modulation %
@@ -269,7 +269,7 @@ function decodeT6Reply(payload, srcId, states) {
     if (cmd === RPL_RX_BITE && data.length >= 6) {
         // [0] = status flags (0x40=normal)
         state.status = 'READY';
-        state.mode   = 'Main';
+        state.mode = 'Main';
         // [2] = supply voltage (integer V)
         state.rx_supply_voltage = String(data[2]);
         // [5] = sensitivity raw — formula: -(raw - 43)
@@ -303,14 +303,14 @@ class MarcRseClient {
      * @param {number} pollInterval - Detik antar poll cycle (default 30)
      */
     constructor(host, port = 950, pollInterval = 30) {
-        this.host         = host;
-        this.port         = port;
+        this.host = host;
+        this.port = port;
         this.pollInterval = pollInterval;
 
-        this._socket    = null;
-        this._running   = false;
+        this._socket = null;
+        this._running = false;
         this._connected = false;
-        this._builder   = new PacketBuilder();
+        this._builder = new PacketBuilder();
         this._extractor = new FrameExtractor();
         this._pollTimer = null;
         this._reconnectTimer = null;
@@ -320,9 +320,9 @@ class MarcRseClient {
 
         // Callbacks
         this.onDataUpdated = null;  // (port) => void
-        this.onConnected   = null;  // () => void
-        this.onDisconnected= null;  // () => void
-        this.onError       = null;  // (msg) => void
+        this.onConnected = null;  // () => void
+        this.onDisconnected = null;  // () => void
+        this.onError = null;  // (msg) => void
     }
 
     get isConnected() { return this._connected; }
@@ -350,7 +350,7 @@ class MarcRseClient {
 
         sock.connect(this.port, this.host, () => {
             console.log(`[MARC] Connected to ${this.host}:${this.port}`);
-            this._socket    = sock;
+            this._socket = sock;
             this._connected = true;
             sock.setTimeout(0);
 
@@ -358,7 +358,7 @@ class MarcRseClient {
 
             // Drain initial data, lalu mulai poll
             setTimeout(() => {
-                try { sock.read(); } catch(e) {}
+                try { sock.read(); } catch (e) { }
                 this._schedulePoll(0);
             }, 500);
         });
@@ -391,7 +391,7 @@ class MarcRseClient {
         sock.on('close', () => {
             const wasConnected = this._connected;
             this._connected = false;
-            this._socket    = null;
+            this._socket = null;
             clearTimeout(this._pollTimer);
 
             if (wasConnected && this.onDisconnected) this.onDisconnected();
@@ -408,14 +408,14 @@ class MarcRseClient {
     _close() {
         this._connected = false;
         if (this._socket) {
-            try { this._socket.destroy(); } catch(e) {}
+            try { this._socket.destroy(); } catch (e) { }
             this._socket = null;
         }
     }
 
     _send(data) {
         if (this._socket && this._connected) {
-            try { this._socket.write(data); } catch(e) {}
+            try { this._socket.write(data); } catch (e) { }
         }
     }
 
@@ -433,7 +433,7 @@ class MarcRseClient {
 
         for (const stateKey of Object.keys(this.states)) {
             if (!this._running || !this._connected) break;
-            
+
             const state = this.states[stateKey];
             const rseId = state.rse_id;
             const port = state.port;
@@ -520,10 +520,10 @@ class MarcPaeParser extends BaseParser {
      */
     constructor(opts = {}) {
         super(opts);
-        this._host        = opts.host        || opts.ip  || '192.168.100.151';
-        this._tcpPort     = opts.port        || 950;
-        this._rseConfigs  = opts.rse_configs || [];
-        this._pollInterval= opts.poll_interval || 30;
+        this._host = opts.host || opts.ip || '192.168.100.151';
+        this._tcpPort = opts.port || 950;
+        this._rseConfigs = opts.rse_configs || [];
+        this._pollInterval = opts.poll_interval || 30;
 
         // Pastikan shared client sudah berjalan
         this._client = getOrCreateClient(this._host, this._tcpPort, this._pollInterval);
@@ -546,20 +546,20 @@ class MarcPaeParser extends BaseParser {
         try {
             const rses = [];
             let anyConnected = false;
-            let anyAlarm     = false;
+            let anyAlarm = false;
 
             const flat_radios = {};
-            
+
             // Tandai radio stale jika tidak ada data > 3× poll interval + cycle time
             const numRadios = Object.keys(this._client.states).length;
-            const cycleDurationMs = numRadios * 150 * 3; 
+            const cycleDurationMs = numRadios * 150 * 3;
             const staleThreshold = cycleDurationMs * 2 + (this._pollInterval * 3 * 1000) + 10000;
 
             for (const state of Object.values(this._client.states)) {
                 if (state.last_seen && (Date.now() - state.last_seen) > staleThreshold) {
                     if (state.connected) {
                         state.connected = false;
-                        state.status    = 'NO DATA';
+                        state.status = 'NO DATA';
                     }
                 }
             }
@@ -584,8 +584,8 @@ class MarcPaeParser extends BaseParser {
             if (!this._client.isConnected || !anyConnected) {
                 return {
                     success: false,
-                    error:   !this._client.isConnected ? 'MARC client not connected' : 'No radio data received',
-                    status:  'Disconnect',
+                    error: !this._client.isConnected ? 'MARC client not connected' : 'No radio data received',
+                    status: 'Disconnect',
                     timestamp: new Date().toISOString(),
                     data: {
                         rses,
@@ -617,27 +617,27 @@ class MarcPaeParser extends BaseParser {
 
             const flat = {
                 // Summary radio pertama
-                frequency_mhz:  firstConnected ? firstConnected.frequency_mhz : '—',
-                mode:            firstConnected ? firstConnected.mode          : '—',
-                status_text:     firstConnected ? firstConnected.status        : '—',
+                frequency_mhz: firstConnected ? firstConnected.frequency_mhz : '—',
+                mode: firstConnected ? firstConnected.mode : '—',
+                status_text: firstConnected ? firstConnected.status : '—',
 
                 // Semua RSE dan radionya
                 rses,
-                
+
                 // Flat radios for UI renderer
                 _isMarcMulti: true,
                 radios: flat_radios,
 
                 // Metadata
-                marc_host:    this._host,
+                marc_host: this._host,
                 marc_tcp_port: this._tcpPort,
             };
 
             return {
                 success: true,
-                data:    flat,
+                data: flat,
                 status,
-                alarms:  anyAlarm ? ['Radio status ALARM'] : [],
+                alarms: anyAlarm ? ['Radio status ALARM'] : [],
                 warnings: [],
                 triggeredParams: [],
                 timestamp: new Date().toISOString(),
@@ -647,8 +647,8 @@ class MarcPaeParser extends BaseParser {
             console.error(`[MARC PAE] Parse error: ${err.message}`);
             return {
                 success: false,
-                error:   err.message,
-                status:  'Error',
+                error: err.message,
+                status: 'Error',
                 timestamp: new Date().toISOString(),
             };
         }
@@ -665,11 +665,11 @@ async function discoverMarcRSEs(host, port, startRse, endRse, timeoutMs = 1500) 
         const sock = new net.Socket();
         const builder = new PacketBuilder();
         const extractor = new FrameExtractor();
-        
+
         const results = [];
         let currentRse = startRse;
         let currentPort = 2; // Test ports 2-9
-        
+
         let discoveryTimer = null;
         let isResolved = false;
 
@@ -687,14 +687,14 @@ async function discoverMarcRSEs(host, port, startRse, endRse, timeoutMs = 1500) 
         sock.connect(port, host, () => {
             console.log(`[MARC DISCOVERY] Connected to ${host}:${port}, scanning ${startRse}-${endRse}`);
             sock.setTimeout(0);
-            
+
             // Start scanning loop
             nextProbe();
         });
 
         async function nextProbe() {
             if (isResolved) return;
-            
+
             if (currentRse > endRse) {
                 // Wait a bit for the last responses to arrive before destroying socket
                 discoveryTimer = setTimeout(() => {
@@ -714,7 +714,7 @@ async function discoverMarcRSEs(host, port, startRse, endRse, timeoutMs = 1500) 
             const cmd = builder.buildT6Cmd(currentRse, currentPort, CMD_SETTINGS1);
             try {
                 sock.write(cmd);
-            } catch (e) {}
+            } catch (e) { }
 
             // Wait a short time for response
             discoveryTimer = setTimeout(() => {
@@ -731,7 +731,7 @@ async function discoverMarcRSEs(host, port, startRse, endRse, timeoutMs = 1500) 
                     if (decoded.payload[0] === T6_PREFIX) {
                         const rseId = decoded.src;
                         const rxPort = decoded.payload[1];
-                        
+
                         console.log(`[MARC DISCOVERY] Received reply from RSE ${rseId} Port ${rxPort}`);
                         let rseObj = results.find(r => r.rse_id === rseId);
                         if (!rseObj) {

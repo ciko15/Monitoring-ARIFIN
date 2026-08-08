@@ -225,17 +225,16 @@ class NetworkListenerService {
     }
 
     /**
-     * Dedicated TCP listener untuk PM5560 Modbus RTU-over-TCP.
-     * Menggunakan net.Socket langsung (bypass connectionManager yang punya
-     * DVOR/DME SOH/STX/ETX buffering), langsung forward tiap chunk ke parser.
+     * Dedicated TCP listener untuk Modbus RTU-over-TCP (seperti PM5560 atau Datakom D700).
+     * Menggunakan net.Socket langsung, langsung forward tiap chunk ke parser.
      */
-    startPm5560Listener(source) {
+    startModbusTcpListener(source, moduleName) {
         const net = require('net');
         const { id, equipt_id, ip_address, tcp_port } = source;
         const port = parseInt(tcp_port) || 502;
 
-        const Pm5560ModbusParser = require('../parsers/pm5560_modbus');
-        const parser = new Pm5560ModbusParser({ equipt_id });
+        const ParserModule = require('../parsers/' + moduleName);
+        const parser = new ParserModule({ equipt_id });
 
         let socket = null;
         let reconnectTimer = null;
@@ -260,26 +259,25 @@ class NetworkListenerService {
             });
 
             socket.on('error', (err) => {
-                this._logThrottled('error', `pm5560:error:${id}:${err.message}`, `[NetworkListener] PM5560 error ${source.name}: ${err.message}`);
+                this._logThrottled('error', `${moduleName}:error:${id}:${err.message}`, `[NetworkListener] ${moduleName} error ${source.name}: ${err.message}`);
             });
 
             socket.on('timeout', () => {
-                this._logThrottled('warn', `pm5560:timeout:${id}`, `[NetworkListener] PM5560 timeout ${source.name}, reconnecting...`);
+                this._logThrottled('warn', `${moduleName}:timeout:${id}`, `[NetworkListener] ${moduleName} timeout ${source.name}, reconnecting...`);
                 socket.destroy();
             });
 
             socket.on('close', () => {
-                this._logThrottled('log', `pm5560:close:${id}`, `[NetworkListener] PM5560 disconnected ${source.name}, retry in 15s`);
+                this._logThrottled('log', `${moduleName}:close:${id}`, `[NetworkListener] ${moduleName} disconnected ${source.name}, retry in 15s`);
                 this.activeListeners.delete(id);
                 parser.reset();
                 if (!stopped) reconnectTimer = setTimeout(connect, 15000);
             });
         };
 
-        // Polling loop: kirim semua FC03 request tiap POLL_INTERVAL
-        const Pm5560Module = require('../parsers/pm5560_modbus');
-        const POLL_INTERVAL = Pm5560Module.POLL_INTERVAL;
-        const POLL_REQ_DELAY = Pm5560Module.POLL_REQ_DELAY;
+        // Polling loop: kirim semua request tiap POLL_INTERVAL
+        const POLL_INTERVAL = ParserModule.POLL_INTERVAL;
+        const POLL_REQ_DELAY = ParserModule.POLL_REQ_DELAY;
         const sleep = ms => new Promise(r => setTimeout(r, ms));
         let pollTimer = null;
 
@@ -293,10 +291,10 @@ class NetworkListenerService {
                     s.write(req.bytes);
                     await sleep(POLL_REQ_DELAY);
                 } catch (e) {
-                    console.warn(`[NetworkListener] PM5560 write error ${source.name}: ${e.message}`);
+                    console.warn(`[NetworkListener] ${moduleName} write error ${source.name}: ${e.message}`);
                 }
             }
-            console.log(`[NetworkListener] PM5560 poll sent for ${source.name}`);
+            console.log(`[NetworkListener] ${moduleName} poll sent for ${source.name}`);
         };
 
         const startPollLoop = () => {
@@ -309,15 +307,15 @@ class NetworkListenerService {
         connect();
 
         // Simpan cleanup handle
-        this._pm5560Cleanup = this._pm5560Cleanup || new Map();
-        this._pm5560Cleanup.set(id, () => {
+        this._modbusTcpCleanup = this._modbusTcpCleanup || new Map();
+        this._modbusTcpCleanup.set(id, () => {
             stopped = true;
             if (reconnectTimer) clearTimeout(reconnectTimer);
             if (pollTimer) clearInterval(pollTimer);
             if (socket) socket.destroy();
         });
 
-        console.log(`[NetworkListener] PM5560 listener started for ${source.name}`);
+        console.log(`[NetworkListener] ${moduleName} listener started for ${source.name}`);
     }
 
     /**
@@ -1004,9 +1002,9 @@ class NetworkListenerService {
             return;
         }
 
-        // PM5560 Modbus — dedicated raw TCP handler (bypass DVOR/DME buffering)
-        if (moduleName === 'pm5560_modbus') {
-            this.startPm5560Listener(source);
+        // Modbus TCP parsers (PM5560, Datakom D700) — dedicated raw TCP handler
+        if (moduleName === 'pm5560_modbus' || moduleName === 'datakom_d700_modbus') {
+            this.startModbusTcpListener(source, moduleName);
             return;
         }
 
