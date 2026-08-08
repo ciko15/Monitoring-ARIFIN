@@ -529,8 +529,7 @@ function clearMarcPortsCheckboxes() {
     if (cb) cb.checked = false;
   }
 }
-
-const SNMP_PARSING_IDS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic'];
+const SNMP_PARSING_IDS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp'];
 
 function isSnmpParsingId(parsingId) {
   return SNMP_PARSING_IDS.includes(String(parsingId || ''));
@@ -713,6 +712,17 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       pm5350Div.style.display = 'none';
     }
 
+    // Populate Temp Humidity extra fields if editing
+    const tempHumDiv = document.getElementById('tempHumidityExtraFields');
+    if (editSource.parsing_id === 'temp_humidity_modbus' && tempHumDiv) {
+      tempHumDiv.style.display = 'block';
+      const tempHumExtra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? JSON.parse(editSource.extra_config) : editSource.extra_config) : {};
+      if (document.getElementById('tempHumiditySlaveId')) document.getElementById('tempHumiditySlaveId').value = tempHumExtra.modbus_slave_id || 1;
+      if (portInput && !portInput.value) portInput.value = '502';
+    } else if (tempHumDiv) {
+      tempHumDiv.style.display = 'none';
+    }
+
     // Populate ioLogik extra fields if editing
     const iologikDiv = document.getElementById('iologikExtraFields');
     const parserId = editSource.parsing_id || editSource.parser;
@@ -772,12 +782,14 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const snmpExtra = document.getElementById('snmpExtraFields');
       const astExtra = document.getElementById('asterixExtraFields');
       const pm5350Extra = document.getElementById('pm5350ExtraFields');
+      const tempHumExtra = document.getElementById('tempHumidityExtraFields');
       const iologikExtra = document.getElementById('iologikExtraFields');
       const marcPaeExtra = document.getElementById('marcPaeExtraFields');
       const portField = document.getElementById('dataSourceUdpPort');
       const isSnmp = isSnmpParsingId(templateSelect.value);
       const isAsterix = templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar';
       const isPm5350 = templateSelect.value === 'pm5350_modbus';
+      const isTempHum = templateSelect.value === 'temp_humidity_modbus';
       const isIologik = templateSelect.value === 'iologik_modbus';
       if (extra) extra.style.display = templateSelect.value === 'vhf_t6tv' ? 'block' : 'none';
       if (marcExtra) marcExtra.style.display = templateSelect.value === 'vhf_marc_rse' ? 'block' : 'none';
@@ -785,6 +797,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       if (snmpExtra) snmpExtra.style.display = isSnmp ? 'block' : 'none';
       if (astExtra) astExtra.style.display = isAsterix ? 'block' : 'none';
       if (pm5350Extra) pm5350Extra.style.display = isPm5350 ? 'block' : 'none';
+      if (tempHumExtra) tempHumExtra.style.display = isTempHum ? 'block' : 'none';
       if (iologikExtra) {
           iologikExtra.style.display = isIologik ? 'block' : 'none';
           if (isIologik && typeof renderIologikBuilderFromJson === 'function') {
@@ -804,6 +817,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         if (templateSelect.value === 'marc_pae' && !portField.value) portField.value = '950';
         if (templateSelect.value === 'diris_a20' && !portField.value) portField.value = '502';
         if (isIologik && !portField.value) portField.value = '502';
+        if (isTempHum && !portField.value) portField.value = '502';
         if (isSnmp) {
           portField.value = '';
           portField.placeholder = 'Tidak diperlukan untuk SNMP';
@@ -891,6 +905,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         password: document.getElementById('t6tvPassword') ? document.getElementById('t6tvPassword').value : 'admin',
       }) : templateSelect.value === 'pm5350_modbus' ? JSON.stringify({
         modbus_slave_id: document.getElementById('pm5350SlaveId') ? parseInt(document.getElementById('pm5350SlaveId').value) || 5 : 5,
+      }) : templateSelect.value === 'temp_humidity_modbus' ? JSON.stringify({
+        modbus_slave_id: document.getElementById('tempHumiditySlaveId') ? parseInt(document.getElementById('tempHumiditySlaveId').value) || 1 : 1,
       }) : templateSelect.value === 'marc_pae' ? JSON.stringify({
         rse_configs: getMarcPaeConfigsFromCheckboxes(),
       }) : templateSelect.value === 'iologik_modbus' ? (

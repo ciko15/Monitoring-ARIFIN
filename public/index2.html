@@ -340,6 +340,18 @@
               </div>
             </div>
 
+            <!-- Temp Humidity Modbus Extra Fields -->
+            <div id="tempHumidityExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">🌡️ TEMP/HUMIDITY MODBUS — KONFIGURASI</div>
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Sesuaikan Slave ID Modbus sensor (default: 1).</div>
+              <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Modbus Slave ID</label>
+                  <input type="number" id="tempHumiditySlaveId" placeholder="1" min="1" max="247" value="1" style="width:100%; box-sizing:border-box;">
+                </div>
+              </div>
+            </div>
+
             <!-- ioLogik Extra Fields — shown only when template = iologik_modbus -->
             <div id="iologikExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
               <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center;">

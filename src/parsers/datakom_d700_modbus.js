@@ -30,21 +30,28 @@ const PARAMS = [
     { key: 'Alarm', addr: 7 }
 ];
 
-// Modbus TCP Request bulk (FC 03, Address 0, Quantity 8)
+// Modbus TCP Request (FC 03, Quantity 1 per parameter)
+// Karena Datakom D700 sepertinya mengembalikan nilai aneh/garbage (0xAAAA, 0xFFFF)
+// jika dibaca secara bulk 8 register sekaligus.
 function buildPollRequests(slave = DEFAULT_SLAVE) {
-    return [{
-        key: 'DATAKOM_ALL',
-        tid: 1,
-        bytes: Buffer.from([
-            (1 >> 8) & 0xFF, 1 & 0xFF, // Transaction ID
-            0x00, 0x00,                // Protocol ID
-            0x00, 0x06,                // Length
-            slave & 0xFF,              // Unit ID
-            0x03,                      // Function Code
-            0x00, 0x00,                // Start Address (0)
-            0x00, 0x08                 // Quantity (8)
-        ])
-    }];
+    const requests = [];
+    PARAMS.forEach((p, idx) => {
+        const tid = idx + 1; // TID mulai dari 1 sampai 8
+        requests.push({
+            key: p.key,
+            tid: tid,
+            bytes: Buffer.from([
+                (tid >> 8) & 0xFF, tid & 0xFF, // Transaction ID
+                0x00, 0x00,                    // Protocol ID
+                0x00, 0x06,                    // Length
+                slave & 0xFF,                  // Unit ID
+                0x03,                          // Function Code
+                (p.addr >> 8) & 0xFF, p.addr & 0xFF, // Start Address
+                0x00, 0x01                     // Quantity (1)
+            ])
+        });
+    });
+    return requests;
 }
 
 const POLL_REQUESTS_DEFAULT = buildPollRequests(DEFAULT_SLAVE);
@@ -79,54 +86,58 @@ class DatakomD700ModbusParser extends BaseParser {
             let alarms = [];
             let warnings = [];
 
-            // Frame Modbus FC03 Response untuk 8 register (16 bytes data):
-            // [TID_HI][TID_LO] [00][00] [00][13(LEN)] [UNIT] [03] [10(ByteCount)] [Val1_HI][Val1_LO] ...
-            // Total panjang = 9 (header + fc + bc) + 16 (data) = 25 bytes
+            // Frame Modbus FC03 Response untuk 1 register (2 bytes data):
+            // [TID_HI][TID_LO] [00][00] [00][05(LEN)] [UNIT] [03] [02(ByteCount)] [Val_HI][Val_LO]
+            // Total panjang = 9 (header + fc + bc) + 2 (data) = 11 bytes
             let i = 0;
-            while (i <= this._buf.length - 25) {
+            while (i <= this._buf.length - 11) {
+                const tid = this._buf.readUInt16BE(i);
                 const prot = this._buf.readUInt16BE(i + 2);
                 const len = this._buf.readUInt16BE(i + 4);
                 const unit = this._buf[i + 6];
                 const fc = this._buf[i + 7];
                 const bc = this._buf[i + 8];
 
-                // Verifikasi signature frame modbus
-                if (prot !== 0 || fc !== 0x03 || bc !== 16 || len !== 19) {
+                // Verifikasi signature frame modbus tunggal
+                if (prot !== 0 || fc !== 0x03 || bc !== 2 || len !== 5) {
                     i++;
                     continue;
                 }
 
-                // Ekstrak data 8 register
-                const r0 = this._buf.readUInt16BE(i + 9);
-                const r1 = this._buf.readUInt16BE(i + 11);
-                const r2 = this._buf.readUInt16BE(i + 13);
-                const r3 = this._buf.readUInt16BE(i + 15);
-                const r4 = this._buf.readUInt16BE(i + 17);
-                const r5 = this._buf.readUInt16BE(i + 19);
-                const r6 = this._buf.readUInt16BE(i + 21);
-                const r7 = this._buf.readUInt16BE(i + 23);
-
-                this._last = {
-                    Voltage: r0 / 10,
-                    Current: r1 / 10,
-                    Frequency: r2 / 100,
-                    Power: r3 / 10,
-                    PowerFactor: r4 / 1000,
-                    Energy: r5 / 10,
-                    Load: r6 / 10,
-                    Alarm: r7
-                };
+                // Ekstrak data 1 register (16-bit)
+                const val = this._buf.readUInt16BE(i + 9);
+                
+                // Cek TID untuk mencocokkan parameter
+                // TID = index + 1
+                const pIdx = tid - 1;
+                if (pIdx >= 0 && pIdx < PARAMS.length) {
+                    const paramName = PARAMS[pIdx].key;
+                    // Scale:
+                    let scale = 1;
+                    if (paramName === 'Voltage' || paramName === 'Current' || paramName === 'Power' || paramName === 'Energy' || paramName === 'Load') scale = 10;
+                    else if (paramName === 'Frequency') scale = 100;
+                    else if (paramName === 'PowerFactor') scale = 1000;
+                    
+                    this._last[paramName] = val / scale;
+                }
 
                 parsedData = { ...this._last };
-                i += 25; // Maju 1 frame utuh
+                i += 11; // Maju 1 frame utuh
             }
 
             // Hapus buffer yang sudah diproses
             this._buf = this._buf.slice(i);
 
-            if (!parsedData) {
-                return { success: false, error: 'Menunggu data Modbus utuh', status: 'Waiting' };
+            // Validasi apakah kita sudah punya setidaknya Voltage (sebagai tanda data mulai masuk)
+            if (!this._last.Voltage && this._last.Voltage !== 0) {
+                return { success: false, error: 'Menunggu data Modbus', status: 'Waiting' };
             }
+
+            // Pastikan data yang kosong diisi 0 agar UI tidak undefined
+            parsedData = Object.assign({
+                Voltage: 0, Current: 0, Frequency: 0, Power: 0, 
+                PowerFactor: 0, Energy: 0, Load: 0, Alarm: 0
+            }, this._last);
 
             // Tentukan Status Genset (OFFLINE / STANDBY / RUNNING)
             let deviceStatus = 'OFFLINE';
