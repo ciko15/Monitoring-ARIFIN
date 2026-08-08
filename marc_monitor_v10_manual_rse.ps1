@@ -7,7 +7,7 @@
 # =============================================================================
 
 param(
-    [string]$MoxaIP = "192.168.100.151",   # ★ GANTI DI SINI - IP Moxa lokasi ini
+    [string]$MoxaIP = "172.16.10.230",   # ★ GANTI DI SINI - IP Moxa lokasi ini
     [int]$MoxaPort = 950,                  # ★ GANTI DI SINI - port TCP Moxa (biasanya 950, TAPI CEK dulu, bisa beda!)
     [int]$PortStart = 2,                   # ★ CEK - port radio terkecil yang mau di-scan (default 2, sesuai standar Sentani)
     [int]$PortEnd = 12,                    # ★ CEK - port radio terbesar yang mau di-scan (naikkan kalau RSE lokasi ini radionya lebih banyak dari 8)
@@ -39,18 +39,18 @@ $RSE_LIST = @(
 [byte]$CMD_ALL_SETTINGS = 0x28   # CR2_ALL_SETTINGS_REQUEST - trigger RSE balas semua radio-nya
 [byte]$CMD_SETTINGS1 = 0xEB
 [byte]$CMD_SETTINGS2 = 0xE9
-[byte]$CMD_TX_BITE   = 0xEF
-[byte]$CMD_RX_BITE   = 0xED
+[byte]$CMD_TX_BITE = 0xEF
+[byte]$CMD_RX_BITE = 0xED
 [byte]$RPL_SETTINGS1 = 0xEA
 [byte]$RPL_SETTINGS2 = 0xE8
-[byte]$RPL_TX_BITE   = 0xEE
-[byte]$RPL_RX_BITE   = 0xEC
+[byte]$RPL_TX_BITE = 0xEE
+[byte]$RPL_RX_BITE = 0xEC
 
 $MASTER_SRC_H = 0x10   # ★ KEMUNGKINAN GANTI - address "kita" sebagai master. Nilai ini (0x1000=4096)
 $MASTER_SRC_L = 0x00   #   terverifikasi benar utk Sentani (lihat CommsLog "s4096"). Kalau di lokasi baru
-                        #   script ini TIDAK dapat balasan sama sekali padahal RSE/port sudah benar,
-                        #   coba cek CommsLog aplikasi original lokasi itu, cari pola "s[angka]" di baris
-                        #   Tx (kirim), itu kemungkinan address master yang harus dipakai di sini.
+#   script ini TIDAK dapat balasan sama sekali padahal RSE/port sudah benar,
+#   coba cek CommsLog aplikasi original lokasi itu, cari pola "s[angka]" di baris
+#   Tx (kirim), itu kemungkinan address master yang harus dipakai di sini.
 
 # =============================================================================
 # SLIP + CRC16 (SAMA seperti script sebelumnya, sudah teruji)
@@ -85,8 +85,8 @@ function Invoke-SlipDecode {
     $i = 0
     while ($i -lt $Data.Length) {
         if ($Data[$i] -eq 0xDB -and ($i + 1) -lt $Data.Length) {
-            if ($Data[$i+1] -eq 0xDC) { $r.Add([byte]0xC0); $i += 2; continue }
-            elseif ($Data[$i+1] -eq 0xDD) { $r.Add([byte]0xDB); $i += 2; continue }
+            if ($Data[$i + 1] -eq 0xDC) { $r.Add([byte]0xC0); $i += 2; continue }
+            elseif ($Data[$i + 1] -eq 0xDD) { $r.Add([byte]0xDB); $i += 2; continue }
         }
         $r.Add([byte]$Data[$i]); $i++
     }
@@ -137,7 +137,8 @@ function Parse-AllFrames {
                 if ($decoded.Length -ge 8) { $frames.Add($decoded) }
                 $current.Clear()
             }
-        } else { $current.Add([byte]$Buffer[$i]) }
+        }
+        else { $current.Add([byte]$Buffer[$i]) }
     }
     return $frames
 }
@@ -146,8 +147,8 @@ function Decode-FrameHeader {
     param([byte[]]$Frame)
     if ($Frame.Length -lt 8) { return $null }
     [int]$dest = ([int]$Frame[1] -shl 8) -bor [int]$Frame[2]
-    [int]$src  = ([int]$Frame[3] -shl 8) -bor [int]$Frame[4]
-    [int]$seq  = [int]$Frame[5]
+    [int]$src = ([int]$Frame[3] -shl 8) -bor [int]$Frame[4]
+    [int]$seq = [int]$Frame[5]
     $payload = New-Object byte[] ($Frame.Length - 8)
     [Array]::Copy($Frame, 6, $payload, 0, $payload.Length)
     return @{ Dest = $dest; Src = $src; Seq = $seq; Payload = $payload }
@@ -211,10 +212,12 @@ function Invoke-Discovery {
                                 $frameBuf.Clear()
                             }
                             $inFrame = $true
-                        } elseif ($inFrame) { $frameBuf.Add($b) }
+                        }
+                        elseif ($inFrame) { $frameBuf.Add($b) }
                     }
                     if ($replied) { break }
-                } else {
+                }
+                else {
                     Start-Sleep -Milliseconds 10
                 }
             }
@@ -248,10 +251,12 @@ function Invoke-Discovery {
                                     $rxFrameBuf.Clear()
                                 }
                                 $rxInFrame = $true
-                            } elseif ($rxInFrame) { $rxFrameBuf.Add($b2) }
+                            }
+                            elseif ($rxInFrame) { $rxFrameBuf.Add($b2) }
                         }
                         if ($isRx) { break }
-                    } else {
+                    }
+                    else {
                         Start-Sleep -Milliseconds 10
                     }
                 }
@@ -273,7 +278,8 @@ function Invoke-Discovery {
     if ($discoveredRSE.Count -eq 0) {
         Write-Host "Tidak ada RSE yang merespon dari daftar `$RSE_LIST." -ForegroundColor Red
         Write-Host "Coba: (1) perbesar -PortEnd, (2) perbesar -DiscoverTimeoutMs, (3) cek IP/port Moxa benar" -ForegroundColor Yellow
-    } else {
+    }
+    else {
         Write-Host "=== DISCOVERY SELESAI: $($discoveredRSE.Count) dari $($RSEList.Count) RSE aktif ===" -ForegroundColor Green
     }
     Write-Host ""
@@ -308,7 +314,7 @@ function Update-RadioState {
     elseif ($Cmd -eq $RPL_RX_BITE -and $Data.Length -ge 6) {
         $RadioState.SupplyV = [int]$Data[2]
         [int]$sensRaw = [int]$Data[5]
-        if ($sensRaw -gt 0) { $RadioState.Sensitivity = -($sensRaw - 43) }
+        if ($sensRaw -gt 0) { $RadioState.Sensitivity = - ($sensRaw - 43) }
         $RadioState.Status = "READY"
     }
     elseif ($Cmd -eq $RPL_SETTINGS2 -and $Data.Length -ge 9) {
@@ -370,7 +376,7 @@ function Show-Dashboard {
             $fwd = if ($null -ne $r.FwdPower) { "$($r.FwdPower)W" } else { "-" }
             $ref = if ($null -ne $r.ReflPower) { "$($r.ReflPower)W" } else { "-" }
             $mod = if ($null -ne $r.ModDepth) { "$($r.ModDepth)%" } else { "-" }
-            $sq  = if ($null -ne $r.Squelch) { "$($r.Squelch)" } else { "-" }
+            $sq = if ($null -ne $r.Squelch) { "$($r.Squelch)" } else { "-" }
             $sens = if ($null -ne $r.Sensitivity) { "$($r.Sensitivity)dBm" } else { "-" }
 
             $line = "  Port {0,-4} {1,-5} {2,-9} {3,-12} {4,4} {5,5} {6,4} {7,4} {8,4} {9,7} {10,6}" -f `
@@ -434,46 +440,49 @@ try {
         while ($true) {
             $pollCount++
 
-        foreach ($destId in @($RSERegistry.Keys)) {
-            foreach ($port in @($RSERegistry[$destId].Radios.Keys)) {
-                $type = $RSERegistry[$destId].Radios[$port].Type
+            foreach ($destId in @($RSERegistry.Keys)) {
+                foreach ($port in @($RSERegistry[$destId].Radios.Keys)) {
+                    $type = $RSERegistry[$destId].Radios[$port].Type
 
-                $pkt1 = Build-T6Cmd -DestId $destId -RadioPort ([byte]$port) -Command $CMD_SETTINGS1
-                try { $stream.Write($pkt1, 0, $pkt1.Length) } catch {}
-                Start-Sleep -Milliseconds 50
+                    $pkt1 = Build-T6Cmd -DestId $destId -RadioPort ([byte]$port) -Command $CMD_SETTINGS1
+                    try { $stream.Write($pkt1, 0, $pkt1.Length) } catch {}
+                    Start-Sleep -Milliseconds 50
 
-                if ($type -eq "RX") {
-                    $pkt2 = Build-T6Cmd -DestId $destId -RadioPort ([byte]$port) -Command $CMD_RX_BITE
-                } else {
-                    $pkt2 = Build-T6Cmd -DestId $destId -RadioPort ([byte]$port) -Command $CMD_TX_BITE
+                    if ($type -eq "RX") {
+                        $pkt2 = Build-T6Cmd -DestId $destId -RadioPort ([byte]$port) -Command $CMD_RX_BITE
+                    }
+                    else {
+                        $pkt2 = Build-T6Cmd -DestId $destId -RadioPort ([byte]$port) -Command $CMD_TX_BITE
+                    }
+                    try { $stream.Write($pkt2, 0, $pkt2.Length) } catch {}
+                    Start-Sleep -Milliseconds 50
+
+                    Read-AndProcess -Stream $stream -RSERegistry $RSERegistry
                 }
-                try { $stream.Write($pkt2, 0, $pkt2.Length) } catch {}
-                Start-Sleep -Milliseconds 50
+            }
 
+            $readUntil = (Get-Date).AddSeconds(2)
+            while ((Get-Date) -lt $readUntil) {
                 Read-AndProcess -Stream $stream -RSERegistry $RSERegistry
+                Start-Sleep -Milliseconds 100
+            }
+
+            Show-Dashboard -RSERegistry $RSERegistry -PollCount $pollCount
+
+            $waitUntil = (Get-Date).AddSeconds($PollInterval - 3)
+            while ((Get-Date) -lt $waitUntil) {
+                Read-AndProcess -Stream $stream -RSERegistry $RSERegistry
+                Start-Sleep -Milliseconds 200
             }
         }
-
-        $readUntil = (Get-Date).AddSeconds(2)
-        while ((Get-Date) -lt $readUntil) {
-            Read-AndProcess -Stream $stream -RSERegistry $RSERegistry
-            Start-Sleep -Milliseconds 100
-        }
-
-        Show-Dashboard -RSERegistry $RSERegistry -PollCount $pollCount
-
-        $waitUntil = (Get-Date).AddSeconds($PollInterval - 3)
-        while ((Get-Date) -lt $waitUntil) {
-            Read-AndProcess -Stream $stream -RSERegistry $RSERegistry
-            Start-Sleep -Milliseconds 200
-        }
-        }
     }
-} catch {
+}
+catch {
     Write-Host ""
     Write-Host "ERROR: $_" -ForegroundColor Red
     Write-Host $_.ScriptStackTrace -ForegroundColor DarkRed
-} finally {
+}
+finally {
     if ($client) { $client.Close() }
     Write-Host "Koneksi ditutup." -ForegroundColor Red
 }
