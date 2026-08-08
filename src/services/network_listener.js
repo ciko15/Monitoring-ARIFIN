@@ -1003,8 +1003,13 @@ class NetworkListenerService {
         }
 
         // Modbus TCP parsers (PM5560, Datakom D700) — dedicated raw TCP handler
-        if (moduleName === 'pm5560_modbus' || moduleName === 'datakom_d700_modbus') {
+        if (moduleName === 'pm5560_modbus') {
             this.startModbusTcpListener(source, moduleName);
+            return;
+        }
+
+        if (moduleName === 'datakom_d700_modbus') {
+            this.startDatakomListener(source);
             return;
         }
 
@@ -1091,6 +1096,13 @@ class NetworkListenerService {
         const onData = async (rawData) => {
             await this.handleIncomingData(source, rawData, parser);
         };
+
+        if (this._datakomTimers) {
+            for (const [id, timer] of this._datakomTimers) {
+                clearInterval(timer);
+            }
+            this._datakomTimers.clear();
+        }
 
         // Generasi token — increment tiap reconnect agar loop lama berhenti
         this._pollGen = this._pollGen || {};
@@ -1275,6 +1287,13 @@ class NetworkListenerService {
             connectionManager.disconnect(sourceId);
         }
         this.activeListeners.clear();
+
+        if (this._datakomTimers) {
+            for (const [id, timer] of this._datakomTimers) {
+                clearInterval(timer);
+            }
+            this._datakomTimers.clear();
+        }
     }
 }
 

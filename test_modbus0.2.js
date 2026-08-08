@@ -16,9 +16,9 @@ async function main() {
     const startTime = Date.now();
 
     try {
-        console.log("🔌 Menghubungkan ke Schneider PM5350 (172.19.7.160:26)...");
+        console.log("🔌 Menghubungkan ke Schneider PM5350 (10.20.3.73:26)...");
         client.setTimeout(4000);
-        await client.connectTelnet("172.19.7.160", { port: 26 });
+        await client.connectTelnet("10.20.3.73", { port: 26 });
 
         client.setID(5);
         console.log("✅ Terhubung ke Slave ID 5 (PM5350)\n");
