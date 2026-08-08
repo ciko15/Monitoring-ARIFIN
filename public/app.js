@@ -1564,13 +1564,24 @@ window.viewEquipmentDetail = async function (id) {
 
     let sourcesHtml = '';
     if (mySources.length > 0) {
-      // Cek apakah ada source MARC RSE
-      const hasMarcSource = mySources.some(s => s.parsing_id === 'vhf_marc_rse');
+      // Cek apakah ada source MARC RSE atau MARC PAE
+      const hasMarcSource = mySources.some(s => s.parsing_id === 'vhf_marc_rse' || s.parsing_id === 'marc_pae');
 
       // Section 1: Data live per radio (untuk MARC RSE)
       let liveRadioHtml = '';
       if (hasMarcSource && itemWithData.lastData) {
-        const radioEntries = Object.entries(itemWithData.lastData).filter(([, d]) => d._parsing_id === 'vhf_marc_rse');
+        let radioEntries = [];
+        Object.entries(itemWithData.lastData).forEach(([srcName, d]) => {
+          if (d._parsing_id === 'vhf_marc_rse' || d._parsing_id === 'marc_pae') {
+            if (d._isMarcMulti && d.radios) {
+              Object.entries(d.radios).forEach(([radName, radData]) => {
+                radioEntries.push([radName, Object.assign({}, radData, { _status: radData.status === 'ALARM' ? 'Alarm' : (radData.connected ? 'Normal' : 'Disconnect'), _logged_at: d._logged_at })]);
+              });
+            } else {
+              radioEntries.push([srcName, d]);
+            }
+          }
+        });
         if (radioEntries.length > 0) {
           liveRadioHtml = `
             <div class="detail-card" style="grid-column: 1 / -1; margin-top: 20px;">
@@ -3600,7 +3611,7 @@ document.getElementById('btnDiscoverMarcPae')?.addEventListener('click', async (
               renderMarcPaeCheckboxes(data.data, false);
           }
       } else {
-          if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${data.message || 'Gagal melakukan discovery'}</div>`;
+          if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${data.message || data.error || 'Gagal melakukan discovery'}</div>`;
       }
   } catch(e) {
       if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${e.message}</div>`;

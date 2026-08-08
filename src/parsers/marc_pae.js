@@ -462,8 +462,10 @@ class MarcRseClient {
             }
         }
 
-        // Tandai radio stale jika tidak ada data > 3× poll interval
-        const staleThreshold = this.pollInterval * 3 * 1000;
+        // Tandai radio stale jika tidak ada data > 3× poll interval + cycle time
+        const numRadios = Object.keys(this.states).length;
+        const cycleDurationMs = numRadios * PORT_DELAY_MS * 3; // 3 commands per port worst case
+        const staleThreshold = cycleDurationMs * 2 + (this.pollInterval * 3 * 1000) + 10000;
         for (const state of Object.values(this.states)) {
             if (state.last_seen && (Date.now() - state.last_seen) > staleThreshold) {
                 if (state.connected) {
@@ -583,6 +585,7 @@ class MarcPaeParser extends BaseParser {
             let anyConnected = false;
             let anyAlarm     = false;
 
+            const flat_radios = {};
             for (const rse of this._rseConfigs) {
                 const rseId = rse.rse_id;
                 const radios = {};
@@ -590,6 +593,7 @@ class MarcPaeParser extends BaseParser {
                     const snap = this._client.getStateSnapshot(rseId, port);
                     if (!snap) continue;
                     radios[port] = snap;
+                    flat_radios[`RSE ${rseId} Port ${port}`] = snap;
                     if (snap.connected) anyConnected = true;
                     if (snap.status === 'ALARM') anyAlarm = true;
                 }
@@ -604,7 +608,16 @@ class MarcPaeParser extends BaseParser {
                     success: false,
                     error:   'No radio data received',
                     status:  'Disconnect',
-                    data:    { rses },
+                    data:    {
+                        rses,
+                        _isMarcMulti: true,
+                        radios: flat_radios,
+                        frequency_mhz: '—',
+                        mode: '—',
+                        status_text: '—',
+                        marc_host: this._host,
+                        marc_tcp_port: this._tcpPort,
+                    },
                     timestamp: new Date().toISOString(),
                 };
             }
@@ -632,6 +645,10 @@ class MarcPaeParser extends BaseParser {
 
                 // Semua RSE dan radionya
                 rses,
+                
+                // Flat radios for UI renderer
+                _isMarcMulti: true,
+                radios: flat_radios,
 
                 // Metadata
                 marc_host:    this._host,

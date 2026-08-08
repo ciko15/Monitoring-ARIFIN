@@ -850,11 +850,11 @@
             </div>`;
         } else if (data._isMarcMulti) {
             // MARC RSE: render radio detail (1 radio per source)
-            body.innerHTML = renderMarcMultiRadioDetail(data.radios, eqSup);
-        } else if (data._parsing_id === 'vhf_marc_rse') {
+            body.innerHTML = renderMarcMultiRadioDetail(data.radios, eqSup, data._logged_at);
+        } else if (data._parsing_id === 'vhf_marc_rse' || data._parsing_id === 'marc_pae') {
             // MARC RSE single radio (direct lastData entry)
             const radioName = src ? src.name : 'Radio';
-            body.innerHTML = renderMarcMultiRadioDetail({ [radioName]: data }, eqSup);
+            body.innerHTML = renderMarcMultiRadioDetail({ [radioName]: data }, eqSup, data._logged_at);
         } else {
             body.innerHTML = renderDetailData(src.parsing_id, data, eqSup);
         }
@@ -863,7 +863,7 @@
     }
 
 
-    function renderMarcMultiRadioDetail(radios, supCategory) {
+    function renderMarcMultiRadioDetail(radios, supCategory, rootLoggedAt) {
         if (!radios || Object.keys(radios).length === 0) {
             return `<div style="text-align:center;padding:40px;color:#4a7a9a">
                 <i class="fas fa-satellite-dish fa-2x"></i>
@@ -892,11 +892,15 @@
             const isRx = rd.is_rx;
             const radioType = rd.radio_type || (isRx ? 'RX' : 'TX');
             const params = isRx ? RX_PARAMS : TX_PARAMS;
-            const status = rd._status || 'Disconnect';
+            let status = rd._status;
+            if (!status) {
+                status = rd.status === 'ALARM' ? 'Alarm' : (rd.connected ? 'Normal' : 'Disconnect');
+            }
             const statusColors = { Normal: '#00ff88', Alarm: '#ff3355', Warning: '#ffcc00', Disconnect: '#3a5a7a' };
             const sc = statusColors[status] || '#3a5a7a';
-            const loggedAt = rd._logged_at
-                ? new Date(rd._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            const loggedAtVal = rd._logged_at || rootLoggedAt;
+            const loggedAt = loggedAtVal
+                ? new Date(loggedAtVal).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                 : '—';
 
             return `

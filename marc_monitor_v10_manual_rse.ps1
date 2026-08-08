@@ -7,7 +7,7 @@
 # =============================================================================
 
 param(
-    [string]$MoxaIP = "172.16.10.230",   # ★ GANTI DI SINI - IP Moxa lokasi ini
+    [string]$MoxaIP = "172.16.10.231",   # ★ GANTI DI SINI - IP Moxa lokasi ini
     [int]$MoxaPort = 950,                  # ★ GANTI DI SINI - port TCP Moxa (biasanya 950, TAPI CEK dulu, bisa beda!)
     [int]$PortStart = 2,                   # ★ CEK - port radio terkecil yang mau di-scan (default 2, sesuai standar Sentani)
     [int]$PortEnd = 12,                    # ★ CEK - port radio terbesar yang mau di-scan (naikkan kalau RSE lokasi ini radionya lebih banyak dari 8)
