@@ -7,7 +7,7 @@ const community = 'public';
 const session = new snmp.Session({ 
     host: host, 
     community: community, 
-    version: snmp.versions.v1, // FORCE V1
+    version: 0, // 0 = SNMPv1, 1 = SNMPv2c
     timeouts: [5000] 
 });
 
