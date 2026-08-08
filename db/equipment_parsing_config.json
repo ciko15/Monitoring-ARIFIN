@@ -196,5 +196,13 @@
     "name": "MARC PAE",
     "type": "binary_tcp",
     "has_snmp": false
+  },
+  {
+    "id": "datakom_d700_modbus",
+    "name": "Datakom D700 Modbus TCP",
+    "description": "Parser Modbus TCP untuk Genset Datakom D700 (Membaca bulk 8 Holding Registers)",
+    "category": "Support",
+    "files": "/src/parsers/datakom_d700_modbus.js",
+    "createdAt": "2026-08-09T00:00:00.000Z"
   }
 ]
