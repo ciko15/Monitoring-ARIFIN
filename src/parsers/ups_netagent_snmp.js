@@ -83,12 +83,21 @@ function snmpGetAll(session, oids) {
     });
 }
 
-// Tambahan fungsi untuk melakukan chunking OID agar paket UDP tidak terlalu besar
 async function snmpGetAllChunked(session, oids, chunkSize = 5) {
     const results = [];
     for (let i = 0; i < oids.length; i += chunkSize) {
         const chunk = oids.slice(i, i + chunkSize);
-        const chunkResults = await snmpGetAll(session, chunk);
+        let chunkResults = await snmpGetAll(session, chunk);
+        
+        // JIKA GAGAL (karena SNMPv1 noSuchName pada salah satu OID di dalam chunk),
+        // fallback ke individual GET agar OID yang valid tetap terbaca (misal UPS 1-Phase tidak punya Phase S & T)
+        if (chunkResults.every(r => r === null)) {
+            chunkResults = [];
+            for (const oid of chunk) {
+                chunkResults.push(await snmpGet(session, oid));
+            }
+        }
+        
         results.push(...chunkResults);
     }
     return results;

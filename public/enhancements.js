@@ -1669,7 +1669,7 @@
                 const otherParams = [];
 
                 Object.entries(data)
-                    .filter(([k]) => !k.startsWith('_') && k !== 'connectivity' && k !== 'sys_descr' && k !== 'sys_name')
+                    .filter(([k, v]) => !k.startsWith('_') && k !== 'connectivity' && k !== 'sys_descr' && k !== 'sys_name' && !isMetricPlaceholder(v))
                     .forEach(([k, v]) => {
                         const label = k.replace(/_/g, ' ').toUpperCase();
                         const displayValue = formatSnmpMetricValue(k, v);
@@ -1702,7 +1702,7 @@
             } else {
                 // Fallback to existing logic: show keys present in data
                 const params = Object.entries(data)
-                    .filter(([k]) => !k.startsWith('_'))
+                    .filter(([k, v]) => !k.startsWith('_') && !isMetricPlaceholder(v))
                     .map(([k, v]) => {
                         const label = k.replace(/_/g, ' ').toUpperCase();
                         const displayValue = parserId.startsWith('snmp_')
