@@ -453,16 +453,16 @@ class NetworkListenerService {
             try {
                 const result = await pollTempHumidity(ip_address, port, slaveId);
                 const logStatus = result.status || 'Disconnect';
-                
+
                 await this._handleLogOutput(
                     source,
-                    { 
+                    {
                         data: {
                             ...result.data,
                             location: location || name
-                        }, 
-                        source: name, 
-                        _ip: ip_address 
+                        },
+                        source: name,
+                        _ip: ip_address
                     },
                     'temp_humidity_modbus',
                     logStatus
@@ -645,7 +645,7 @@ class NetworkListenerService {
         const port = parseInt(tcp_port) || 502;
         let slaveId = 1;
         let devicesConfig = null;
-        
+
         if (extra_config) {
             try {
                 const config = typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config;
@@ -884,7 +884,7 @@ class NetworkListenerService {
             try {
                 const parsed = JSON.parse(extra_config);
                 if (parsed.rse_configs) rseConfigs = parsed.rse_configs;
-            } catch(e) {}
+            } catch (e) { }
         } else if (extra_config && extra_config.rse_configs) {
             rseConfigs = extra_config.rse_configs;
         }
@@ -917,7 +917,7 @@ class NetworkListenerService {
                 for (const rse of rses) {
                     const rseId = rse.rse_id;
                     const radios = rse.radios;
-                    
+
                     for (const [portStr, radioState] of Object.entries(radios)) {
                         const radioData = {
                             frequency_mhz: radioState.frequency_mhz,
@@ -935,7 +935,7 @@ class NetworkListenerService {
                             port: parseInt(portStr, 10),
                             name: radioState.name
                         };
-    
+
                         const flatData = {
                             ...result.data,
                             radio: radioData,
@@ -943,7 +943,7 @@ class NetworkListenerService {
                             rse_id: rseId
                         };
                         delete flatData.rses; // Clean up
-    
+
                         // Simulate push
                         await this.handleIncomingData(source, Buffer.from([]), {
                             parse: () => ({
@@ -983,7 +983,7 @@ class NetworkListenerService {
             try {
                 const result = await pollDatakomD700(ip_address, port, slaveId);
                 const logLine = `[Datakom D700] ${name}: status=${result.status}`;
-                
+
                 if (String(result.status || '').toLowerCase() === 'disconnect') {
                     this._logThrottled('log', `datakom:disconnect:${id}`, logLine);
                 }

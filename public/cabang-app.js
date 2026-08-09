@@ -225,7 +225,7 @@ const cabangModule = (function () {
 
     try {
       const token = localStorage.getItem('authToken');
-      
+
       const headers = { 'Content-Type': 'application/json' };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -283,7 +283,7 @@ const cabangModule = (function () {
     if (!cabangGrid) return;
 
     if (!window.normalizeSourceStatus) {
-      window.normalizeSourceStatus = function(rawStatus) {
+      window.normalizeSourceStatus = function (rawStatus) {
         const s = String(rawStatus || '').toLowerCase();
         if (s === 'alarm' || s === 'alert' || s === 'fail' || s === 'critical') return 'Alarm';
         if (s === 'warning') return 'Warning';
@@ -296,7 +296,7 @@ const cabangModule = (function () {
     function deriveEquipmentStatus(item) {
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
         const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status).toLowerCase());
-        
+
         if (sourceStatuses.some(st => st === 'alarm')) return 'alarm';
         if (sourceStatuses.some(st => st === 'warning')) return 'warning';
         if (sourceStatuses.every(st => st === 'disconnect')) return 'disconnect';
@@ -335,7 +335,7 @@ const cabangModule = (function () {
       let filterVal = String(currentStatusFilter).toLowerCase();
       if (filterVal === 'alert') filterVal = 'alarm';
       if (filterVal === 'disconnect') filterVal = 'offline';
-      
+
       filtered = filtered.filter(e => {
         const normalized = window.normalizeStatus
           ? String(window.normalizeStatus(deriveEquipmentStatus(e))).toLowerCase()
@@ -388,8 +388,8 @@ const cabangModule = (function () {
             const srcStatus = sourceData._status || 'Normal';
             const logDate = sourceData._logged_at ? new Date(sourceData._logged_at) : null;
             const isToday = logDate && logDate.toDateString() === new Date().toDateString();
-            const srcTime = logDate 
-              ? logDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + (isToday ? '' : ` (${logDate.toLocaleDateString('id-ID', {day:'numeric', month:'short'})})`)
+            const srcTime = logDate
+              ? logDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + (isToday ? '' : ` (${logDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })})`)
               : '-';
             // Map status to color
             let dotColor = '#10b981'; // normal
