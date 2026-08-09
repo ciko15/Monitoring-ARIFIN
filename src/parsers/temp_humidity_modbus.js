@@ -11,6 +11,9 @@ const ModbusRTU = require("modbus-serial");
 const WARN_TEMP  = 30.0;
 const ALARM_TEMP = 35.0;
 
+// Mutex lock global per IP agar 2 sensor tidak pernah di-poll bersamaan (menghentikan collision 100%)
+const ipLocks = new Map();
+
 async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
     // Validasi nilai default jika tidak ada parameter yang di-passing
     if (!port) port = 502;
@@ -18,13 +21,18 @@ async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
 
     // Delay acak / terstruktur berdasarkan ID untuk mencegah tabrakan data (Collision) 
     // jika 2 sensor di-poll di milidetik yang sama pada 1 IP Modbus Gateway.
-    await new Promise(r => setTimeout(r, slaveId * 250));
+    // Tunggu sampai IP ini sedang tidak di-poll oleh sensor lain (Antrian)
+    while (ipLocks.get(host)) {
+        await new Promise(r => setTimeout(r, 100));
+    }
+    // Kunci IP ini
+    ipLocks.set(host, true);
 
     const client = new ModbusRTU();
     try {
         client.setTimeout(timeoutMs); 
-        // Menggunakan TcpRTUBuffered agar frame RTU difilter ketat berdasarkan Slave ID!
-        await client.connectTcpRTUBuffered(host, { port: port });
+        // connectTelnet lebih stabil untuk USR-TCP232 (Raw TCP ke RTU)
+        await client.connectTelnet(host, { port: port });
         
         client.setID(slaveId);
 
@@ -91,6 +99,9 @@ async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
             triggeredParams: [],
             timestamp: new Date().toISOString(),
         };
+    } finally {
+        // Selalu buka kunci IP saat selesai (berhasil ataupun error)
+        ipLocks.set(host, false);
     }
 }
 
