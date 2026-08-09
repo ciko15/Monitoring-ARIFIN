@@ -11,11 +11,20 @@ const ModbusRTU = require("modbus-serial");
 const WARN_TEMP  = 30.0;
 const ALARM_TEMP = 35.0;
 
-async function pollTempHumidity(host, port = 502, slaveId = 1, timeoutMs = 4000) {
+async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
+    // Validasi nilai default jika tidak ada parameter yang di-passing
+    if (!port) port = 502;
+    if (!slaveId) slaveId = 1;
+
+    // Delay acak / terstruktur berdasarkan ID untuk mencegah tabrakan data (Collision) 
+    // jika 2 sensor di-poll di milidetik yang sama pada 1 IP Modbus Gateway.
+    await new Promise(r => setTimeout(r, slaveId * 250));
+
     const client = new ModbusRTU();
     try {
         client.setTimeout(timeoutMs); 
-        await client.connectTelnet(host, { port: port });
+        // Menggunakan TcpRTUBuffered agar frame RTU difilter ketat berdasarkan Slave ID!
+        await client.connectTcpRTUBuffered(host, { port: port });
         
         client.setID(slaveId);
 
