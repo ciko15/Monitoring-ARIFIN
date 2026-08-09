@@ -62,15 +62,19 @@ function readModbusRegister(host, port, unitId, address, timeoutMs = 2000) {
         }, timeoutMs);
 
         client.connect(port, host, () => {
+            console.log(`[Datakom] Connected to ${host}:${port}, sending request for addr ${address}`);
             client.write(req);
         });
 
         client.on('data', (data) => {
             if (resolved) return;
+            console.log(`[Datakom] RCV addr ${address}:`, data.toString('hex'));
+            
             // Frame minimal Modbus TCP FC03 response adalah 9 bytes
             if (data.length >= 9) {
                 // Cek Exception
                 if (data[7] === (0x03 + 0x80)) {
+                    console.warn(`[Datakom] Exception response for addr ${address}: 0x${data[8].toString(16)}`);
                     resolved = true;
                     clearTimeout(timeoutTimer);
                     cleanup();
@@ -103,8 +107,9 @@ function readModbusRegister(host, port, unitId, address, timeoutMs = 2000) {
             }
         });
 
-        client.on('error', () => {
+        client.on('error', (err) => {
             if (!resolved) {
+                console.warn(`[Datakom] TCP Error for addr ${address}:`, err.message);
                 resolved = true;
                 clearTimeout(timeoutTimer);
                 cleanup();
@@ -142,6 +147,7 @@ async function pollDatakomD700(host, port = 502, slaveId = 1) {
     }
 
     if (!hasValidData) {
+        console.warn(`[Datakom D700] All registers returned null. Device might be offline or rejecting connections.`);
         return {
             success: false,
             status: 'Disconnect',
@@ -152,6 +158,8 @@ async function pollDatakomD700(host, port = 502, slaveId = 1) {
             timestamp: new Date().toISOString()
         };
     }
+
+    console.log(`[Datakom D700] Poll success: Voltage=${parsedData.Voltage}, Current=${parsedData.Current}`);
 
     // Tentukan Status Genset (OFFLINE / STANDBY / RUNNING)
     let deviceStatus = 'OFFLINE';
