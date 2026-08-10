@@ -871,27 +871,25 @@
             </div>`;
         }
 
-        const TX_PARAMS = [
+        const MARC_PARAMS = [
             ['Frequency (MHz)', 'frequency_mhz'],
             ['Mode', 'mode'],
             ['Status', 'status'],
             ['Fwd Power (W)', 'fwd_power_w'],
             ['Refl Power (W)', 'refl_power_w'],
+            ['VSWR', 'vswr'],
             ['PA Temp (°C)', 'pa_temp_c'],
             ['Modulation (%)', 'modulation_pct'],
-            ['Supply Voltage (V)', 'supply_voltage'],
-        ];
-        const RX_PARAMS = [
-            ['Frequency (MHz)', 'frequency_mhz'],
             ['Sensitivity (dBm)', 'sensitivity_dbm'],
             ['Squelch (dBm)', 'squelch_dbm'],
-            ['Supply Voltage (V)', 'rx_supply_voltage'],
+            ['TX Supply (V)', 'supply_voltage'],
+            ['RX Supply (V)', 'rx_supply_voltage'],
         ];
 
         return Object.entries(radios).map(([radioName, rd]) => {
             const isRx = rd.is_rx;
             const radioType = rd.radio_type || (isRx ? 'RX' : 'TX');
-            const params = isRx ? RX_PARAMS : TX_PARAMS;
+            const params = MARC_PARAMS;
             let status = rd._status;
             if (!status) {
                 status = rd.status === 'ALARM' ? 'Alarm' : (rd.connected ? 'Normal' : 'Disconnect');

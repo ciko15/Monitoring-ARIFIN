@@ -188,7 +188,6 @@ function makeRadioState(rseId, port, name, radioType, isRx) {
         pa_temp_c: '—',
         fwd_power_w: '—',
         refl_power_w: '—',
-        vswr: '—',
         modulation_pct: '—',
         // RX BITE
         rx_supply_voltage: '—',
@@ -262,18 +261,6 @@ function decodeT6Reply(payload, srcId, states) {
         state.fwd_power_w = String(data[6]);
         // [7] = refl power W
         state.refl_power_w = String(data[7]);
-        // Calculate VSWR
-        let pf = data[6];
-        let pr = data[7];
-        if (pf > 0) {
-            let ratio = Math.sqrt(pr / pf);
-            // Mencegah division by zero jika ratio = 1
-            if (ratio === 1) ratio = 0.999; 
-            let vswr = (1 + ratio) / (1 - ratio);
-            state.vswr = vswr.toFixed(2);
-        } else {
-            state.vswr = '—';
-        }
         // [8] = modulation %
         state.modulation_pct = String(data[8]);
         return true;
@@ -294,10 +281,12 @@ function decodeT6Reply(payload, srcId, states) {
     }
 
     if (cmd === RPL_SETTINGS2 && data.length >= 9) {
-        // [8] = squelch (signed int8)
-        let squelchRaw = data[8];
-        if (squelchRaw > 127) squelchRaw -= 256;
-        state.squelch_dbm = String(squelchRaw);
+        // [8] = squelch (signed int8) — RX only
+        if (state.is_rx) {
+            let squelchRaw = data[8];
+            if (squelchRaw > 127) squelchRaw -= 256;
+            state.squelch_dbm = String(squelchRaw);
+        }
         return true;
     }
 
@@ -455,21 +444,16 @@ class MarcRseClient {
 
             if (!this._connected) break;
 
-            // TX BITE (Tanya data power dll)
-            this._send(this._builder.buildT6Cmd(rseId, port, CMD_TX_BITE));
+            // BITE (RX atau TX)
+            const biteCmd = state.is_rx ? CMD_RX_BITE : CMD_TX_BITE;
+            this._send(this._builder.buildT6Cmd(rseId, port, biteCmd));
             await this._delay(PORT_DELAY_MS);
 
-            if (!this._connected) break;
-
-            // RX BITE (Tanya data sensitivity dll)
-            this._send(this._builder.buildT6Cmd(rseId, port, CMD_RX_BITE));
-            await this._delay(PORT_DELAY_MS);
-
-            if (!this._connected) break;
-
-            // Settings 2 (Tanya squelch)
-            this._send(this._builder.buildT6Cmd(rseId, port, CMD_SETTINGS2));
-            await this._delay(PORT_DELAY_MS);
+            // Settings 2 untuk RX (berisi squelch)
+            if (state.is_rx && this._connected) {
+                this._send(this._builder.buildT6Cmd(rseId, port, CMD_SETTINGS2));
+                await this._delay(PORT_DELAY_MS);
+            }
         }
 
         // staleThreshold logic has been moved to parse()

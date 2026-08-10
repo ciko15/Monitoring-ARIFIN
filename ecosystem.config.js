@@ -62,6 +62,7 @@ module.exports = {
       MESSAGE_SERVICE_NAME: process.env.MESSAGE_SERVICE_NAME || 'MONITORING_ARIFIN_BRANCH',
       CENTRAL_SERVICE_NAME: process.env.CENTRAL_SERVICE_NAME || 'EMS',
       TARGET_SERVICE_NAME: process.env.TARGET_SERVICE_NAME || 'EMS',
+      EMS_ENABLED: 'false',
       /* === RABBITMQ (LAMA) ===
       RABBITMQ_PROTOCOL: process.env.RABBITMQ_PROTOCOL || 'amqp',
       RABBITMQ_HOST: process.env.RABBITMQ_HOST || '172.20.17.104',
@@ -87,6 +88,7 @@ module.exports = {
       MESSAGE_SERVICE_NAME: process.env.MESSAGE_SERVICE_NAME || 'MONITORING_ARIFIN_BRANCH',
       CENTRAL_SERVICE_NAME: process.env.CENTRAL_SERVICE_NAME || 'EMS',
       TARGET_SERVICE_NAME: process.env.TARGET_SERVICE_NAME || 'EMS',
+      EMS_ENABLED: 'false',
       /* === RABBITMQ (LAMA) ===
       RABBITMQ_PROTOCOL: process.env.RABBITMQ_PROTOCOL || 'amqp',
       RABBITMQ_HOST: process.env.RABBITMQ_HOST || '172.20.17.104',
