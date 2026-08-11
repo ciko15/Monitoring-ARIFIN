@@ -148,7 +148,7 @@ class NetworkListenerService {
             console.log(`[NetworkListener] Found ${sources.length} total sources`);
 
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal)
-            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv_snmp'];
+            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv_snmp', 'vhf_t6tv'];
             const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 10;
             const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 3000;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -1116,14 +1116,8 @@ class NetworkListenerService {
 
         const moduleName = this._getParserModule(parsing_id);
 
-        // T6TV uses WebSocket — route to dedicated handler
-        if (moduleName === 'vhf_t6tv') {
-            await this.startT6tvListener(source);
-            return;
-        }
-
-        // T6TV via SNMP — pull-based, no port needed
-        if (moduleName === 'vhf_t6tv_snmp') {
+        // T6TV uses SNMP — pull-based, no port needed
+        if (moduleName === 'vhf_t6tv' || moduleName === 'vhf_t6tv_snmp') {
             this.startT6tvSnmpListener(source);
             return;
         }
