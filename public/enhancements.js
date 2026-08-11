@@ -1660,7 +1660,32 @@
                 }
             }
 
-            if (parserId === 'ups_netagent_snmp') {
+            if (parserId === 'vhf_t6tv_snmp') {
+                const dataParams = [];
+                const meterParams = [];
+                const meterKeys = [
+                    'tx_frequency_mhz', 'rf_power_watts', 'modulation_depth', 'tone_keying_freq', 
+                    'fwd_power', 'refl_power', 'tx_level', 'mod_level', 'rx_level', 'squelch_level', 
+                    'sinad', 'audio_level', 'rx_freq', 'ambient_temp', 'internal_temp', 'dc_supply_v'
+                ];
+
+                Object.entries(data)
+                    .filter(([k, v]) => !k.startsWith('_') && !isMetricPlaceholder(v))
+                    .forEach(([k, v]) => {
+                        const label = k.replace(/_/g, ' ').toUpperCase();
+                        const displayValue = formatSnmpMetricValue(k, v);
+                        const item = [label, displayValue, getLimitColor(supCategory, label, v)];
+
+                        if (meterKeys.includes(k.toLowerCase())) {
+                            meterParams.push(item);
+                        } else {
+                            dataParams.push(item);
+                        }
+                    });
+
+                if (dataParams.length > 0) sections.push({ title: 'DATA', params: dataParams });
+                if (meterParams.length > 0) sections.push({ title: 'METER READING', params: meterParams });
+            } else if (parserId === 'ups_netagent_snmp') {
                 const inputParams = [];
                 const outputParams = [];
                 const batteryParams = [];
