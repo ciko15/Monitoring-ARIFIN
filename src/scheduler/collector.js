@@ -102,8 +102,8 @@ class DataCollectorScheduler {
 
             console.log(`[Scheduler] Collection complete - Success: ${successCount}, Failed: ${failCount}`);
             
-            // Send grouped equipment list to EMS
-            await this.equipmentService.sendEquipmentListToEms().catch(e => console.error('[Scheduler] Failed to send equipment list to EMS:', e));
+            // Send grouped equipment list to EMS (DIMATIKAN SESUAI PERMINTAAN USER AGAR TIDAK BATCHING)
+            // await this.equipmentService.sendEquipmentListToEms().catch(e => console.error('[Scheduler] Failed to send equipment list to EMS:', e));
 
         } catch (error) {
             console.error('[Scheduler] Collection cycle error:', error);

@@ -28,6 +28,7 @@ if (os.platform() === 'win32') {
 
 const stabilityEnv = {
   EMS_ENABLED: process.env.EMS_ENABLED || 'true',
+  EMS_TELEMETRY_INTERVAL_MS: process.env.EMS_TELEMETRY_INTERVAL_MS || 30000,
   EMS_PUBLISH_TIMEOUT_MS: process.env.EMS_PUBLISH_TIMEOUT_MS || 10000,
   EMS_RETRY_BACKOFF_MS: process.env.EMS_RETRY_BACKOFF_MS || 30000,
   EMS_MAX_BACKOFF_MS: process.env.EMS_MAX_BACKOFF_MS || 300000,
@@ -62,7 +63,7 @@ module.exports = {
       MESSAGE_SERVICE_NAME: process.env.MESSAGE_SERVICE_NAME || 'MONITORING_ARIFIN_BRANCH',
       CENTRAL_SERVICE_NAME: process.env.CENTRAL_SERVICE_NAME || 'EMS',
       TARGET_SERVICE_NAME: process.env.TARGET_SERVICE_NAME || 'EMS',
-      EMS_ENABLED: 'false',
+      EMS_ENABLED: 'true',
       /* === RABBITMQ (LAMA) ===
       RABBITMQ_PROTOCOL: process.env.RABBITMQ_PROTOCOL || 'amqp',
       RABBITMQ_HOST: process.env.RABBITMQ_HOST || '172.20.17.104',

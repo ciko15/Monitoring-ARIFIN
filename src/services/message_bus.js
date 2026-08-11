@@ -330,7 +330,7 @@ async function publishEquipmentConfigurationChanged(action, equipment = {}) {
         'equipment.configuration.changed',
         {
             action, // 'add', 'update', 'delete'
-            equipment_id: equipment.id,
+            equipment_id: equipment.id || null,
             airport_code: airportCode,
             equipment_data: action === 'delete' ? null : equipment,
             changed_at: new Date().toISOString()
@@ -357,6 +357,7 @@ async function publishDataSourceConfigurationChanged(action, datasource = {}) {
         {
             action, // 'add', 'update', 'delete'
             equipment_id: datasource.equipt_id || datasource.equipmentId || null,
+            datasource_id: datasource.id || null,
             airport_code: airportCode,
             datasource_data: action === 'delete' ? null : datasource,
             changed_at: new Date().toISOString()

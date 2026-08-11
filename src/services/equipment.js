@@ -12,6 +12,31 @@ const {
 } = require('./message_bus');
 const { SourceStatusGate } = require('./source_status_gate');
 
+/**
+ * Helper function untuk melakukan Deep Merge pada object
+ * Agar nested object (seperti parameter per port) tidak hilang saat tertimpa update parsial.
+ */
+function isObject(item) {
+    return (item && typeof item === 'object' && !Array.isArray(item));
+}
+
+function deepMerge(target, ...sources) {
+    if (!sources.length) return target;
+    const source = sources.shift();
+
+    if (isObject(target) && isObject(source)) {
+        for (const key in source) {
+            if (isObject(source[key])) {
+                if (!target[key]) Object.assign(target, { [key]: {} });
+                deepMerge(target[key], source[key]);
+            } else {
+                Object.assign(target, { [key]: source[key] });
+            }
+        }
+    }
+    return deepMerge(target, ...sources);
+}
+
 class EquipmentService {
     constructor(db) {
         this.db = db;
@@ -282,12 +307,12 @@ class EquipmentService {
                 this.telemetryCache.set(cacheKey, cache);
             }
 
-            // Jika alat Disconnect/Kosong, bersihkan cache agar frontend tahu data benar-benar hilang
-            if (finalStatus === 'Disconnect' || finalStatus === 'Error') {
-                cache.mergedData = {};
-            } else {
-                // Merge data baru ke data lama (Saling Mengisi)
-                cache.mergedData = { ...cache.mergedData, ...(parsedData.data || {}) };
+            // Agar UI frontend cabang tidak berubah-ubah/berkedip (hilang timbul), 
+            // JANGAN pernah menghapus data lama meskipun statusnya Disconnect/Error.
+            // Biarkan statusnya menjadi Disconnect, tapi nilai (angka) terakhir tetap dipertahankan.
+            if (finalStatus !== 'Disconnect' && finalStatus !== 'Error') {
+                // Gunakan Deep Merge agar data lama berkedalaman tingkat 2+ (misal radios/array) tidak hilang tertimpa
+                cache.mergedData = deepMerge({}, cache.mergedData, (parsedData.data || {}));
             }
 
             // Reset timer (Tunggu 1 detik untuk mengumpulkan sisa potongan data)
@@ -296,7 +321,7 @@ class EquipmentService {
                 cache.timer = setTimeout(async () => {
                     cache.timer = null;
 
-                    // 2. Database logging & Publish
+                    // 2. Database logging & Local Update (Cepat)
                     const datalog = {
                         equipmentId,
                         equipment_name: equipName,
@@ -310,9 +335,28 @@ class EquipmentService {
                     };
 
                     await this.db.createEquipmentLog(datalog);
-                    this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(datalog, equipment));
+                }, 1000); // 1000ms throttle untuk lokal
+            }
 
-                }, 1000); // 1000ms throttle
+            // EMS Publish Throttle (Lambat, contoh 30 detik)
+            // EMS hanya butuh snapshot data terakhir yang sudah matang
+            if (!cache.emsTimer) {
+                const emsInterval = parseInt(process.env.EMS_TELEMETRY_INTERVAL_MS || '30000', 10);
+                cache.emsTimer = setTimeout(async () => {
+                    cache.emsTimer = null;
+                    const emsDatalog = {
+                        equipmentId,
+                        equipment_name: equipName,
+                        status: finalStatus,
+                        data: { ...cache.mergedData },
+                        source: sourceName,
+                        connection_type: connectionType,
+                        airport_name: airport ? airport.name : 'Unknown',
+                        airport_city: airport ? airport.city : 'Unknown',
+                        logged_at: new Date().toISOString()
+                    };
+                    this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(emsDatalog, equipment));
+                }, emsInterval);
             }
 
         } catch (error) {
