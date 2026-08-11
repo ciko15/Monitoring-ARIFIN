@@ -113,7 +113,13 @@ class VhfT6tvSnmpCollector extends EventEmitter {
 
         this._session.on('error', (err) => {
             this._connected = false;
-            this.emit('error', err);
+            // Prevent Node.js crash from Unhandled 'error' event
+            this.emit('data', {
+                success: false,
+                error: err.message || String(err),
+                status: 'Disconnect',
+                timestamp: new Date().toISOString()
+            });
         });
 
         // Poll pertama langsung, lalu jadwalkan interval
