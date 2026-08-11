@@ -143,33 +143,52 @@ class VhfT6tvSnmpCollector extends EventEmitter {
         return oids;
     }
 
-    _poll() {
+    async _poll() {
         if (!this._session) return;
 
         const oidList = this._buildOidList();
+        const chunkSize = 10;
+        let allVarbinds = [];
+        let hasError = false;
+        let lastError = null;
 
-        this._session.get(oidList, (error, varbinds) => {
-            if (error) {
-                this._connected = false;
-                const result = {
-                    success: false,
-                    error: error.message || String(error),
-                    status: 'Error',
-                    timestamp: new Date().toISOString()
-                };
-                this.emit('data', result);
-                return;
+        for (let i = 0; i < oidList.length; i += chunkSize) {
+            const chunk = oidList.slice(i, i + chunkSize);
+            try {
+                const varbinds = await new Promise((resolve, reject) => {
+                    this._session.get(chunk, (error, vbs) => {
+                        if (error) reject(error);
+                        else resolve(vbs);
+                    });
+                });
+                allVarbinds = allVarbinds.concat(varbinds);
+            } catch (err) {
+                hasError = true;
+                lastError = err;
+                break;
             }
+        }
 
-            this._connected = true;
-
-            // Map balik varbinds ke object { oid: value }
-            const byOid = {};
-            varbinds.forEach(vb => { byOid[vb.oid] = vbValue(vb); });
-
-            const result = this._buildFlatResult(byOid);
+        if (hasError) {
+            this._connected = false;
+            const result = {
+                success: false,
+                error: lastError.message || String(lastError),
+                status: 'Disconnect',
+                timestamp: new Date().toISOString()
+            };
             this.emit('data', result);
-        });
+            return;
+        }
+
+        this._connected = true;
+
+        // Map balik varbinds ke object { oid: value }
+        const byOid = {};
+        allVarbinds.forEach(vb => { byOid[vb.oid] = vbValue(vb); });
+
+        const result = this._buildFlatResult(byOid);
+        this.emit('data', result);
     }
 
     _buildFlatResult(byOid) {
