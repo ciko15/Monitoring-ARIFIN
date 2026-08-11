@@ -208,6 +208,19 @@ class VhfT6tvSnmpCollector extends EventEmitter {
         let status = 'Normal';
         if (txFaults !== 0 || anyEscalated) status = 'Alarm';
 
+        const alarms = status !== 'Normal'
+            ? bitEscRows.filter(([, s]) => s === 'Escalated').map(([k]) => k)
+            : [];
+
+        // Gabungkan TX Confirmed dan Raw menjadi format array 2D yang disukai frontend
+        const amvTxsRows = [
+            ['RF Power (W)', amvTxConfirmed.rf_power_watts || '—'],
+            ['Modulation Depth', amvTxConfirmed.modulation_depth || '—'],
+            ['PTT Ref Voltage', amvTxConfirmed.ptt_ref_voltage || '—'],
+            ['Tone Keying Freq', amvTxConfirmed.tone_keying_freq || '—'],
+            ...amvTxRaw.map(x => [`Raw Field ${x.index}`, x.value !== undefined ? String(x.value) : '—'])
+        ];
+
         const flat = {
             // ── SYSTEM INFO ──
             model: byOid[OID.model] || '—',
@@ -219,36 +232,58 @@ class VhfT6tvSnmpCollector extends EventEmitter {
             snmp_name: byOid[OID.sysName] || '—',
             snmp_location: byOid[OID.sysLocation] || '—',
 
-            // ── RF METRICS ──
+            // ── SERVICE STATUS (Sesuai format lama Frontend) ──
+            overall_status:  status,
+            ac_power:        '—',
+            dc_power:        '—',
+            dc_supply_v:     '—',
+            ambient_temp:    '—',
+            internal_temp:   '—',
+            elapsed_time:    byOid[OID.elapsedTime] || '—',
+            status_messages: '—',
+
+            // ── RADIO CONFIG ──
+            channel: '—',
+
+            // ── TX MEASUREMENTS ──
+            fwd_power:  byOid[OID.txPowerLevel] !== undefined ? String(byOid[OID.txPowerLevel]) : '—',
+            refl_power: '—',
+            tx_level:   '—',
+            mod_level:  byOid[OID.modError] !== undefined ? String(byOid[OID.modError]) : '—',
+
+            // ── TX SETTINGS ──
+            rf_power_watts:   amvTxConfirmed.rf_power_watts !== undefined ? String(amvTxConfirmed.rf_power_watts) : '—',
+            modulation_depth: amvTxConfirmed.modulation_depth !== undefined ? String(amvTxConfirmed.modulation_depth) : '—',
+            ptt_state:        '—',
+            alc_enabled:      '—',
+            audio_line_in:    '—',
+            tx_timeout:       '—',
+            tone_keying_freq: amvTxConfirmed.tone_keying_freq !== undefined ? String(amvTxConfirmed.tone_keying_freq) : '—',
+
+            // ── RX MEASUREMENTS ──
+            rx_level:     '—',
+            squelch_level:'—',
+            sinad:        '—',
+            audio_level:  '—',
+            rx_freq:      '—',
+            squelch_state:'—',
+
+            // ── RAW ROWS (Wajib ada untuk sidebar enhancements.js) ──
+            _amv_txs_rows: amvTxsRows,
+            _amv_rxs_rows: [],
+            _bit_esc_rows: bitEscRows,
+            _radio_rows:   [],
+            
+            // ── EXTRA (Khusus SNMP) ──
             tx_frequency_mhz: txFrequencyMhz,
             tx_faults: byOid[OID.txFaults],
-            tx_power_level: byOid[OID.txPowerLevel],
-            mod_error: byOid[OID.modError],
             tx_enabled: byOid[OID.txEnabled] === 1,
             tx_active: byOid[OID.txActive] === 1,
             pa_status: byOid[OID.paStatus] === 1 ? 'OK' : 'Fault',
             antenna_status: byOid[OID.antennaStatus] === 0 ? 'OK' : 'Alert',
             vswr_alarm: byOid[OID.vswrAlarm] === 0 ? 'Normal' : 'Alert',
-            duty_cycle_alarm: byOid[OID.dutyCycleAlarm] === 0 ? 'Normal' : 'Alert',
-            elapsed_time: byOid[OID.elapsedTime] || '—',
-
-            // ── BIT ESCALATE (9 -> aktual 8 param di OID) ──
-            _bit_esc_rows: bitEscRows,
-
-            // ── AM VOICE TX ──
-            ...amvTxConfirmed,
-            _amv_tx_raw: amvTxRaw,  // field belum terverifikasi, tampilkan sbg raw index:value
-
-            // ── FIELD YANG SENGAJA TIDAK ADA (dari keputusan diskusi) ──
-            _radio_rows: [],       // Radio Settings tidak tersedia via SNMP
-            ambient_temp: '—',     // tidak tersedia via SNMP
-            internal_temp: '—',    // tidak tersedia via SNMP
-            status_messages: '—',  // tidak tersedia via SNMP
+            duty_cycle_alarm: byOid[OID.dutyCycleAlarm] === 0 ? 'Normal' : 'Alert'
         };
-
-        const alarms = status !== 'Normal'
-            ? bitEscRows.filter(([, s]) => s === 'Escalated').map(([k]) => k)
-            : [];
 
         return {
             success: true,
