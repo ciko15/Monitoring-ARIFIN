@@ -529,7 +529,7 @@ function clearMarcPortsCheckboxes() {
     if (cb) cb.checked = false;
   }
 }
-const SNMP_PARSING_IDS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp'];
+const SNMP_PARSING_IDS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv', 'vhf_t6tv_snmp'];
 
 function isSnmpParsingId(parsingId) {
   return SNMP_PARSING_IDS.includes(String(parsingId || ''));
