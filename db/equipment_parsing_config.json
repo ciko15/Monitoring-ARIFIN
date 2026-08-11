@@ -48,6 +48,13 @@
     "createdAt": "2026-04-20T00:00:00.000Z"
   },
   {
+    "id": "vhf_t6tv_snmp",
+    "name": "VHF T6TV (SNMP)",
+    "category": "Communication",
+    "files": "/src/parsers/vhf_t6tv_snmp.js",
+    "createdAt": "2026-08-11T00:00:00.000Z"
+  },
+  {
     "id": "pm5560_modbus",
     "name": "PM5560 Modbus TCP",
     "description": "Parser untuk Schneider PowerLogic PM5560 — Voltage, Current, Power, PF, Hz, KWh via Modbus FC03",
