@@ -79,10 +79,10 @@ module.exports = {
       ...stabilityEnv
     },
     // Menggunakan path relatif agar aman di Windows
-    error_file: './logs/pm2-error.log',
-    out_file: './logs/pm2-out.log',
-    log_file: './logs/pm2-combined.log',
-    merge_logs: true,
+    error_file: 'NUL',
+    out_file: 'NUL',
+    log_file: 'NUL',
+    merge_logs: false,
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     time: true,
     max_restarts: 10,

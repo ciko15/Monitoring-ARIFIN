@@ -107,10 +107,10 @@ module.exports = {
       RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || '/',
       ...stabilityEnv
     },
-    error_file: './logs/pm2-error.log',
-    out_file: './logs/pm2-out.log',
-    log_file: './logs/pm2-combined.log',
-    merge_logs: true,
+    error_file: '/dev/null',
+    out_file: '/dev/null',
+    log_file: '/dev/null',
+    merge_logs: false,
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     time: true,
     // Restart aplikasi jika crash

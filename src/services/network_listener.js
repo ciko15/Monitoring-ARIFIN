@@ -148,7 +148,7 @@ class NetworkListenerService {
             console.log(`[NetworkListener] Found ${sources.length} total sources`);
 
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal)
-            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp'];
+            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv_snmp'];
             const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 10;
             const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 3000;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -222,6 +222,75 @@ class NetworkListenerService {
         this._t6tvConnectors = this._t6tvConnectors || new Map();
         this._t6tvConnectors.set(id, connector);
         console.log(`[NetworkListener] T6TV listener active for ${source.name}`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // VHF T6TV via SNMP (pengganti WebSocket untuk device yang sudah support SNMP)
+    // ─────────────────────────────────────────────────────────────────────────
+    startT6tvSnmpListener(source) {
+        const { id, equipt_id, ip_address, name, community, poll_interval, extra_config } = source;
+
+        // Ambil config: community dan interval bisa dari kolom khusus atau extra_config JSON
+        let comm = community || 'public';
+        let pollSec = parseInt(poll_interval) || 30;
+
+        if (extra_config) {
+            try {
+                const extra = typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config;
+                if (extra.community) comm = extra.community;
+                if (extra.interval) pollSec = parseInt(extra.interval);
+            } catch (e) {
+                console.warn(`[T6TV SNMP] Invalid extra_config for ${name}`);
+            }
+        }
+
+        const VhfT6tvSnmpCollector = require('../parsers/vhf_t6tv_snmp');
+        const collector = new VhfT6tvSnmpCollector({
+            host: ip_address,
+            community: comm,
+            interval: pollSec * 1000,
+            timeout: 5000,
+            retries: 1,
+        });
+
+        collector.on('data', async (result) => {
+            try {
+                const logStatus = result.success ? (result.status || 'Normal') : 'Disconnect';
+
+                await this._handleLogOutput(
+                    source,
+                    {
+                        data: result.data || {},
+                        source: name,
+                        _ip: ip_address,
+                        _triggered: result.triggeredParams || [],
+                    },
+                    'vhf_t6tv_snmp',
+                    logStatus
+                );
+
+                if (result.success) {
+                    console.log(`[T6TV SNMP] ${name}: status=${logStatus} freq=${result.data?.tx_frequency_mhz || '?'} MHz`);
+                } else {
+                    this._logThrottled('warn', `t6tv-snmp:fail:${id}`, `[T6TV SNMP] Poll failed for ${name}: ${result.error || 'unknown'}`);
+                }
+            } catch (err) {
+                console.error(`[T6TV SNMP] handleLogOutput error for ${name}:`, err.message);
+            }
+        });
+
+        collector.on('error', (err) => {
+            this._logThrottled('error', `t6tv-snmp:error:${id}:${err.message}`, `[T6TV SNMP] Error for ${name}: ${err.message}`);
+        });
+
+        collector.start();
+        this.activeListeners.add(id);
+
+        // Simpan collector untuk keperluan cleanup (stopAll)
+        this._t6tvSnmpCollectors = this._t6tvSnmpCollectors || new Map();
+        this._t6tvSnmpCollectors.set(id, collector);
+
+        console.log(`[T6TV SNMP] Listener started: ${name} (${ip_address}, community=${comm}, interval=${pollSec}s)`);
     }
 
     /**
@@ -1053,6 +1122,12 @@ class NetworkListenerService {
             return;
         }
 
+        // T6TV via SNMP — pull-based, no port needed
+        if (moduleName === 'vhf_t6tv_snmp') {
+            this.startT6tvSnmpListener(source);
+            return;
+        }
+
         // Modbus TCP parsers (PM5560, Datakom D700) — dedicated raw TCP handler
         if (moduleName === 'pm5560_modbus') {
             this.startModbusTcpListener(source, moduleName);
@@ -1344,6 +1419,14 @@ class NetworkListenerService {
                 clearInterval(timer);
             }
             this._datakomTimers.clear();
+        }
+
+        // Stop SNMP-based T6TV collectors
+        if (this._t6tvSnmpCollectors) {
+            for (const [id, collector] of this._t6tvSnmpCollectors) {
+                try { collector.stop(); } catch (e) { }
+            }
+            this._t6tvSnmpCollectors.clear();
         }
     }
 }

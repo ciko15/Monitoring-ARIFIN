@@ -40,6 +40,19 @@ const MARC_RADIO_DEFAULTS = {
 
 const PARSER_TEMPLATES = {
   'vhf_t6tv': ['overall_status', 'ac_power', 'dc_power', 'dc_supply_v', 'ambient_temp', 'internal_temp', 'elapsed_time', 'status_messages', 'channel', 'rf_power_watts', 'modulation_depth', 'ptt_state', 'alc_enabled', 'audio_line_in', 'tx_timeout', 'tone_keying_freq', 'tx_power_state', 'fwd_power', 'refl_power', 'tx_level', 'mod_level', 'rx_level', 'squelch_level', 'sinad', 'audio_level', 'rx_freq', 'squelch_state', 'snmp_name', 'model', 'serial_number', 'firmware', 'equipment', 'boot_installed'],
+  'vhf_t6tv_snmp': [
+    // System Info
+    'model', 'equipment', 'serial_number', 'firmware', 'software_version', 'boot_installed',
+    'snmp_name', 'snmp_location',
+    // RF Metrics
+    'tx_frequency_mhz', 'tx_faults', 'tx_power_level', 'mod_error',
+    'tx_enabled', 'tx_active', 'pa_status', 'antenna_status',
+    'vswr_alarm', 'duty_cycle_alarm', 'elapsed_time',
+    // AM Voice TX (confirmed)
+    'rf_power_watts', 'modulation_depth', 'ptt_ref_voltage', 'tone_keying_freq',
+    // Overall
+    'overall_status',
+  ],
   'dme_maru_310_320': ['txp_active', 'ident', 'txp1_m1_sys_delay', 'txp1_m1_reply_eff', 'txp1_m1_pair_rate', 'txp1_m1_fwd_power', 'txp1_m1_dur_a', 'txp1_m1_spacing', 'txp1_active', 'txp2_m1_sys_delay', 'txp2_m1_reply_eff', 'txp2_m1_pair_rate', 'txp2_m1_fwd_power', 'txp2_active'],
   'dvor_maru_220': ['mon1_carrier_power', 'mon1_rf_input', 'mon1_azimuth', 'mon1_fm_index', 'mon1_am_30hz', 'mon1_am_9960hz', 'mon1_am_1020hz', 'mon1_carrier_freq', 'mon1_ident', 'mon2_carrier_power', 'mon2_rf_input', 'mon2_azimuth', 'tx1_carrier_power', 'tx1_cpa_temp', 'tx1_az_offset', 'tx2_carrier_power', 'tx2_cpa_temp', 'lcu_dc_5v', 'lcu_dc_7v', 'lcu_dc_15v', 'lcu_dc_28v', 'lcu_ac_28v', 'tx_active'],
   'custom_1775446808830': ['m1_sys_delay', 'm1_reply_eff', 'm1_fwd_power', 'm1_5v_ps', 'm1_15v_ps', 'm1_48v_ps', 'ident'],
