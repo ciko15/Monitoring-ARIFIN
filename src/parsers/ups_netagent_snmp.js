@@ -31,6 +31,10 @@ const OID = {
     upsOutputCurrentS: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 3, 2],
     upsOutputCurrentT: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 3, 3],
     
+    upsOutputPowerR: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 4, 1],
+    upsOutputPowerS: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 4, 2],
+    upsOutputPowerT: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 4, 3],
+    
     upsOutputPercentLoadR: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 5, 1],
     upsOutputPercentLoadS: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 5, 2],
     upsOutputPercentLoadT: [1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 5, 3],
@@ -114,6 +118,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             OID.upsInputVoltageR, OID.upsInputVoltageS, OID.upsInputVoltageT,
             OID.upsOutputVoltageR, OID.upsOutputVoltageS, OID.upsOutputVoltageT,
             OID.upsOutputCurrentR, OID.upsOutputCurrentS, OID.upsOutputCurrentT,
+            OID.upsOutputPowerR, OID.upsOutputPowerS, OID.upsOutputPowerT,
             OID.upsOutputPercentLoadR, OID.upsOutputPercentLoadS, OID.upsOutputPercentLoadT
         ];
         const [
@@ -122,6 +127,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             inputVoltageR, inputVoltageS, inputVoltageT,
             outputVoltageR, outputVoltageS, outputVoltageT,
             outputCurrentRawR, outputCurrentRawS, outputCurrentRawT,
+            outputPowerR, outputPowerS, outputPowerT,
             outputPercentLoadR, outputPercentLoadS, outputPercentLoadT
         ] = await snmpGetAllChunked(session, oidsToFetch, 5); // Ambil per 5 OID
 
@@ -180,6 +186,26 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         else if (batteryStatusRaw === 3) batteryStatusStr = 'Low';
         else if (batteryStatusRaw === 4) batteryStatusStr = 'Depleted';
 
+        // Kalkulasi Total Power Factor
+        let totalRealPower = 0;
+        let totalApparentPower = 0;
+
+        const addPower = (v, iRaw, p) => {
+            if (v && iRaw && p) {
+                totalRealPower += p;
+                totalApparentPower += v * (iRaw / 10);
+            }
+        };
+
+        addPower(outputVoltageR, outputCurrentRawR, outputPowerR);
+        addPower(outputVoltageS, outputCurrentRawS, outputPowerS);
+        addPower(outputVoltageT, outputCurrentRawT, outputPowerT);
+
+        let totalPF = '—';
+        if (totalApparentPower > 0) {
+            totalPF = Number((totalRealPower / totalApparentPower).toFixed(2));
+        }
+
         session.close();
 
         return {
@@ -211,6 +237,8 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 output_load_pct_r: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—',
                 output_load_pct_s: outputPercentLoadS !== null ? String(outputPercentLoadS) : '—',
                 output_load_pct_t: outputPercentLoadT !== null ? String(outputPercentLoadT) : '—',
+
+                power_factor: totalPF !== '—' ? String(totalPF) : '—',
                 
                 // Compatibility untuk Frontend yg mungkin cuma pakai 1 parameter general
                 input_voltage: inputVoltageR !== null ? String(inputVoltageR) : '—',
