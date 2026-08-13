@@ -1854,6 +1854,7 @@
 
             /* ── Source card status styling ─────────────────────────────── */
             .sp-source-card {
+                box-sizing: border-box;
                 background: #0a1628;
                 border: 1px solid #1a3a5c;
                 border-radius: 8px;
@@ -1861,6 +1862,7 @@
                 cursor: pointer;
                 transition: all .2s;
                 position: relative;
+                overflow: hidden;
             }
             .sp-source-card:hover { border-color: #007a9e; background: #0d1e38; }
 
@@ -1929,7 +1931,7 @@
                 border-color: #ffcc00 !important;
             }
 
-            .sp-panel-content { padding: 14px; }
+            .sp-panel-content { padding: 14px; box-sizing: border-box; width: 100%; overflow-x: hidden; }
             .sp-panel-toolbar { 
                 margin-bottom: 14px; 
                 display: flex; 
@@ -1943,6 +1945,8 @@
                 display: grid;
                 grid-template-columns: 1fr;
                 gap: 12px;
+                box-sizing: border-box;
+                width: 100%;
             }
             @media (min-width: 1200px) {
                 .sp-sources-grid { grid-template-columns: 1fr 1fr; }
@@ -1950,20 +1954,20 @@
 
             .sp-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
             .sp-card-title { display: flex; align-items: center; gap: 8px; }
-            .sp-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4a7a9a; }
+            .sp-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4a7a9a; flex-shrink: 0; }
             .sp-status-dot.normal { background: #00ff88; box-shadow: 0 0 8px #00ff8844; }
             .sp-status-dot.alarm { background: #ff3355; box-shadow: 0 0 8px #ff335544; }
             .sp-status-dot.warning { background: #ffcc00; box-shadow: 0 0 8px #ffcc0044; }
-            .sp-source-name { font-size: 13px; font-weight: 600; color: #e8f4ff; }
-            .sp-status-pill { font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+            .sp-source-name { font-size: 13px; font-weight: 600; color: #e8f4ff; word-break: break-word; }
+            .sp-status-pill { font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; flex-shrink: 0; }
             .sp-status-pill.normal { background: #005533; color: #00ff88; }
             .sp-status-pill.alarm { background: #660022; color: #ff3355; }
             .sp-status-pill.warning { background: #332200; color: #ffcc00; }
 
             .sp-card-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-            .sp-card-preview-point { display: flex; flex-direction: column; gap: 2px; }
-            .sp-preview-label { font-size: 9px; color: #5a8aaa; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .sp-preview-value { font-size: 11px; color: #e8f4ff; font-family: monospace; font-weight: bold; }
+            .sp-card-preview-point { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+            .sp-preview-label { font-size: 9px; color: #5a8aaa; text-transform: uppercase; letter-spacing: 0.5px; white-space: normal; word-break: break-word; line-height: 1.2; }
+            .sp-preview-value { font-size: 11px; color: #e8f4ff; font-family: monospace; font-weight: bold; white-space: normal; word-break: break-word; }
 
             .sp-card-meta { display: flex; gap: 8px; flex-wrap: wrap; }
             .sp-conn-badge { 

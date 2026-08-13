@@ -163,22 +163,29 @@ function snmpWalk(session, oid) {
     });
 }
 
-async function readDeviceTemperature(session, sysObjectID) {
+async function readDeviceTemperature(session, sysObjectID, sysDescr) {
     const sysObjectIdText = Array.isArray(sysObjectID) ? sysObjectID.join('.') : String(sysObjectID || '');
+    const descr = String(sysDescr || '').toLowerCase();
     const isAlcatelDevice = sysObjectIdText.startsWith('1.3.6.1.4.1.6486.');
+    const isLinux = sysObjectIdText.startsWith('1.3.6.1.4.1.8072.') || sysObjectIdText.startsWith('1.3.6.1.4.1.2021.') || descr.includes('linux');
 
     if (isAlcatelDevice) {
         const alcatelTemp = await readAlcatelTemperature(session, snmpWalk, snmpGet);
         if (alcatelTemp.hottest) return alcatelTemp;
     }
 
-    const genericSensors = await readTemperatureSensors(session, snmpWalk);
-    if (genericSensors.hottest) return genericSensors;
+    if (isLinux) {
+        const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
+        if (ucdSensors.hottest) return ucdSensors;
+    } else {
+        const genericSensors = await readTemperatureSensors(session, snmpWalk);
+        if (genericSensors.hottest) return genericSensors;
 
-    const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
-    if (ucdSensors.hottest) return ucdSensors;
+        const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
+        if (ucdSensors.hottest) return ucdSensors;
+    }
 
-    return genericSensors;
+    return { sensors: [], hottest: null };
 }
 
 async function pollSNMP(host, community = 'public', options = {}) {
@@ -188,15 +195,21 @@ async function pollSNMP(host, community = 'public', options = {}) {
         const oids1 = [OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation, OID.sysUpTime];
         const oids2 = [OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal, OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached];
         
-        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw] = await snmpGetAll(session, oids1);
-        const [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await snmpGetAll(session, oids2);
+        const [
+            [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw],
+            [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb],
+            cpuVbs
+        ] = await Promise.all([
+            snmpGetAll(session, oids1),
+            snmpGetAll(session, oids2),
+            snmpWalk(session, OID.hrProcessorLoad)
+        ]);
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
         }
 
         // CPU average
-        const cpuVbs = await snmpWalk(session, OID.hrProcessorLoad);
         let cpu_pct = null;
         if (cpuVbs.length > 0) {
             const vals = cpuVbs.map(v => parseFloat(v.value)).filter(v => !isNaN(v));
@@ -204,11 +217,9 @@ async function pollSNMP(host, community = 'public', options = {}) {
         }
 
         const walkOids = [OID.hrStorageType, OID.hrStorageSize, OID.hrStorageUsed, OID.hrStorageAlloc];
-        const walkResults = [];
-        for (const oid of walkOids) {
-            walkResults.push(await snmpWalk(session, oid));
-        }
-        const [typeVbs, sizeVbs, usedVbs, allocVbs] = walkResults;
+        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.all(
+            walkOids.map(oid => snmpWalk(session, oid))
+        );
 
         // Build index maps
         // NOTE: hrStorageType value dikembalikan snmp-native sebagai Array OID
@@ -272,7 +283,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
         const memRealPctRaw = (memTotalRealMbRaw && memTotalRealMbRaw > 0 && memUsedRealMbRaw !== null) ? (memUsedRealMbRaw / memTotalRealMbRaw * 100) : null;
 
         const processor_count = cpuVbs.length > 0 ? String(cpuVbs.length) : '—';
-        const tempInfo = await readDeviceTemperature(session, sysObjectID);
+        const tempInfo = await readDeviceTemperature(session, sysObjectID, sysDescr);
         const temperatureSensors = tempInfo.sensors.map((sensor) => ({
             name: sensor.name,
             value_c: sensor.value_c.toFixed(1),
@@ -363,7 +374,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 }
 
 // Wrapper dengan hard timeout — mencegah hang di Bun runtime
-async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 40000) {
+async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 60000) {
     if (typeof options === 'number') {
         timeoutMs = options;
         options = {};

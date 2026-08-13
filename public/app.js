@@ -278,6 +278,20 @@ function generateUniqueCode(length = 8) {
   return result;
 }
 
+function getAirportPrefix(airportId = null) {
+  let code = 'wajj';
+  if (typeof airportsData !== 'undefined' && airportsData.length > 0) {
+    let airport = airportId ? airportsData.find(a => String(a.id) === String(airportId)) : airportsData[0];
+    if (!airport) airport = airportsData[0];
+    if (airport && airport.code) {
+      code = airport.code.toLowerCase();
+    } else if (airport && airport.siteId) {
+      code = airport.siteId.toLowerCase();
+    }
+  }
+  return code + '_';
+}
+
 // Global "Pick Location" logic
 window.getCurrentLocation = function(type) {
   if (navigator.geolocation) {
@@ -750,7 +764,10 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     clearMarcPortsCheckboxes();
     resetSnmpFields();
     if (equipmentSelect) equipmentSelect.value = equipmentId;
-    if (dataSourceIdInput) dataSourceIdInput.value = generateUniqueCode(8);
+    if (dataSourceIdInput) {
+      const prefix = typeof getAirportPrefix === 'function' ? getAirportPrefix(equipment ? equipment.airportId || equipment.branchId : null) : 'wajj_';
+      dataSourceIdInput.value = prefix + generateUniqueCode(8);
+    }
 
     // Default Lat/Lng from Equipment
     if (equipment) {
@@ -2348,19 +2365,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('addEquipmentBtn').addEventListener('click', () => {
     document.getElementById('equipmentForm').reset();
+    
+    // Auto-select first airport if available
+    const airportSelect = document.getElementById('equipmentAirport');
+    let selectedAirportId = null;
+    if (airportSelect && typeof airportsData !== 'undefined' && airportsData.length > 0) {
+      airportSelect.value = airportsData[0].id;
+      selectedAirportId = airportsData[0].id;
+    }
+
+    const prefix = typeof getAirportPrefix === 'function' ? getAirportPrefix(selectedAirportId) : 'wajj_';
+
     // Generate ID immediately so child data sources can be added
-    document.getElementById('equipmentId').value = Date.now();
-    document.getElementById('equipmentCode').value = generateUniqueCode(8);
+    document.getElementById('equipmentId').value = prefix + Date.now();
+    document.getElementById('equipmentCode').value = prefix + generateUniqueCode(8);
 
     // Clear data sources for new equipment
     const container = document.getElementById('dataSourceContainer');
     if (container) container.innerHTML = '';
-
-    // Auto-select first airport if available
-    const airportSelect = document.getElementById('equipmentAirport');
-    if (airportSelect && airportsData.length > 0) {
-      airportSelect.value = airportsData[0].id;
-    }
 
     document.getElementById('modalFormTitle').textContent = 'Add New Equipment';
     document.getElementById('equipmentModal').classList.remove('hidden');
@@ -2763,7 +2785,8 @@ window.showAddConfigModal = function (type) {
   const container = document.getElementById('configFieldsContainer');
 
   form.reset();
-  const newId = typeof generateUniqueCode === 'function' ? generateUniqueCode(8) : `cfg_${Date.now()}`;
+  const prefix = typeof getAirportPrefix === 'function' ? getAirportPrefix() : 'cfg_';
+  const newId = typeof generateUniqueCode === 'function' ? prefix + generateUniqueCode(8) : prefix + Date.now();
   document.getElementById('configId').value = newId;
   document.getElementById('configType').value = type;
   document.getElementById('configMode').value = 'add';

@@ -827,7 +827,7 @@ async function createEquipment(data) {
   let equipmentList = await readJson(EQUIPMENT_CONFIG_PATH);
   const newEquip = {
     ...data,
-    id: Number(data.id) || Date.now(),
+    id: data.id || Date.now(),
     status: data.status || 'Normal',
     merk: data.merk || '-',
     type: data.type || '-',
@@ -1044,9 +1044,9 @@ async function syncEquipmentDataSourceRelation(equipmentId, sourceData) {
 
 async function createOtentication(data) {
   let authList = await readJson(AUTH_CONFIG_PATH);
-  const { id: _ignoredId, ...sourceData } = data || {};
+  const { id: passedId, ...sourceData } = data || {};
   const newItem = {
-    id: Date.now() + Math.floor(Math.random() * 1000),
+    id: passedId || (Date.now() + Math.floor(Math.random() * 1000)),
     name: sourceData.name || 'Source',
     equipt_id: sourceData.equipt_id || null,
     ip_address: sourceData.ip_address ?? sourceData.ip ?? null,
