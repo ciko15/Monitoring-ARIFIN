@@ -186,7 +186,8 @@ class ParserFactory {
             'custom_1783483057654',
             'vhf_t6tv',
             'vhf_marc_rse',
-            'datakom_d700_modbus'
+            'datakom_d700_modbus',
+            'dse7320_modbus'
         ];
     }
 }

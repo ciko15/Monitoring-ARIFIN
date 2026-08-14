@@ -1085,6 +1085,68 @@ class NetworkListenerService {
         }, initialDelay);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // DSE7320 Poller
+    // ─────────────────────────────────────────────────────────────────────────
+    startDse7320Listener(source) {
+        const { id, equipt_id, ip_address, tcp_port, name, poll_interval, extra_config } = source;
+        const pollSec = parseInt(poll_interval) || 5;
+        const port = parseInt(tcp_port) || 502;
+        
+        let slaveId = 10; // Default DSE7320 unit ID
+        if (extra_config) {
+            try {
+                const config = typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config;
+                if (config.modbus_slave_id) slaveId = parseInt(config.modbus_slave_id);
+                // Dukung juga jika user menulis unit_id di config
+                if (config.unit_id) slaveId = parseInt(config.unit_id);
+            } catch (e) {
+                console.warn(`[DSE7320] Invalid extra_config for ${name}`);
+            }
+        }
+
+        const { pollDse7320 } = require('../parsers/dse7320_modbus');
+
+        this.activeListeners.add(id);
+        console.log(`[DSE7320] Listener started: ${name} (${ip_address}:${port}, Slave ID: ${slaveId})`);
+
+        const doPoll = async () => {
+            try {
+                const result = await pollDse7320(ip_address, port, slaveId);
+                const logLine = `[DSE7320] ${name}: status=${result.status}`;
+
+                if (String(result.status || '').toLowerCase() === 'disconnect') {
+                    this._logThrottled('log', `dse7320:disconnect:${id}`, logLine);
+                }
+
+                // LogData HARUS berisi semua metadata (success, status, alarms, dll)
+                const logData = {
+                    ...result,
+                    source: name,
+                    _ip: ip_address
+                };
+
+                await this._handleLogOutput(
+                    source,
+                    logData,
+                    'dse7320_modbus',
+                    result.status || 'Disconnect'
+                );
+            } catch (err) {
+                console.error(`[DSE7320] Poll error ${name}:`, err.message);
+            }
+        };
+
+        const initialDelay = 1000 + Math.floor(Math.random() * 2000);
+        setTimeout(() => {
+            doPoll();
+            const timer = setInterval(doPoll, pollSec * 1000);
+
+            if (!this._dseTimers) this._dseTimers = new Map();
+            this._dseTimers.set(id, timer);
+        }, initialDelay);
+    }
+
     _getParserModule(parsing_id) {
         if (!parsing_id || !parsing_id.startsWith('custom_')) return parsing_id;
         try {
@@ -1130,6 +1192,11 @@ class NetworkListenerService {
 
         if (moduleName === 'datakom_d700_modbus') {
             this.startDatakomListener(source);
+            return;
+        }
+
+        if (moduleName === 'dse7320_modbus') {
+            this.startDse7320Listener(source);
             return;
         }
 
