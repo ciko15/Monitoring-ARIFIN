@@ -211,5 +211,13 @@
     "category": "Support",
     "files": "/src/parsers/datakom_d700_modbus.js",
     "createdAt": "2026-08-09T00:00:00.000Z"
+  },
+  {
+    "id": "dse7320_modbus",
+    "name": "DSE7320 Modbus TCP",
+    "description": "Parser Modbus TCP untuk Genset Deep Sea Electronics 7320 (Volt, Hz, RPM, Baterai, Suhu, Tekanan Oli). Mendukung kustomisasi Unit ID / Slave ID.",
+    "category": "Support",
+    "files": "/src/parsers/dse7320_modbus.js",
+    "createdAt": "2026-08-14T00:00:00.000Z"
   }
 ]
