@@ -16,9 +16,17 @@ const PARAMS = [
     { key: 'BatteryVoltage', addr: 1028, scale: 0.1 },
     { key: 'EngineSpeed', addr: 1030, scale: 1 },
     { key: 'GeneratorFreq', addr: 1032, scale: 0.1 },
-    { key: 'GenVL1N', addr: 1034, scale: 0.1 },
-    { key: 'GenVL2N', addr: 1036, scale: 0.1 },
-    { key: 'GenVL3N', addr: 1038, scale: 0.1 }
+    { key: 'GenVL1N', addr: 1034, scale: 1 }, // Changed scale to 1 based on scan
+    { key: 'GenVL2N', addr: 1036, scale: 1 }, // Changed scale to 1 based on scan
+    { key: 'GenVL3N', addr: 1038, scale: 1 }, // Changed scale to 1 based on scan
+    { key: 'MainsFreq', addr: 1058, scale: 0.1 },
+    { key: 'MainsVL1N', addr: 1060, scale: 1 },
+    { key: 'MainsVL2N', addr: 1062, scale: 1 },
+    { key: 'MainsVL3N', addr: 1064, scale: 1 },
+    { key: 'MainsCurrentL1', addr: 1076, scale: 0.1 },
+    { key: 'MainsCurrentL2', addr: 1078, scale: 0.1 },
+    { key: 'MainsCurrentL3', addr: 1080, scale: 0.1 },
+    { key: 'EarthCurrent', addr: 1082, scale: 0.1 }
 ];
 
 let globalTid = 0;
@@ -83,8 +91,8 @@ function readModbusRegister32(host, port, unitId, address, timeoutMs = 2000) {
                     const msw = data.readUInt16BE(9);
                     const lsw = data.readUInt16BE(11);
                     
-                    // Filter "Unimplemented" values in DSE (usually 0xFFFF or 255 for sensors not fitted)
-                    if (msw === 0xFFFF || msw === 0x00FF) {
+                    // Filter "Unimplemented" values in DSE (usually 0xFFFF, 0x00FF, or 0x7FFFFFFF for sensors not fitted)
+                    if (msw === 0xFFFF || msw === 0x00FF || (msw === 0x7FFF && lsw === 0xFFFF)) {
                         resolved = true;
                         clearTimeout(timeoutTimer);
                         cleanup();
