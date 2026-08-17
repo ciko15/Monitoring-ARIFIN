@@ -143,6 +143,17 @@ class Pm5560ModbusParser extends BaseParser {
                 return { success: false, error: 'Menunggu data', status: 'Waiting', _mode: this._mode };
             }
 
+            // Hitung manual PF dari KW / KVA jika tersedia untuk menghindari anomali dari sensor
+            const originalPF = this._last.PF;
+            
+            if (this._last.KVA && Math.abs(this._last.KVA) > 0.001 && this._last.KW != null) {
+                this._last.PF = this._last.KW / this._last.KVA;
+            }
+            if (this._last.PF != null) {
+                if (this._last.PF > 1) this._last.PF = 1;
+                if (this._last.PF < -1) this._last.PF = -1;
+            }
+
             const d = this._last;
             const vlnV = [d.VL1N, d.VL2N, d.VL3N].filter(v => v != null);
             const vllV = [d.VL12, d.VL23, d.VL31].filter(v => v != null);
@@ -171,6 +182,7 @@ class Pm5560ModbusParser extends BaseParser {
                     KVAR: d.KVAR  != null ? +d.KVAR.toFixed(3)  : null,
                     KVA:  d.KVA   != null ? +d.KVA.toFixed(3)   : null,
                     PF:   d.PF    != null ? +d.PF.toFixed(3)    : null,
+                    PF_Raw: originalPF != null ? +originalPF.toFixed(3) : null,
                     HZ:   d.HZ    != null ? +d.HZ.toFixed(2)    : null,
                     KWH:  d.KWH   != null ? +d.KWH.toFixed(1)   : null,
                     alarmDetail: alarms,
