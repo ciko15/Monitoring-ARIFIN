@@ -194,7 +194,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             if (v !== null && iRaw !== null && p !== null) {
                 const volts = Number(v);
                 const amps = Number(iRaw) / 10;
-                const watts = Number(p);
+                const watts = Number(p) / 10;
                 
                 if (volts > 0 && amps > 0) {
                     totalRealPower += watts;
@@ -246,9 +246,9 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 output_load_pct_s: outputPercentLoadS !== null ? String(outputPercentLoadS) : '—',
                 output_load_pct_t: outputPercentLoadT !== null ? String(outputPercentLoadT) : '—',
 
-                output_power_r: outputPowerR !== null ? String(outputPowerR) : '—',
-                output_power_s: outputPowerS !== null ? String(outputPowerS) : '—',
-                output_power_t: outputPowerT !== null ? String(outputPowerT) : '—',
+                output_power_r: outputPowerR !== null ? String(outputPowerR / 10) : '—',
+                output_power_s: outputPowerS !== null ? String(outputPowerS / 10) : '—',
+                output_power_t: outputPowerT !== null ? String(outputPowerT / 10) : '—',
                 
                 debug_apparent_power: String(totalApparentPower),
                 debug_real_power: String(totalRealPower),
