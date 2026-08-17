@@ -191,9 +191,15 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         let totalApparentPower = 0;
 
         const addPower = (v, iRaw, p) => {
-            if (v && iRaw && p) {
-                totalRealPower += p;
-                totalApparentPower += v * (iRaw / 10);
+            if (v !== null && iRaw !== null && p !== null) {
+                const volts = Number(v);
+                const amps = Number(iRaw) / 10;
+                const watts = Number(p);
+                
+                if (volts > 0 && amps > 0) {
+                    totalRealPower += watts;
+                    totalApparentPower += (volts * amps);
+                }
             }
         };
 
@@ -203,7 +209,9 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
 
         let totalPF = '—';
         if (totalApparentPower > 0) {
-            totalPF = Number((totalRealPower / totalApparentPower).toFixed(2));
+            let calcPF = totalRealPower / totalApparentPower;
+            if (calcPF > 1) calcPF = 1; // Cap at 1 because PF cannot be > 1
+            totalPF = Number(calcPF.toFixed(2));
         }
 
         session.close();
