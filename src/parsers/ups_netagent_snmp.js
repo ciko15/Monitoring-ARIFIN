@@ -246,6 +246,14 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 output_load_pct_s: outputPercentLoadS !== null ? String(outputPercentLoadS) : '—',
                 output_load_pct_t: outputPercentLoadT !== null ? String(outputPercentLoadT) : '—',
 
+                output_power_r: outputPowerR !== null ? String(outputPowerR) : '—',
+                output_power_s: outputPowerS !== null ? String(outputPowerS) : '—',
+                output_power_t: outputPowerT !== null ? String(outputPowerT) : '—',
+                
+                debug_apparent_power: String(totalApparentPower),
+                debug_real_power: String(totalRealPower),
+                debug_calc_pf: (totalApparentPower > 0) ? String(totalRealPower / totalApparentPower) : '—',
+
                 power_factor: totalPF !== '—' ? String(totalPF) : '—',
                 
                 // Compatibility untuk Frontend yg mungkin cuma pakai 1 parameter general
