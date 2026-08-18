@@ -107,7 +107,7 @@ class NetworkListenerService {
             return;
         }
 
-        const dataToSave = { ...parsedData, source: source.name };
+        const dataToSave = { ...parsedData, source: source.name, source_id: source.id, source_name: source.name };
 
         await this.equipmentService.saveToLogs(
             source.equipt_id,

@@ -272,9 +272,11 @@ class EquipmentService {
             const airport = equipment ? await this.db.getAirportById(equipment.airportId) : null;
             const equipName = equipment.name;
             const sourceName = parsedData.source || (parsedData._sources && parsedData._sources.length > 0 ? parsedData._sources[0].name : 'default');
+            const sourceId = parsedData.source_id || sourceName; // Gunakan ID sebagai penanda utama jika ada
+
             const gateDecision = this.statusGate.evaluate(
                 {
-                    id: `${equipmentId}:${sourceName}`,
+                    id: `${equipmentId}:${sourceId}`,
                     equipt_id: equipmentId,
                     name: sourceName
                 },
@@ -296,7 +298,7 @@ class EquipmentService {
                 this.telemetryCache = new Map();
             }
 
-            const cacheKey = `${equipmentId}:${sourceName}`;
+            const cacheKey = `${equipmentId}:${sourceId}`;
             let cache = this.telemetryCache.get(cacheKey);
             if (!cache) {
                 cache = {
@@ -327,7 +329,8 @@ class EquipmentService {
                         equipment_name: equipName,
                         status: finalStatus,
                         data: { ...cache.mergedData },
-                        source: sourceName,
+                        source: sourceId,
+                        source_name: parsedData.source_name || sourceName,
                         connection_type: connectionType,
                         airport_name: airport ? airport.name : 'Unknown',
                         airport_city: airport ? airport.city : 'Unknown',
@@ -349,7 +352,8 @@ class EquipmentService {
                         equipment_name: equipName,
                         status: finalStatus,
                         data: { ...cache.mergedData },
-                        source: sourceName,
+                        source: sourceId,
+                        source_name: parsedData.source_name || sourceName,
                         connection_type: connectionType,
                         airport_name: airport ? airport.name : 'Unknown',
                         airport_city: airport ? airport.city : 'Unknown',
