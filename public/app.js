@@ -1361,13 +1361,10 @@ async function handleEquipmentSubmit(e) {
     lng: lngVal ? parseFloat(lngVal) : null,
     description: document.getElementById('equipmentDescription').value,
     isActive: document.getElementById('equipmentActive').checked,
-    dataSources: Array.from(document.querySelectorAll('.data-source-select'))
-      .map(select => select.value)
-      .filter(id => id !== '')
   };
 
   try {
-    const isEdit = document.getElementById('modalFormTitle').textContent.includes('Edit');
+    const isEdit = !!document.getElementById('equipmentId').value;
     const method = isEdit ? 'PUT' : 'POST';
     const url = isEdit ? `${API_URL}/equipment/${id}` : `${API_URL}/equipment`;
     const res = await fetch(url, {
