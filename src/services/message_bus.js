@@ -73,6 +73,7 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
         data: datalog.data || {}
     };
 
+    console.log("[EMS-PAYLOAD]", JSON.stringify(payload));
     return publishCategorizedEvent(
         equipment.category || 'Support',
         'equipment.telemetry.received',
@@ -96,6 +97,7 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
 async function publishEquipmentStatusChanged(equipment = {}, status, error = null, options = {}) {
     const airportCode = await getAirportCode();
     
+    console.log("[EMS-PAYLOAD]", JSON.stringify(payload));
     return publishCategorizedEvent(
         equipment.category || 'Support',
         'equipment.status.changed',
@@ -326,6 +328,7 @@ async function publishCollectorRefreshResult(success, result = {}) {
 async function publishEquipmentConfigurationChanged(action, equipment = {}) {
     const airportCode = await getAirportCode();
     
+    console.log("[EMS-PAYLOAD]", JSON.stringify(payload));
     return publishCategorizedEvent(
         equipment.category || 'Support',
         'equipment.configuration.changed',
@@ -352,6 +355,7 @@ async function publishEquipmentConfigurationChanged(action, equipment = {}) {
 async function publishDataSourceConfigurationChanged(action, datasource = {}) {
     const airportCode = await getAirportCode();
     
+    console.log("[EMS-PAYLOAD]", JSON.stringify(payload));
     return publishCategorizedEvent(
         'Support',
         'datasource.configuration.changed',
