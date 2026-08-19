@@ -105,7 +105,7 @@ class SourceStatusGate {
             state.failCount += 1;
             state.successCount = 0;
 
-            if (confirmDisconnect && state.status !== 'Disconnect' && state.failCount < this.failCountToDisconnect) {
+            if (confirmDisconnect && state.status !== null && state.status !== 'Disconnect' && state.failCount < this.failCountToDisconnect) {
                 return {
                     shouldEmit: false,
                     status: state.status || 'Warning',

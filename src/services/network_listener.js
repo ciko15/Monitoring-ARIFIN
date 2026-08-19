@@ -1475,11 +1475,21 @@ class NetworkListenerService {
         }
         this.activeListeners.clear();
 
-        if (this._datakomTimers) {
-            for (const [id, timer] of this._datakomTimers) {
-                clearInterval(timer);
+        const timerMaps = [
+            '_datakomTimers', '_dseTimers', '_iologikTimers', '_pm5350Timers',
+            '_upsNetagentTimers', '_snmpSystemTimers', '_tempHumidityTimers',
+            '_asterixTimers', '_marcRseTimers', '_vhfT6tvConnections'
+        ];
+
+        for (const mapName of timerMaps) {
+            if (this[mapName]) {
+                for (const [id, timer] of this[mapName]) {
+                    clearInterval(timer);
+                    // Also clear timeout if any (some might be timeouts)
+                    clearTimeout(timer); 
+                }
+                this[mapName].clear();
             }
-            this._datakomTimers.clear();
         }
 
         // Stop SNMP-based T6TV collectors
