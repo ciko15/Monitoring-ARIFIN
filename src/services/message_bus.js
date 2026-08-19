@@ -66,6 +66,7 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
         airport_code: airportCode,
         airport_name: datalog.airport_name || null,
         source: datalog.source,
+        source_id: datalog.source_id || datalog.source,
         connection_type: datalog.connection_type,
         status: datalog.status,
         logged_at: datalog.logged_at,
