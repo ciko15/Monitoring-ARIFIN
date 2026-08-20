@@ -1179,8 +1179,14 @@ class NetworkListenerService {
         const moduleName = this._getParserModule(parsing_id);
 
         // T6TV uses SNMP — pull-based, no port needed
-        if (moduleName === 'vhf_t6tv' || moduleName === 'vhf_t6tv_snmp') {
+        if (moduleName === 'vhf_t6tv_snmp') {
             this.startT6tvSnmpListener(source);
+            return;
+        }
+
+        // T6TV uses WebSocket
+        if (moduleName === 'vhf_t6tv') {
+            this.startT6tvListener(source);
             return;
         }
 
