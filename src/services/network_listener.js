@@ -1357,20 +1357,23 @@ class NetworkListenerService {
 
                     while (this.activeListeners.has(id) && this._pollGen[id] === myGen) {
                         // Only poll when parser is in ACTIVE mode
-                        if (parser.getMode && parser.getMode() === 'ACTIVE') {
-                            const conn = connectionManager.connections.get(id);
-                            if (conn && conn.socket && !conn.socket.destroyed) {
-                                const requests = parser.getPollRequests();
-                                for (const req of requests) {
-                                    const buf = req.bytes || req;
-                                    try {
-                                        conn.socket.write(buf);
-                                        await sleep(POLL_REQ_DELAY);
-                                    } catch (e) {
-                                        console.warn(`[NetworkListener] Poll write error for ${source.name}: ${e.message}`);
+                        if (parser.getMode) {
+                            if (typeof parser.checkTimeout === 'function') parser.checkTimeout();
+                            if (parser.getMode() === 'ACTIVE') {
+                                const conn = connectionManager.connections.get(id);
+                                if (conn && conn.socket && !conn.socket.destroyed) {
+                                    const requests = parser.getPollRequests();
+                                    for (const req of requests) {
+                                        const buf = req.bytes || req;
+                                        try {
+                                            conn.socket.write(buf);
+                                            await sleep(POLL_REQ_DELAY);
+                                        } catch (e) {
+                                            console.warn(`[NetworkListener] Poll write error for ${source.name}: ${e.message}`);
+                                        }
                                     }
+                                    console.log(`[NetworkListener] ACTIVE poll cycle sent for ${source.name}`);
                                 }
-                                console.log(`[NetworkListener] ACTIVE poll cycle sent for ${source.name}`);
                             }
                         }
                         await sleep(POLL_INTERVAL);

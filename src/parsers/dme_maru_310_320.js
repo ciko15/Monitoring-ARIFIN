@@ -305,6 +305,13 @@ class DmeMaru310320Parser extends BaseParser {
     getPollRequests() { return POLL_REQUESTS; }
     getMode()         { return this._mode; }
     getLastData()     { return this._lastData; }
+
+    checkTimeout() {
+        if (this._mode === 'PASSIVE' && Date.now() - this._lastDataTime > PASSIVE_TIMEOUT) {
+            this._mode = 'ACTIVE';
+            console.log('[DME Maru 310/320] Deadlock broken: No data for 30s — switching to ACTIVE polling mode');
+        }
+    }
 }
 
 module.exports = DmeMaru310320Parser;

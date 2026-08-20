@@ -280,6 +280,13 @@ class DvorMaru220Parser extends BaseParser {
     getPollRequests() { return POLL_REQUESTS; }
     getMode()         { return this._mode; }
     getLastData()     { return this._lastData || {}; }
+
+    checkTimeout() {
+        if (this._mode === 'PASSIVE' && Date.now() - this._lastDataTime > PASSIVE_TIMEOUT) {
+            this._mode = 'ACTIVE';
+            console.log('[DVOR Maru 220] Deadlock broken: No data for 30s — switching to ACTIVE polling mode');
+        }
+    }
 }
 
 module.exports = DvorMaru220Parser;
