@@ -29,6 +29,13 @@ async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
     ipLocks.set(host, true);
 
     const client = new ModbusRTU();
+    
+    // Cegah Unhandled Rejection dari library modbus-serial jika koneksi terputus (ECONNREFUSED)
+    client.on('error', (err) => {
+        // Error akan ditangkap oleh try-catch di bawah, 
+        // tapi listener ini mencegah NodeJS crash (Unhandled Rejection)
+    });
+
     try {
         client.setTimeout(timeoutMs); 
         // connectTelnet lebih stabil untuk USR-TCP232 (Raw TCP ke RTU)
