@@ -1313,12 +1313,8 @@ class NetworkListenerService {
 
         let success = false;
 
-        // Force Sniffing Mode for ANY DME parser to prevent blocking the built-in PMDT app
-        if (parsing_id.includes('dme') || (source.name && source.name.toLowerCase().includes('dme'))) {
-            // Sniffing Mode
-            const interfaceName = process.env.SNIFFER_INTERFACE || 'Ethernet 8';
-            success = await connectionManager.connectSniffer(id, ip_address || '0.0.0.0', port, interfaceName, onData, onError);
-        } else if (protocol === 'udp') {
+        // Mode TCP langsung untuk DME (Sniffing di-disable agar bisa Active Polling)
+        if (protocol === 'udp') {
             success = connectionManager.connectUDP(id, ip_address || '0.0.0.0', port, onData, onError);
         } else {
             success = await connectionManager.connectTCP(id, ip_address || '0.0.0.0', port, onData, onError);
