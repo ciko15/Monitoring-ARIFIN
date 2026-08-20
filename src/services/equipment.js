@@ -316,7 +316,7 @@ class EquipmentService {
                 // Gunakan Deep Merge agar data lama berkedalaman tingkat 2+ (misal radios/array) tidak hilang tertimpa
                 cache.mergedData = deepMerge({}, cache.mergedData, (parsedData.data || {}));
             }
-            
+
             // Injeksi source_name selalu, meskipun statusnya Disconnect, agar nama baru tetap terkirim ke EMS
             if (parsedData.source_name) {
                 cache.mergedData.source_name = parsedData.source_name;

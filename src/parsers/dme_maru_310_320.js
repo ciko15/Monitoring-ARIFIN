@@ -279,10 +279,17 @@ class DmeMaru310320Parser extends BaseParser {
                 txp2_active:        d3.txp_active,
             };
 
+            let currentStatus = 'Normal';
+            if (!d2.ident && !d3.ident) {
+                currentStatus = 'Disconnect';
+            } else if (allAlarms.length > 0) {
+                currentStatus = 'Alarm';
+            }
+
             return {
                 success: true,
                 data: flat,
-                status: allAlarms.length > 0 ? 'Alarm' : 'Normal',
+                status: currentStatus,
                 alarms: allAlarms,
                 warnings: [],
                 triggeredParams: allAlarms,
