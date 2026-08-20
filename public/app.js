@@ -1364,7 +1364,7 @@ async function handleEquipmentSubmit(e) {
   };
 
   try {
-    const isEdit = !!document.getElementById('equipmentId').value;
+    const isEdit = equipmentData.some(e => String(e.id) === String(id));
     const method = isEdit ? 'PUT' : 'POST';
     const url = isEdit ? `${API_URL}/equipment/${id}` : `${API_URL}/equipment`;
     const res = await fetch(url, {
