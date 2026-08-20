@@ -1327,10 +1327,10 @@ function renderEquipmentTable(data) {
         <td style="text-align: center;">${item.merk || '-'} / ${item.type || '-'}</td>
         <td style="text-align: center;">${item.lat}, ${item.lng}</td>
         <td style="text-align: center; white-space: nowrap;">
-          <button class="btn-view" title="View Details" onclick="viewEquipmentDetail(${item.id})">
+          <button class="btn-view" title="View Details" onclick="viewEquipmentDetail('${item.id}')">
             <i class="fas fa-eye"></i>
           </button>
-          <button class="btn-edit" title="Edit" onclick="editEquipment(${item.id})">
+          <button class="btn-edit" title="Edit" onclick="editEquipment('${item.id}')">
             <i class="fas fa-edit"></i>
           </button>
           <button class="btn-delete" title="Delete" onclick="deleteEquipment('${item.id}')">
@@ -3132,8 +3132,8 @@ function renderUserTable(data) {
       <td>${user.username}</td>
       <td><span class="badge badge-${user.role}">${user.role}</span></td>
       <td class="actions">
-        <button class="btn-edit" onclick="editUser(${user.id})" title="Edit User"><i class="fas fa-edit"></i></button>
-        <button class="btn-delete" onclick="deleteUser(${user.id})" title="Delete User"><i class="fas fa-trash"></i></button>
+        <button class="btn-edit" onclick="editUser('${user.id}')" title="Edit User"><i class="fas fa-edit"></i></button>
+        <button class="btn-delete" onclick="deleteUser('${user.id}')" title="Delete User"><i class="fas fa-trash"></i></button>
       </td>
     </tr>
   `).join('');

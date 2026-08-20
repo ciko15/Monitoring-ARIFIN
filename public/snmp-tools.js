@@ -345,8 +345,8 @@ function renderThresholdTable(thresholds) {
       <td><span class="status-badge ${t.is_active ? 'Normal' : 'Disconnect'}">${t.is_active ? 'Active' : 'Inactive'}</span></td>
       <td>
         <div class="action-buttons">
-          <button class="btn-edit" onclick="editThreshold(${t.id})" title="Edit"><i class="fas fa-edit"></i></button>
-          <button class="btn-delete" onclick="deleteThreshold(${t.id})" title="Delete"><i class="fas fa-trash"></i></button>
+          <button class="btn-edit" onclick="editThreshold('${t.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+          <button class="btn-delete" onclick="deleteThreshold('${t.id}')" title="Delete"><i class="fas fa-trash"></i></button>
         </div>
       </td>
     </tr>
