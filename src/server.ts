@@ -1645,12 +1645,14 @@ const app = new Elysia()
                 const item = await db.createOtentication(body as any);
                 set.status = 201;
                 pushSyncToTOC();
+                publishDataSourceConfigurationChanged('add', item).catch((e: any) => console.error('[EMS] Failed to publish datasource add:', e.message));
                 return item;
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .put('/authentications/:id', async ({ params, body, set }) => {
                 const updated = await db.updateOtentication(params.id, body);
                 if (!updated) { set.status = 404; return { message: 'Not found' }; }
                 pushSyncToTOC();
+                publishDataSourceConfigurationChanged('update', updated).catch((e: any) => console.error('[EMS] Failed to publish datasource update:', e.message));
                 return updated;
             }, { beforeHandle: authorize(['superadmin', 'admin']) })
             .delete('/authentications/:id', async ({ params }) => {
