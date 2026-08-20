@@ -1313,7 +1313,7 @@ class NetworkListenerService {
 
         let success = false;
 
-        // Mode TCP langsung untuk DME (Sniffing di-disable agar bisa Active Polling)
+        // Mode TCP langsung untuk DME
         if (protocol === 'udp') {
             success = connectionManager.connectUDP(id, ip_address || '0.0.0.0', port, onData, onError);
         } else {
@@ -1348,7 +1348,8 @@ class NetworkListenerService {
                         if (conn && conn.socket && !conn.socket.destroyed) {
                             const requests = parser.getPollRequests();
                             for (const req of requests) {
-                                try { conn.socket.write(req.bytes); await sleep(POLL_REQ_DELAY); } catch (e) { }
+                                const buf = req.bytes || req;
+                                try { conn.socket.write(buf); await sleep(POLL_REQ_DELAY); } catch (e) { }
                             }
                             console.log(`[NetworkListener] Kick-start poll sent for ${source.name}`);
                         }
@@ -1361,8 +1362,9 @@ class NetworkListenerService {
                             if (conn && conn.socket && !conn.socket.destroyed) {
                                 const requests = parser.getPollRequests();
                                 for (const req of requests) {
+                                    const buf = req.bytes || req;
                                     try {
-                                        conn.socket.write(req.bytes);
+                                        conn.socket.write(buf);
                                         await sleep(POLL_REQ_DELAY);
                                     } catch (e) {
                                         console.warn(`[NetworkListener] Poll write error for ${source.name}: ${e.message}`);
