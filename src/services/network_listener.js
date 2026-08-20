@@ -149,8 +149,8 @@ class NetworkListenerService {
 
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal)
             const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv_snmp', 'vhf_t6tv'];
-            const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 10;
-            const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 3000;
+            const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 25;
+            const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 1000;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             let startedCount = 0;
 
