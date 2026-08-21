@@ -50,7 +50,7 @@ async function pollDse7320(host, port = 502, slaveId = 10) {
 
     try {
         client.setTimeout(timeoutMs);
-        await client.connectTelnet(host, { port: port });
+        await client.connectTCP(host, { port: port });
         client.setID(slaveId);
 
         // Ambil data dalam 1 siklus koneksi!
