@@ -845,11 +845,23 @@ const app = new Elysia()
             // Delete Equipment
             .delete('/remove/:id', async ({ params, set }) => {
                 try {
-                    const eqId = parseInt(params.id.toString());
-                    await db.deleteEquipment(params.id);
+                    const equipmentIdStr = params.id.toString();
+
+                    const authInfo = await db.getOtenticationByEquipment(equipmentIdStr);
+                    if (authInfo && authInfo.length > 0) {
+                        for (const ds of authInfo) {
+                            publishDataSourceConfigurationChanged('delete', { 
+                                id: ds.id, 
+                                equipmentId: equipmentIdStr 
+                            }).catch((e: any) => console.error('[EMS] Failed to publish datasource delete:', e.message));
+                        }
+                    }
+
+                    await db.deleteOtenticationByEquipment(equipmentIdStr);
+                    await db.deleteEquipment(equipmentIdStr);
                     pushSyncToTOC();
-                    publishEquipmentConfigurationChanged('delete', { id: eqId }).catch((e: any) => console.error('[EMS] Failed to publish config change:', e.message));
-                    return { message: 'Equipment deleted' };
+                    publishEquipmentConfigurationChanged('delete', { id: equipmentIdStr }).catch((e: any) => console.error('[EMS] Failed to publish config change:', e.message));
+                    return { message: 'Equipment and its data sources deleted successfully (and synced to EMS)' };
                 } catch (error: any) {
                     set.status = 500;
                     return { message: error.message };

@@ -384,8 +384,14 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
     const effectiveTimeoutMs = Number(options && options.timeoutMs) || timeoutMs;
 
     return new Promise((resolve) => {
-        const timer = setTimeout(() => {
-            resolve({
+        // JITTER DELAY: Tunda eksekusi secara acak antara 0 hingga 2500 milidetik (2.5 detik)
+        // Ini sangat krusial dan aman untuk mencegah UDP Flooding (Thundering Herd) 
+        // ketika puluhan PC di-poll secara serentak di milidetik yang sama.
+        const jitterMs = Math.floor(Math.random() * 2500);
+        
+        setTimeout(() => {
+            const timer = setTimeout(() => {
+                resolve({
                 success: false,
                 status: 'Disconnect',
                 error:  `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
@@ -437,6 +443,7 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
                 timestamp: new Date().toISOString(),
             });
         });
+        }, jitterMs); // Akhir dari blok Jitter Delay
     });
 }
 

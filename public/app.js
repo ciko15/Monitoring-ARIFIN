@@ -1170,8 +1170,16 @@ async function loadEquipmentMarkers() {
 
     if (Array.isArray(equipment)) {
       equipment.forEach(item => {
-        const lat = parseFloat(item.lat);
-        const lng = parseFloat(item.lng);
+        let lat = parseFloat(item.lat);
+        let lng = parseFloat(item.lng);
+
+        if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+          const airport = (window.airportsData || []).find(a => String(a.id) === String(item.airportId || item.branch_id));
+          if (airport && airport.lat && airport.lng) {
+            lat = parseFloat(airport.lat) + (Math.random() - 0.5) * 0.0015;
+            lng = parseFloat(airport.lng) + (Math.random() - 0.5) * 0.0015;
+          }
+        }
 
         if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
           hasCoords = true;
@@ -1198,8 +1206,6 @@ async function loadEquipmentMarkers() {
           // Show popup on hover
           marker.on('mouseover', function () { this.openPopup(); });
           marker.on('mouseout', function () { this.closePopup(); });
-        } else {
-          console.warn(`[MAP] Skipping marker for ${item.name} (ID: ${item.id}) - Invalid coords: ${item.lat}, ${item.lng}`);
         }
       });
 
@@ -1814,6 +1820,7 @@ window.deleteEquipment = async function (id) {
     if (res.ok) {
       loadEquipment();
       loadStats();
+      if (typeof loadAuthentications === 'function') loadAuthentications();
       if (typeof loadEquipmentMarkers === 'function') loadEquipmentMarkers();
     } else {
       let errorMsg = result.message || 'Unknown error';
