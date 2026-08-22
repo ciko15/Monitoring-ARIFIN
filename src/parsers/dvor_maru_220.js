@@ -149,6 +149,7 @@ function decodeAll(sections) {
     // LCU (LC) — v2 mapping: S25=dc_28v, S26=dc_5v, S27=dc_7v, S28=dc_15v, S47=ac_28v
     const lc = sections['LC'] || {};
     if (Object.keys(lc).length > 0) {
+        console.log('\n[DEBUG DVOR MARU LCU] RAW DATA MAPPING SENSOR:', JSON.stringify(lc), '\n');
         r.lcu = {
             dc_5v:     fi(lc,'S26', 10),
             dc_7v:     fi(lc,'S27', 10),
