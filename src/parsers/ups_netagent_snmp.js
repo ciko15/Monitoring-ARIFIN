@@ -197,10 +197,10 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
 
         // Ekstrak KVA dari sysDescr ATAU sysName (contoh: "UPS 30 KVA" -> 30) untuk rumus gaib
         let upsKVA = 0;
-        const combinedName = String(sysDescr || '') + ' ' + String(sysName || '') + ' ' + String(options.name || '');
+        const combinedName = String(sysDescr || '') + ' ' + String(sysName || '') + ' ' + String(options.name || '') + ' ' + String(options.equipment_name || '');
         const kvaMatch = combinedName.match(/(\d+)\s*kva/i);
         if (kvaMatch) upsKVA = Number(kvaMatch[1]);
-        console.log(`[UPS DEBUG] IP: ${host}, Name: ${options.name}, Combined: ${combinedName}, KVA: ${upsKVA}`);
+        console.log(`[UPS DEBUG] IP: ${host}, Name: ${options.name}, EqName: ${options.equipment_name}, Combined: ${combinedName}, KVA: ${upsKVA}`);
 
         const fixSensor = (v, aRaw, wRaw, loadPct) => {
             let a = Number(aRaw);
@@ -302,17 +302,17 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 output_voltage_s: outputVoltageS !== null ? String(outputVoltageS) : '—',
                 output_voltage_t: outputVoltageT !== null ? String(outputVoltageT) : '—',
                 
-                output_current_r: outputCurrentRawR !== null ? String(phaseR.a.toFixed(1)) : '—',
-                output_current_s: outputCurrentRawS !== null ? String(phaseS.a.toFixed(1)) : '—',
-                output_current_t: outputCurrentRawT !== null ? String(phaseT.a.toFixed(1)) : '—',
+                output_current_r: outputVoltageR !== null ? String(phaseR.a.toFixed(1)) : '—',
+                output_current_s: outputVoltageS !== null ? String(phaseS.a.toFixed(1)) : '—',
+                output_current_t: outputVoltageT !== null ? String(phaseT.a.toFixed(1)) : '—',
                 
                 output_load_pct_r: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—',
                 output_load_pct_s: outputPercentLoadS !== null ? String(outputPercentLoadS) : '—',
                 output_load_pct_t: outputPercentLoadT !== null ? String(outputPercentLoadT) : '—',
 
-                output_power_r: outputPowerR !== null ? String(Math.round(phaseR.w)) : '—',
-                output_power_s: outputPowerS !== null ? String(Math.round(phaseS.w)) : '—',
-                output_power_t: outputPowerT !== null ? String(Math.round(phaseT.w)) : '—',
+                output_power_r: outputVoltageR !== null ? String(Math.round(phaseR.w)) : '—',
+                output_power_s: outputVoltageS !== null ? String(Math.round(phaseS.w)) : '—',
+                output_power_t: outputVoltageT !== null ? String(Math.round(phaseT.w)) : '—',
                 
                 debug_apparent_power: String(finalApparentPower),
                 debug_real_power: String(totalRealPower),
@@ -323,7 +323,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 // Compatibility untuk Frontend yg mungkin cuma pakai 1 parameter general
                 input_voltage: inputVoltageR !== null ? String(inputVoltageR) : '—',
                 output_voltage: outputVoltageR !== null ? String(outputVoltageR) : '—',
-                output_current_ampere: outputCurrentRawR !== null ? String(phaseR.a.toFixed(1)) : '—',
+                output_current_ampere: outputVoltageR !== null ? String(phaseR.a.toFixed(1)) : '—',
                 output_load_pct: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—'
             },
             alarms,

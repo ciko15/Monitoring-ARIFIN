@@ -636,7 +636,12 @@ class NetworkListenerService {
 
         const doPoll = async () => {
             try {
-                const result = await pollUPSNetagent(ip_address, comm, { port, version, name });
+                const result = await pollUPSNetagent(ip_address, comm, { 
+                    port, 
+                    version, 
+                    name: source.name, 
+                    equipment_name: source.equipment_name 
+                });
                 await this._handleLogOutput(
                     source,
                     { data: result.data, source: name, _ip: ip_address },
