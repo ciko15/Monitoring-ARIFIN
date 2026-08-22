@@ -195,7 +195,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         const addPower = (v, iRaw, p) => {
             if (v !== null && iRaw !== null && p !== null) {
                 const volts = Number(v);
-                const amps = Number(iRaw) / 10;
+                const amps = Number(iRaw); // Disesuaikan: UPS Piller mengirim data Ampere murni (bukan 0.1A)
                 const watts = Number(p); // Watt murni (P)
                 
                 if (volts > 0 && amps > 0) {
@@ -266,9 +266,9 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 output_voltage_s: outputVoltageS !== null ? String(outputVoltageS) : '—',
                 output_voltage_t: outputVoltageT !== null ? String(outputVoltageT) : '—',
                 
-                output_current_r: outputCurrentRawR !== null ? String(outputCurrentRawR / 10) : '—',
-                output_current_s: outputCurrentRawS !== null ? String(outputCurrentRawS / 10) : '—',
-                output_current_t: outputCurrentRawT !== null ? String(outputCurrentRawT / 10) : '—',
+                output_current_r: outputCurrentRawR !== null ? String(outputCurrentRawR) : '—',
+                output_current_s: outputCurrentRawS !== null ? String(outputCurrentRawS) : '—',
+                output_current_t: outputCurrentRawT !== null ? String(outputCurrentRawT) : '—',
                 
                 output_load_pct_r: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—',
                 output_load_pct_s: outputPercentLoadS !== null ? String(outputPercentLoadS) : '—',
@@ -287,7 +287,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 // Compatibility untuk Frontend yg mungkin cuma pakai 1 parameter general
                 input_voltage: inputVoltageR !== null ? String(inputVoltageR) : '—',
                 output_voltage: outputVoltageR !== null ? String(outputVoltageR) : '—',
-                output_current_ampere: outputCurrentRawR !== null ? String(outputCurrentRawR / 10) : '—',
+                output_current_ampere: outputCurrentRawR !== null ? String(outputCurrentRawR) : '—',
                 output_load_pct: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—'
             },
             alarms,
