@@ -1724,16 +1724,18 @@
                 sections.push({ title: tmpl.name || 'DATA', params });
             } else {
                 // Fallback to existing logic: show keys present in data
-                const params = Object.entries(data)
-                    .filter(([k, v]) => !k.startsWith('_') && !isMetricPlaceholder(v))
-                    .map(([k, v]) => {
-                        const label = k.replace(/_/g, ' ').toUpperCase();
-                        const displayValue = parserId.startsWith('snmp_')
-                            ? formatSnmpMetricValue(k, v)
-                            : v;
-                        return [label, displayValue, getLimitColor(supCategory, label, v)];
-                    });
-                sections.push({ title: 'DATA', params: params.length > 0 ? params : [['No data available', '—', '#4a7a9a']] });
+                if (sections.length === 0) {
+                    const params = Object.entries(data)
+                        .filter(([k, v]) => !k.startsWith('_') && !isMetricPlaceholder(v))
+                        .map(([k, v]) => {
+                            const label = k.replace(/_/g, ' ').toUpperCase();
+                            const displayValue = parserId && parserId.startsWith('snmp_')
+                                ? formatSnmpMetricValue(k, v)
+                                : v;
+                            return [label, displayValue, getLimitColor(supCategory, label, v)];
+                        });
+                    sections.push({ title: 'DATA', params: params.length > 0 ? params : [['No data available', '—', '#4a7a9a']] });
+                }
             }
         }
 
