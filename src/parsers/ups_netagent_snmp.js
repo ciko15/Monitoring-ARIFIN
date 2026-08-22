@@ -195,9 +195,10 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         // Deteksi apakah ini UPS Piller yang sensor arusnya rusak (10x lebih kecil dari aslinya)
         const isPiller = String(sysDescr || '').toLowerCase().includes('piller');
 
-        // Ekstrak KVA dari sysDescr (contoh: "UPS 30 KVA" -> 30) untuk rumus gaib
+        // Ekstrak KVA dari sysDescr ATAU sysName (contoh: "UPS 30 KVA" -> 30) untuk rumus gaib
         let upsKVA = 0;
-        const kvaMatch = String(sysDescr || '').match(/(\d+)\s*kva/i);
+        const combinedName = String(sysDescr || '') + ' ' + String(sysName || '') + ' ' + String(options.name || '');
+        const kvaMatch = combinedName.match(/(\d+)\s*kva/i);
         if (kvaMatch) upsKVA = Number(kvaMatch[1]);
 
         const fixSensor = (v, aRaw, wRaw, loadPct) => {
