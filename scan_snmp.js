@@ -1,26 +1,24 @@
-const snmp = require('snmp-native');
+const { pollSNMPRaw } = require('./src/parsers/snmp_network_basic');
 
-const host = '192.168.64.241';
-const community = 'alsatm2023';
-
-console.log(`Starting SNMP scan on ${host} with community: ${community} (v1)...`);
-const session_v1 = new snmp.Session({ host, port: 161, community, family: 'udp4', version: snmp.Versions.SNMPv1 });
-session_v1.get({ oid: [1, 3, 6, 1, 2, 1, 1, 1, 0] }, (err, vbs) => {
-    if (err) {
-        console.error('[ERROR v1]', err.message || err);
-    } else {
-        console.log('[SUCCESS v1] sysDescr:', vbs[0].value);
+async function test() {
+    const host = '192.168.64.241';
+    const community = 'alsatm2023';
+    
+    console.log(`Running full pollSNMP with v1...`);
+    try {
+        const res1 = await pollSNMPRaw(host, community, { port: 161, version: '1' });
+        console.log('[v1 Result]', JSON.stringify(res1).substring(0, 500) + '...');
+    } catch (e) {
+        console.error('[v1 Error]', e.message);
     }
-    session_v1.close();
-});
 
-console.log(`Starting SNMP scan on ${host} with community: ${community} (v2c)...`);
-const session_v2c = new snmp.Session({ host, port: 161, community, family: 'udp4', version: snmp.Versions.SNMPv2c });
-session_v2c.get({ oid: [1, 3, 6, 1, 2, 1, 1, 1, 0] }, (err, vbs) => {
-    if (err) {
-        console.error('[ERROR v2c]', err.message || err);
-    } else {
-        console.log('[SUCCESS v2c] sysDescr:', vbs[0].value);
+    console.log(`\nRunning full pollSNMP with v2c...`);
+    try {
+        const res2 = await pollSNMPRaw(host, community, { port: 161, version: '2c' });
+        console.log('[v2c Result]', JSON.stringify(res2).substring(0, 500) + '...');
+    } catch (e) {
+        console.error('[v2c Error]', e.message);
     }
-    session_v2c.close();
-});
+}
+
+test();
