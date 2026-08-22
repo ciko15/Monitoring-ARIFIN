@@ -193,6 +193,9 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         let totalReactivePower = 0;
         let activePhases = 0;
 
+        // Deteksi UPS Piller: Piller tidak mengikuti standar skala per-sepuluh RFC 1628 untuk nilai Ampere
+        const isPiller = String(sysDescr || '').toLowerCase().includes('piller');
+
         // Ekstrak KVA dari sysDescr, sysName, netAgentModel, atau nama equipment di DB
         let upsKVA = 0;
         const combinedName = String(sysDescr || '') + ' ' + String(sysName || '') + ' ' + String(netAgentModel || '') + ' ' + String(options.name || '') + ' ' + String(options.equipt_name || '');
@@ -207,7 +210,10 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             const load = Number(loadPct);
             
             // Normalisasi Ampere
-            a = a / 10; // Standar RFC 1628: 150 = 15.0 A
+            if (!isPiller) {
+                a = a / 10; // Standar RFC 1628: 150 = 15.0 A
+            }
+            // Jika Piller, biarkan a = a (Piller mengirimkan 10 untuk 10.0 A)
 
             console.log(`[MAGIC TRACE] IP: ${host}, a=${a} (${typeof a}), w=${w} (${typeof w}), load=${load}, KVA=${upsKVA}`);
             
