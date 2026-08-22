@@ -200,6 +200,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         const combinedName = String(sysDescr || '') + ' ' + String(sysName || '') + ' ' + String(options.name || '');
         const kvaMatch = combinedName.match(/(\d+)\s*kva/i);
         if (kvaMatch) upsKVA = Number(kvaMatch[1]);
+        console.log(`[UPS DEBUG] IP: ${host}, Name: ${options.name}, Combined: ${combinedName}, KVA: ${upsKVA}`);
 
         const fixSensor = (v, aRaw, wRaw, loadPct) => {
             let a = Number(aRaw);
