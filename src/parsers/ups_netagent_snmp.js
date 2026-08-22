@@ -217,8 +217,8 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
 
             console.log(`[MAGIC TRACE] IP: ${host}, a=${a} (${typeof a}), w=${w} (${typeof w}), load=${load}, KVA=${upsKVA}`);
             
-            // MAGIC FORMULA: Jika Amps & Watts mati (0) tapi Load % menyala, kita tebak nilainya
-            if ((a === 0 || isNaN(a)) && (w === 0 || isNaN(w)) && load > 0 && upsKVA > 0) {
+            // MAGIC FORMULA: Jika Amps & Watts mati (<= 0) tapi Load % menyala, kita tebak nilainya
+            if ((a <= 0 || isNaN(a)) && (w <= 0 || isNaN(w)) && load > 0 && upsKVA > 0) {
                 const capacityPerPhaseVA = (upsKVA * 1000) / 3; // Misal 30kVA -> 10,000 VA per fasa
                 const apparentVA = (load / 100) * capacityPerPhaseVA;
                 if (volts > 0) {
