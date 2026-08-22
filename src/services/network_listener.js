@@ -640,7 +640,7 @@ class NetworkListenerService {
                     port, 
                     version, 
                     name: source.name, 
-                    equipment_name: source.equipment_name 
+                    equipment_name: source.equipt_name 
                 });
                 await this._handleLogOutput(
                     source,
