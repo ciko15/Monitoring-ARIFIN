@@ -218,6 +218,18 @@ class DvorMaru220Parser extends BaseParser {
 
             if (Object.keys(sections).length < 2) {
                 // Not enough sections yet
+                if (this._lastData && Object.keys(this._lastData).length > 0) {
+                    return {
+                        success: true,
+                        data: this._lastData,
+                        status: 'Normal',
+                        alarms: [],
+                        warnings: [],
+                        triggeredParams: [],
+                        timestamp: new Date().toISOString(),
+                        _isBuffer: true
+                    };
+                }
                 return { success: false, error: 'Waiting for complete packet', status: 'Waiting', _mode: this._mode };
             }
 
