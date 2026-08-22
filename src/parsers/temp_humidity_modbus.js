@@ -36,23 +36,37 @@ async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
         // tapi listener ini mencegah NodeJS crash (Unhandled Rejection)
     });
 
+    let tempC, humiP;
     try {
         client.setTimeout(timeoutMs); 
-        // connectTelnet lebih stabil untuk USR-TCP232 (Raw TCP ke RTU)
-        await client.connectTelnet(host, { port: port });
         
-        client.setID(slaveId);
-
-        // Dari hasil analisa dan screenshot Modbus Poll:
-        // Function = 03 (Holding Registers)
-        // Register 0 = Suhu (misal 252 -> 25.2 °C)
-        // Register 1 = Kelembapan (misal 352 -> 35.2 %)
-        const res = await client.readHoldingRegisters(0, 2);
-        
-        const tempC = (res.data[0] / 10.0);
-        const humiP = (res.data[1] / 10.0);
-        
-        client.close();
+        try {
+            // 1. Coba mode RAW RTU-over-TCP (seperti konfigurasi di Biak)
+            await client.connectTelnet(host, { port: port });
+            client.setID(slaveId);
+            const res = await client.readHoldingRegisters(0, 2);
+            tempC = (res.data[0] / 10.0);
+            humiP = (res.data[1] / 10.0);
+            client.close();
+        } catch (err) {
+            try { client.close(); } catch(e) {}
+            
+            // 2. Jika gagal karena CRC Error (Protocol Mismatch) atau Timeout, 
+            // otomatis coba mode Modbus TCP murni (seperti konfigurasi asli di Sentani)
+            if (err.message.includes('CRC') || err.message.includes('Timed out')) {
+                const tcpClient = new ModbusRTU();
+                tcpClient.setTimeout(timeoutMs);
+                
+                await tcpClient.connectTCP(host, { port: port });
+                tcpClient.setID(slaveId);
+                const res = await tcpClient.readHoldingRegisters(0, 2);
+                tempC = (res.data[0] / 10.0);
+                humiP = (res.data[1] / 10.0);
+                tcpClient.close();
+            } else {
+                throw err;
+            }
+        }
 
         // --- PROTEKSI & VALIDASI DATA (SANITY CHECK) ---
         // Jika terjadi tabrakan data di kabel RS485, angka yang didapat akan ngawur.
