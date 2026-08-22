@@ -20,3 +20,6 @@ db/*.json
 !db/sup_category.json
 !db/templates_config.json
 data/ipc_state.json
+
+# Ciko Test Folder
+ciko/

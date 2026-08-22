@@ -583,7 +583,10 @@ class NetworkListenerService {
         this.activeListeners.add(id);
         console.log(`[SNMP System] Listener started: ${name} (${ip_address}:${port}, v${version})`);
 
+        let isPolling = false;
         const doPoll = async () => {
+            if (isPolling) return;
+            isPolling = true;
             console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
             try {
                 const result = await pollSNMP(ip_address, comm, { port, version });
@@ -601,6 +604,8 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[SNMP System] Poll error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         };
 
@@ -634,7 +639,13 @@ class NetworkListenerService {
         this.activeListeners.add(id);
         console.log(`[UPS SNMP] Listener started: ${name} (${ip_address}:${port}, v${version})`);
 
+        let isPolling = false;
         const doPoll = async () => {
+            if (isPolling) {
+                console.log(`[UPS SNMP] Skiping poll for ${name}, previous poll still running`);
+                return;
+            }
+            isPolling = true;
             try {
                 const result = await pollUPSNetagent(ip_address, comm, { 
                     port, 
@@ -650,6 +661,8 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[UPS SNMP] Poll error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         };
 
@@ -697,6 +710,8 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[PM5350] Poll error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         };
 

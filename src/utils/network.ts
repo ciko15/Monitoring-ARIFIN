@@ -257,7 +257,7 @@ export async function fetchAndParseData(equipment: any) {
             ...rawData, 
             data: {
                 ...rawData,
-                reachability: sourceResults
+                reachability: sourceResults.map(s => `${s.name} (${s.ip}): ${s.alive ? 'Online' : 'Offline'}`).join(', ')
             },
             status 
         }, 
