@@ -10,6 +10,7 @@ const snmp = require('snmp-native');
 const OID = {
     sysDescr: [1, 3, 6, 1, 2, 1, 1, 1, 0],
     sysName: [1, 3, 6, 1, 2, 1, 1, 5, 0],
+    netAgentModel: [1, 3, 6, 1, 4, 1, 935, 1, 1, 1, 1, 1, 2, 0], // Tambahan untuk deteksi nama NetAgent (UPS 15 KVA TOWER)
     
     // Status
     upsBatteryStatus: [1, 3, 6, 1, 2, 1, 33, 1, 2, 1, 0], // 1=unknown, 2=normal, 3=low, 4=depleted
@@ -113,7 +114,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
     try {
         // Menggunakan getAll dengan chunking agar UDP packet size tidak terlalu besar (mencegah packet drop di WAN/VSAT)
         const oidsToFetch = [
-            OID.sysDescr, OID.sysName, OID.upsBatteryStatus, OID.upsEstimatedMinutesRemaining,
+            OID.sysDescr, OID.sysName, OID.netAgentModel, OID.upsBatteryStatus, OID.upsEstimatedMinutesRemaining,
             OID.upsEstimatedChargeRemaining, OID.upsBatteryVoltage, OID.upsBatteryTemp,
             OID.upsInputVoltageR, OID.upsInputVoltageS, OID.upsInputVoltageT,
             OID.upsOutputVoltageR, OID.upsOutputVoltageS, OID.upsOutputVoltageT,
@@ -122,7 +123,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             OID.upsOutputPercentLoadR, OID.upsOutputPercentLoadS, OID.upsOutputPercentLoadT
         ];
         const [
-            sysDescr, sysName,
+            sysDescr, sysName, netAgentModel,
             batteryStatusRaw, minutesRemaining, chargeRemaining, batteryVoltageRaw, batteryTemp,
             inputVoltageR, inputVoltageS, inputVoltageT,
             outputVoltageR, outputVoltageS, outputVoltageT,
@@ -195,12 +196,12 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         // Deteksi apakah ini UPS Piller yang sensor arusnya rusak (10x lebih kecil dari aslinya)
         const isPiller = String(sysDescr || '').toLowerCase().includes('piller');
 
-        // Ekstrak KVA dari sysDescr ATAU sysName (contoh: "UPS 30 KVA" -> 30) untuk rumus gaib
+        // Ekstrak KVA dari sysDescr, sysName, netAgentModel, atau nama equipment di DB
         let upsKVA = 0;
-        const combinedName = String(sysDescr || '') + ' ' + String(sysName || '') + ' ' + String(options.name || '') + ' ' + String(options.equipment_name || '');
+        const combinedName = String(sysDescr || '') + ' ' + String(sysName || '') + ' ' + String(netAgentModel || '') + ' ' + String(options.name || '') + ' ' + String(options.equipt_name || '');
         const kvaMatch = combinedName.match(/(\d+)\s*kva/i);
         if (kvaMatch) upsKVA = Number(kvaMatch[1]);
-        console.log(`[UPS DEBUG] IP: ${host}, Name: ${options.name}, EqName: ${options.equipment_name}, Combined: ${combinedName}, KVA: ${upsKVA}`);
+        console.log(`[UPS DEBUG] IP: ${host}, Name: ${options.name}, EqName: ${options.equipt_name}, Combined: ${combinedName}, KVA: ${upsKVA}`);
 
         const fixSensor = (v, aRaw, wRaw, loadPct) => {
             let a = Number(aRaw);
