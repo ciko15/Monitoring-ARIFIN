@@ -648,7 +648,7 @@
                                 }
                             }
                         }
-                    } catch(e) {}
+                    } catch (e) { }
                 }
 
                 // Fallback to first 6 keys if still empty and we have data
@@ -667,7 +667,7 @@
 
                         // Try to get label from template if available
                         let label = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                        
+
                         if (k.startsWith('iologik_pin_')) {
                             const pName = k.split('_').slice(3).join(' ');
                             const dName = k.split('_')[2];
@@ -801,7 +801,7 @@
         // Build modal
         const modal = document.getElementById('dataSourceDetailModal');
         if (!modal) { createDetailModal(); }
-        
+
         window._activeSourceDetail = src; // Set ini DULU sebelum memanggil showDetailModal agar fallback UI bisa baca extra_config
 
         const { latestData, eqSup } = getSourceDetailPayload(src);
@@ -1067,7 +1067,7 @@
                     ['DC +7V', unflattenedData.lcu?.dc_7v, '#e8f4ff'],
                     ['DC +15V', unflattenedData.lcu?.dc_15v, '#e8f4ff'],
                     ['DC +28V', unflattenedData.lcu?.dc_28v, '#e8f4ff'],
-                    ['AC +28V', unflattenedData.lcu?.ac_28v, '#e8f4ff'],
+                    // ['AC +28V', unflattenedData.lcu?.ac_28v, '#e8f4ff'],
                     ['MSG1 Comm', unflattenedData.lcu?.msg1_comm, '#00d4ff'],
                     ['MSG2 Comm', unflattenedData.lcu?.msg2_comm, '#00d4ff'],
                     ['MON1 Comm', unflattenedData.lcu?.mon1_comm, '#00d4ff'],
@@ -1079,26 +1079,26 @@
                 ]
             });
         }
-        
+
         if (parserId === 'iologik_modbus') {
-            
+
             const renderDevice = (title, deviceData) => {
                 if (!deviceData) return [];
                 const params = [];
-                
+
                 let cfg = null;
                 if (window._activeSourceDetail && window._activeSourceDetail.extra_config) {
                     try {
                         cfg = JSON.parse(window._activeSourceDetail.extra_config);
-                    } catch(e) {}
+                    } catch (e) { }
                 }
-                
+
                 for (const [key, val] of Object.entries(deviceData)) {
                     let type = 'normal';
                     if (cfg && cfg.devices && cfg.devices[title] && cfg.devices[title][key]) {
                         type = cfg.devices[title][key].type || 'normal';
                     }
-                    
+
                     let color = '#4a7a9a'; // Default abu-abu gelap (Tidak Aktif)
                     if (type === 'alarm') {
                         color = (val === 'Aktif') ? '#ff3355' : '#00ffcc';
@@ -1107,10 +1107,10 @@
                     } else {
                         if (val === 'Aktif' || val === 'TX 1' || val === 'TX 2' || val === 'Normal') color = '#00ffcc';
                     }
-                    
+
                     params.push([key, val, color]);
                 }
-                
+
                 return params;
             };
 
@@ -1132,7 +1132,7 @@
                                 devicesToRender[dName] = dummy;
                             }
                         }
-                    } catch(e) {}
+                    } catch (e) { }
                 }
             }
 
@@ -1664,8 +1664,8 @@
                 const dataParams = [];
                 const meterParams = [];
                 const meterKeys = [
-                    'tx_frequency_mhz', 'rf_power_watts', 'modulation_depth', 'tone_keying_freq', 
-                    'fwd_power', 'refl_power', 'tx_level', 'mod_level', 'rx_level', 'squelch_level', 
+                    'tx_frequency_mhz', 'rf_power_watts', 'modulation_depth', 'tone_keying_freq',
+                    'fwd_power', 'refl_power', 'tx_level', 'mod_level', 'rx_level', 'squelch_level',
                     'sinad', 'audio_level', 'rx_freq', 'ambient_temp', 'internal_temp', 'dc_supply_v'
                 ];
 

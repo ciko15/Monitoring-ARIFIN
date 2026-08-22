@@ -19,41 +19,41 @@ const BaseParser = require('./base');
 const SOH = 0x01;
 const STX = 0x02;
 const ETX = 0x03;
-const TAG_MAP = { 'LC':'LC', 'N1':'N1', 'N2':'N2', 'G1':'G1', 'G2':'G2' };
+const TAG_MAP = { 'LC': 'LC', 'N1': 'N1', 'N2': 'N2', 'G1': 'G1', 'G2': 'G2' };
 
 // Active polling request bytes
 const POLL_REQUESTS = [
-    { bytes: Buffer.from([0x01,0x02,0x4C,0x43,0x7C,0x53,0x51,0x7C,0x2A,0x03,0x45,0x41,0x41,0x44]), tag: 'LC'  },
-    { bytes: Buffer.from([0x01,0x02,0x4E,0x31,0x7C,0x53,0x51,0x7C,0x2A,0x03,0x34,0x34,0x39,0x32]), tag: 'N1'  },
-    { bytes: Buffer.from([0x01,0x02,0x4E,0x32,0x7C,0x53,0x51,0x7C,0x2A,0x03,0x38,0x41,0x37,0x32]), tag: 'N2'  },
-    { bytes: Buffer.from([0x01,0x02,0x47,0x31,0x7C,0x53,0x51,0x7C,0x2A,0x03,0x36,0x46,0x35,0x45]), tag: 'G1'  },
-    { bytes: Buffer.from([0x01,0x02,0x47,0x32,0x7C,0x53,0x51,0x7C,0x2A,0x03,0x41,0x31,0x42,0x45]), tag: 'G2'  },
+    { bytes: Buffer.from([0x01, 0x02, 0x4C, 0x43, 0x7C, 0x53, 0x51, 0x7C, 0x2A, 0x03, 0x45, 0x41, 0x41, 0x44]), tag: 'LC' },
+    { bytes: Buffer.from([0x01, 0x02, 0x4E, 0x31, 0x7C, 0x53, 0x51, 0x7C, 0x2A, 0x03, 0x34, 0x34, 0x39, 0x32]), tag: 'N1' },
+    { bytes: Buffer.from([0x01, 0x02, 0x4E, 0x32, 0x7C, 0x53, 0x51, 0x7C, 0x2A, 0x03, 0x38, 0x41, 0x37, 0x32]), tag: 'N2' },
+    { bytes: Buffer.from([0x01, 0x02, 0x47, 0x31, 0x7C, 0x53, 0x51, 0x7C, 0x2A, 0x03, 0x36, 0x46, 0x35, 0x45]), tag: 'G1' },
+    { bytes: Buffer.from([0x01, 0x02, 0x47, 0x32, 0x7C, 0x53, 0x51, 0x7C, 0x2A, 0x03, 0x41, 0x31, 0x42, 0x45]), tag: 'G2' },
 ];
 
-const PASSIVE_TIMEOUT  = 30000; // ms — switch ke ACTIVE jika tidak ada data
-const POLL_INTERVAL    = 2000;  // ms — interval polling ACTIVE
-const POLL_REQ_DELAY   = 150;   // ms — jeda antar request
+const PASSIVE_TIMEOUT = 30000; // ms — switch ke ACTIVE jika tidak ada data
+const POLL_INTERVAL = 2000;  // ms — interval polling ACTIVE
+const POLL_REQ_DELAY = 150;   // ms — jeda antar request
 
 const LIMITS = {
-    carrier_power: [80.0,  120.0],
-    rf_input:      [-25.0, 0.0 ],
-    fm_index:      [15.0,  17.0 ],
-    am_30hz:       [28.0,  32.0 ],
-    am_9960hz:     [25.0,  32.5 ],
-    am_1020hz:     [6.0,   8.0  ],
+    carrier_power: [80.0, 120.0],
+    rf_input: [-25.0, 0.0],
+    fm_index: [15.0, 17.0],
+    am_30hz: [28.0, 32.0],
+    am_9960hz: [25.0, 32.5],
+    am_1020hz: [6.0, 8.0],
 };
 
 function extractSections(buf) {
     const results = {};
     let i = 0;
     while (i < buf.length - 3) {
-        if (buf[i] === SOH && buf[i+1] === STX) {
-            const tagStr = buf.slice(i+2, i+4).toString('ascii');
+        if (buf[i] === SOH && buf[i + 1] === STX) {
+            const tagStr = buf.slice(i + 2, i + 4).toString('ascii');
             const tag = TAG_MAP[tagStr];
             if (tag) {
-                const etxPos = buf.indexOf(ETX, i+4);
-                if (etxPos > i+4) {
-                    const seg = buf.slice(i+4, etxPos).toString('ascii');
+                const etxPos = buf.indexOf(ETX, i + 4);
+                if (etxPos > i + 4) {
+                    const seg = buf.slice(i + 4, etxPos).toString('ascii');
                     const params = {};
                     const regex = /([A-Z]\d+)=([^|\x03\x01]+)/g;
                     let m;
@@ -76,7 +76,7 @@ function fi(p, k, div, dec = 1) {
         const v = parseInt(p[k], 10);
         if (isNaN(v)) return null;
         return Math.round((v / div) * Math.pow(10, dec)) / Math.pow(10, dec);
-    } catch(e) { return null; }
+    } catch (e) { return null; }
 }
 
 function fs(p, k) { return p[k] !== undefined ? p[k] : null; }
@@ -91,19 +91,19 @@ function decodeAll(sections) {
         r.tx_active = (txSel !== null && /^-?\d+$/.test(txSel.trim()))
             ? parseInt(txSel, 10) : null;
         r.mon1 = {
-            carrier_power: fi(n1,'S1',  10),
-            rf_input:      fi(n1,'S2',  10),
-            azimuth:       fi(n1,'S3',  10),
-            carrier_freq:  fi(n1,'S4',  10000, 4),
-            usb_freq:      fi(n1,'S5',  10000, 4),
-            lsb_freq:      fi(n1,'S6',  10000, 4),
-            am_30hz:       fi(n1,'S10', 10),
-            am_9960hz:     fi(n1,'S11', 10),
-            am_1020hz:     fi(n1,'S12', 10),
-            fm_index:      fi(n1,'S13', 10),
-            ident:         fs(n1,'S14'),
-            tsg_30hz:      fi(n1,'S15', 10),
-            tsg_azimuth:   fi(n1,'S18', 10),
+            carrier_power: fi(n1, 'S1', 10),
+            rf_input: fi(n1, 'S2', 10),
+            azimuth: fi(n1, 'S3', 10),
+            carrier_freq: fi(n1, 'S4', 10000, 4),
+            usb_freq: fi(n1, 'S5', 10000, 4),
+            lsb_freq: fi(n1, 'S6', 10000, 4),
+            am_30hz: fi(n1, 'S10', 10),
+            am_9960hz: fi(n1, 'S11', 10),
+            am_1020hz: fi(n1, 'S12', 10),
+            fm_index: fi(n1, 'S13', 10),
+            ident: fs(n1, 'S14'),
+            tsg_30hz: fi(n1, 'S15', 10),
+            tsg_azimuth: fi(n1, 'S18', 10),
         };
     }
 
@@ -111,37 +111,37 @@ function decodeAll(sections) {
     const n2 = sections['N2'] || {};
     if (Object.keys(n2).length > 0) {
         r.mon2 = {
-            carrier_power: fi(n2,'S1',  10),
-            rf_input:      fi(n2,'S2',  10),
-            azimuth:       fi(n2,'S3',  10),
-            carrier_freq:  fi(n2,'S4',  10000, 4),
-            usb_freq:      fi(n2,'S5',  10000, 4),
-            lsb_freq:      fi(n2,'S6',  10000, 4),
-            am_30hz:       fi(n2,'S10', 10),
-            am_9960hz:     fi(n2,'S11', 10),
-            am_1020hz:     fi(n2,'S12', 10),
-            fm_index:      fi(n2,'S13', 10),
-            ident:         fs(n2,'S14'),
+            carrier_power: fi(n2, 'S1', 10),
+            rf_input: fi(n2, 'S2', 10),
+            azimuth: fi(n2, 'S3', 10),
+            carrier_freq: fi(n2, 'S4', 10000, 4),
+            usb_freq: fi(n2, 'S5', 10000, 4),
+            lsb_freq: fi(n2, 'S6', 10000, 4),
+            am_30hz: fi(n2, 'S10', 10),
+            am_9960hz: fi(n2, 'S11', 10),
+            am_1020hz: fi(n2, 'S12', 10),
+            fm_index: fi(n2, 'S13', 10),
+            ident: fs(n2, 'S14'),
         };
     }
 
     // TX1 (G1) & TX2 (G2)
-    for (const [tagKey, resKey] of [['G1','tx1'],['G2','tx2']]) {
+    for (const [tagKey, resKey] of [['G1', 'tx1'], ['G2', 'tx2']]) {
         const g = sections[tagKey] || {};
         if (Object.keys(g).length > 0) {
             r[resKey] = {
-                carrier_power: fi(g,'V2',  10),
-                usb_sin:       fi(g,'V3',  100),
-                usb_cos:       fi(g,'V4',  100),
-                lsb_sin:       fi(g,'V5',  100),
-                lsb_cos:       fi(g,'V6',  100),
-                az_offset:     fi(g,'V7',  10),
-                am_30hz:       fi(g,'V8',  10),
-                am_1020hz:     fi(g,'V9',  10),
-                phase_offset:  fi(g,'V28', 10),
-                cpa_temp:      fi(g,'S6',  10),
-                msg_temp:      fi(g,'S1',  10),
-                ident:         fs(g,'V15'),
+                carrier_power: fi(g, 'V2', 10),
+                usb_sin: fi(g, 'V3', 100),
+                usb_cos: fi(g, 'V4', 100),
+                lsb_sin: fi(g, 'V5', 100),
+                lsb_cos: fi(g, 'V6', 100),
+                az_offset: fi(g, 'V7', 10),
+                am_30hz: fi(g, 'V8', 10),
+                am_1020hz: fi(g, 'V9', 10),
+                phase_offset: fi(g, 'V28', 10),
+                cpa_temp: fi(g, 'S6', 10),
+                msg_temp: fi(g, 'S1', 10),
+                ident: fs(g, 'V15'),
             };
         }
     }
@@ -150,19 +150,19 @@ function decodeAll(sections) {
     const lc = sections['LC'] || {};
     if (Object.keys(lc).length > 0) {
         r.lcu = {
-            dc_5v:     fi(lc,'S1',  100),
-            dc_7v:     fi(lc,'S3',  100),
-            dc_15v:    fi(lc,'S5',  100),
-            dc_28v:    fi(lc,'S12', 100),
-            ac_28v:    fi(lc,'S11', 100),
-            msg1_comm: fs(lc,'B9'),
-            msg2_comm: fs(lc,'B10'),
-            mon1_comm: fs(lc,'B11'),
-            mon2_comm: fs(lc,'B12'),
-            battery1:  fs(lc,'B20'),
-            battery2:  fs(lc,'B21'),
-            acdc1:     fs(lc,'B22'),
-            acdc2:     fs(lc,'B23'),
+            dc_5v: fi(lc, 'S1', 100),
+            dc_7v: fi(lc, 'S3', 100),
+            dc_15v: fi(lc, 'S5', 100),
+            dc_28v: fi(lc, 'S11', 100),
+            // ac_28v:    fi(lc,'S11', 100),
+            msg1_comm: fs(lc, 'B9'),
+            msg2_comm: fs(lc, 'B10'),
+            mon1_comm: fs(lc, 'B11'),
+            mon2_comm: fs(lc, 'B12'),
+            battery1: fs(lc, 'B20'),
+            battery2: fs(lc, 'B21'),
+            acdc1: fs(lc, 'B22'),
+            acdc2: fs(lc, 'B23'),
         };
     }
 
@@ -192,6 +192,13 @@ class DvorMaru220Parser extends BaseParser {
         this._passiveBuf = Buffer.alloc(0);
     }
 
+    reset() {
+        this._passiveBuf = Buffer.alloc(0);
+        // Do NOT clear this._lastData so values survive TCP reconnects
+        this._lastDataTime = Date.now();
+        this._mode = 'PASSIVE';
+    }
+
     /**
      * Main parse entry — called by NetworkListener on each TCP data chunk.
      * Handles both PASSIVE (streaming) and ACTIVE (polling) modes.
@@ -216,7 +223,7 @@ class DvorMaru220Parser extends BaseParser {
             // Try to parse current buffer
             const sections = extractSections(this._passiveBuf);
 
-            if (Object.keys(sections).length < 2) {
+            if (Object.keys(sections).length < 1) {
                 // Not enough sections yet
                 if (this._lastData && Object.keys(this._lastData).length > 0) {
                     return {
@@ -245,24 +252,24 @@ class DvorMaru220Parser extends BaseParser {
             if (lastEtx >= 0) this._passiveBuf = this._passiveBuf.slice(lastEtx + 5);
 
             const decoded = decodeAll(sections);
-            const alarms  = checkAlarms(decoded);
+            const alarms = checkAlarms(decoded);
 
             // Flatten for dashboard (hanya timpa jika nilai tidak null/undefined)
             const flat = { _mode: this._mode };
             if (decoded.mon1) {
-                Object.entries(decoded.mon1).forEach(([k,v]) => { if (v != null) flat[`mon1_${k}`] = v; });
+                Object.entries(decoded.mon1).forEach(([k, v]) => { if (v != null) flat[`mon1_${k}`] = v; });
             }
             if (decoded.mon2) {
-                Object.entries(decoded.mon2).forEach(([k,v]) => { if (v != null) flat[`mon2_${k}`] = v; });
+                Object.entries(decoded.mon2).forEach(([k, v]) => { if (v != null) flat[`mon2_${k}`] = v; });
             }
             if (decoded.tx1) {
-                Object.entries(decoded.tx1).forEach(([k,v]) => { if (v != null) flat[`tx1_${k}`] = v; });
+                Object.entries(decoded.tx1).forEach(([k, v]) => { if (v != null) flat[`tx1_${k}`] = v; });
             }
             if (decoded.tx2) {
-                Object.entries(decoded.tx2).forEach(([k,v]) => { if (v != null) flat[`tx2_${k}`] = v; });
+                Object.entries(decoded.tx2).forEach(([k, v]) => { if (v != null) flat[`tx2_${k}`] = v; });
             }
             if (decoded.lcu) {
-                Object.entries(decoded.lcu).forEach(([k,v]) => { if (v != null) flat[`lcu_${k}`] = v; });
+                Object.entries(decoded.lcu).forEach(([k, v]) => { if (v != null) flat[`lcu_${k}`] = v; });
             }
             if (decoded.tx_active != null) flat.tx_active = decoded.tx_active;
 
@@ -290,8 +297,8 @@ class DvorMaru220Parser extends BaseParser {
      * Called by NetworkListener when mode is ACTIVE.
      */
     getPollRequests() { return POLL_REQUESTS; }
-    getMode()         { return this._mode; }
-    getLastData()     { return this._lastData || {}; }
+    getMode() { return this._mode; }
+    getLastData() { return this._lastData || {}; }
 
     checkTimeout() {
         if (this._mode === 'PASSIVE' && Date.now() - this._lastDataTime > PASSIVE_TIMEOUT) {
@@ -302,7 +309,7 @@ class DvorMaru220Parser extends BaseParser {
 }
 
 module.exports = DvorMaru220Parser;
-module.exports.POLL_REQUESTS   = POLL_REQUESTS;
+module.exports.POLL_REQUESTS = POLL_REQUESTS;
 module.exports.PASSIVE_TIMEOUT = PASSIVE_TIMEOUT;
-module.exports.POLL_INTERVAL   = POLL_INTERVAL;
-module.exports.POLL_REQ_DELAY  = POLL_REQ_DELAY;
+module.exports.POLL_INTERVAL = POLL_INTERVAL;
+module.exports.POLL_REQ_DELAY = POLL_REQ_DELAY;
