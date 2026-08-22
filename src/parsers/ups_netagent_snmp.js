@@ -192,10 +192,21 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         let totalReactivePower = 0;
         let activePhases = 0;
 
+        // Deteksi apakah ini UPS Piller yang sensor arusnya rusak (10x lebih kecil dari aslinya)
+        const isPiller = String(sysDescr || '').toLowerCase().includes('piller');
+
         const addPower = (v, iRaw, p) => {
             if (v !== null && iRaw !== null && p !== null) {
                 const volts = Number(v);
-                const amps = Number(iRaw); // Disesuaikan: UPS Piller mengirim data Ampere murni (bukan 0.1A)
+                
+                // Normalisasi Ampere
+                let amps = Number(iRaw);
+                if (isPiller) {
+                    amps = amps * 10; // Piller lapor 0.8, aslinya 8.0 A
+                } else {
+                    amps = amps / 10; // Standar RFC 1628: 150 = 15.0 A
+                }
+                
                 const watts = Number(p); // Watt murni (P)
                 
                 if (volts > 0 && amps > 0) {
@@ -266,9 +277,9 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 output_voltage_s: outputVoltageS !== null ? String(outputVoltageS) : '—',
                 output_voltage_t: outputVoltageT !== null ? String(outputVoltageT) : '—',
                 
-                output_current_r: outputCurrentRawR !== null ? String(outputCurrentRawR) : '—',
-                output_current_s: outputCurrentRawS !== null ? String(outputCurrentRawS) : '—',
-                output_current_t: outputCurrentRawT !== null ? String(outputCurrentRawT) : '—',
+                output_current_r: outputCurrentRawR !== null ? String(isPiller ? Number(outputCurrentRawR) * 10 : Number(outputCurrentRawR) / 10) : '—',
+                output_current_s: outputCurrentRawS !== null ? String(isPiller ? Number(outputCurrentRawS) * 10 : Number(outputCurrentRawS) / 10) : '—',
+                output_current_t: outputCurrentRawT !== null ? String(isPiller ? Number(outputCurrentRawT) * 10 : Number(outputCurrentRawT) / 10) : '—',
                 
                 output_load_pct_r: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—',
                 output_load_pct_s: outputPercentLoadS !== null ? String(outputPercentLoadS) : '—',
@@ -287,7 +298,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 // Compatibility untuk Frontend yg mungkin cuma pakai 1 parameter general
                 input_voltage: inputVoltageR !== null ? String(inputVoltageR) : '—',
                 output_voltage: outputVoltageR !== null ? String(outputVoltageR) : '—',
-                output_current_ampere: outputCurrentRawR !== null ? String(outputCurrentRawR) : '—',
+                output_current_ampere: outputCurrentRawR !== null ? String(isPiller ? Number(outputCurrentRawR) * 10 : Number(outputCurrentRawR) / 10) : '—',
                 output_load_pct: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—'
             },
             alarms,
