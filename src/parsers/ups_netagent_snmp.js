@@ -195,29 +195,52 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         // Deteksi apakah ini UPS Piller yang sensor arusnya rusak (10x lebih kecil dari aslinya)
         const isPiller = String(sysDescr || '').toLowerCase().includes('piller');
 
-        const addPower = (v, iRaw, p) => {
-            if (v !== null && iRaw !== null && p !== null) {
-                const volts = Number(v);
-                
-                // Normalisasi Ampere
-                let amps = Number(iRaw);
-                if (isPiller) {
-                    amps = amps * 10; // Piller lapor 0.8, aslinya 8.0 A
-                } else {
-                    amps = amps / 10; // Standar RFC 1628: 150 = 15.0 A
+        // Ekstrak KVA dari sysDescr (contoh: "UPS 30 KVA" -> 30) untuk rumus gaib
+        let upsKVA = 0;
+        const kvaMatch = String(sysDescr || '').match(/(\d+)\s*kva/i);
+        if (kvaMatch) upsKVA = Number(kvaMatch[1]);
+
+        const fixSensor = (v, aRaw, wRaw, loadPct) => {
+            let a = Number(aRaw);
+            let w = Number(wRaw);
+            const volts = Number(v);
+            const load = Number(loadPct);
+            
+            // Normalisasi Ampere
+            if (isPiller) {
+                a = a * 10; // Piller lapor 0.8, aslinya 8.0 A
+            } else {
+                a = a / 10; // Standar RFC 1628: 150 = 15.0 A
+            }
+            
+            // MAGIC FORMULA: Jika Amps & Watts mati (0) tapi Load % menyala, kita tebak nilainya
+            if (a === 0 && w === 0 && load > 0 && upsKVA > 0) {
+                const capacityPerPhaseVA = (upsKVA * 1000) / 3; // Misal 30kVA -> 10,000 VA per fasa
+                const apparentVA = (load / 100) * capacityPerPhaseVA;
+                if (volts > 0) {
+                    a = apparentVA / volts; // V * A = VA -> A = VA / V
                 }
-                
-                const watts = Number(p); // Watt murni (P)
-                
-                if (volts > 0 && amps > 0) {
-                    const apparentVA = volts * amps; // Daya Semu per fasa (S)
+                w = apparentVA * 0.9; // Asumsi Power Factor UPS standar = 0.9
+            }
+            
+            return { a, w };
+        };
+
+        const phaseR = fixSensor(outputVoltageR, outputCurrentRawR, outputPowerR, outputPercentLoadR);
+        const phaseS = fixSensor(outputVoltageS, outputCurrentRawS, outputPowerS, outputPercentLoadS);
+        const phaseT = fixSensor(outputVoltageT, outputCurrentRawT, outputPowerT, outputPercentLoadT);
+
+        const addPower = (v, a, w) => {
+            if (v !== null) {
+                const volts = Number(v);
+                if (volts > 0 && a > 0) {
+                    const apparentVA = volts * a; // Daya Semu per fasa (S)
                     
-                    totalRealPower += watts;
+                    totalRealPower += w;
                     arithmeticApparentPower += apparentVA;
                     
                     // Hitung Daya Reaktif (Q) per fasa: Q = \u221A(S\u00B2 - P\u00B2)
-                    // Math.max(0, ...) untuk mencegah nilai minus jika sensor Watt sedikit meleset
-                    const reactiveVAR = Math.sqrt(Math.max(0, (apparentVA * apparentVA) - (watts * watts)));
+                    const reactiveVAR = Math.sqrt(Math.max(0, (apparentVA * apparentVA) - (w * w)));
                     totalReactivePower += reactiveVAR;
                     
                     activePhases++;
@@ -225,9 +248,9 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
             }
         };
 
-        addPower(outputVoltageR, outputCurrentRawR, outputPowerR);
-        addPower(outputVoltageS, outputCurrentRawS, outputPowerS);
-        addPower(outputVoltageT, outputCurrentRawT, outputPowerT);
+        addPower(outputVoltageR, phaseR.a, phaseR.w);
+        addPower(outputVoltageS, phaseS.a, phaseS.w);
+        addPower(outputVoltageT, phaseT.a, phaseT.w);
 
         let totalPF = '—';
         let finalApparentPower = 0;
@@ -277,17 +300,17 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 output_voltage_s: outputVoltageS !== null ? String(outputVoltageS) : '—',
                 output_voltage_t: outputVoltageT !== null ? String(outputVoltageT) : '—',
                 
-                output_current_r: outputCurrentRawR !== null ? String(isPiller ? Number(outputCurrentRawR) * 10 : Number(outputCurrentRawR) / 10) : '—',
-                output_current_s: outputCurrentRawS !== null ? String(isPiller ? Number(outputCurrentRawS) * 10 : Number(outputCurrentRawS) / 10) : '—',
-                output_current_t: outputCurrentRawT !== null ? String(isPiller ? Number(outputCurrentRawT) * 10 : Number(outputCurrentRawT) / 10) : '—',
+                output_current_r: outputCurrentRawR !== null ? String(phaseR.a.toFixed(1)) : '—',
+                output_current_s: outputCurrentRawS !== null ? String(phaseS.a.toFixed(1)) : '—',
+                output_current_t: outputCurrentRawT !== null ? String(phaseT.a.toFixed(1)) : '—',
                 
                 output_load_pct_r: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—',
                 output_load_pct_s: outputPercentLoadS !== null ? String(outputPercentLoadS) : '—',
                 output_load_pct_t: outputPercentLoadT !== null ? String(outputPercentLoadT) : '—',
 
-                output_power_r: outputPowerR !== null ? String(outputPowerR) : '—',
-                output_power_s: outputPowerS !== null ? String(outputPowerS) : '—',
-                output_power_t: outputPowerT !== null ? String(outputPowerT) : '—',
+                output_power_r: outputPowerR !== null ? String(Math.round(phaseR.w)) : '—',
+                output_power_s: outputPowerS !== null ? String(Math.round(phaseS.w)) : '—',
+                output_power_t: outputPowerT !== null ? String(Math.round(phaseT.w)) : '—',
                 
                 debug_apparent_power: String(finalApparentPower),
                 debug_real_power: String(totalRealPower),
@@ -298,7 +321,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 // Compatibility untuk Frontend yg mungkin cuma pakai 1 parameter general
                 input_voltage: inputVoltageR !== null ? String(inputVoltageR) : '—',
                 output_voltage: outputVoltageR !== null ? String(outputVoltageR) : '—',
-                output_current_ampere: outputCurrentRawR !== null ? String(isPiller ? Number(outputCurrentRawR) * 10 : Number(outputCurrentRawR) / 10) : '—',
+                output_current_ampere: outputCurrentRawR !== null ? String(phaseR.a.toFixed(1)) : '—',
                 output_load_pct: outputPercentLoadR !== null ? String(outputPercentLoadR) : '—'
             },
             alarms,
