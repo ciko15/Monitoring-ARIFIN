@@ -247,24 +247,24 @@ class DvorMaru220Parser extends BaseParser {
             const decoded = decodeAll(sections);
             const alarms  = checkAlarms(decoded);
 
-            // Flatten for dashboard
+            // Flatten for dashboard (hanya timpa jika nilai tidak null/undefined)
             const flat = { _mode: this._mode };
             if (decoded.mon1) {
-                Object.entries(decoded.mon1).forEach(([k,v]) => { flat[`mon1_${k}`] = v; });
+                Object.entries(decoded.mon1).forEach(([k,v]) => { if (v != null) flat[`mon1_${k}`] = v; });
             }
             if (decoded.mon2) {
-                Object.entries(decoded.mon2).forEach(([k,v]) => { flat[`mon2_${k}`] = v; });
+                Object.entries(decoded.mon2).forEach(([k,v]) => { if (v != null) flat[`mon2_${k}`] = v; });
             }
             if (decoded.tx1) {
-                Object.entries(decoded.tx1).forEach(([k,v]) => { flat[`tx1_${k}`] = v; });
+                Object.entries(decoded.tx1).forEach(([k,v]) => { if (v != null) flat[`tx1_${k}`] = v; });
             }
             if (decoded.tx2) {
-                Object.entries(decoded.tx2).forEach(([k,v]) => { flat[`tx2_${k}`] = v; });
+                Object.entries(decoded.tx2).forEach(([k,v]) => { if (v != null) flat[`tx2_${k}`] = v; });
             }
             if (decoded.lcu) {
-                Object.entries(decoded.lcu).forEach(([k,v]) => { flat[`lcu_${k}`] = v; });
+                Object.entries(decoded.lcu).forEach(([k,v]) => { if (v != null) flat[`lcu_${k}`] = v; });
             }
-            if (decoded.tx_active !== undefined) flat.tx_active = decoded.tx_active;
+            if (decoded.tx_active != null) flat.tx_active = decoded.tx_active;
 
             // MERGE dengan data sebelumnya agar tidak ada yang "hilang/blank" saat data datang sepotong-sepotong
             this._lastData = { ...(this._lastData || {}), ...flat };
