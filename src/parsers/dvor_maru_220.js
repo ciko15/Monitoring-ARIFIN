@@ -150,11 +150,11 @@ function decodeAll(sections) {
     const lc = sections['LC'] || {};
     if (Object.keys(lc).length > 0) {
         r.lcu = {
-            dc_5v:     fi(lc,'S29', 10),
-            dc_7v:     fi(lc,'S39', 100),
-            dc_15v:    fi(lc,'S41', 100),
-            dc_28v:    fi(lc,'S27', 10),
-            ac_28v:    fi(lc,'S47', 100),
+            dc_5v:     fi(lc,'S1',  100),
+            dc_7v:     fi(lc,'S3',  100),
+            dc_15v:    fi(lc,'S5',  100),
+            dc_28v:    fi(lc,'S12', 100),
+            ac_28v:    fi(lc,'S11', 100),
             msg1_comm: fs(lc,'B9'),
             msg2_comm: fs(lc,'B10'),
             mon1_comm: fs(lc,'B11'),
