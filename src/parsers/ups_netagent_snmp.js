@@ -186,19 +186,30 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         else if (batteryStatusRaw === 3) batteryStatusStr = 'Low';
         else if (batteryStatusRaw === 4) batteryStatusStr = 'Depleted';
 
-        // Kalkulasi Total Power Factor
+        // Kalkulasi Total Power Factor (Mendukung Vektor 3-Phase)
         let totalRealPower = 0;
-        let totalApparentPower = 0;
+        let arithmeticApparentPower = 0;
+        let totalReactivePower = 0;
+        let activePhases = 0;
 
         const addPower = (v, iRaw, p) => {
             if (v !== null && iRaw !== null && p !== null) {
                 const volts = Number(v);
                 const amps = Number(iRaw) / 10;
-                const watts = Number(p); // Kembalikan ke Watt asli (tidak dibagi 10) karena OID standar memang Watt
+                const watts = Number(p); // Watt murni (P)
                 
                 if (volts > 0 && amps > 0) {
+                    const apparentVA = volts * amps; // Daya Semu per fasa (S)
+                    
                     totalRealPower += watts;
-                    totalApparentPower += (volts * amps);
+                    arithmeticApparentPower += apparentVA;
+                    
+                    // Hitung Daya Reaktif (Q) per fasa: Q = \u221A(S\u00B2 - P\u00B2)
+                    // Math.max(0, ...) untuk mencegah nilai minus jika sensor Watt sedikit meleset
+                    const reactiveVAR = Math.sqrt(Math.max(0, (apparentVA * apparentVA) - (watts * watts)));
+                    totalReactivePower += reactiveVAR;
+                    
+                    activePhases++;
                 }
             }
         };
@@ -208,9 +219,26 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         addPower(outputVoltageT, outputCurrentRawT, outputPowerT);
 
         let totalPF = '—';
-        if (totalApparentPower > 0) {
-            let calcPF = totalRealPower / totalApparentPower;
-            if (calcPF > 1) calcPF = 1; // Cap at 1 because PF cannot be > 1
+        let finalApparentPower = 0;
+
+        if (arithmeticApparentPower > 0) {
+            let calcPF = 0;
+            
+            if (activePhases <= 1) {
+                // RUMUS 1-PHASE (Skalar)
+                finalApparentPower = arithmeticApparentPower;
+                calcPF = totalRealPower / finalApparentPower;
+            } else {
+                // RUMUS 3-PHASE (Vektor Pythagoras dari gambar: S = \u221A(P\u00B2 + Q\u00B2))
+                finalApparentPower = Math.sqrt(Math.pow(totalRealPower, 2) + Math.pow(totalReactivePower, 2));
+                
+                if (finalApparentPower > 0) {
+                    calcPF = totalRealPower / finalApparentPower; // Cos \u03C6 = P / S
+                }
+            }
+
+            if (calcPF > 1) calcPF = 1; // Maksimal PF adalah 1
+            if (calcPF < 0) calcPF = 0;
             totalPF = Number(calcPF.toFixed(2));
         }
 
@@ -250,9 +278,9 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
                 output_power_s: outputPowerS !== null ? String(outputPowerS) : '—',
                 output_power_t: outputPowerT !== null ? String(outputPowerT) : '—',
                 
-                debug_apparent_power: String(totalApparentPower),
+                debug_apparent_power: String(finalApparentPower),
                 debug_real_power: String(totalRealPower),
-                debug_calc_pf: (totalApparentPower > 0) ? String(totalRealPower / totalApparentPower) : '—',
+                debug_calc_pf: (finalApparentPower > 0) ? String(totalRealPower / finalApparentPower) : '—',
 
                 power_factor: totalPF !== '—' ? String(totalPF) : '—',
                 
