@@ -146,16 +146,15 @@ function decodeAll(sections) {
         }
     }
 
-    // LCU (LC) — v2 mapping: S25=dc_28v, S26=dc_5v, S27=dc_7v, S28=dc_15v, S47=ac_28v
+    // LCU (LC)
     const lc = sections['LC'] || {};
     if (Object.keys(lc).length > 0) {
-        console.log('\n[DEBUG DVOR MARU LCU] RAW DATA MAPPING SENSOR:', JSON.stringify(lc), '\n');
         r.lcu = {
-            dc_5v:     fi(lc,'S26', 10),
-            dc_7v:     fi(lc,'S27', 10),
-            dc_15v:    fi(lc,'S28', 10),
-            dc_28v:    fi(lc,'S25', 10),
-            ac_28v:    fi(lc,'S47', 10),
+            dc_5v:     fi(lc,'S29', 10),
+            dc_7v:     fi(lc,'S39', 100),
+            dc_15v:    fi(lc,'S41', 100),
+            dc_28v:    fi(lc,'S27', 10),
+            ac_28v:    fi(lc,'S47', 100),
             msg1_comm: fs(lc,'B9'),
             msg2_comm: fs(lc,'B10'),
             mon1_comm: fs(lc,'B11'),
