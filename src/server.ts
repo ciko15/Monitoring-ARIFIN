@@ -470,6 +470,31 @@ const app = new Elysia()
     // --- SYSTEM COMMAND ROUTES ---
     .group('/api/system', app => app
         .use(authenticate)
+        .post('/hard-reset', async ({ body, set }) => {
+            const { password } = body as { password?: string };
+            if (password !== 'smart1234') {
+                set.status = 401;
+                return { success: false, error: 'Password salah.' };
+            }
+            try {
+                const { spawn } = require('child_process');
+                const path = require('path');
+                const batPath = path.resolve(process.cwd(), 'reset_aplikasi.bat');
+                
+                // Spawn the bat file detached so it survives the node/bun process termination
+                const child = spawn('cmd.exe', ['/c', batPath], {
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsHide: false
+                });
+                child.unref();
+
+                return { success: true, message: 'Hard reset sedang dijalankan...' };
+            } catch (err: any) {
+                set.status = 500;
+                return { success: false, error: err.message };
+            }
+        })
         .post('/command', async ({ body, set }) => {
             const { command } = body as { command: string };
             if (!command) {

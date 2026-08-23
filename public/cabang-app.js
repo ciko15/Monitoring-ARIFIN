@@ -535,4 +535,71 @@ window.cabangModule = cabangModule;
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   cabangModule.init();
+
+  // Secret reset logic on logo (5 clicks)
+  let logoClickCount = 0;
+  let logoClickTimer = null;
+  const logoEl = document.getElementById('app-logo');
+  
+  if (logoEl) {
+    logoEl.style.cursor = 'pointer';
+    logoEl.addEventListener('click', () => {
+      logoClickCount++;
+      
+      if (logoClickCount === 5) {
+        logoClickCount = 0;
+        clearTimeout(logoClickTimer);
+        
+        Swal.fire({
+          title: 'Hard Reset Aplikasi',
+          text: 'Masukkan kode rahasia untuk me-restart aplikasi cabang ini.',
+          input: 'password',
+          inputAttributes: {
+            autocapitalize: 'off'
+          },
+          showCancelButton: true,
+          confirmButtonText: 'Reset Sekarang',
+          confirmButtonColor: '#ff3355',
+          showLoaderOnConfirm: true,
+          preConfirm: (password) => {
+            return fetch('/api/system/hard-reset', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ password })
+            })
+            .then(response => {
+              if (!response.ok) {
+                return response.json().then(data => { throw new Error(data.error || 'Password salah atau sistem error') });
+              }
+              return response.json();
+            })
+            .catch(error => {
+              Swal.showValidationMessage(`Gagal: ${error.message}`);
+            });
+          },
+          allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+          if (result.isConfirmed && result.value.success) {
+            Swal.fire({
+              title: 'Berhasil!',
+              text: 'Proses reset sedang berjalan. Halaman akan dimuat ulang dalam 10 detik...',
+              icon: 'success',
+              timer: 10000,
+              timerProgressBar: true,
+              didClose: () => {
+                window.location.reload();
+              }
+            });
+          }
+        });
+      }
+      
+      clearTimeout(logoClickTimer);
+      logoClickTimer = setTimeout(() => {
+        logoClickCount = 0;
+      }, 3000); // Reset count after 3 seconds of inactivity
+    });
+  }
 });
