@@ -344,7 +344,7 @@ class EquipmentService {
                     };
 
                     await this.db.createEquipmentLog(datalog);
-                }, 1000); // 1000ms throttle untuk lokal
+                }, parseInt(process.env.EMS_TELEMETRY_INTERVAL_MS || '30000', 10)); // Local logging throttle disamakan 30s
             }
 
             // EMS Publish Throttle (Lambat, contoh 30 detik)

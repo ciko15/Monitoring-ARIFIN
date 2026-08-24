@@ -119,6 +119,27 @@ export const state = {
     }
 };
 
+// Garbage collection cleanup for cache (every 1 hour)
+setInterval(() => {
+    try {
+        console.log('[SYSTEM] Performing memory cleanup for snmpDataCache...');
+        const now = Date.now();
+        let cleaned = 0;
+        // Hapus cache yang usianya sudah lebih dari 10 menit
+        for (const [key, value] of Object.entries(state.snmpDataCache)) {
+            if (value && value._timestamp && (now - value._timestamp > 10 * 60 * 1000)) {
+                delete state.snmpDataCache[key];
+                cleaned++;
+            }
+        }
+        if (cleaned > 0) {
+            console.log(`[SYSTEM] Cleaned ${cleaned} stale items from snmpDataCache`);
+        }
+    } catch (e) {
+        // ignore
+    }
+}, 60 * 60 * 1000);
+
 
 
 
@@ -128,41 +149,57 @@ async function collectEquipmentData() {
         const networkUtils = require('./utils/network');
         const fetchAndParseData = networkUtils.fetchAndParseData;
         console.log('[SCHEDULER] Starting equipment data collection (direct connect)...');
-        const allEquipment = await db.getAllEquipment({ limit: 10000 });
-        const equipmentList = allEquipment.data || allEquipment;
+        
+        let page = 1;
+        const limit = 200; // Chunking to save RAM
+        let hasMore = true;
 
-        for (const item of equipmentList) {
-            // Only process active equipment
-            const isActive = item.isActive === true || item.isActive === 'true' || item.is_active === 1 || item.is_active === '1' || item.is_active === true;
-            if (!isActive) continue;
+        while (hasMore) {
+            const allEquipment = await db.getAllEquipment({ limit, page });
+            const equipmentList = allEquipment.data || allEquipment;
+            
+            if (!equipmentList || equipmentList.length === 0) {
+                hasMore = false;
+                break;
+            }
 
-            const config = item.snmpConfig || item.snmp_config;
+            for (const item of equipmentList) {
+                // Only process active equipment
+                const isActive = item.isActive === true || item.isActive === 'true' || item.is_active === 1 || item.is_active === '1' || item.is_active === true;
+                if (!isActive) continue;
 
-            try {
-                const { parsedData, status, triggeredParameters, isProcessed } = await fetchAndParseData(item);
+                const config = item.snmpConfig || item.snmp_config;
 
-                // Only update status and logs if we actually had sources to monitor
-                if (isProcessed) {
-                    // Status is now handled by the watchdog consolidation
-                    // await equipmentService.updateEquipmentStatus(item.id, status);
-                    await equipmentService.saveToLogs(
-                        item.id,
-                        {
-                            ...parsedData,
-                            triggeredParameters: triggeredParameters || [],
-                            _ip: parsedData._ip || (parsedData._sources && parsedData._sources[0]?.ip)
-                        },
-                        config?.templateId || 'ping_monitor',
-                        status
-                    );
-                }
-            } catch (err: any) {
-                console.error(`[SCHEDULER] Error for ${item.name}:`, err.message);
-                // If it's a critical failure for a monitored device, mark as Disconnect
-                if (config?.enabled) {
-                    await db.updateEquipmentStatus(item.id, 'Disconnect');
+                try {
+                    const { parsedData, status, triggeredParameters, isProcessed } = await fetchAndParseData(item);
+
+                    // Only update status and logs if we actually had sources to monitor
+                    if (isProcessed) {
+                        // Status is now handled by the watchdog consolidation
+                        // await equipmentService.updateEquipmentStatus(item.id, status);
+                        await equipmentService.saveToLogs(
+                            item.id,
+                            {
+                                ...parsedData,
+                                triggeredParameters: triggeredParameters || [],
+                                _ip: parsedData._ip || (parsedData._sources && parsedData._sources[0]?.ip)
+                            },
+                            config?.templateId || 'ping_monitor',
+                            status
+                        );
+                    }
+                } catch (err: any) {
+                    console.error(`[SCHEDULER] Error for ${item.name}:`, err.message);
+                    // If it's a critical failure for a monitored device, mark as Disconnect
+                    if (config?.enabled) {
+                        await db.updateEquipmentStatus(item.id, 'Disconnect');
+                    }
                 }
             }
+            
+            // Allow garbage collection to breathe between chunks
+            await new Promise(resolve => setTimeout(resolve, 50));
+            page++;
         }
 
     } catch (error) {
@@ -197,51 +234,67 @@ async function checkEquipmentWatchdog() {
             return;
         }
 
-        console.log('[WATCHDOG] Checking for timed-out equipment and partial failures...');
-        const result = await db.getAllEquipment({ includeData: true, isActive: true });
-        const equipmentList = result.data || [];
+        console.log('[WATCHDOG] Checking for timed-out equipment and partial failures (batched)...');
+        
+        let page = 1;
+        const limit = 200; // Process in chunks to save memory
+        let hasMore = true;
         const now = Date.now();
         const TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes
 
-        for (const item of equipmentList) {
-            let finalStatus = item.status || 'Normal';
+        while (hasMore) {
+            const result = await db.getAllEquipment({ includeData: true, isActive: true, limit, page });
+            const equipmentList = result.data || [];
+            
+            if (equipmentList.length === 0) {
+                hasMore = false;
+                break;
+            }
 
-            if (item.lastData) {
-                const sourceNames = Object.keys(item.lastData);
-                const sourceStatuses = sourceNames.map(name => {
-                    const src = item.lastData[name];
-                    const age = now - new Date(src._logged_at).getTime();
-                    // Each source has its own age check
-                    if (age > TIMEOUT_MS) return 'Disconnect';
-                    return src._status || 'Normal';
-                });
+            for (const item of equipmentList) {
+                let finalStatus = item.status || 'Normal';
 
-                // Rule-based consolidation
-                if (sourceStatuses.length > 0) {
-                    const lowerStatuses = sourceStatuses.map(s => String(s).toLowerCase());
-                    if (lowerStatuses.some(s => s === 'alert' || s === 'alarm' || s === 'fail' || s === 'critical')) {
-                        finalStatus = 'Alert';
-                    } else if (lowerStatuses.some(s => s === 'warning')) {
-                        finalStatus = 'Warning';
-                    } else if (lowerStatuses.every(s => s === 'disconnect' || s === 'offline')) {
-                        finalStatus = 'Disconnect';
-                    } else if (lowerStatuses.some(s => s === 'disconnect' || s === 'offline')) {
-                        finalStatus = 'Warning';
-                    } else {
-                        finalStatus = 'Normal';
+                if (item.lastData) {
+                    const sourceNames = Object.keys(item.lastData);
+                    const sourceStatuses = sourceNames.map(name => {
+                        const src = item.lastData[name];
+                        const age = now - new Date(src._logged_at).getTime();
+                        // Each source has its own age check
+                        if (age > TIMEOUT_MS) return 'Disconnect';
+                        return src._status || 'Normal';
+                    });
+
+                    // Rule-based consolidation
+                    if (sourceStatuses.length > 0) {
+                        const lowerStatuses = sourceStatuses.map(s => String(s).toLowerCase());
+                        if (lowerStatuses.some(s => s === 'alert' || s === 'alarm' || s === 'fail' || s === 'critical')) {
+                            finalStatus = 'Alert';
+                        } else if (lowerStatuses.some(s => s === 'warning')) {
+                            finalStatus = 'Warning';
+                        } else if (lowerStatuses.every(s => s === 'disconnect' || s === 'offline')) {
+                            finalStatus = 'Disconnect';
+                        } else if (lowerStatuses.some(s => s === 'disconnect' || s === 'offline')) {
+                            finalStatus = 'Warning';
+                        } else {
+                            finalStatus = 'Normal';
+                        }
                     }
+                } else if (item.lastUpdate) {
+                    // Fallback for equipment without grouped data
+                    const lastUpdate = new Date(item.lastUpdate).getTime();
+                    if (now - lastUpdate > TIMEOUT_MS) finalStatus = 'Disconnect';
                 }
-            } else if (item.lastUpdate) {
-                // Fallback for equipment without grouped data
-                const lastUpdate = new Date(item.lastUpdate).getTime();
-                if (now - lastUpdate > TIMEOUT_MS) finalStatus = 'Disconnect';
-            }
 
-            // Update only if status changed
-            if (item.status !== finalStatus) {
-                console.log(`[WATCHDOG] Equipment ${item.name} status changed: ${item.status} -> ${finalStatus}`);
-                await equipmentService.updateEquipmentStatus(item.id, finalStatus);
+                // Update only if status changed
+                if (item.status !== finalStatus) {
+                    console.log(`[WATCHDOG] Equipment ${item.name} status changed: ${item.status} -> ${finalStatus}`);
+                    await equipmentService.updateEquipmentStatus(item.id, finalStatus);
+                }
             }
+            
+            // Allow garbage collection to breathe between chunks
+            await new Promise(resolve => setTimeout(resolve, 50));
+            page++;
         }
     } catch (error) {
         console.error('[WATCHDOG] Error:', error);

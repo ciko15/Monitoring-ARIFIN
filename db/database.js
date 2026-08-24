@@ -383,7 +383,9 @@ async function syncEquipmentLogsFromDisk(force = false) {
     }
 
     try {
-      equipmentLogsDB = JSON.parse(data);
+      const parsedData = JSON.parse(data);
+      // Cap at 2000 items to prevent RAM exhaustion
+      equipmentLogsDB = Array.isArray(parsedData) ? parsedData.slice(-2000) : [];
       rebuildLatestEquipmentData();
     } catch (parseErr) {
       console.error(`[DB] JSON Parse error in equipment_logs.json: ${parseErr.message}`);
