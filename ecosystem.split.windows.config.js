@@ -81,9 +81,10 @@ module.exports = {
         PORT: 3100,
         SERVICE_ROLE: 'web'
       },
-      error_file: './logs/pm2-web-error.log',
-      out_file: './logs/pm2-web-out.log',
-      log_file: './logs/pm2-web-combined.log',
+      error_file: 'NUL',
+      out_file: 'NUL',
+      log_file: 'NUL',
+      merge_logs: false,
       time: true
     },
     {
@@ -100,9 +101,10 @@ module.exports = {
         ...commonEnv,
         SERVICE_ROLE: 'collector'
       },
-      error_file: './logs/pm2-collector-error.log',
-      out_file: './logs/pm2-collector-out.log',
-      log_file: './logs/pm2-collector-combined.log',
+      error_file: 'NUL',
+      out_file: 'NUL',
+      log_file: 'NUL',
+      merge_logs: false,
       time: true
     },
     {
@@ -119,9 +121,10 @@ module.exports = {
         ...commonEnv,
         SERVICE_ROLE: 'processor'
       },
-      error_file: './logs/pm2-processor-error.log',
-      out_file: './logs/pm2-processor-out.log',
-      log_file: './logs/pm2-processor-combined.log',
+      error_file: 'NUL',
+      out_file: 'NUL',
+      log_file: 'NUL',
+      merge_logs: false,
       time: true
     }
   ]
