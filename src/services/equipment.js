@@ -309,13 +309,11 @@ class EquipmentService {
                 this.telemetryCache.set(cacheKey, cache);
             }
 
-            // Agar UI frontend cabang tidak berubah-ubah/berkedip (hilang timbul), 
-            // JANGAN pernah menghapus data lama meskipun statusnya Disconnect/Error.
-            // Biarkan statusnya menjadi Disconnect, tapi nilai (angka) terakhir tetap dipertahankan.
-            if (finalStatus !== 'Disconnect' && finalStatus !== 'Error') {
-                // Gunakan Deep Merge agar data lama berkedalaman tingkat 2+ (misal radios/array) tidak hilang tertimpa
-                cache.mergedData = deepMerge({}, cache.mergedData, (parsedData.data || {}));
-            }
+            // Karena LKGV (Last Known Good Value) dan konversi garis putus-putus (-) 
+            // sekarang ditangani secara terpusat di network_listener.js (_handleLogOutput),
+            // kita harus selalu melakukan merge agar EMS/DB menerima garis putus-putus tersebut
+            // setelah threshold 2 menit terlewati.
+            cache.mergedData = deepMerge({}, cache.mergedData, (parsedData.data || {}));
 
             // Injeksi source_name selalu, meskipun statusnya Disconnect, agar nama baru tetap terkirim ke EMS
             if (parsedData.source_name) {

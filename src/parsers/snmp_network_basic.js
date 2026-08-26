@@ -320,6 +320,8 @@ async function pollSNMP(host, community = 'public', options = {}) {
     }
 }
 
+const lastKnownSnmpData = new Map();
+
 async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 15000) {
     if (typeof options === 'number') {
         timeoutMs = options;
@@ -331,41 +333,26 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
 
     return new Promise((resolve) => {
         const timer = setTimeout(() => {
+            const prev = lastKnownSnmpData.get(host);
+            const fallbackData = prev ? { ...prev, connectivity: 'Disconnected' } : {
+                connectivity: 'Disconnected',
+                resolved_ip: host,
+                sys_name: '—', sys_descr: '—', hardware: '—', operating_system: '—', sys_object_id: '—',
+                sys_contact: '—', sys_uptime: '—', sys_location: '—', interface_count: '—',
+                active_interface_count: '—', down_interface_count: '—',
+                active_interfaces_summary: '—', down_interfaces_summary: '—',
+                active_interfaces: [], down_interfaces: [], processor_count: '—',
+                top_interface_name: '—', top_interface_status: '—', top_interface_in_octets: '—',
+                top_interface_out_octets: '—', temperature_c: '—', temperature_sensor_name: '—',
+                temperature_sensor_count: '—', temperature_sensors: [], cpu_usage: '—',
+                ram_usage_pct: '—', disk_usage_pct: '—',
+            };
+
             resolve({
                 success: false,
                 status: 'Disconnect',
                 error: `SNMP timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
-                data: {
-                    connectivity: 'Disconnected',
-                    resolved_ip: host,
-                    sys_name: '—',
-                    sys_descr: '—',
-                    hardware: '—',
-                    operating_system: '—',
-                    sys_object_id: '—',
-                    sys_contact: '—',
-                    sys_uptime: '—',
-                    sys_location: '—',
-                    interface_count: '—',
-                    active_interface_count: '—',
-                    down_interface_count: '—',
-                    active_interfaces_summary: '—',
-                    down_interfaces_summary: '—',
-                    active_interfaces: [],
-                    down_interfaces: [],
-                    processor_count: '—',
-                    top_interface_name: '—',
-                    top_interface_status: '—',
-                    top_interface_in_octets: '—',
-                    top_interface_out_octets: '—',
-                    temperature_c: '—',
-                    temperature_sensor_name: '—',
-                    temperature_sensor_count: '—',
-                    temperature_sensors: [],
-                    cpu_usage: '—',
-                    ram_usage_pct: '—',
-                    disk_usage_pct: '—',
-                },
+                data: fallbackData,
                 timestamp: new Date().toISOString(),
             });
         }, effectiveTimeoutMs);
@@ -373,45 +360,33 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
         pollSNMP(host, community, snmpOptions)
             .then((result) => {
                 clearTimeout(timer);
+                if (result.success && result.data) {
+                    lastKnownSnmpData.set(host, result.data);
+                }
                 resolve(result);
             })
             .catch((err) => {
                 clearTimeout(timer);
+                const prev = lastKnownSnmpData.get(host);
+                const fallbackData = prev ? { ...prev, connectivity: 'Disconnected' } : {
+                    connectivity: 'Disconnected',
+                    resolved_ip: host,
+                    sys_name: '—', sys_descr: '—', hardware: '—', operating_system: '—', sys_object_id: '—',
+                    sys_contact: '—', sys_uptime: '—', sys_location: '—', interface_count: '—',
+                    active_interface_count: '—', down_interface_count: '—',
+                    active_interfaces_summary: '—', down_interfaces_summary: '—',
+                    active_interfaces: [], down_interfaces: [], processor_count: '—',
+                    top_interface_name: '—', top_interface_status: '—', top_interface_in_octets: '—',
+                    top_interface_out_octets: '—', temperature_c: '—', temperature_sensor_name: '—',
+                    temperature_sensor_count: '—', temperature_sensors: [], cpu_usage: '—',
+                    ram_usage_pct: '—', disk_usage_pct: '—',
+                };
+
                 resolve({
                     success: false,
                     status: 'Disconnect',
                     error: err.message,
-                    data: {
-                        connectivity: 'Disconnected',
-                        resolved_ip: host,
-                        sys_name: '—',
-                        sys_descr: '—',
-                        hardware: '—',
-                        operating_system: '—',
-                        sys_object_id: '—',
-                        sys_contact: '—',
-                        sys_uptime: '—',
-                        sys_location: '—',
-                        interface_count: '—',
-                        active_interface_count: '—',
-                        down_interface_count: '—',
-                        active_interfaces_summary: '—',
-                        down_interfaces_summary: '—',
-                        active_interfaces: [],
-                        down_interfaces: [],
-                        processor_count: '—',
-                        top_interface_name: '—',
-                        top_interface_status: '—',
-                        top_interface_in_octets: '—',
-                        top_interface_out_octets: '—',
-                        temperature_c: '—',
-                        temperature_sensor_name: '—',
-                        temperature_sensor_count: '—',
-                        temperature_sensors: [],
-                        cpu_usage: '—',
-                        ram_usage_pct: '—',
-                        disk_usage_pct: '—',
-                    },
+                    data: fallbackData,
                     timestamp: new Date().toISOString(),
                 });
             });

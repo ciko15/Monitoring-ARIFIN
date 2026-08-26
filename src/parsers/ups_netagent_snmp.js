@@ -361,6 +361,8 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
     }
 }
 
+const lastKnownUpsData = new Map();
+
 // Wrapper dengan timeout untuk mencegah hang
 async function pollUPSNetagentWithTimeout(host, community = 'public', options = {}, timeoutMs = 40000) {
     if (typeof options === 'number') {
@@ -372,23 +374,18 @@ async function pollUPSNetagentWithTimeout(host, community = 'public', options = 
 
     return new Promise((resolve) => {
         const timer = setTimeout(() => {
+            const prev = lastKnownUpsData.get(host);
+            const fallbackData = prev ? { ...prev, connectivity: 'Disconnected' } : {
+                connectivity: 'Disconnected', sys_descr: '—', sys_name: '—', battery_status: '—',
+                battery_capacity_pct: '—', battery_minutes_remaining: '—', battery_voltage: '—',
+                input_voltage: '—', output_voltage: '—', output_current_ampere: '—', output_load_pct: '—'
+            };
+            
             resolve({
                 success: false,
                 status: 'Disconnect',
                 error: `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
-                data: {
-                    connectivity: 'Disconnected',
-                    sys_descr: '—',
-                    sys_name: '—',
-                    battery_status: '—',
-                    battery_capacity_pct: '—',
-                    battery_minutes_remaining: '—',
-                    battery_voltage: '—',
-                    input_voltage: '—',
-                    output_voltage: '—',
-                    output_current_ampere: '—',
-                    output_load_pct: '—'
-                },
+                data: fallbackData,
                 alarms: [],
                 warnings: [],
                 triggeredParams: [],
@@ -398,26 +395,24 @@ async function pollUPSNetagentWithTimeout(host, community = 'public', options = 
 
         pollUPSNetagent(host, community, options).then(result => {
             clearTimeout(timer);
+            if (result.success && result.data) {
+                lastKnownUpsData.set(host, result.data);
+            }
             resolve(result);
         }).catch(err => {
             clearTimeout(timer);
+            const prev = lastKnownUpsData.get(host);
+            const fallbackData = prev ? { ...prev, connectivity: 'Disconnected' } : {
+                connectivity: 'Disconnected', sys_descr: '—', sys_name: '—', battery_status: '—',
+                battery_capacity_pct: '—', battery_minutes_remaining: '—', battery_voltage: '—',
+                input_voltage: '—', output_voltage: '—', output_current_ampere: '—', output_load_pct: '—'
+            };
+            
             resolve({
                 success: false,
                 status: 'Disconnect',
                 error: err.message,
-                data: {
-                    connectivity: 'Disconnected',
-                    sys_descr: '—',
-                    sys_name: '—',
-                    battery_status: '—',
-                    battery_capacity_pct: '—',
-                    battery_minutes_remaining: '—',
-                    battery_voltage: '—',
-                    input_voltage: '—',
-                    output_voltage: '—',
-                    output_current_ampere: '—',
-                    output_load_pct: '—'
-                },
+                data: fallbackData,
                 alarms: [],
                 warnings: [],
                 triggeredParams: [],

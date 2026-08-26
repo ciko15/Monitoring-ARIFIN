@@ -89,6 +89,27 @@ class NetworkListenerService {
 
         const finalStatus = decision.status;
 
+        // LKGV (Last Known Good Value) & Dash Conversion
+        if (!this._lkgvCache) this._lkgvCache = new Map();
+        const isDisconnect = String(finalStatus || '').toLowerCase() === 'disconnect' || String(finalStatus || '').toLowerCase() === 'error';
+        
+        if (!isDisconnect && parsedData && parsedData.data) {
+            // Simpan data terakhir yang sukses ke dalam cache
+            this._lkgvCache.set(source.id, JSON.parse(JSON.stringify(parsedData.data)));
+        } else if (isDisconnect && parsedData) {
+            // Karena statusGate sudah menahan emit selama 2 menit, jika sampai di sini berarti sudah fix Disconnect.
+            // Ubah semua nilai menjadi garis putus-putus (-) berdasarkan bentuk data terakhir.
+            const prevData = this._lkgvCache.get(source.id);
+            if (prevData) {
+                const dashData = {};
+                for (const key of Object.keys(prevData)) {
+                    dashData[key] = '—';
+                }
+                dashData.connectivity = 'Disconnected';
+                parsedData.data = { ...parsedData.data, ...dashData };
+            }
+        }
+
         if (this._isSplitCollectorMode()) {
             await this.rawEventQueue.enqueue({
                 type: 'parsed',

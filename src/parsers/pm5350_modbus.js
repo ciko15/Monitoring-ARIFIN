@@ -41,8 +41,25 @@ async function pollPM5350(host, port = 26, slaveId = 5, timeoutMs = 4000) {
 
         const FREQ = await readFloat32(3110);
         const KW = await readFloat32(3060);
-        const KVA = await readFloat32(3068);
-        const PF = await readFloat32(3192);
+        const KVAR = await readFloat32(3068); // 3068 adalah Total Reactive Power
+        const KVA = await readFloat32(3076);  // 3076 adalah Total Apparent Power
+        let PF = await readFloat32(3192);
+
+        // Hitung manual PF dari KW / KVAR (Rumus 3-Phase Pythagoras: S = √(P² + Q²))
+        if (KW != null && KVAR != null) {
+            const P = KW;
+            const Q = KVAR;
+            const absP = Math.abs(P);
+            const calcApparentPower = Math.sqrt(Math.pow(P, 2) + Math.pow(Q, 2));
+            if (calcApparentPower > 0.001) {
+                PF = absP / calcApparentPower;
+            }
+        } else if (KVA && Math.abs(KVA) > 0.001 && KW != null) {
+            PF = Math.abs(KW) / KVA;
+        }
+
+        if (PF > 1) PF = 1;
+        if (PF < 0) PF = 0;
 
         client.close();
 
@@ -78,6 +95,7 @@ async function pollPM5350(host, port = 26, slaveId = 5, timeoutMs = 4000) {
                 V_TR: V_TR.toFixed(2),
                 FREQ: FREQ.toFixed(2),
                 KW: KW.toFixed(3),
+                KVAR: KVAR.toFixed(3),
                 KVA: KVA.toFixed(3),
                 PF: PF.toFixed(3)
             },
