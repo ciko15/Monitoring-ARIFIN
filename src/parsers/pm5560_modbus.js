@@ -143,15 +143,28 @@ class Pm5560ModbusParser extends BaseParser {
                 return { success: false, error: 'Menunggu data', status: 'Waiting', _mode: this._mode };
             }
 
-            // Hitung manual PF dari KW / KVA jika tersedia untuk menghindari anomali dari sensor
+            // Hitung manual PF dari KW / KVAR (Rumus 3-Phase Pythagoras: S = √(P² + Q²)) seperti di UPS
             const originalPF = this._last.PF;
             
-            if (this._last.KVA && Math.abs(this._last.KVA) > 0.001 && this._last.KW != null) {
-                this._last.PF = this._last.KW / this._last.KVA;
+            if (this._last.KW != null && this._last.KVAR != null) {
+                const P = this._last.KW;
+                const Q = this._last.KVAR;
+                
+                // Gunakan nilai Absolut agar CT terbalik tidak membuat hasil jadi minus
+                const absP = Math.abs(P);
+                const calcApparentPower = Math.sqrt(Math.pow(P, 2) + Math.pow(Q, 2));
+                
+                if (calcApparentPower > 0.001) {
+                    this._last.PF = absP / calcApparentPower;
+                }
+            } else if (this._last.KVA && Math.abs(this._last.KVA) > 0.001 && this._last.KW != null) {
+                // Fallback jika tidak ada KVAR
+                this._last.PF = Math.abs(this._last.KW) / this._last.KVA;
             }
+
             if (this._last.PF != null) {
                 if (this._last.PF > 1) this._last.PF = 1;
-                if (this._last.PF < -1) this._last.PF = -1;
+                if (this._last.PF < 0) this._last.PF = 0; // Maksimal 1, Minimal 0
             }
 
             const d = this._last;
