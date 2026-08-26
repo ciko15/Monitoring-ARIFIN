@@ -88,13 +88,22 @@ class NetworkListenerService {
         }
 
         const finalStatus = decision.status;
+        const isFrozen = decision.reason === 'Frozen (Pending Disconnect)';
 
         // LKGV (Last Known Good Value) & Dash Conversion
         if (!this._lkgvCache) this._lkgvCache = new Map();
         const isDisconnect = String(finalStatus || '').toLowerCase() === 'disconnect' || String(finalStatus || '').toLowerCase() === 'error';
         
-        if (!isDisconnect && parsedData && parsedData.data) {
-            // Simpan data terakhir yang sukses ke dalam cache
+        if (isFrozen) {
+            // Jika sedang dibekukan (karena aslinya Disconnect tapi belum 2 menit), 
+            // JANGAN simpan data kosong/putus-putus dari parser ke cache.
+            // Sebaliknya, kembalikan data asli dari cache agar UI tetap melihat angka terakhir.
+            const prevData = this._lkgvCache.get(source.id);
+            if (prevData && parsedData) {
+                parsedData.data = JSON.parse(JSON.stringify(prevData));
+            }
+        } else if (!isDisconnect && parsedData && parsedData.data) {
+            // Simpan data terakhir yang SUKSES BENERAN ke dalam cache
             this._lkgvCache.set(source.id, JSON.parse(JSON.stringify(parsedData.data)));
         } else if (isDisconnect && parsedData) {
             // Karena statusGate sudah menahan emit selama 2 menit, jika sampai di sini berarti sudah fix Disconnect.
