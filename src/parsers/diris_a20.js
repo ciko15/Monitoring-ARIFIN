@@ -171,15 +171,14 @@ class DirisA20Parser extends BaseParser {
     }
 
     getPollRequests() {
-        // Read 32 registers. Send both 0xC551 (50513) and 0xC552 (50514) to handle 0-indexed and 1-indexed devices.
-        // Jika ada SCADA lain (RS485 Master), request ini mungkin tabrakan, tapi kita akan tetap menangkap response SCADA.
-        return [
-            { key: 'main_0', bytes: Buffer.from([0x01, 0x03, 0xC5, 0x51, 0x00, 0x20, 0x29, 0x0F]) },
-            { key: 'main_1', bytes: Buffer.from([0x01, 0x03, 0xC5, 0x52, 0x00, 0x20, 0xD9, 0x0F]) }
-        ];
+        // Read 32 registers starting from 0xC552 (50514). Slave ID = 1.
+        return [{
+            key: 'main',
+            bytes: Buffer.from([0x01, 0x03, 0xC5, 0x52, 0x00, 0x20, 0xD9, 0x0F])
+        }];
     }
 }
 
 module.exports = DirisA20Parser;
-module.exports.POLL_INTERVAL = 30000;
-module.exports.POLL_REQ_DELAY = 1000;
+module.exports.POLL_INTERVAL = 15000;
+module.exports.POLL_REQ_DELAY = 200;

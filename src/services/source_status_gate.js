@@ -12,7 +12,7 @@ function normalizeStatus(status) {
     const value = String(status || 'Normal').trim();
     const lower = value.toLowerCase();
 
-    if (lower === 'disconnected' || lower === 'disconnect' || lower === 'offline') {
+    if (lower === 'disconnected' || lower === 'disconnect' || lower === 'offline' || lower === 'error') {
         return 'Disconnect';
     }
 
