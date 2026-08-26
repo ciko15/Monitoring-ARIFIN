@@ -338,6 +338,7 @@ class NetworkListenerService {
         let socket = null;
         let reconnectTimer = null;
         let stopped = false;
+        let lastReceivedTime = 0;
 
         const connect = () => {
             if (stopped) return;
@@ -356,6 +357,7 @@ class NetworkListenerService {
 
             // Forward chunk langsung ke parser — tanpa buffering tambahan
             socket.on('data', async (chunk) => {
+                lastReceivedTime = Date.now();
                 await this.handleIncomingData(source, chunk, parser);
             });
 
@@ -383,6 +385,11 @@ class NetworkListenerService {
         let pollTimer = null;
 
         const doPoll = async () => {
+            if (lastReceivedTime > 0 && (Date.now() - lastReceivedTime < 25000)) {
+                // If we received data in the last 25 seconds (sniffed from SCADA), skip active polling to avoid RS485 collision!
+                return;
+            }
+
             const s = socket;
             if (!s || s.destroyed) return;
             const requests = parser.getPollRequests();

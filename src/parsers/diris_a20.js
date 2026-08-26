@@ -1,7 +1,6 @@
 const BaseParser = require('./base');
 
 const LABELS = [
-    { Name: "V_UNUSED", Unit: "", Scale: 1 },
     { Name: "VL12", Unit: "V", Scale: 100 },
     { Name: "VL23", Unit: "V", Scale: 100 },
     { Name: "VL31", Unit: "V", Scale: 100 },
@@ -16,7 +15,8 @@ const LABELS = [
     { Name: "KW", Unit: "kW", Scale: 100 },
     { Name: "KVAR", Unit: "kVAR", Scale: 100 },
     { Name: "KVA", Unit: "kVA", Scale: 100 },
-    { Name: "PF_Meter", Unit: "", Scale: 1000 }
+    { Name: "PF_Meter", Unit: "", Scale: 1000 },
+    { Name: "Phase1_PF", Unit: "", Scale: 1000 }
 ];
 
 function getModbusCRC16(buffer) {
@@ -181,5 +181,5 @@ class DirisA20Parser extends BaseParser {
 }
 
 module.exports = DirisA20Parser;
-module.exports.POLL_INTERVAL = 120000;
+module.exports.POLL_INTERVAL = 30000;
 module.exports.POLL_REQ_DELAY = 1000;
