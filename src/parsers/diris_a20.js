@@ -143,6 +143,16 @@ class DirisA20Parser extends BaseParser {
     reset() {
         this._buf = Buffer.alloc(0);
     }
+
+    getPollRequests() {
+        // Read 32 registers starting from 0xC552 (50514). Slave ID = 1.
+        return [{
+            key: 'main',
+            bytes: Buffer.from([0x01, 0x03, 0xC5, 0x52, 0x00, 0x20, 0xD9, 0x0F])
+        }];
+    }
 }
 
 module.exports = DirisA20Parser;
+module.exports.POLL_INTERVAL = 15000;
+module.exports.POLL_REQ_DELAY = 200;

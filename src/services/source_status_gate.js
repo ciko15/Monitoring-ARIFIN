@@ -93,7 +93,7 @@ class SourceStatusGate {
                 status: null,
                 failCount: 0,
                 successCount: 0,
-                lastStatusChangedAt: null,
+                lastStatusChangedAt: now,
                 lastDisconnectSentAt: 0,
                 lastTelemetrySentAt: 0,
                 lastSuccessAt: null
@@ -105,7 +105,8 @@ class SourceStatusGate {
             state.failCount += 1;
             state.successCount = 0;
 
-            const timeSinceLastSuccess = state.lastSuccessAt ? (now - state.lastSuccessAt) : 0;
+            // If it never succeeded, calculate time since the state was created (startup)
+            const timeSinceLastSuccess = state.lastSuccessAt ? (now - state.lastSuccessAt) : (now - state.lastStatusChangedAt);
 
             if (confirmDisconnect && state.status !== null && state.status !== 'Disconnect' && timeSinceLastSuccess < 120000) {
                 return {

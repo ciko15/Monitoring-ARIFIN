@@ -1275,8 +1275,8 @@ class NetworkListenerService {
             return;
         }
 
-        // Modbus TCP parsers (PM5560, Datakom D700) — dedicated raw TCP handler
-        if (moduleName === 'pm5560_modbus') {
+        // Modbus TCP parsers (PM5560, Datakom D700, Diris A20) — dedicated raw TCP handler
+        if (moduleName === 'pm5560_modbus' || moduleName === 'diris_a20') {
             this.startModbusTcpListener(source, moduleName);
             return;
         }
@@ -1292,7 +1292,7 @@ class NetworkListenerService {
         }
 
         // ILS GP / LLZ — binary streaming TCP, bypass SOH/STX/ETX buffering
-        if (moduleName === 'ils_gp_thales421' || moduleName === 'ils_llz_thales421' || moduleName === 'ils_gp_normac' || moduleName === 'ils_gp_normac7030' || moduleName === 'ils_llz_normac' || moduleName === 'ils_llz_normac7030' || moduleName === 'diris_a20') {
+        if (moduleName === 'ils_gp_thales421' || moduleName === 'ils_llz_thales421' || moduleName === 'ils_gp_normac' || moduleName === 'ils_gp_normac7030' || moduleName === 'ils_llz_normac' || moduleName === 'ils_llz_normac7030') {
             console.log(`[LLZ-TRACE] Routing ${source.name} to startBinaryTcpListener`);
             this.startBinaryTcpListener(source);
             return;
