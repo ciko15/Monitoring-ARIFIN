@@ -215,15 +215,14 @@ class EquipmentService {
             const connTest = await connectionManager.testConnection(host, port);
 
             if (!connTest.success) {
-                await this.updateEquipmentStatus(equipmentId, 'Disconnect', connTest.message);
+                // DO NOT update status here, let network_listener.js handle it to respect the 2-minute rule
                 return { success: false, error: connTest.message, connectionStatus: 'Disconnect' };
             }
 
-            // Update status to connected
-            await this.updateEquipmentStatus(equipmentId, 'Normal', null, 'Connected');
-
+            // DO NOT update status to connected here, because Ping success doesn't guarantee Parser success.
+            // Let network_listener.js update the status upon actual successful data collection.
+            
             // TODO: Actual SNMP polling would happen here using the resolved template
-
             return {
                 success: true,
                 connectionStatus: 'Connected',
