@@ -1,22 +1,22 @@
 const BaseParser = require('./base');
 
 const LABELS = [
-    { Name: "const_id", Unit: "", Scale: 1 },
-    { Name: "VLL_RS", Unit: "V", Scale: 100 },
-    { Name: "VLL_ST", Unit: "V", Scale: 100 },
-    { Name: "VLL_TR", Unit: "V", Scale: 100 },
-    { Name: "VLN_R", Unit: "V", Scale: 100 },
-    { Name: "VLN_S", Unit: "V", Scale: 100 },
-    { Name: "VLN_T", Unit: "V", Scale: 100 },
-    { Name: "Freq", Unit: "Hz", Scale: 100 },
-    { Name: "ArusR", Unit: "A", Scale: 1000 },
-    { Name: "ArusS", Unit: "A", Scale: 1000 },
-    { Name: "ArusT", Unit: "A", Scale: 1000 },
-    { Name: "reg11", Unit: "", Scale: 100 },
-    { Name: "reg12", Unit: "", Scale: 100 },
-    { Name: "reg13", Unit: "", Scale: 100 },
-    { Name: "reg14", Unit: "", Scale: 100 },
-    { Name: "PF", Unit: "", Scale: 1000 }
+    { Name: "V_UNUSED", Unit: "", Scale: 1 },
+    { Name: "VL12", Unit: "V", Scale: 100 },
+    { Name: "VL23", Unit: "V", Scale: 100 },
+    { Name: "VL31", Unit: "V", Scale: 100 },
+    { Name: "VL1N", Unit: "V", Scale: 100 },
+    { Name: "VL2N", Unit: "V", Scale: 100 },
+    { Name: "VL3N", Unit: "V", Scale: 100 },
+    { Name: "HZ", Unit: "Hz", Scale: 100 },
+    { Name: "IL1", Unit: "A", Scale: 1000 },
+    { Name: "IL2", Unit: "A", Scale: 1000 },
+    { Name: "IL3", Unit: "A", Scale: 1000 },
+    { Name: "IN", Unit: "A", Scale: 1000 },
+    { Name: "KW", Unit: "kW", Scale: 100 },
+    { Name: "KVAR", Unit: "kVAR", Scale: 100 },
+    { Name: "KVA", Unit: "kVA", Scale: 100 },
+    { Name: "PF_Meter", Unit: "", Scale: 1000 }
 ];
 
 function getModbusCRC16(buffer) {
@@ -117,11 +117,37 @@ class DirisA20Parser extends BaseParser {
                 // Get INT32 BE
                 const val = payload.readInt32BE(i);
                 const label = LABELS[i / 4];
-                if (label) {
+                if (label && label.Name !== "V_UNUSED") {
                     out[label.Name] = Number((val / label.Scale).toFixed(3));
                 }
             }
         }
+
+        // Hitung manual PF dari KW / KVAR (Rumus 3-Phase Pythagoras: S = √(P² + Q²))
+        if (out.KW != null && out.KVAR != null) {
+            const P = out.KW;
+            const Q = out.KVAR;
+            const absP = Math.abs(P);
+            const calcApparentPower = Math.sqrt(Math.pow(P, 2) + Math.pow(Q, 2));
+            
+            if (calcApparentPower > 0.001) {
+                out.PF = Number((absP / calcApparentPower).toFixed(3));
+            }
+        } else if (out.KVA && Math.abs(out.KVA) > 0.001 && out.KW != null) {
+            out.PF = Number((Math.abs(out.KW) / out.KVA).toFixed(3));
+        }
+
+        if (out.PF != null) {
+            if (out.PF > 1) out.PF = 1;
+            if (out.PF < 0) out.PF = 0;
+        }
+
+        // Calculate averages
+        const vlnV = [out.VL1N, out.VL2N, out.VL3N].filter(v => v != null);
+        const vllV = [out.VL12, out.VL23, out.VL31].filter(v => v != null);
+        out.VLN_avg = vlnV.length ? Number((vlnV.reduce((a, b) => a + b) / vlnV.length).toFixed(1)) : null;
+        out.VLL_avg = vllV.length ? Number((vllV.reduce((a, b) => a + b) / vllV.length).toFixed(1)) : null;
+
         return out;
     }
 

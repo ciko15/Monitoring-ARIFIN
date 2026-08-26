@@ -31,6 +31,7 @@
         'snmp_system': ['connectivity', 'sys_name', 'resolved_ip', 'hardware', 'operating_system', 'cpu_usage', 'physical_memory_usage_pct', 'disk_usage_pct', 'temperature_c'],
         'snmp_network_basic': ['connectivity', 'sys_name', 'resolved_ip', 'top_interface_name', 'top_interface_status', 'top_interface_in_octets', 'top_interface_out_octets', 'temperature_c'],
         'pm5560_modbus': ['VLN_avg', 'VLL_avg', 'HZ', 'PF', 'KW', 'KWH'],
+        'diris_a20': ['VLN_avg', 'VLL_avg', 'HZ', 'PF', 'KW', 'KVAR'],
         'pm5350_modbus': ['V_RN', 'V_SN', 'V_TN', 'V_RS', 'V_ST', 'V_TR', 'I_R', 'I_S', 'I_T', 'FREQ', 'KW', 'KVA', 'PF'],
         'ils_gp_thales421': ['GP_ANGLE', 'RF_POWER', 'DDM_COURSE', 'CARRIER_PWR', 'RF_OUT', 'MON_POWER'],
         'ils_llz_thales421': ['CRS_RF', 'WIDTH_RF', 'NF_RF', 'CRS_SDM', 'IDENT_AM', 'FREQ_DEV']
@@ -160,7 +161,7 @@
             return srcData[key];
         }
 
-        if (parserId === 'pm5560_modbus') {
+        if (parserId === 'pm5560_modbus' || parserId === 'diris_a20') {
             if (key === 'VLN_avg') {
                 return calcAverage([srcData.VL1N, srcData.VL2N, srcData.VL3N]);
             }
@@ -1325,7 +1326,7 @@
                     ['Boot Installed', data.boot_installed, info],
                 ]
             });
-        } else if (parserId === 'pm5560_modbus') {
+        } else if (parserId === 'pm5560_modbus' || parserId === 'diris_a20') {
             const sup = 'Power Meter';
             const fn = (v, d) => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(d) : '—';
             const vn = (v) => (v != null && !isNaN(parseFloat(v))) ? '#e8f4ff' : '#4a7a9a';
