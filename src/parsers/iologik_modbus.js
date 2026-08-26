@@ -31,6 +31,10 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
         }
         client.close();
 
+        if (diData.length === 0) {
+            throw new Error('Failed to read any Discrete Inputs from device (Timeout or Refused)');
+        }
+
         const data = { devices: {} };
         const alarms = [];
         const warnings = [];

@@ -312,7 +312,9 @@ class NetworkListenerService {
         const connect = () => {
             if (stopped) return;
             socket = new net.Socket();
-            socket.setTimeout(15000);
+            // Use dynamic timeout based on poll interval (add 15s padding)
+            const pollInterval = ParserModule.POLL_INTERVAL || 15000;
+            socket.setTimeout(pollInterval + 15000);
 
             socket.connect(port, ip_address, () => {
                 console.log(`[NetworkListener] PM5560 TCP connected: ${source.name} (${ip_address}:${port})`);
@@ -518,7 +520,10 @@ class NetworkListenerService {
         this.activeListeners.add(id);
         console.log(`[TempHumidity] Listener started: ${name} (${ip_address}:${port}, Slave ID: ${slaveId}, Poll: ${pollSec}s)`);
 
+        let isPolling = false;
         const doPoll = async () => {
+            if (isPolling) return;
+            isPolling = true;
             try {
                 const result = await pollTempHumidity(ip_address, port, slaveId);
                 const logStatus = result.status || 'Disconnect';
@@ -538,6 +543,8 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[TempHumidity] Poll error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         };
 
@@ -699,7 +706,10 @@ class NetworkListenerService {
         this.activeListeners.add(id);
         console.log(`[PM5350] Listener started: ${name} (${ip_address}:${port}, Slave ID: ${slaveId}, Poll: ${pollSec}s)`);
 
+        let isPolling = false;
         const doPoll = async () => {
+            if (isPolling) return;
+            isPolling = true;
             try {
                 const result = await pollPM5350(ip_address, port, slaveId);
                 await this._handleLogOutput(
@@ -729,8 +739,8 @@ class NetworkListenerService {
     // Moxa ioLogik 4000 (Modbus TCP)
     // ─────────────────────────────────────────────────────────────────────────
     startIologikModbusListener(source) {
-        const { id, name, ip_address, tcp_port, extra_config } = source;
-        const pollSec = 5;
+        const { id, name, ip_address, tcp_port, poll_interval, extra_config } = source;
+        const pollSec = parseInt(poll_interval) || 30; // Gunakan setting interval, default 30s
         const port = parseInt(tcp_port) || 502;
         let slaveId = 1;
         let devicesConfig = null;
@@ -746,9 +756,12 @@ class NetworkListenerService {
         const { pollIoLogik } = require('../parsers/iologik_modbus');
 
         this.activeListeners.add(id);
-        console.log(`[ioLogik] Listener started: ${name} (${ip_address}:${port})`);
+        console.log(`[ioLogik] Listener started: ${name} (${ip_address}:${port}, Poll: ${pollSec}s)`);
 
+        let isPolling = false;
         const doPoll = async () => {
+            if (isPolling) return;
+            isPolling = true;
             try {
                 const result = await pollIoLogik(ip_address, port, slaveId, devicesConfig);
                 if (result.error && result.data) {
@@ -762,6 +775,8 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[ioLogik] Poll error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         };
 
@@ -914,7 +929,10 @@ class NetworkListenerService {
         // Poll parser setiap pollSec detik — 1 source = 1 radio = 1 log entry
         // source name = src.name (nama source config) → jadi key lastData di frontend
         const pollMs = pollSec * 1000;
+        let isPolling = false;
         const pollTimer = setInterval(async () => {
+            if (isPolling) return;
+            isPolling = true;
             try {
                 const result = parser.parse(null);
                 if (!result.success || !result.data || !result.data.radios) return;
@@ -955,6 +973,8 @@ class NetworkListenerService {
                 console.log(`[NetworkListener] MARC RSE logged for ${name}`);
             } catch (err) {
                 console.error(`[NetworkListener] MARC RSE poll error for ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         }, pollMs);
 
@@ -996,7 +1016,10 @@ class NetworkListenerService {
         this.activeListeners.add(id);
 
         const pollMs = pollSec * 1000;
+        let isPolling = false;
         const pollTimer = setInterval(async () => {
+            if (isPolling) return;
+            isPolling = true;
             try {
                 const result = parser.parse(null);
                 if (!result.success || !result.data || !result.data.rses) return;
@@ -1048,6 +1071,8 @@ class NetworkListenerService {
                 }
             } catch (err) {
                 console.error(`[NetworkListener] MARC PAE Error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         }, pollMs);
         this._marcPaeTimers = this._marcPaeTimers || new Map();
@@ -1068,7 +1093,10 @@ class NetworkListenerService {
         this.activeListeners.add(id);
         console.log(`[Datakom D700] Listener started: ${name} (${ip_address}:${port}, Slave ID: ${slaveId})`);
 
+        let isPolling = false;
         const doPoll = async () => {
+            if (isPolling) return;
+            isPolling = true;
             try {
                 const result = await pollDatakomD700(ip_address, port, slaveId);
                 const logLine = `[Datakom D700] ${name}: status=${result.status}`;
@@ -1092,6 +1120,8 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[Datakom D700] Poll error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         };
 
@@ -1130,7 +1160,10 @@ class NetworkListenerService {
         this.activeListeners.add(id);
         console.log(`[DSE7320] Listener started: ${name} (${ip_address}:${port}, Slave ID: ${slaveId})`);
 
+        let isPolling = false;
         const doPoll = async () => {
+            if (isPolling) return;
+            isPolling = true;
             try {
                 const result = await pollDse7320(ip_address, port, slaveId);
                 const logLine = `[DSE7320] ${name}: status=${result.status}`;
@@ -1154,6 +1187,8 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[DSE7320] Poll error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
             }
         };
 
