@@ -37,6 +37,8 @@ function deepMerge(target, ...sources) {
     return deepMerge(target, ...sources);
 }
 
+const globalTelemetryCache = new Map();
+
 class EquipmentService {
     constructor(db) {
         this.db = db;
@@ -293,19 +295,15 @@ class EquipmentService {
             const finalStatus = gateDecision.status;
 
             // --- GLOBAL TELEMETRY MERGER & DEBOUNCER ---
-            if (!this.telemetryCache) {
-                this.telemetryCache = new Map();
-            }
-
             const cacheKey = `${equipmentId}:${sourceId}`;
-            let cache = this.telemetryCache.get(cacheKey);
+            let cache = globalTelemetryCache.get(cacheKey);
             if (!cache) {
                 cache = {
                     mergedData: {},
                     timer: null,
                     lastPublishedString: null
                 };
-                this.telemetryCache.set(cacheKey, cache);
+                globalTelemetryCache.set(cacheKey, cache);
             }
 
             // Karena LKGV (Last Known Good Value) dan konversi garis putus-putus (-) 
