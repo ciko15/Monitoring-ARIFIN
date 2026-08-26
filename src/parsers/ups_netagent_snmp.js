@@ -378,7 +378,13 @@ async function pollUPSNetagentWithTimeout(host, community = 'public', options = 
             const fallbackData = prev ? { ...prev, connectivity: 'Disconnected' } : {
                 connectivity: 'Disconnected', sys_descr: '—', sys_name: '—', battery_status: '—',
                 battery_capacity_pct: '—', battery_minutes_remaining: '—', battery_voltage: '—',
-                input_voltage: '—', output_voltage: '—', output_current_ampere: '—', output_load_pct: '—'
+                input_voltage: '—', output_voltage: '—', output_current_ampere: '—', output_load_pct: '—',
+                input_voltage_r: '—', input_voltage_s: '—', input_voltage_t: '—',
+                output_voltage_r: '—', output_voltage_s: '—', output_voltage_t: '—',
+                output_current_r: '—', output_current_s: '—', output_current_t: '—',
+                output_power_r: '—', output_power_s: '—', output_power_t: '—',
+                output_load_pct_r: '—', output_load_pct_s: '—', output_load_pct_t: '—',
+                power_factor: '—', active_phases: '—', ups_kva: '—'
             };
             
             resolve({
@@ -401,11 +407,16 @@ async function pollUPSNetagentWithTimeout(host, community = 'public', options = 
             resolve(result);
         }).catch(err => {
             clearTimeout(timer);
-            const prev = lastKnownUpsData.get(host);
             const fallbackData = prev ? { ...prev, connectivity: 'Disconnected' } : {
                 connectivity: 'Disconnected', sys_descr: '—', sys_name: '—', battery_status: '—',
                 battery_capacity_pct: '—', battery_minutes_remaining: '—', battery_voltage: '—',
-                input_voltage: '—', output_voltage: '—', output_current_ampere: '—', output_load_pct: '—'
+                input_voltage: '—', output_voltage: '—', output_current_ampere: '—', output_load_pct: '—',
+                input_voltage_r: '—', input_voltage_s: '—', input_voltage_t: '—',
+                output_voltage_r: '—', output_voltage_s: '—', output_voltage_t: '—',
+                output_current_r: '—', output_current_s: '—', output_current_t: '—',
+                output_power_r: '—', output_power_s: '—', output_power_t: '—',
+                output_load_pct_r: '—', output_load_pct_s: '—', output_load_pct_t: '—',
+                power_factor: '—', active_phases: '—', ups_kva: '—'
             };
             
             resolve({
