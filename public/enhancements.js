@@ -705,6 +705,17 @@
                 </div>`;
             }
 
+            // Tampilkan status Ping dinamis hasil check latar belakang
+            let pingLabel = '';
+            if (srcStatus.toLowerCase() === 'disconnect' || srcStatus.toLowerCase() === 'error') {
+                const pingStatus = srcData ? srcData.ping_status : null;
+                if (pingStatus === 'Normal') {
+                    pingLabel = ` <span class="sp-conn-badge" style="background: rgba(0,255,136,0.1); color: #00ff88; border-color: #00ff88; margin-left: auto;"><i class="fas fa-network-wired"></i> Koneksi Ditolak (Ping Normal)</span>`;
+                } else if (pingStatus === 'Gagal') {
+                    pingLabel = ` <span class="sp-conn-badge" style="background: rgba(255,51,85,0.1); color: #ff3355; border-color: #ff3355; margin-left: auto;"><i class="fas fa-network-wired"></i> Alat Mati / Ping Gagal</span>`;
+                }
+            }
+
             return `
                 <div class="sp-source-card ${srcStatus.toLowerCase()}" onclick="window.openSourceDetail('${src.id}')">
                     <div class="sp-card-main">
@@ -720,9 +731,10 @@
                             ${previewHtml}
                         </div>
 
-                        <div class="sp-card-meta">
+                        <div class="sp-card-meta" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%;">
                             <span class="sp-conn-badge"><i class="fas fa-database"></i> ${ip}:${port}</span>
                             <span class="sp-conn-badge sp-parser-badge" title="${parserName}"><i class="fas fa-code"></i> ${parserName}</span>
+                            ${pingLabel}
                         </div>
                     </div>
                 </div>

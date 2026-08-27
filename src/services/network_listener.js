@@ -9,8 +9,30 @@ const db = require('../../db/database');
 const EquipmentService = require('./equipment');
 const RawEventQueue = require('./raw_event_queue');
 const { SourceStatusGate } = require('./source_status_gate');
+const { exec } = require('child_process');
 
 const RAW_DEBUG = String(process.env.RAW_DEBUG || 'false').toLowerCase() === 'true';
+
+// Cache untuk ping agar tidak flood
+const _pingCache = new Map();
+async function checkIcmpPing(ip) {
+    if (!ip) return false;
+    const now = Date.now();
+    if (_pingCache.has(ip)) {
+        const cached = _pingCache.get(ip);
+        if (now - cached.time < 30000) return cached.result; // Cache 30 detik
+    }
+    return new Promise(resolve => {
+        const isWin = process.platform === 'win32';
+        // -n 1 (Win) or -c 1 (Linux)
+        const cmd = isWin ? `ping -n 1 -w 1000 ${ip}` : `ping -c 1 -W 1 ${ip}`;
+        exec(cmd, (err) => {
+            const result = !err;
+            _pingCache.set(ip, { time: now, result });
+            resolve(result);
+        });
+    });
+}
 
 class NetworkListenerService {
     constructor() {
@@ -117,6 +139,11 @@ class NetworkListenerService {
                 dashData.connectivity = 'Disconnected';
                 parsedData.data = { ...parsedData.data, ...dashData };
             }
+
+            // Cek status Ping (ICMP)
+            if (!parsedData.data) parsedData.data = {};
+            const isPingable = await checkIcmpPing(source.ip_address);
+            parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
         }
 
         if (this._isSplitCollectorMode()) {
@@ -233,6 +260,7 @@ class NetworkListenerService {
         };
         const onError = (err) => {
             console.error(`[NetworkListener] T6TV error for ${source.name}:`, err.message || err);
+            this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, 'vhf_t6tv', 'Disconnect').catch(e => console.error(e));
         };
 
         const connector = new T6tvConnector(
@@ -361,17 +389,24 @@ class NetworkListenerService {
                 await this.handleIncomingData(source, chunk, parser);
             });
 
+            const reportDisconnect = (reason) => {
+                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => {});
+            };
+
             socket.on('error', (err) => {
                 this._logThrottled('error', `${moduleName}:error:${id}:${err.message}`, `[NetworkListener] ${moduleName} error ${source.name}: ${err.message}`);
+                reportDisconnect(err.message);
             });
 
             socket.on('timeout', () => {
                 this._logThrottled('warn', `${moduleName}:timeout:${id}`, `[NetworkListener] ${moduleName} timeout ${source.name}, reconnecting...`);
+                reportDisconnect('timeout');
                 socket.destroy();
             });
 
             socket.on('close', () => {
                 this._logThrottled('log', `${moduleName}:close:${id}`, `[NetworkListener] ${moduleName} disconnected ${source.name}, retry in 15s`);
+                reportDisconnect('close');
                 this.activeListeners.delete(id);
                 parser.reset();
                 if (!stopped) reconnectTimer = setTimeout(connect, 15000);
@@ -501,17 +536,24 @@ class NetworkListenerService {
                 await this.handleIncomingData(source, chunk, parser);
             });
 
+            const reportDisconnect = (reason) => {
+                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => {});
+            };
+
             socket.on('error', (err) => {
                 this._logThrottled('error', `ils:error:${id}:${err.message}`, `[NetworkListener] ILS binary TCP error ${name}: ${err.message}`);
+                reportDisconnect(err.message);
             });
 
             socket.on('timeout', () => {
                 this._logThrottled('warn', `ils:timeout:${id}`, `[NetworkListener] ILS binary TCP timeout ${name}, reconnecting...`);
+                reportDisconnect('timeout');
                 socket.destroy();
             });
 
             socket.on('close', () => {
                 this._logThrottled('log', `ils:close:${id}`, `[NetworkListener] ILS binary TCP disconnected ${name}, retry in 15s`);
+                reportDisconnect('close');
                 if (pollTimer) clearInterval(pollTimer);
                 this.activeListeners.delete(id);
                 if (typeof parser.reset === 'function') parser.reset();
