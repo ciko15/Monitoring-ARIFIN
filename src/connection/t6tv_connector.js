@@ -34,10 +34,15 @@ function getDigestParams(host, port) {
     return new Promise((resolve) => {
         const req = http.request({ host, port: port || 80, path: '/', method: 'GET', timeout: 5000 }, (res) => {
             const wwwAuth = res.headers['www-authenticate'] || '';
-            const realmM  = wwwAuth.match(/realm="([^"]+)"/);
-            const nonceM  = wwwAuth.match(/nonce="([^"]+)"/);
+            const realmM  = wwwAuth.match(/realm="([^"]+)"/i);
+            const nonceM  = wwwAuth.match(/nonce="([^"]+)"/i);
+            const qopM    = wwwAuth.match(/qop="?([^",]+)"?/i);
             if (realmM && nonceM) {
-                resolve({ realm: realmM[1], nonce: nonceM[1] });
+                resolve({ 
+                    realm: realmM[1], 
+                    nonce: nonceM[1],
+                    qop: qopM ? qopM[1] : null
+                });
             } else {
                 resolve(null);
             }
@@ -55,14 +60,21 @@ function normalizePorts(primaryPort, fallbackPorts = []) {
     return [...new Set(ports.length > 0 ? ports : [80])];
 }
 
-function buildDigestHeader(username, password, realm, nonce, uri = '/ws') {
+function buildDigestHeader(username, password, realm, nonce, qop, uri = '/ws') {
     const ha1      = md5(`${username}:${realm}:${password}`);
     const ha2      = md5(`GET:${uri}`);
-    const nc       = '00000001';
-    const cnonce   = crypto.randomBytes(8).toString('hex');
-    const response = md5(`${ha1}:${nonce}:${nc}:${cnonce}:auth:${ha2}`);
-    return `Digest username="${username}", realm="${realm}", nonce="${nonce}", ` +
-           `uri="${uri}", qop=auth, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
+    
+    if (qop && qop.toLowerCase() === 'auth') {
+        const nc       = '00000001';
+        const cnonce   = crypto.randomBytes(8).toString('hex');
+        const response = md5(`${ha1}:${nonce}:${nc}:${cnonce}:auth:${ha2}`);
+        return `Digest username="${username}", realm="${realm}", nonce="${nonce}", ` +
+               `uri="${uri}", qop=auth, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
+    } else {
+        const response = md5(`${ha1}:${nonce}:${ha2}`);
+        return `Digest username="${username}", realm="${realm}", nonce="${nonce}", ` +
+               `uri="${uri}", response="${response}"`;
+    }
 }
 
 class T6tvConnector {
@@ -177,14 +189,16 @@ class T6tvConnector {
                     this.username, this.password,
                     digestCache.realm,
                     digestCache.nonce,
+                    digestCache.qop,
                     this.wsPath
                 );
             }
 
-            // Dynamic import of 'ws' — Bun has it built-in
-            const WebSocket = globalThis.WebSocket || require('ws');
+            // Memaksa menggunakan ws package karena globalThis.WebSocket di Bun 
+            // menolak custom headers (atau menganggapnya sebagai parameter subprotocols).
+            const WebSocketClient = require('ws');
             const url = `ws://${this.host}:${port}${this.wsPath}`;
-            this._ws = new WebSocket(url, { headers });
+            this._ws = new WebSocketClient(url, { headers });
             let opened = false;
             let lastError = null;
 
