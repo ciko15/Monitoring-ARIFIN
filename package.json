@@ -2,6 +2,9 @@
   "name": "my-fullstack-app",
   "version": "1.0.0",
   "description": "SNMP Airport Management System - Full-stack Bun application with ElysiaJS backend",
+  "engines": {
+    "bun": ">= 1.4.0"
+  },
   "main": "src/server.ts",
   "scripts": {
     "start": "bun src/server.ts",
