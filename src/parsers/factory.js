@@ -19,6 +19,7 @@ const IlsLlzNormacParser = require('./ils_llz_normac');
 const DvorMaruBinaryParser = require('./dvor_maru_binary');
 const DmeMopahBinaryParser = require('./dme_mopah_binary');
 const DatakomD700Parser = require('./datakom_d700_modbus');
+const UniversalApiParser = require('./universal_api');
 
 class ParserFactory {
     /**
@@ -147,6 +148,9 @@ class ParserFactory {
             case 'json':
                 return new JsonParser(config);
             
+            case 'universal_api':
+                return new UniversalApiParser(config);
+            
             case 'tcp':
             case 'udp':
                 return new RcmsParser(config);
@@ -187,7 +191,8 @@ class ParserFactory {
             'vhf_t6tv',
             'vhf_marc_rse',
             'datakom_d700_modbus',
-            'dse7320_modbus'
+            'dse7320_modbus',
+            'universal_api'
         ];
     }
 }

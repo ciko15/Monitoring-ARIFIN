@@ -1050,6 +1050,34 @@ const app = new Elysia()
             })
     )
 
+    // --- PROXY ROUTE FOR UI (UNIVERSAL API SYNC) ---
+    .group('/api/proxy', (app) =>
+        app.post('/', async ({ body, set }) => {
+            try {
+                const { url, method = 'GET', headers = {} } = body as any;
+                if (!url) {
+                    set.status = 400;
+                    return { error: 'URL is required' };
+                }
+                const response = await fetch(url, {
+                    method: method.toUpperCase(),
+                    headers: { 'Accept': 'application/json', ...headers },
+                    signal: AbortSignal.timeout(10000)
+                });
+                
+                const data = await response.json().catch(() => null);
+                return {
+                    status: response.status,
+                    ok: response.ok,
+                    data: data
+                };
+            } catch (err: any) {
+                set.status = 500;
+                return { error: err.message };
+            }
+        })
+    )
+
     // --- EQUIPMENT OTENTICATION ROUTES ---
     .group('/api/otentication', (app) =>
         app.get('/:equipmentId', async ({ params }) => await db.getOtenticationByEquipment(params.equipmentId))

@@ -249,6 +249,43 @@
               </div>
             </div>
 
+            <!-- Universal API Extra Fields -->
+            <div id="universalApiExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center;">
+                🌐 UNIVERSAL API PULL CONFIG
+              </div>
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Gunakan placeholder {ip} dan {port} pada URL.</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div>
+                  <label style="font-size:11px;">Endpoint URL</label>
+                  <input type="text" id="univApiUrl" value="http://{ip}:{port}/api" style="width:100%; box-sizing:border-box;">
+                </div>
+                <div>
+                  <label style="font-size:11px;">HTTP Method</label>
+                  <select id="univApiMethod" style="width:100%; box-sizing:border-box;">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;">Poll Interval (detik)</label>
+                  <input type="number" id="univApiInterval" value="15" min="1" style="width:100%; box-sizing:border-box;">
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                  <button type="button" class="btn btn-primary btn-sm" id="btnSyncUniversalApi" style="width:100%; padding:8px 12px; height:32px;">
+                    <i class="fas fa-sync" id="syncApiIcon"></i> Sync Data
+                  </button>
+                </div>
+              </div>
+              <div style="margin-top:12px; border-top:1px dashed #1a3a5c; padding-top:10px;">
+                <div style="font-size:11px; color:#00d4ff; margin-bottom:6px;">MAPPED FIELDS (Pilih Data & Beri Nama)</div>
+                <!-- Container for dynamically discovered JSON keys -->
+                <div id="univApiMappingsContainer" style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:8px;">
+                  <div style="font-size:10px; color:#a0b4c4; text-align:center;">Klik "Sync Data" untuk memuat struktur JSON dari alat.</div>
+                </div>
+              </div>
+            </div>
+
             <!-- MARC PAE Extra Fields -->
             <div id="marcPaeExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
               <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">MARC PAE DISCOVERY</div>

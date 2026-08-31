@@ -1305,6 +1305,55 @@ class NetworkListenerService {
         return parsing_id;
     }
 
+    async startHttpPullListener(source, parser) {
+        const { id, name, ip_address, tcp_port, udp_port } = source;
+        const port = tcp_port || udp_port || 80;
+        
+        this.activeListeners.add(id);
+        console.log(`[HTTP Pull] Listener started: ${name} (${ip_address}:${port})`);
+
+        let isPolling = false;
+        
+        // Use POLL_INTERVAL if available in parser config, otherwise default to 15 seconds
+        const pollIntervalMs = (parser.parserConfig && parser.parserConfig.poll_interval) 
+                                ? parseInt(parser.parserConfig.poll_interval) 
+                                : 15000;
+
+        const doPoll = async () => {
+            if (isPolling || !this.activeListeners.has(id)) return;
+            isPolling = true;
+            try {
+                const result = await parser.fetchApiData(ip_address, port);
+                if (String(result.status || '').toLowerCase() === 'error') {
+                    this._logThrottled('log', `http-pull:error:${id}`, `[HTTP Pull] ${name}: Error ${result.error}`, 30000);
+                }
+                
+                await this._handleLogOutput(
+                    source,
+                    { data: result.data, source: name, _ip: ip_address },
+                    'universal_api',
+                    result.status || (result.success ? 'Normal' : 'Disconnect')
+                );
+            } catch (err) {
+                console.error(`[HTTP Pull] Poll error ${name}:`, err.message);
+            } finally {
+                isPolling = false;
+            }
+        };
+
+        // Random jitter to prevent thundering herd
+        const jitter = Math.floor(Math.random() * 5000);
+        setTimeout(() => {
+            doPoll();
+            const timerId = setInterval(doPoll, pollIntervalMs);
+            
+            // Store timer if we need to clean it up later (optional)
+            if (!this._httpTimers) this._httpTimers = new Map();
+            if (this._httpTimers.has(id)) clearInterval(this._httpTimers.get(id));
+            this._httpTimers.set(id, timerId);
+        }, jitter);
+    }
+
     async startListener(source) {
         const { id, equipt_id, ip_address, udp_port, tcp_port, parsing_id } = source;
         const port = parseInt(udp_port || tcp_port);
@@ -1411,12 +1460,22 @@ class NetworkListenerService {
         // 1. Create Parser (or reuse existing one to preserve _lastData across TCP drops)
         let parser = this.parsers.get(id);
         if (!parser && parsing_id) {
-            parser = ParserFactory.createParser(parsing_id, { equipt_id });
+            let pConfig = { equipt_id };
+            if (source.extra_config) {
+                pConfig.parser_config = typeof source.extra_config === 'string' ? JSON.parse(source.extra_config) : source.extra_config;
+            }
+            parser = ParserFactory.createParser(parsing_id, pConfig);
             if (parser) this.parsers.set(id, parser);
         }
 
         if (!parser) {
             console.warn(`[NetworkListener] No valid parser found for parsing_id: ${parsing_id}. Data will be logged as raw.`);
+        }
+
+        // --- HTTP PULL MODE ---
+        if (parser && parser.isHttpPull) {
+            this.startHttpPullListener(source, parser);
+            return;
         }
 
         // 2. Bind Socket

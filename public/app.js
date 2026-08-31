@@ -802,13 +802,16 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       const tempHumExtra = document.getElementById('tempHumidityExtraFields');
       const iologikExtra = document.getElementById('iologikExtraFields');
       const marcPaeExtra = document.getElementById('marcPaeExtraFields');
+      const univApiExtra = document.getElementById('universalApiExtraFields');
       const portField = document.getElementById('dataSourceUdpPort');
       const isSnmp = isSnmpParsingId(templateSelect.value);
       const isAsterix = templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar';
       const isPm5350 = templateSelect.value === 'pm5350_modbus';
       const isTempHum = templateSelect.value === 'temp_humidity_modbus';
       const isIologik = templateSelect.value === 'iologik_modbus';
+      const isUnivApi = templateSelect.value === 'universal_api';
       if (extra) extra.style.display = templateSelect.value === 'vhf_t6tv' ? 'block' : 'none';
+      if (univApiExtra) univApiExtra.style.display = isUnivApi ? 'block' : 'none';
       if (marcExtra) marcExtra.style.display = templateSelect.value === 'vhf_marc_rse' ? 'block' : 'none';
       if (marcPaeExtra) marcPaeExtra.style.display = templateSelect.value === 'marc_pae' ? 'block' : 'none';
       if (snmpExtra) snmpExtra.style.display = isSnmp ? 'block' : 'none';
@@ -920,6 +923,14 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         interval: document.getElementById('t6tvInterval') ? parseInt(document.getElementById('t6tvInterval').value) || 5 : 5,
         username: document.getElementById('t6tvUsername') ? document.getElementById('t6tvUsername').value : 'admin',
         password: document.getElementById('t6tvPassword') ? document.getElementById('t6tvPassword').value : 'admin',
+      }) : templateSelect.value === 'universal_api' ? JSON.stringify({
+        endpoint_url: document.getElementById('univApiUrl') ? document.getElementById('univApiUrl').value : '',
+        poll_interval: document.getElementById('univApiInterval') ? parseInt(document.getElementById('univApiInterval').value) || 15 : 15,
+        api_options: {
+            method: document.getElementById('univApiMethod') ? document.getElementById('univApiMethod').value : 'GET',
+            headers: { 'Accept': 'application/json' }
+        },
+        mappings: typeof getUniversalApiConfigs === 'function' ? getUniversalApiConfigs() : []
       }) : templateSelect.value === 'pm5350_modbus' ? JSON.stringify({
         modbus_slave_id: document.getElementById('pm5350SlaveId') ? parseInt(document.getElementById('pm5350SlaveId').value) || 5 : 5,
       }) : templateSelect.value === 'temp_humidity_modbus' ? JSON.stringify({
@@ -3720,3 +3731,133 @@ function getMarcPaeConfigsFromCheckboxes() {
 
 window.renderMarcPaeCheckboxes = renderMarcPaeCheckboxes;
 window.getMarcPaeConfigsFromCheckboxes = getMarcPaeConfigsFromCheckboxes;
+
+// ── UNIVERSAL API UI FUNCTIONS ───────────────────────────────────────────
+
+document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async () => {
+    const ip = document.getElementById('dataSourceIp')?.value || '127.0.0.1';
+    const port = document.getElementById('dataSourceUdpPort')?.value || '80';
+    let url = document.getElementById('univApiUrl')?.value || `http://{ip}:{port}/api`;
+    const method = document.getElementById('univApiMethod')?.value || 'GET';
+    
+    url = url.replace(/{ip}/g, ip).replace(/{port}/g, port);
+    
+    const container = document.getElementById('univApiMappingsContainer');
+    const icon = document.getElementById('syncApiIcon');
+    if (icon) icon.className = 'fas fa-spinner fa-spin';
+    if (container) container.innerHTML = '<div style="color:#00d4ff;">Fetching data dari API...</div>';
+    
+    try {
+        const res = await fetch(`${API_URL}/proxy`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ url, method })
+        });
+        
+        const data = await res.json();
+        if (icon) icon.className = 'fas fa-sync';
+        
+        if (!res.ok || data.error) {
+            if (container) container.innerHTML = `<div style="color:red;">Error: ${data.error || 'Gagal memanggil API'}</div>`;
+            return;
+        }
+        
+        if (data.data) {
+            const flatKeys = flattenObjectKeys(data.data);
+            if (container) {
+                container.innerHTML = '';
+                flatKeys.forEach(key => {
+                    const val = getNestedValue(data.data, key);
+                    const displayVal = typeof val === 'object' ? JSON.stringify(val) : val;
+                    const div = document.createElement('div');
+                    div.style.display = 'flex';
+                    div.style.gap = '8px';
+                    div.style.alignItems = 'center';
+                    div.style.borderBottom = '1px dashed rgba(255,255,255,0.1)';
+                    div.style.paddingBottom = '4px';
+                    div.innerHTML = `
+                        <input type="checkbox" class="univ-api-check" data-path="${key}" style="cursor:pointer;">
+                        <span style="font-size:11px; color:#fff; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${key} (Value: ${displayVal})">
+                            ${key} <span style="color:#a0b4c4;">(${displayVal})</span>
+                        </span>
+                        <input type="text" class="univ-api-name" data-path="${key}" placeholder="Nama Custom" style="width:120px; font-size:10px; padding:4px;">
+                        <input type="number" class="univ-api-divisor" data-path="${key}" placeholder="Divisor" style="width:70px; font-size:10px; padding:4px;">
+                    `;
+                    container.appendChild(div);
+                });
+            }
+        } else {
+            if (container) container.innerHTML = '<div style="color:orange;">Response kosong atau bukan JSON.</div>';
+        }
+    } catch (e) {
+        if (icon) icon.className = 'fas fa-sync';
+        if (container) container.innerHTML = `<div style="color:red;">Gagal: ${e.message}</div>`;
+    }
+});
+
+function flattenObjectKeys(obj, prefix = '') {
+    let keys = [];
+    for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+            const propName = prefix ? `${prefix}.${key}` : key;
+            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                keys = keys.concat(flattenObjectKeys(obj[key], propName));
+            } else if (Array.isArray(obj[key])) {
+                obj[key].forEach((item, index) => {
+                    const arrPropName = `${propName}[${index}]`;
+                    if (typeof item === 'object' && item !== null) {
+                        keys = keys.concat(flattenObjectKeys(item, arrPropName));
+                    } else {
+                        keys.push(arrPropName);
+                    }
+                });
+            } else {
+                keys.push(propName);
+            }
+        }
+    }
+    return keys;
+}
+
+function getNestedValue(obj, path) {
+    if (!path) return undefined;
+    const parts = path.split('.');
+    let current = obj;
+    for (const part of parts) {
+        if (current === undefined || current === null) return current;
+        const arrayMatch = part.match(/^(.+)\[(\d+)\]$/);
+        if (arrayMatch) {
+            const arrayName = arrayMatch[1];
+            const index = parseInt(arrayMatch[2], 10);
+            if (current[arrayName] && Array.isArray(current[arrayName])) {
+                current = current[arrayName][index];
+            } else return undefined;
+        } else {
+            current = current[part];
+        }
+    }
+    return current;
+}
+
+function getUniversalApiConfigs() {
+    const container = document.getElementById('univApiMappingsContainer');
+    if (!container) return [];
+    const checks = container.querySelectorAll('.univ-api-check');
+    const mappings = [];
+    checks.forEach(check => {
+        if (check.checked) {
+            const path = check.getAttribute('data-path');
+            const nameInput = container.querySelector(`.univ-api-name[data-path="${path}"]`);
+            const divInput = container.querySelector(`.univ-api-divisor[data-path="${path}"]`);
+            mappings.push({
+                json_path: path,
+                name: (nameInput && nameInput.value) ? nameInput.value : path.split('.').pop(),
+                divisor: (divInput && divInput.value) ? parseFloat(divInput.value) : 1
+            });
+        }
+    });
+    return mappings;
+}
