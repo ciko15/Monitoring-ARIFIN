@@ -613,10 +613,11 @@
             // Get live data preview for this source based on schema or template
             let previewHtml = '';
             let lastTime = '—';
+            let srcData = null;
 
             if (window.equipmentDataCache) {
                 const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
-                const srcData = resolveSourceData(eq, src);
+                srcData = resolveSourceData(eq, src);
 
                 if (srcData && srcData._logged_at) {
                     lastTime = new Date(srcData._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
