@@ -3932,6 +3932,9 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
                     const displayVal = typeof val === 'object' ? JSON.stringify(val) : String(val);
                     const safeTitle = displayVal.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const safeDisplay = safeTitle; // Use same escaped string for display
+                    
+                    const defaultName = key.split('.').pop();
+                    
                     const div = document.createElement('div');
                     div.style.display = 'flex';
                     div.style.gap = '8px';
@@ -3939,12 +3942,12 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
                     div.style.borderBottom = '1px dashed rgba(255,255,255,0.1)';
                     div.style.paddingBottom = '4px';
                     div.innerHTML = `
-                        <input type="checkbox" class="univ-api-check" data-path="${key}" style="cursor:pointer;">
+                        <input type="checkbox" class="univ-api-check" data-path="${key}" checked style="cursor:pointer;">
                         <span style="font-size:11px; color:#fff; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${key} (Value: ${safeTitle})">
                             ${key} <span style="color:#a0b4c4;">(${safeDisplay})</span>
                         </span>
-                        <input type="text" class="univ-api-name" data-path="${key}" placeholder="Nama Custom" style="width:120px; font-size:10px; padding:4px;">
-                        <input type="number" class="univ-api-divisor" data-path="${key}" placeholder="Divisor" style="width:70px; font-size:10px; padding:4px;">
+                        <input type="text" class="univ-api-name" data-path="${key}" value="${defaultName}" placeholder="Nama Custom" style="width:120px; font-size:10px; padding:4px;">
+                        <input type="number" class="univ-api-divisor" data-path="${key}" value="1" placeholder="Divisor" style="width:70px; font-size:10px; padding:4px;">
                     `;
                     container.appendChild(div);
                 });
