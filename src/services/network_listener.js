@@ -1678,7 +1678,7 @@ class NetworkListenerService {
         const timerMaps = [
             '_datakomTimers', '_dseTimers', '_iologikTimers', '_pm5350Timers',
             '_upsNetagentTimers', '_snmpSystemTimers', '_tempHumidityTimers',
-            '_asterixTimers', '_marcRseTimers', '_vhfT6tvConnections'
+            '_asterixTimers', '_marcRseTimers', '_vhfT6tvConnections', '_httpTimers'
         ];
 
         for (const mapName of timerMaps) {
@@ -1687,6 +1687,19 @@ class NetworkListenerService {
                     clearInterval(timer);
                     // Also clear timeout if any (some might be timeouts)
                     clearTimeout(timer); 
+                }
+                this[mapName].clear();
+            }
+        }
+
+        const cleanupMaps = [
+            '_modbusTcpCleanup', '_binaryTcpCleanup', '_tempHumidityCleanup'
+        ];
+
+        for (const mapName of cleanupMaps) {
+            if (this[mapName]) {
+                for (const [id, cleanupFn] of this[mapName]) {
+                    try { cleanupFn(); } catch (e) { }
                 }
                 this[mapName].clear();
             }
