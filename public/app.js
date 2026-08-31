@@ -3953,6 +3953,7 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
                     if ((defaultName === 'value' || defaultName === 'string_value') && pathParts.length >= 2) {
                         defaultName = pathParts[pathParts.length - 2]; // Ambil nama parameternya, bukan kata 'value'
                     }
+                    const div = document.createElement('div');
                     div.className = 'univ-api-row';
                     div.setAttribute('data-path', key);
                     div.style.display = 'flex';
