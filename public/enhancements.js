@@ -682,11 +682,27 @@
                         }
                         if (isObj && valObj.label) label = valObj.label;
 
-                        const rawVal = isObj ? (valObj.value ?? '—') : (valObj ?? '—');
+                        let rawVal = '—';
+                        let unit = '';
+                        if (isObj) {
+                            if (valObj.value !== undefined) {
+                                rawVal = valObj.value;
+                                unit = valObj.unit || '';
+                            } else {
+                                // Nested group case: find first numeric or string primitive
+                                const firstKey = Object.keys(valObj).find(gk => !gk.startsWith('_') && typeof valObj[gk] !== 'object');
+                                if (firstKey) {
+                                    rawVal = valObj[firstKey];
+                                    unit = valObj[`${firstKey}_unit`] || '';
+                                }
+                            }
+                        } else {
+                            rawVal = valObj ?? '—';
+                        }
+                        
                         const val = src.parsing_id.startsWith('snmp_')
                             ? formatSnmpMetricValue(k, rawVal)
                             : rawVal;
-                        const unit = isObj && valObj.unit ? valObj.unit : '';
                         const eqSup = eq ? eq.sup_category : '';
                         const valColor = getLimitColor(eqSup, label, rawVal);
 
