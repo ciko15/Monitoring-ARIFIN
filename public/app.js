@@ -759,6 +759,56 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         renderIologikBuilderFromJson('');
       }
     }
+    
+    // Populate Universal API extra fields if editing
+    const univApiDiv = document.getElementById('universalApiExtraFields');
+    if (parserId === 'universal_api' && univApiDiv) {
+      univApiDiv.style.display = 'block';
+      const univExtra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? JSON.parse(editSource.extra_config) : editSource.extra_config) : {};
+      if (document.getElementById('univApiUrl')) document.getElementById('univApiUrl').value = univExtra.endpoint_url || `http://{ip}:{port}/api`;
+      if (document.getElementById('univApiMethod')) document.getElementById('univApiMethod').value = (univExtra.api_options && univExtra.api_options.method) ? univExtra.api_options.method : 'GET';
+      if (document.getElementById('univApiInterval')) document.getElementById('univApiInterval').value = univExtra.poll_interval || 15;
+      if (document.getElementById('univApiHeaders')) {
+          if (univExtra.api_options && univExtra.api_options.headers) {
+              const h = { ...univExtra.api_options.headers };
+              delete h['Accept'];
+              if (Object.keys(h).length > 0) document.getElementById('univApiHeaders').value = JSON.stringify(h);
+              else document.getElementById('univApiHeaders').value = '';
+          } else {
+              document.getElementById('univApiHeaders').value = '';
+          }
+      }
+      
+      const container = document.getElementById('univApiMappingsContainer');
+      if (container && univExtra.mappings && Array.isArray(univExtra.mappings)) {
+          container.innerHTML = '';
+          if (univExtra.mappings.length === 0) {
+              container.innerHTML = '<div style="font-size:10px; color:#a0b4c4; text-align:center;">Klik "Sync Data" untuk memuat struktur JSON dari alat.</div>';
+          } else {
+              univExtra.mappings.forEach(map => {
+                  const div = document.createElement('div');
+                  div.style.display = 'flex';
+                  div.style.gap = '8px';
+                  div.style.alignItems = 'center';
+                  div.style.borderBottom = '1px dashed rgba(255,255,255,0.1)';
+                  div.style.paddingBottom = '4px';
+                  div.innerHTML = `
+                      <input type="checkbox" class="univ-api-check" data-path="${map.json_path}" checked style="cursor:pointer;">
+                      <span style="font-size:11px; color:#fff; flex:1;" title="${map.json_path}">
+                          ${map.json_path}
+                      </span>
+                      <input type="text" class="univ-api-name" data-path="${map.json_path}" value="${map.name || ''}" placeholder="Nama Custom" style="width:120px; font-size:10px; padding:4px;">
+                      <input type="number" class="univ-api-divisor" data-path="${map.json_path}" value="${map.divisor || 1}" placeholder="Divisor" style="width:70px; font-size:10px; padding:4px;">
+                  `;
+                  container.appendChild(div);
+              });
+          }
+      }
+    } else if (univApiDiv) {
+      univApiDiv.style.display = 'none';
+      const container = document.getElementById('univApiMappingsContainer');
+      if (container) container.innerHTML = '<div style="font-size:10px; color:#a0b4c4; text-align:center;">Klik "Sync Data" untuk memuat struktur JSON dari alat.</div>';
+    }
   } else {
     form.reset();
     clearMarcPortsCheckboxes();
