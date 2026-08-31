@@ -3831,8 +3831,48 @@ document.getElementById('btnViewRawUniversalApi')?.addEventListener('click', asy
             return;
         }
         
-        rawContainer.style.color = '#0f0';
-        rawContainer.textContent = JSON.stringify(data.data, null, 2);
+        // Smart Discovery Heuristic for Arrays with IDs
+        if (Array.isArray(data.data) && data.data.length > 0 && (data.data[0].id || data.data[0].device_id)) {
+            rawContainer.style.color = '#fff';
+            rawContainer.innerHTML = '<div style="margin-bottom:8px; font-weight:bold; color:#00d4ff;">Daftar Alat Ditemukan (Klik untuk menarik parameter):</div>';
+            
+            const listDiv = document.createElement('div');
+            listDiv.style.display = 'flex';
+            listDiv.style.flexDirection = 'column';
+            listDiv.style.gap = '6px';
+            
+            data.data.forEach(item => {
+                const itemId = item.id || item.device_id;
+                const itemName = item.name || item.device_type || 'Unknown';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-secondary btn-sm';
+                btn.style.textAlign = 'left';
+                btn.style.padding = '6px';
+                btn.style.fontSize = '11px';
+                btn.style.cursor = 'pointer';
+                btn.innerHTML = `<i class="fas fa-plug" style="margin-right:6px; color:#a0b4c4;"></i> <strong style="color:#0f0;">${itemId}</strong> - ${itemName}`;
+                
+                btn.onclick = () => {
+                    const urlInput = document.getElementById('univApiUrl');
+                    const originalUrl = urlInput.value.trim().replace(/\/+$/, '');
+                    
+                    // Ensure we don't duplicate if they already appended it somehow
+                    if (!originalUrl.endsWith('/latest') && !originalUrl.endsWith(itemId)) {
+                         urlInput.value = `${originalUrl}/${itemId}/latest`;
+                    }
+                    
+                    rawContainer.style.display = 'none';
+                    document.getElementById('btnSyncUniversalApi').click();
+                };
+                listDiv.appendChild(btn);
+            });
+            rawContainer.appendChild(listDiv);
+        } else {
+            // Fallback to Raw JSON
+            rawContainer.style.color = '#0f0';
+            rawContainer.textContent = JSON.stringify(data.data, null, 2);
+        }
     } catch (e) {
         rawContainer.style.color = 'red';
         rawContainer.textContent = `Gagal: ${e.message}`;
