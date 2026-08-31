@@ -3873,8 +3873,11 @@ document.getElementById('btnViewRawUniversalApi')?.addEventListener('click', asy
                     const urlInput = document.getElementById('univApiUrl');
                     const originalUrl = urlInput.value.trim().replace(/\/+$/, '');
                     
-                    // Ensure we don't duplicate if they already appended it somehow
-                    if (!originalUrl.endsWith('/latest') && !originalUrl.endsWith(itemId)) {
+                    // Replace existing device ID if URL already ends with /latest
+                    const match = originalUrl.match(/^(.*\/)([^\/]+)(\/latest)$/);
+                    if (match) {
+                         urlInput.value = `${match[1]}${itemId}${match[3]}`;
+                    } else if (!originalUrl.endsWith(itemId)) {
                          urlInput.value = `${originalUrl}/${itemId}/latest`;
                     }
                     
@@ -3993,7 +3996,19 @@ function flattenObjectKeys(obj, prefix = '') {
         if (obj.hasOwnProperty(key)) {
             const propName = prefix ? `${prefix}.${key}` : key;
             if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                keys = keys.concat(flattenObjectKeys(obj[key], propName));
+                // Smart Discovery Heuristic: Telemetry block detection
+                if (obj[key].hasOwnProperty('value') && (obj[key].hasOwnProperty('parameter') || obj[key].hasOwnProperty('timestamp'))) {
+                    // It's a telemetry block. Only extract the primary value field to reduce clutter
+                    if (obj[key].value !== null && obj[key].value !== undefined) {
+                        keys.push(`${propName}.value`);
+                    } else if (obj[key].string_value !== null && obj[key].string_value !== undefined) {
+                        keys.push(`${propName}.string_value`);
+                    } else {
+                        keys.push(`${propName}.value`);
+                    }
+                } else {
+                    keys = keys.concat(flattenObjectKeys(obj[key], propName));
+                }
             } else if (Array.isArray(obj[key])) {
                 obj[key].forEach((item, index) => {
                     const arrPropName = `${propName}[${index}]`;
