@@ -130,6 +130,20 @@ class UniversalApiParser extends BaseParser {
     }
 
     parse(rawData) {
+        // If data is already an object (passed from network_listener HTTP Pull loop)
+        if (typeof rawData === 'object' && rawData !== null && !Buffer.isBuffer(rawData)) {
+            if (rawData.data !== undefined) {
+                return {
+                    success: true,
+                    data: rawData.data,
+                    status: 'Normal',
+                    alarms: [],
+                    warnings: [],
+                    timestamp: new Date().toISOString()
+                };
+            }
+        }
+
         // Fallback if called directly with raw data (string/buffer) instead of fetchApiData
         try {
             const strData = Buffer.isBuffer(rawData) ? rawData.toString() : rawData;
