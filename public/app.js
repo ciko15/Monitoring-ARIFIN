@@ -3958,16 +3958,23 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
         }
         
         if (data.data) {
+            // Confirm with user if they have existing items
+            const existingItems = document.querySelectorAll('.univ-api-group-dropzone .univ-api-row');
+            if (existingItems.length > 0) {
+                if (!confirm('Perhatian: Melakukan Sync ulang akan mereset semua parameter yang sudah Anda tarik ke dalam grup. Anda harus menarik ulangnya dari awal. Lanjutkan?')) {
+                    if (container) container.innerHTML = '<div style="color:orange; padding:8px;">Sync dibatalkan.</div>';
+                    return;
+                }
+                // Hapus semua parameter dari dalam grup (kembali kosong)
+                existingItems.forEach(r => r.remove());
+            }
+
             const flatKeys = flattenObjectKeys(data.data);
             if (container) {
                 container.innerHTML = '';
                 
-                // Keep track of existing mapped paths so we don't duplicate them in available fields
-                const existingPaths = new Set(getUniversalApiConfigs().map(m => m.json_path));
-                
                 flatKeys.forEach(key => {
-                    if (existingPaths.has(key)) return; // Skip if already mapped
-                    
+                    // Karena sudah di-reset, semua key pasti masuk ke Available Fields
                     let defaultName = key.split('.').pop();
                     const pathParts = key.split('.');
                     if ((defaultName === 'value' || defaultName === 'string_value') && pathParts.length >= 2) {
