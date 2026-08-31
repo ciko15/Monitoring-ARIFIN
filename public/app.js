@@ -3948,10 +3948,11 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
                     const displayVal = typeof val === 'object' ? JSON.stringify(val) : String(val);
                     const safeTitle = displayVal.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const safeDisplay = safeTitle; // Use same escaped string for display
-                    
-                    const defaultName = key.split('.').pop();
-                    
-                    const div = document.createElement('div');
+                    let defaultName = key.split('.').pop();
+                    const pathParts = key.split('.');
+                    if ((defaultName === 'value' || defaultName === 'string_value') && pathParts.length >= 2) {
+                        defaultName = pathParts[pathParts.length - 2]; // Ambil nama parameternya, bukan kata 'value'
+                    }
                     div.className = 'univ-api-row';
                     div.setAttribute('data-path', key);
                     div.style.display = 'flex';
