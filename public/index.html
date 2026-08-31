@@ -275,10 +275,15 @@
                   <label style="font-size:11px;">Custom Headers (JSON) - Opsional</label>
                   <input type="text" id="univApiHeaders" placeholder='{"Authorization": "Bearer token..."}' style="width:100%; box-sizing:border-box;">
                 </div>
-                <div style="grid-column: span 2; display:flex; align-items:flex-end;">
-                  <button type="button" class="btn btn-primary btn-sm" id="btnSyncUniversalApi" style="width:100%; padding:8px 12px; height:32px;">
+                <div style="grid-column: span 2; display:flex; align-items:flex-end; gap:8px;">
+                  <button type="button" class="btn btn-primary btn-sm" id="btnSyncUniversalApi" style="flex:1; padding:8px 12px; height:32px;">
                     <i class="fas fa-sync" id="syncApiIcon"></i> Sync Data
                   </button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btnViewRawUniversalApi" style="padding:8px 12px; height:32px; flex:0 0 auto;" title="Lihat Raw JSON untuk mencari ID alat dll">
+                    <i class="fas fa-code"></i> Raw JSON
+                  </button>
+                </div>
+                <div id="univApiRawContainer" style="display:none; margin-top:8px; max-height:200px; overflow:auto; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:8px; background:#000; font-family:monospace; font-size:10px; color:#0f0; white-space:pre-wrap;">
                 </div>
               </div>
               <div style="margin-top:12px; border-top:1px dashed #1a3a5c; padding-top:10px;">
@@ -1997,7 +2002,7 @@
   </div>
 
   <!-- Scripts -->
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
   <script src="cabang-app.js"></script>
   <script src="enhancements.js?v=5"></script>
   <script src="snmp-tools.js"></script>

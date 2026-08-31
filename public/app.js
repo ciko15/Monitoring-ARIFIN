@@ -3789,6 +3789,57 @@ window.getMarcPaeConfigsFromCheckboxes = getMarcPaeConfigsFromCheckboxes;
 
 // ── UNIVERSAL API UI FUNCTIONS ───────────────────────────────────────────
 
+document.getElementById('btnViewRawUniversalApi')?.addEventListener('click', async () => {
+    const ip = document.getElementById('dataSourceIp')?.value || '127.0.0.1';
+    const port = document.getElementById('dataSourceUdpPort')?.value || '80';
+    let url = document.getElementById('univApiUrl')?.value || `http://{ip}:{port}/api`;
+    const method = document.getElementById('univApiMethod')?.value || 'GET';
+    const headersStr = document.getElementById('univApiHeaders')?.value;
+    
+    url = url.replace(/{ip}/g, ip).replace(/{port}/g, port);
+    
+    let customHeaders = {};
+    if (headersStr) {
+        try {
+            customHeaders = JSON.parse(headersStr);
+        } catch (e) {
+            alert('Format Custom Headers harus JSON valid!');
+            return;
+        }
+    }
+    
+    const rawContainer = document.getElementById('univApiRawContainer');
+    if (!rawContainer) return;
+    
+    rawContainer.style.display = 'block';
+    rawContainer.textContent = 'Membaca API...';
+    
+    try {
+        const res = await fetch(`${API_URL}/proxy`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ url, method, headers: customHeaders })
+        });
+        
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            rawContainer.style.color = 'red';
+            rawContainer.textContent = `Error: ${data.error || 'Gagal memanggil API'}`;
+            return;
+        }
+        
+        rawContainer.style.color = '#0f0';
+        rawContainer.textContent = JSON.stringify(data.data, null, 2);
+    } catch (e) {
+        rawContainer.style.color = 'red';
+        rawContainer.textContent = `Gagal: ${e.message}`;
+    }
+});
+
+
 document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async () => {
     const ip = document.getElementById('dataSourceIp')?.value || '127.0.0.1';
     const port = document.getElementById('dataSourceUdpPort')?.value || '80';
