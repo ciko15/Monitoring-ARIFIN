@@ -797,8 +797,9 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
                       <span style="font-size:11px; color:#fff; flex:1;" title="${map.json_path}">
                           ${map.json_path}
                       </span>
-                      <input type="text" class="univ-api-name" data-path="${map.json_path}" value="${map.name || ''}" placeholder="Nama Custom" style="width:120px; font-size:10px; padding:4px;">
-                      <input type="number" class="univ-api-divisor" data-path="${map.json_path}" value="${map.divisor || 1}" placeholder="Divisor" style="width:70px; font-size:10px; padding:4px;">
+                      <input type="text" class="univ-api-group" data-path="${map.json_path}" value="${map.group || ''}" placeholder="Group (Opsional)" style="width:100px; font-size:10px; padding:4px; border:1px solid #1a3a5c; background:#000; color:#0f0;">
+                      <input type="text" class="univ-api-name" data-path="${map.json_path}" value="${map.name || ''}" placeholder="Nama Custom" style="width:110px; font-size:10px; padding:4px;">
+                      <input type="number" class="univ-api-divisor" data-path="${map.json_path}" value="${map.divisor || 1}" placeholder="Divisor" style="width:60px; font-size:10px; padding:4px;">
                   `;
                   container.appendChild(div);
               });
@@ -3975,8 +3976,9 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
                         <span style="font-size:11px; color:#fff; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${key} (Value: ${safeTitle})">
                             ${key} <span style="color:#a0b4c4;">(${safeDisplay})</span>
                         </span>
-                        <input type="text" class="univ-api-name" data-path="${key}" value="${defaultName}" placeholder="Nama Custom" style="width:120px; font-size:10px; padding:4px;">
-                        <input type="number" class="univ-api-divisor" data-path="${key}" value="1" placeholder="Divisor" style="width:70px; font-size:10px; padding:4px;">
+                        <input type="text" class="univ-api-group" data-path="${key}" value="" placeholder="Group (Opsional)" style="width:100px; font-size:10px; padding:4px; border:1px solid #1a3a5c; background:#000; color:#0f0;">
+                        <input type="text" class="univ-api-name" data-path="${key}" value="${defaultName}" placeholder="Nama Custom" style="width:110px; font-size:10px; padding:4px;">
+                        <input type="number" class="univ-api-divisor" data-path="${key}" value="1" placeholder="Divisor" style="width:60px; font-size:10px; padding:4px;">
                     `;
                     container.appendChild(div);
                 });
@@ -4056,10 +4058,12 @@ function getUniversalApiConfigs() {
             const path = check.getAttribute('data-path');
             const nameInput = container.querySelector(`.univ-api-name[data-path="${path}"]`);
             const divInput = container.querySelector(`.univ-api-divisor[data-path="${path}"]`);
+            const groupInput = container.querySelector(`.univ-api-group[data-path="${path}"]`);
             mappings.push({
                 json_path: path,
                 name: (nameInput && nameInput.value) ? nameInput.value : path.split('.').pop(),
-                divisor: (divInput && divInput.value) ? parseFloat(divInput.value) : 1
+                divisor: (divInput && divInput.value) ? parseFloat(divInput.value) : 1,
+                group: (groupInput && groupInput.value) ? groupInput.value.trim() : ''
             });
         }
     });

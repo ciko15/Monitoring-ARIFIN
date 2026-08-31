@@ -58,10 +58,19 @@ class UniversalApiParser extends BaseParser {
                     finalValue = parseFloat((value / mapping.divisor).toFixed(2));
                 }
                 
-                parsed[mapping.name] = finalValue;
-                
-                if (mapping.unit) {
-                    parsed[`${mapping.name}_unit`] = mapping.unit;
+                if (mapping.group) {
+                    if (!parsed[mapping.group]) {
+                        parsed[mapping.group] = {};
+                    }
+                    parsed[mapping.group][mapping.name] = finalValue;
+                    if (mapping.unit) {
+                        parsed[mapping.group][`${mapping.name}_unit`] = mapping.unit;
+                    }
+                } else {
+                    parsed[mapping.name] = finalValue;
+                    if (mapping.unit) {
+                        parsed[`${mapping.name}_unit`] = mapping.unit;
+                    }
                 }
             }
         }
