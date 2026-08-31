@@ -1712,6 +1712,11 @@ class NetworkListenerService {
             }
             this._t6tvSnmpCollectors.clear();
         }
+
+        // CLEAR PARSERS SO THEY ARE RE-INSTANTIATED WITH NEW CONFIG!
+        if (this.parsers) {
+            this.parsers.clear();
+        }
     }
 }
 
