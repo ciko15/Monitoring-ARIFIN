@@ -277,7 +277,7 @@ class EquipmentService {
 
             const gateDecision = this.statusGate.evaluate(
                 {
-                    id: `${equipmentId}:${sourceId}`,
+                    id: `${equipmentId}:${sourceName}`,
                     equipt_id: equipmentId,
                     name: sourceName
                 },
@@ -295,7 +295,7 @@ class EquipmentService {
             const finalStatus = gateDecision.status;
 
             // --- GLOBAL TELEMETRY MERGER & DEBOUNCER ---
-            const cacheKey = `${equipmentId}:${sourceId}`;
+            const cacheKey = `${equipmentId}:${sourceName}`;
             let cache = globalTelemetryCache.get(cacheKey);
             if (!cache) {
                 cache = {
