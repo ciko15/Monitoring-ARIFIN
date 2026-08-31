@@ -4053,7 +4053,8 @@ function getUniversalApiConfigs() {
     const mappings = [];
     const groupBoxes = document.querySelectorAll('.univ-api-group-box');
     groupBoxes.forEach(box => {
-        const groupName = box.getAttribute('data-group-name') || '';
+        const groupInput = box.querySelector('.univ-api-group-name');
+        const groupName = groupInput ? groupInput.value.trim() : (box.getAttribute('data-group-name') || '');
         const rows = box.querySelectorAll('.univ-api-row');
         
         rows.forEach(row => {
