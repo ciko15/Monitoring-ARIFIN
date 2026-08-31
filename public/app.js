@@ -788,15 +788,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
           initUnivApiSortable(availContainer);
       }
       if (groupsContainer) {
-          // Clear custom groups but keep root
-          const customGroups = groupsContainer.querySelectorAll('.univ-api-group-box[data-is-custom="true"]');
-          customGroups.forEach(g => g.remove());
-          
-          const rootDropzone = groupsContainer.querySelector('.univ-api-group-dropzone');
-          if (rootDropzone) {
-              rootDropzone.innerHTML = '';
-              initUnivApiSortable(rootDropzone);
-          }
+          groupsContainer.innerHTML = ''; // Completely clear custom groups
       }
       
       if (univExtra.mappings && Array.isArray(univExtra.mappings)) {
@@ -811,7 +803,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
           for (const [gName, maps] of Object.entries(grouped)) {
               let dropzone = null;
               if (gName === '') {
-                  dropzone = groupsContainer?.querySelector('.univ-api-group-dropzone');
+                  dropzone = availContainer;
               } else {
                   const box = addUnivApiGroup(gName);
                   dropzone = box.querySelector('.univ-api-group-dropzone');
@@ -819,7 +811,9 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
               
               if (dropzone) {
                   maps.forEach(map => {
-                      dropzone.appendChild(createUnivApiMappingRow(map.json_path, map.name, map.divisor, true));
+                      // If it goes to availContainer, we don't show inputs initially
+                      const showInputs = gName !== '';
+                      dropzone.appendChild(createUnivApiMappingRow(map.json_path, map.name, map.divisor, showInputs));
                   });
               }
           }
