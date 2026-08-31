@@ -256,7 +256,7 @@
               </div>
               <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Gunakan placeholder {ip} dan {port} pada URL.</div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <div>
+                <div style="grid-column: span 2;">
                   <label style="font-size:11px;">Endpoint URL</label>
                   <input type="text" id="univApiUrl" value="http://{ip}:{port}/api" style="width:100%; box-sizing:border-box;">
                 </div>
@@ -271,7 +271,11 @@
                   <label style="font-size:11px;">Poll Interval (detik)</label>
                   <input type="number" id="univApiInterval" value="15" min="1" style="width:100%; box-sizing:border-box;">
                 </div>
-                <div style="display:flex; align-items:flex-end;">
+                <div style="grid-column: span 2;">
+                  <label style="font-size:11px;">Custom Headers (JSON) - Opsional</label>
+                  <input type="text" id="univApiHeaders" placeholder='{"Authorization": "Bearer token..."}' style="width:100%; box-sizing:border-box;">
+                </div>
+                <div style="grid-column: span 2; display:flex; align-items:flex-end;">
                   <button type="button" class="btn btn-primary btn-sm" id="btnSyncUniversalApi" style="width:100%; padding:8px 12px; height:32px;">
                     <i class="fas fa-sync" id="syncApiIcon"></i> Sync Data
                   </button>

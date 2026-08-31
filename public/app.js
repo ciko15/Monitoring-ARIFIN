@@ -928,7 +928,12 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         poll_interval: document.getElementById('univApiInterval') ? parseInt(document.getElementById('univApiInterval').value) || 15 : 15,
         api_options: {
             method: document.getElementById('univApiMethod') ? document.getElementById('univApiMethod').value : 'GET',
-            headers: { 'Accept': 'application/json' }
+            headers: (function() {
+                try {
+                    const h = document.getElementById('univApiHeaders');
+                    return h && h.value ? { 'Accept': 'application/json', ...JSON.parse(h.value) } : { 'Accept': 'application/json' };
+                } catch(e) { return { 'Accept': 'application/json' }; }
+            })()
         },
         mappings: typeof getUniversalApiConfigs === 'function' ? getUniversalApiConfigs() : []
       }) : templateSelect.value === 'pm5350_modbus' ? JSON.stringify({
@@ -3739,8 +3744,20 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
     const port = document.getElementById('dataSourceUdpPort')?.value || '80';
     let url = document.getElementById('univApiUrl')?.value || `http://{ip}:{port}/api`;
     const method = document.getElementById('univApiMethod')?.value || 'GET';
+    const headersStr = document.getElementById('univApiHeaders')?.value;
     
     url = url.replace(/{ip}/g, ip).replace(/{port}/g, port);
+    
+    let customHeaders = {};
+    if (headersStr) {
+        try {
+            customHeaders = JSON.parse(headersStr);
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('Format Custom Headers harus JSON valid!', 'error');
+            else alert('Format Custom Headers harus JSON valid!');
+            return;
+        }
+    }
     
     const container = document.getElementById('univApiMappingsContainer');
     const icon = document.getElementById('syncApiIcon');
@@ -3754,7 +3771,7 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
                 'Content-Type': 'application/json',
                 ...getAuthHeaders()
             },
-            body: JSON.stringify({ url, method })
+            body: JSON.stringify({ url, method, headers: customHeaders })
         });
         
         const data = await res.json();
