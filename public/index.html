@@ -287,7 +287,10 @@
                 </div>
               </div>
               <div style="margin-top:12px; border-top:1px dashed #1a3a5c; padding-top:10px;">
-                <div style="font-size:11px; color:#00d4ff; margin-bottom:6px;">MAPPED FIELDS (Pilih Data & Beri Nama)</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <div style="font-size:11px; color:#00d4ff;">MAPPED FIELDS (Pilih Data & Beri Nama)</div>
+                  <input type="text" id="univApiFilter" placeholder="Cari path (misal: .value)" style="font-size:10px; padding:2px 4px; width:130px; background:#0a1628; color:#fff; border:1px solid #1a3a5c; border-radius:3px;">
+                </div>
                 <!-- Container for dynamically discovered JSON keys -->
                 <div id="univApiMappingsContainer" style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:8px;">
                   <div style="font-size:10px; color:#a0b4c4; text-align:center;">Klik "Sync Data" untuk memuat struktur JSON dari alat.</div>
@@ -2002,7 +2005,7 @@
   </div>
 
   <!-- Scripts -->
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
   <script src="cabang-app.js"></script>
   <script src="enhancements.js?v=5"></script>
   <script src="snmp-tools.js"></script>

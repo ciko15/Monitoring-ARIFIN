@@ -3789,6 +3789,22 @@ window.getMarcPaeConfigsFromCheckboxes = getMarcPaeConfigsFromCheckboxes;
 
 // ── UNIVERSAL API UI FUNCTIONS ───────────────────────────────────────────
 
+document.getElementById('univApiFilter')?.addEventListener('input', (e) => {
+    const term = e.target.value.toLowerCase();
+    const container = document.getElementById('univApiMappingsContainer');
+    if (!container) return;
+    const rows = container.querySelectorAll('.univ-api-row');
+    rows.forEach(row => {
+        const path = row.getAttribute('data-path').toLowerCase();
+        if (path.includes(term)) {
+            row.style.display = 'flex';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
+
+
 document.getElementById('btnViewRawUniversalApi')?.addEventListener('click', async () => {
     const ip = document.getElementById('dataSourceIp')?.value || '127.0.0.1';
     const port = document.getElementById('dataSourceUdpPort')?.value || '80';
@@ -3936,11 +3952,19 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
                     const defaultName = key.split('.').pop();
                     
                     const div = document.createElement('div');
+                    div.className = 'univ-api-row';
+                    div.setAttribute('data-path', key);
                     div.style.display = 'flex';
                     div.style.gap = '8px';
                     div.style.alignItems = 'center';
                     div.style.borderBottom = '1px dashed rgba(255,255,255,0.1)';
                     div.style.paddingBottom = '4px';
+                    // Apply filter immediately if one exists
+                    const filterTerm = document.getElementById('univApiFilter')?.value?.toLowerCase();
+                    if (filterTerm && !key.toLowerCase().includes(filterTerm)) {
+                        div.style.display = 'none';
+                    }
+                    
                     div.innerHTML = `
                         <input type="checkbox" class="univ-api-check" data-path="${key}" checked style="cursor:pointer;">
                         <span style="font-size:11px; color:#fff; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${key} (Value: ${safeTitle})">
