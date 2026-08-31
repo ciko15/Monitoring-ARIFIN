@@ -67,6 +67,20 @@ db.setConfigUpdateHook((filePath: string, data: any) => {
     const configType = configMap[baseName];
     if (configType) {
         syncManager.pushConfigToBranches(configType, data).catch((err: any) => console.error(err));
+        
+        // INSTANT RELOAD: Tembak networkListener secara langsung tanpa fs.watchFile!
+        if (configType === 'auth' || configType === 'parsers' || configType === 'equipment') {
+            try {
+                const networkListener = require('./services/network_listener');
+                console.log(`[SYSTEM] Triggering networkListener.initialize() due to ${configType} config change...`);
+                // Jeda 500ms agar file DB selesai ditulis sepenuhnya
+                setTimeout(() => {
+                    networkListener.initialize().catch((e: any) => console.error(e));
+                }, 500);
+            } catch (e) {
+                console.error('[SYSTEM] Error reloading networkListener:', e);
+            }
+        }
     }
 });
 

@@ -39,27 +39,15 @@ class NetworkListenerService {
         this.equipmentService = new EquipmentService(db);
         this.activeListeners = new Set(); // source_id -> true
         this.parsers = new Map(); // source_id -> parser instance
-        this._parseWarningTimestamps = new Map();
+        this._parseWarningTimestamps = new Map(); // Untuk mencegah spam log
         this.statusGate = new SourceStatusGate();
         this.pipelineMode = process.env.PIPELINE_MODE || 'inline';
         this.serviceRole = process.env.SERVICE_ROLE || 'all';
         this.rawEventQueue = new RawEventQueue();
 
-        // Auto-reload listeners when auth config changes
-        const fs = require('fs');
-        const path = require('path');
-        const authPath = path.join(__dirname, '../../db/equipment_otentication_config.json');
-
-        let debounceTimer = null;
-        fs.watchFile(authPath, { interval: 3000 }, (curr, prev) => {
-            if (curr.mtime > prev.mtime) {
-                console.log('[NetworkListener] Config file changed! Auto-reloading listeners...');
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    this.initialize().catch(e => console.error('[NetworkListener] Error auto-reloading:', e));
-                }, 2000);
-            }
-        });
+        // Note: fs.watchFile dihapus karena sekarang direload secara instan 
+        // langsung dari trigger db.setConfigUpdateHook di server.ts 
+        // (Windows fs.watchFile sering lambat/tidak jalan)
     }
 
     _shouldLogParseWarning(sourceId, errorKey, throttleMs = 15000) {
