@@ -177,7 +177,7 @@ function checkAlarms(data) {
         for (const [field, [lo, hi]] of Object.entries(LIMITS)) {
             const v = mon[field];
             if (v !== null && v !== undefined && (v < lo || v > hi)) {
-                alarms.push(`${monKey.toUpperCase()} ${field}=${v} out of range [${lo}-${hi}]`);
+                // alarms.push (removed hardcode)(`${monKey.toUpperCase()} ${field}=${v} out of range [${lo}-${hi}]`);
             }
         }
     }
@@ -280,7 +280,7 @@ class DvorMaru220Parser extends BaseParser {
             return {
                 success: true,
                 data: this._lastData,
-                status: alarms.length > 0 ? 'Alarm' : 'Normal',
+                status: alarms.length > 0 ? 'Warning' : 'Normal',
                 alarms,
                 warnings: [],
                 triggeredParams: alarms,

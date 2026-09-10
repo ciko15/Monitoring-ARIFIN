@@ -84,7 +84,7 @@ async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
 
         if (tempC >= ALARM_TEMP) {
             status = 'Alarm';
-            alarms.push(`Suhu Ruangan Tinggi (${tempC.toFixed(1)}°C)`);
+            // alarms.push (removed hardcode)(`Suhu Ruangan Tinggi (${tempC.toFixed(1)}°C)`);
         } else if (tempC >= WARN_TEMP) {
             status = 'Warning';
             warnings.push(`Suhu Ruangan Hangat (${tempC.toFixed(1)}°C)`);

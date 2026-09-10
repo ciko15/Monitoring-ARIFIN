@@ -117,7 +117,7 @@ async function pollDse7320(host, port = 502, slaveId = 10) {
     let alarms = [];
     let warnings = [];
 
-    const finalStatus = alarms.length > 0 ? 'Alarm' : deviceStatus;
+    const finalStatus = alarms.length > 0 ? 'Warning' : deviceStatus;
 
     return {
         success: true,

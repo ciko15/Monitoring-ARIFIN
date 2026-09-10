@@ -295,12 +295,12 @@ async function checkEquipmentWatchdog() {
                                     const pingRes = await pingHost(ipToPing, 1);
                                     if (pingRes && pingRes.alive) {
                                         pingErrorMsgs.push(`${name}: Reachable (${pingRes.time || '<1'}ms) but no data`);
-                                        return 'Disconnect';
+                                        return 'Alarm';
                                     }
                                 } catch (e) {}
                             }
                             pingErrorMsgs.push(`${name}: Ping failed or unreachable`);
-                            return 'Alarm';
+                            return 'Disconnect';
                         }
                         return src._status || 'Normal';
                     }));

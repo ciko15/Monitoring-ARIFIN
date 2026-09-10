@@ -132,7 +132,7 @@ class BaseParser {
             alarms,
             warnings,
             triggeredParams,
-            status: alarms.length > 0 ? 'Alarm' : 
+            status: alarms.length > 0 ? 'Warning' : 
                     warnings.length > 0 ? 'Warning' : 'Normal'
         };
     }
@@ -144,7 +144,7 @@ class BaseParser {
      * @returns {string} Status string
      */
     getStatus(alarms, warnings) {
-        if (alarms && alarms.length > 0) return 'Alarm';
+        if (alarms && alarms.length > 0) return 'Warning';
         if (warnings && warnings.length > 0) return 'Warning';
         return 'Normal';
     }
