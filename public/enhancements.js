@@ -518,8 +518,15 @@
 
             // Update equipmentDataCache dengan lastData terbaru
             if (dataRes.ok) {
-                const eqData = await dataRes.json();
-                updateEquipmentCacheEntry(eqData);
+                const eqText = await dataRes.text();
+                if (eqText) {
+                    try {
+                        const eqData = JSON.parse(eqText);
+                        updateEquipmentCacheEntry(eqData);
+                    } catch (err) {
+                        console.warn("Failed to parse equipment data JSON:", err);
+                    }
+                }
             }
 
             const finalSources = Array.isArray(srcJson) ? srcJson : [];
@@ -672,7 +679,7 @@
                             ? formatSnmpMetricValue(k, rawVal)
                             : rawVal;
                         const eqSup = eq ? eq.sup_category : '';
-                        const valColor = getLimitColor(eqSup, label, rawVal);
+                        const valColor = getLimitColor(eqSup, label, rawVal, srcData || {});
 
                         return `<div class="sp-card-preview-point">
                                 <span class="sp-preview-label" title="${label}">${label}</span>
