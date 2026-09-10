@@ -56,12 +56,12 @@ const WARN_TEMP_C = 65;
 const ALARM_TEMP_C = 75;
 
 function statusFromPct(pct) {
-    if (pct >= ALARM_PCT) return 'Alarm';
+    if (pct >= ALARM_PCT) return 'Warning';
     if (pct >= WARN_PCT)  return 'Warning';
     return 'Normal';
 }
 function statusFromAvailablePct(pct) {
-    if (pct <= RAM_AVAIL_ALARM_PCT) return 'Alarm';
+    if (pct <= RAM_AVAIL_ALARM_PCT) return 'Warning';
     if (pct <= RAM_AVAIL_WARN_PCT)  return 'Warning';
     return 'Normal';
 }
@@ -80,7 +80,7 @@ function statusFromTemperature(tempC, sysObjectID, sysDescr) {
     const warnLimit = isSwitch ? 65 : WARN_TEMP_C;
     const alarmLimit = isSwitch ? 75 : ALARM_TEMP_C;
 
-    if (tempC >= alarmLimit) return 'Alarm';
+    if (tempC >= alarmLimit) return 'Warning'; // Changed from Alarm to Warning
     if (tempC >= warnLimit) return 'Warning';
     return 'Normal';
 }
