@@ -69,7 +69,7 @@ async function pollPM5350(host, port = 26, slaveId = 5, timeoutMs = 4000) {
 
         // Evaluasi sederhana
         if (V_RN < 200 || V_RN > 240) {
-            // alarms.push (removed hardcode)(`Tegangan R-N Tidak Normal (${V_RN.toFixed(1)}V)`);
+            alarms.push(`Tegangan R-N Tidak Normal (${V_RN.toFixed(1)}V)`);
             triggeredParams.push('V_RN');
         }
         if (FREQ < 49 || FREQ > 51) {
@@ -77,7 +77,7 @@ async function pollPM5350(host, port = 26, slaveId = 5, timeoutMs = 4000) {
             triggeredParams.push('FREQ');
         }
 
-        let status = alarms.length > 0 ? 'Warning' : (warnings.length > 0 ? 'Warning' : 'Normal');
+        let status = alarms.length > 0 ? 'Alarm' : (warnings.length > 0 ? 'Warning' : 'Normal');
 
         return {
             success: true,

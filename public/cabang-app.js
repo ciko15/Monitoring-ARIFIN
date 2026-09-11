@@ -295,29 +295,18 @@ const cabangModule = (function () {
 
     function deriveEquipmentStatus(item) {
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
-        // Evaluate if data is stale (older than 5 minutes)
-        const now = Date.now();
-        const isStale = Object.values(item.lastData).some(src => {
-            if (!src || !src._logged_at) return true;
-            return (now - new Date(src._logged_at).getTime()) > (5 * 60 * 1000);
-        });
-
-        if (isStale) {
-            return String(item.status || 'normal').toLowerCase();
-        }
-
         const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status).toLowerCase());
 
         if (sourceStatuses.some(st => st === 'alarm')) return 'alarm';
         if (sourceStatuses.some(st => st === 'warning')) return 'warning';
         if (sourceStatuses.every(st => st === 'disconnect')) return 'disconnect';
-        if (sourceStatuses.some(st => st === 'disconnect')) return 'disconnect';
+        if (sourceStatuses.some(st => st === 'disconnect')) return 'warning';
         return 'normal';
       }
 
       const fallback = String(item?.status || 'offline').toLowerCase();
       return ['normal', 'alarm', 'alert', 'warning', 'offline', 'disconnect'].includes(fallback)
-        ? (fallback === 'disconnect' ? 'disconnect' : (fallback === 'alert' ? 'alarm' : fallback))
+        ? (fallback === 'disconnect' ? 'offline' : (fallback === 'alert' ? 'alarm' : fallback))
         : 'offline';
     }
 
@@ -345,6 +334,7 @@ const cabangModule = (function () {
     if (currentStatusFilter) {
       let filterVal = String(currentStatusFilter).toLowerCase();
       if (filterVal === 'alert') filterVal = 'alarm';
+      if (filterVal === 'disconnect') filterVal = 'offline';
 
       filtered = filtered.filter(e => {
         const normalized = window.normalizeStatus
@@ -395,11 +385,7 @@ const cabangModule = (function () {
         if (sources.length > 0) {
           const cardsHtml = sources.map(sourceName => {
             const sourceData = item.lastData[sourceName] || {};
-            const _rawStatus = sourceData._status || 'Normal';
-            // Normalize tampilan badge agar selalu rapi (Warning, Alarm, Normal, Disconnect)
-            // Berapapun nilai _status mentah dari DB (termasuk 'WARR', 'ALARM', dll)
-            const _normalizedStatus = normalizeSourceStatus(_rawStatus);
-            const srcStatus = _normalizedStatus; // Gunakan nilai ternormalisasi untuk tampil
+            const srcStatus = sourceData._status || 'Normal';
             const logDate = sourceData._logged_at ? new Date(sourceData._logged_at) : null;
             const isToday = logDate && logDate.toDateString() === new Date().toDateString();
             const srcTime = logDate
@@ -426,7 +412,7 @@ const cabangModule = (function () {
                     <span class="status-dot ${statusClass}" style="background-color: ${dotColor}"></span>
                     <span class="source-name">${sourceName}</span>
                   </div>
-                  <span class="status-pill ${statusClass}">${srcStatus === 'Alarm' ? 'Offline' : srcStatus}</span>
+                  <span class="status-pill ${statusClass}">${srcStatus}</span>
                 </div>
                 <div class="source-card-footer">
                   <span class="update-label"><i class="far fa-clock"></i></span>

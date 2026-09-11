@@ -28,7 +28,7 @@ class ConnectionManager {
             this.disconnect(equipmentId);
 
             const socket = new net.Socket();
-            socket.setTimeout(45000); // 45 second timeout (must be > 30s for DME/DVOR deadlock recovery)
+            socket.setTimeout(10000); // 10 second timeout
 
             socket.connect(port, host, () => {
                 console.log(`[Connection] TCP connected to ${host}:${port} (equipment: ${equipmentId})`);

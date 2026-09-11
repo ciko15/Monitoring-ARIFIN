@@ -146,7 +146,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         if (chargeRemaining !== null) {
             if (chargeRemaining < 30) {
                 status = 'Alarm';
-                // alarms.push (removed hardcode)('Kapasitas Baterai Sangat Rendah (<30%)');
+                alarms.push('Kapasitas Baterai Sangat Rendah (<30%)');
                 triggeredParams.push('battery_capacity');
             } else if (chargeRemaining <= 50) {
                 if (status !== 'Alarm') status = 'Warning';
@@ -157,7 +157,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         
         if (batteryStatusRaw === 3 || batteryStatusRaw === 4) { // Low atau Depleted
             status = 'Alarm';
-            // alarms.push (removed hardcode)('Status Baterai Lemah/Kosong (Low/Depleted)');
+            alarms.push('Status Baterai Lemah/Kosong (Low/Depleted)');
             triggeredParams.push('battery_status');
         }
 
@@ -165,7 +165,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         const avgInputVoltage = (inputVoltageR !== null) ? inputVoltageR : 0; // Deteksi drop di Phase R
         if (inputVoltageR !== null && inputVoltageR < 150) {
             status = 'Alarm';
-            // alarms.push (removed hardcode)('Listrik Input Mati / Drop (On Battery)');
+            alarms.push('Listrik Input Mati / Drop (On Battery)');
             triggeredParams.push('input_voltage_r');
         }
 
@@ -173,7 +173,7 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         const maxLoad = Math.max(outputPercentLoadR || 0, outputPercentLoadS || 0, outputPercentLoadT || 0);
         if (maxLoad > 90) {
             status = 'Alarm';
-            // alarms.push (removed hardcode)('Beban UPS Overload (>90%)');
+            alarms.push('Beban UPS Overload (>90%)');
             triggeredParams.push('output_load_percent');
         } else if (maxLoad > 80) {
             if (status !== 'Alarm') status = 'Warning';

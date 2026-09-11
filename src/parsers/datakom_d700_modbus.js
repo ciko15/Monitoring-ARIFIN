@@ -179,10 +179,10 @@ async function pollDatakomD700(host, port = 502, slaveId = 1) {
     let warnings = [];
 
     if (parsedData.Alarm !== '-' && parsedData.Alarm > 0) {
-        // alarms.push (removed hardcode)(`Genset Alarm Code: ${parsedData.Alarm}`);
+        alarms.push(`Genset Alarm Code: ${parsedData.Alarm}`);
     }
 
-    const finalStatus = alarms.length > 0 ? 'Warning' : deviceStatus;
+    const finalStatus = alarms.length > 0 ? 'Alarm' : deviceStatus;
 
     return {
         success: true,

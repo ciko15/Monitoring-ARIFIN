@@ -70,21 +70,13 @@ function evaluateParameters(parameters, thresholds) {
   // Status priority order (highest to lowest)
   const statusPriority = { 'Alert': 3, 'Warning': 2, 'Normal': 1, 'Disconnect': 0 };
 
-  let allDisconnected = true;
-  let hasParameters = false;
-
   for (const [paramName, value] of Object.entries(parameters)) {
-    hasParameters = true;
     const config = thresholds[paramName] || {};
     let status = checkThreshold(value, config);
     
     // Force status to never exceed Warning for threshold breaches
     if (status === 'Alert') status = 'Warning';
     
-    if (status !== 'Disconnect') {
-      allDisconnected = false;
-    }
-
     parameterStatuses[paramName] = status;
 
     if (status === 'Warning') {
@@ -95,13 +87,6 @@ function evaluateParameters(parameters, thresholds) {
     if (statusPriority[status] > statusPriority[overallStatus]) {
       overallStatus = status;
     }
-  }
-
-  // Jika SEMUA parameter bernilai kosong/'-' (Disconnect), 
-  // dan ada minimal 1 parameter yang dievaluasi, 
-  // maka ubah overallStatus menjadi 'Alarm' (karena data alat kosong tapi koneksi ada).
-  if (hasParameters && allDisconnected) {
-    overallStatus = 'Alarm';
   }
 
   return {

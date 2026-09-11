@@ -254,7 +254,7 @@ async function checkEquipmentWatchdog() {
         const limit = 200; // Process in chunks to save memory
         let hasMore = true;
         const now = Date.now();
-        const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+        const TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes
 
         while (hasMore) {
             const result = await db.getAllEquipment({ includeData: true, isActive: true, limit, page });
@@ -266,10 +266,7 @@ async function checkEquipmentWatchdog() {
             }
 
             for (const item of equipmentList) {
-                // Determine group level consolidated status
-                let finalStatus = 'Unknown';
-                let pingErrorMsgs = [];
-                const equipmentId = String(item.id);
+                let finalStatus = item.status || 'Normal';
 
                 if (item.lastData) {
                     const sourceNames = Object.keys(item.lastData);
@@ -283,8 +280,7 @@ async function checkEquipmentWatchdog() {
                             
                             // Bypass ping for Radar and ADSB
                             if (parserId.includes('radar') || parserId.includes('adsb') || category.includes('radar') || category.includes('adsb')) {
-                                pingErrorMsgs.push(`${name}: No data (Radar/ADSB bypass)`);
-                                return 'Disconnect';
+                                return 'Alarm';
                             }
                             
                             // For regular equipment, try ping
@@ -292,14 +288,10 @@ async function checkEquipmentWatchdog() {
                             if (ipToPing) {
                                 try {
                                     const { pingHost } = require('./utils/network');
-                                    const pingRes = await pingHost(ipToPing, 3);
-                                    if (pingRes && pingRes.alive) {
-                                        pingErrorMsgs.push(`${name}: Reachable (${pingRes.time || '<1'}ms) but no data`);
-                                        return 'Alarm';
-                                    }
+                                    const pingRes = await pingHost(ipToPing, 1);
+                                    if (pingRes && pingRes.alive) return 'Alarm';
                                 } catch (e) {}
                             }
-                            pingErrorMsgs.push(`${name}: Ping failed or unreachable`);
                             return 'Disconnect';
                         }
                         return src._status || 'Normal';
@@ -326,38 +318,29 @@ async function checkEquipmentWatchdog() {
                     if (now - lastUpdate > TIMEOUT_MS) {
                         const category = String(item.category || item.sup_category || '').toLowerCase();
                         if (category.includes('radar') || category.includes('adsb')) {
-                            finalStatus = 'Disconnect';
-                            pingErrorMsgs.push('No data received (Radar/ADSB bypass ping)');
+                            finalStatus = 'Alarm';
                         } else {
                             const ipToPing = item.ip_address || null;
                             if (ipToPing) {
                                 try {
                                     const { pingHost } = require('./utils/network');
                                     const pingRes = await pingHost(ipToPing, 1);
-                                    if (pingRes && pingRes.alive) {
-                                        finalStatus = 'Disconnect';
-                                        pingErrorMsgs.push(`Device reachable (${pingRes.time || '<1'}ms) but no data received`);
-                                    } else {
-                                        finalStatus = 'Alarm';
-                                        pingErrorMsgs.push('Ping failed: Device unreachable');
-                                    }
+                                    if (pingRes && pingRes.alive) finalStatus = 'Alarm';
+                                    else finalStatus = 'Disconnect';
                                 } catch (e) {
-                                    finalStatus = 'Alarm';
-                                    pingErrorMsgs.push('Ping execution failed');
+                                    finalStatus = 'Disconnect';
                                 }
                             } else {
-                                finalStatus = 'Alarm';
-                                pingErrorMsgs.push('No IP address configured');
+                                finalStatus = 'Disconnect';
                             }
                         }
                     }
-                }
+                } // Missing closing brace added here
 
                 // Update only if status changed
                 if (item.status !== finalStatus) {
                     console.log(`[WATCHDOG] Equipment ${item.name} status changed: ${item.status} -> ${finalStatus}`);
-                    const combinedErrorMsg = pingErrorMsgs.length > 0 ? pingErrorMsgs.join(' | ') : null;
-                    await equipmentService.updateEquipmentStatus(item.id, finalStatus, combinedErrorMsg);
+                    await equipmentService.updateEquipmentStatus(item.id, finalStatus);
                 }
             }
             
@@ -648,50 +631,6 @@ const app = new Elysia()
             }
         }, { beforeHandle: authorize(['superadmin', 'admin']) })
     )
-
-    // API Get Available Parameters for UI Dropdown (by Sub-Category)
-    .get('/api/limitations/available-parameters', async ({ query, set }) => {
-        try {
-            const supCategory = query.sup_category;
-            const paramsList = new Set<string>();
-
-            // Find all equipments in this sub-category
-            const equipments = await db.getAllEquipment();
-            const relevantEquips = equipments.filter((e: any) => 
-                !supCategory || e.sup_category === supCategory || supCategory === 'all'
-            );
-
-            for (const equipment of relevantEquips) {
-                // Check latest log
-                const latestLog = await db.getLatestEquipmentLog(equipment.id);
-                if (latestLog && latestLog.data) {
-                    const actualData = latestLog.data.data || latestLog.data;
-                    for (const key of Object.keys(actualData)) {
-                        if (key.startsWith('_') || ['status', 'alarms', 'warnings', 'triggeredParams', 'connectivity', 'reachability', 'error'].includes(key)) continue;
-                        const valObj = actualData[key];
-                        if (valObj === null || valObj === undefined || valObj === '-' || valObj === '—') continue;
-                        paramsList.add(key);
-                    }
-                }
-
-                // Check templates
-                if (equipment.templateId) {
-                    const config = await db.getParsingConfigById(equipment.templateId);
-                    if (config && config.template_parameters && Array.isArray(config.template_parameters)) {
-                        config.template_parameters.forEach((p: any) => {
-                            if (p.name) paramsList.add(p.name);
-                        });
-                    }
-                }
-            }
-
-            return Array.from(paramsList).sort();
-        } catch (error: any) {
-            console.error('[API] Error fetching available parameters:', error);
-            set.status = 500;
-            return { error: 'Failed to fetch available parameters' };
-        }
-    })
 
     // Public Equipment Stats
     .get('/api/equipment/stats', async () => {
@@ -2046,15 +1985,6 @@ async function startServices() {
         }
 
         if (SHOULD_START_PROCESSOR) {
-            // Run watchdog immediately on startup so statuses are not stale
-            setTimeout(async () => {
-                try {
-                    await checkEquipmentWatchdog();
-                } catch (e) {
-                    console.error('[WATCHDOG] Startup Error:', e);
-                }
-            }, 5000); // 5 seconds delay to allow listeners to bind
-
             setInterval(async () => {
                 try {
                     await checkEquipmentWatchdog();

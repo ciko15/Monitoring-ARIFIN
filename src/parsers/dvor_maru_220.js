@@ -35,13 +35,12 @@ const POLL_INTERVAL = 2000;  // ms — interval polling ACTIVE
 const POLL_REQ_DELAY = 150;   // ms — jeda antar request
 
 const LIMITS = {
-    // Alarm limits dihilangkan atas permintaan user
-    // carrier_power: [80.0, 120.0],
-    // rf_input: [-25.0, 0.0],
-    // fm_index: [15.0, 17.0],
-    // am_30hz: [28.0, 32.0],
-    // am_9960hz: [25.0, 32.5],
-    // am_1020hz: [6.0, 8.0],
+    carrier_power: [80.0, 120.0],
+    rf_input: [-25.0, 0.0],
+    fm_index: [15.0, 17.0],
+    am_30hz: [28.0, 32.0],
+    am_9960hz: [25.0, 32.5],
+    am_1020hz: [6.0, 8.0],
 };
 
 function extractSections(buf) {
@@ -177,7 +176,7 @@ function checkAlarms(data) {
         for (const [field, [lo, hi]] of Object.entries(LIMITS)) {
             const v = mon[field];
             if (v !== null && v !== undefined && (v < lo || v > hi)) {
-                // alarms.push (removed hardcode)(`${monKey.toUpperCase()} ${field}=${v} out of range [${lo}-${hi}]`);
+                alarms.push(`${monKey.toUpperCase()} ${field}=${v} out of range [${lo}-${hi}]`);
             }
         }
     }
@@ -280,7 +279,7 @@ class DvorMaru220Parser extends BaseParser {
             return {
                 success: true,
                 data: this._lastData,
-                status: alarms.length > 0 ? 'Warning' : 'Normal',
+                status: alarms.length > 0 ? 'Alarm' : 'Normal',
                 alarms,
                 warnings: [],
                 triggeredParams: alarms,

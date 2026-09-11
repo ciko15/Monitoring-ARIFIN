@@ -349,7 +349,7 @@ class JsonParser {
                 };
                 
                 if (rule.severity === 'alarm') {
-                    // alarms.push (removed hardcode)(info);
+                    alarms.push(info);
                 } else {
                     warnings.push(info);
                 }
@@ -359,7 +359,7 @@ class JsonParser {
         return {
             alarms,
             warnings,
-            status: alarms.length > 0 ? 'Warning' : warnings.length > 0 ? 'Warning' : 'Normal'
+            status: alarms.length > 0 ? 'Alarm' : warnings.length > 0 ? 'Warning' : 'Normal'
         };
     }
 }

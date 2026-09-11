@@ -164,7 +164,7 @@ function checkAlarms(d, isActive) {
         const v = d[field];
         const lim = LIMITS[limitKey];
         if (v !== null && v !== undefined && lim && (v < lim[0] || v > lim[1])) {
-            // alarms.push (removed hardcode)(`${field}=${v} out of range [${lim[0]}-${lim[1]}]`);
+            alarms.push(`${field}=${v} out of range [${lim[0]}-${lim[1]}]`);
         }
     }
     return alarms;

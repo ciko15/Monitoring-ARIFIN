@@ -80,7 +80,7 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
                         out[key] = isActive ? 'Aktif' : 'Tidak Aktif';
                         
                         if (type === 'alarm' && isActive) {
-                            // alarms.push (removed hardcode)(key);
+                            alarms.push(key);
                         } else if (type === 'warning' && isActive) {
                             warnings.push(key);
                         }
@@ -128,13 +128,21 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
             for (let i = 0; i < 14; i++) dvor2Bits.push(bitArray[i + 32]);
             data.devices['DVOR 2'] = parse14Bits(dvor2Bits);
 
-            // Cek Alarms fallback (removed)
+            // Cek Alarms fallback
+            for (const [deviceName, out] of Object.entries(data.devices)) {
+                if (out['STATUS'] !== 'Normal' && out['STATUS'] !== '-') alarms.push(`${deviceName} Status: ${out['STATUS']}`);
+                if (out['DESCRIPTION'] !== '-') alarms.push(`${deviceName} Info: ${out['DESCRIPTION']}`);
+                if (out['Battery Charge 1'] === 'Alarm') alarms.push(`${deviceName} Battery Charge 1 Alarm`);
+                if (out['Battery Charge 2'] === 'Alarm') alarms.push(`${deviceName} Battery Charge 2 Alarm`);
+                if (out['Mains OK'] === 'Alarm') alarms.push(`${deviceName} Mains OK Alarm`);
+                if (out['Normal AC Power'] === 'Alarm') alarms.push(`${deviceName} Normal AC Power Alarm`);
+            }
         }
 
         return {
             success: true,
             data: data,
-            status: alarms.length > 0 ? 'Warning' : (warnings.length > 0 ? 'Warning' : 'Normal'),
+            status: alarms.length > 0 ? 'Alarm' : (warnings.length > 0 ? 'Warning' : 'Normal'),
             alarms: alarms,
             warnings: warnings,
             triggeredParams: triggeredParams,

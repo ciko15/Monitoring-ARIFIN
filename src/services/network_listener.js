@@ -97,7 +97,7 @@ class NetworkListenerService {
             return;
         }
 
-        let finalStatus = decision.status;
+        const finalStatus = decision.status;
         const isFrozen = decision.reason === 'Frozen (Pending Disconnect)';
 
         // LKGV (Last Known Good Value) & Dash Conversion
@@ -113,8 +113,6 @@ class NetworkListenerService {
                 parsedData.data = JSON.parse(JSON.stringify(prevData));
             }
         } else if (!isDisconnect && parsedData && parsedData.data) {
-            // Jika bisa connect SNMP/API, berarti secara logika network normal. Reset ping_status agar tidak nyangkut 'Gagal' di deepMerge
-            parsedData.data.ping_status = 'Normal';
             // Simpan data terakhir yang SUKSES BENERAN ke dalam cache
             this._lkgvCache.set(source.id, JSON.parse(JSON.stringify(parsedData.data)));
         } else if (isDisconnect && parsedData) {
@@ -134,10 +132,6 @@ class NetworkListenerService {
             if (!parsedData.data) parsedData.data = {};
             const isPingable = await checkIcmpPing(source.ip_address);
             parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
-            
-            if (isPingable) {
-                finalStatus = 'Alarm';
-            }
         }
 
         if (this._isSplitCollectorMode()) {
@@ -692,8 +686,8 @@ class NetworkListenerService {
         // Add random jitter (0 to 15 seconds) to prevent 'Thundering Herd'
         // di mana puluhan server ditembak SNMP secara bersamaan yang membuat
         // UDP packet terbuang (drop) oleh switch/buffer.
-        const jitterMs = Math.floor(Math.random() * 3000);
-        const initialDelay = 500 + jitterMs;
+        const jitterMs = Math.floor(Math.random() * 15000);
+        const initialDelay = 2000 + jitterMs;
 
         setTimeout(() => {
             doPoll();

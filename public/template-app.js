@@ -265,7 +265,7 @@ window.viewTemplate = async (id) => {
         <div class="template-parameters">
           <h4>Parameters (${params.length})</h4>
           <table class="detail-table">
-            <thead><tr><th>Label</th><th>Source</th><th>Unit</th><th>Warning (Min/Max)</th><th>Offline (Min/Max)</th></tr></thead>
+            <thead><tr><th>Label</th><th>Source</th><th>Unit</th><th>Warning (Min/Max)</th><th>Alarm (Min/Max)</th></tr></thead>
             <tbody>${paramsHtml || '<tr><td colspan="5">No parameters defined</td></tr>'}</tbody>
           </table>
         </div>

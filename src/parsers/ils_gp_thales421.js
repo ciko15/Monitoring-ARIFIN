@@ -146,7 +146,7 @@ function checkAlarms(params) {
         if (v == null) continue;
         if (v < lim[0] || v > lim[1]) {
             const [label, unit] = PARAM_LABELS[key] || [key, ''];
-            // alarms.push (removed hardcode)(`${label}=${v.toFixed(3)}${unit} [${lim[0]}~${lim[1]}]`);
+            alarms.push(`${label}=${v.toFixed(3)}${unit} [${lim[0]}~${lim[1]}]`);
         }
     }
     return alarms;
@@ -215,7 +215,7 @@ class IlsGpThales421Parser extends BaseParser {
                 tx_stby_label: `${d.tx_stby} STBY`,
                 ...d.params,
             },
-            status: alarms.length > 0 ? 'Warning' : 'Normal',
+            status: alarms.length > 0 ? 'Alarm' : 'Normal',
             alarms, warnings: [], triggeredParams: alarms,
             timestamp: new Date().toISOString(),
         };

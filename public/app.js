@@ -1810,10 +1810,10 @@ window.viewEquipmentDetail = async function (id) {
         const isNumeric = (limit.value_type === 'numeric' || limit.value_type === 'percent' || !limit.value_type);
         const thresholdHtml = isNumeric ? `
                   <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                    <span class="status-badge Alert" style="padding: 2px 6px; font-size: 0.75rem;" title="Offline Low">${limit.min_alarm_limit || limit.alv || '-'}</span>
+                    <span class="status-badge Alert" style="padding: 2px 6px; font-size: 0.75rem;" title="Alarm Low">${limit.min_alarm_limit || limit.alv || '-'}</span>
                     <span class="status-badge Warning" style="padding: 2px 6px; font-size: 0.75rem;" title="Warning Low">${limit.min_warning_limit || limit.wlv || '-'}</span>
                     <span class="status-badge Warning" style="padding: 2px 6px; font-size: 0.75rem;" title="Warning High">${limit.max_warning_limit || limit.whv || '-'}</span>
-                    <span class="status-badge Alert" style="padding: 2px 6px; font-size: 0.75rem;" title="Offline High">${limit.max_alarm_limit || limit.ahv || '-'}</span>
+                    <span class="status-badge Alert" style="padding: 2px 6px; font-size: 0.75rem;" title="Alarm High">${limit.max_alarm_limit || limit.ahv || '-'}</span>
                   </div>
                 ` : '<span class="text-muted" style="font-size: 0.75rem;">Non-numeric</span>';
 
@@ -2268,7 +2268,7 @@ function initDashboardInteractivity() {
 
       if (label === 'Normal') targetStatus = 'Normal';
       else if (label === 'Warning') targetStatus = 'Warning';
-      else if (label === 'Offline') targetStatus = 'Alert';
+      else if (label === 'Alert') targetStatus = 'Alert';
       else if (label === 'Disconnect') targetStatus = 'Disconnect';
       // 'Total' means empty targetStatus (All)
 
@@ -2924,19 +2924,18 @@ window.renderConfigFields = function (type, item, container) {
     container.innerHTML = `
       <div class="form-group-ux">
         <label>Parameter Name</label>
-        <input type="text" name="name" list="params-datalist" value="${item?.name || ''}" required placeholder="e.g. Temperature, Status" autocomplete="off" onfocus="fetchAvailableParams(this)">
-        <datalist id="params-datalist"></datalist>
+        <input type="text" name="name" value="${item?.name || ''}" required placeholder="e.g. Temperature, Status">
       </div>
       <div class="form-row-ux">
         <div class="form-group-ux">
           <label>Category</label>
-          <select name="category" required onchange="updateSubCategoryDropdown(this.value, 'modalSubCat'); document.getElementById('params-datalist').innerHTML = '';">
+          <select name="category" required onchange="updateSubCategoryDropdown(this.value, 'modalSubCat')">
             ${categoriesHtml}
           </select>
         </div>
         <div class="form-group-ux">
           <label>Sub-Category</label>
-          <select name="sup_category" id="modalSubCat" required onchange="document.getElementById('params-datalist').innerHTML = '';">
+          <select name="sup_category" id="modalSubCat" required>
             ${item ? `<option value="${item.sup_category}">${item.sup_category}</option>` : '<option value="">Select Category First</option>'}
           </select>
         </div>
@@ -2957,8 +2956,8 @@ window.renderConfigFields = function (type, item, container) {
       </div>
       <div class="form-row-ux">
         <div class="form-group-ux">
-          <label>Min. Offline Limit</label>
-          <input type="number" step="any" name="min_alarm_limit" value="${item?.min_alarm_limit || item?.alv || ''}" placeholder="Min Offline">
+          <label>Min. Alarm Limit</label>
+          <input type="number" step="any" name="min_alarm_limit" value="${item?.min_alarm_limit || item?.alv || ''}" placeholder="Min Alarm">
         </div>
         <div class="form-group-ux">
           <label>Min. Warning Limit</label>
@@ -2971,8 +2970,8 @@ window.renderConfigFields = function (type, item, container) {
           <input type="number" step="any" name="max_warning_limit" value="${item?.max_warning_limit || item?.whv || ''}" placeholder="Max Warning">
         </div>
         <div class="form-group-ux">
-          <label>Max. Offline Limit</label>
-          <input type="number" step="any" name="max_alarm_limit" value="${item?.max_alarm_limit || item?.ahv || ''}" placeholder="Max Offline">
+          <label>Max. Alarm Limit</label>
+          <input type="number" step="any" name="max_alarm_limit" value="${item?.max_alarm_limit || item?.ahv || ''}" placeholder="Max Alarm">
         </div>
       </div>
     `;
@@ -3590,7 +3589,7 @@ function addIoParam(deviceId, key = '', pin = '') {
       <input type="number" class="io-param-pin" placeholder="PIN (0-47)" value="${pinVal}" min="0" max="47" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; flex:1;">
       <select class="io-param-type" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; width:75px;">
         <option value="normal" ${typeVal === 'normal' ? 'selected' : ''}>Status</option>
-        <option value="alarm" ${typeVal === 'alarm' ? 'selected' : ''}>Offline</option>
+        <option value="alarm" ${typeVal === 'alarm' ? 'selected' : ''}>Alarm</option>
         <option value="warning" ${typeVal === 'warning' ? 'selected' : ''}>Warning</option>
       </select>
       <select class="io-param-logic" onchange="syncIologikBuilderToJson()" style="background:#0a1628; color:#00ffcc; border:1px solid #234c7a; border-radius:4px; padding:4px; font-size:10px; width:65px;">
@@ -4179,23 +4178,4 @@ window.addUnivApiGroup = function(name = '') {
     initUnivApiSortable(dropzone);
     
     return groupDiv;
-};
-
-window.fetchAvailableParams = async function(inputElement) {
-  const datalist = document.getElementById('params-datalist');
-  // If already populated, skip
-  if (datalist.children.length > 0) return;
-
-  const supCategory = document.getElementById('modalSubCat')?.value;
-  if (!supCategory) return; // Cannot fetch if subcategory is empty
-
-  try {
-    const res = await fetch(`/api/limitations/available-parameters?sup_category=${encodeURIComponent(supCategory)}`);
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      datalist.innerHTML = data.map(param => `<option value="${param}">`).join('');
-    }
-  } catch (err) {
-    console.error('Failed to fetch available params', err);
-  }
 };

@@ -97,26 +97,25 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
 async function publishEquipmentStatusChanged(equipment = {}, status, error = null, options = {}) {
     const airportCode = await getAirportCode();
     
-    const payload = {
-        equipment_id: equipment.id,
-        equipment_name: equipment.name,
-        category: equipment.category || null,
-        airport_code: airportCode,
-        status,
-        message: error || null,
-        occurred_at: options.changedAt || new Date().toISOString()
-    };
     console.log("[EMS-PAYLOAD]", JSON.stringify(payload));
     return publishCategorizedEvent(
         equipment.category || 'Support',
         'equipment.status.changed',
-        payload,
+        {
+            equipment_id: equipment.id,
+            equipment_name: equipment.name,
+            category: equipment.category || null,
+            airport_code: airportCode,
+            status,
+            message: error || null,
+            changed_at: options.changedAt || new Date().toISOString()
+        },
         {
             producerService: options.producerService || await getBranchServiceName(),
             producerSiteId: options.producerSiteId || await getLocalSiteId(),
             targetService: options.targetService || await getCentralServiceName(),
             targetSiteId: options.targetSiteId || 'PUSAT',
-            occurredAt: payload.occurred_at,
+            occurredAt: options.changedAt,
             correlationId: options.correlationId,
             eventType: 'status',
             domain: 'equipment',
@@ -329,18 +328,17 @@ async function publishCollectorRefreshResult(success, result = {}) {
 async function publishEquipmentConfigurationChanged(action, equipment = {}) {
     const airportCode = await getAirportCode();
     
-    const payload = {
-        action, // 'add', 'update', 'delete'
-        equipment_id: equipment.id || null,
-        airport_code: airportCode,
-        equipment_data: action === 'delete' ? null : equipment,
-        changed_at: new Date().toISOString()
-    };
     console.log("[EMS-PAYLOAD]", JSON.stringify(payload));
     return publishCategorizedEvent(
         equipment.category || 'Support',
         'equipment.configuration.changed',
-        payload,
+        {
+            action, // 'add', 'update', 'delete'
+            equipment_id: equipment.id || null,
+            airport_code: airportCode,
+            equipment_data: action === 'delete' ? null : equipment,
+            changed_at: new Date().toISOString()
+        },
         {
             producerService: await getBranchServiceName(),
             producerSiteId: await getLocalSiteId(),
@@ -357,19 +355,18 @@ async function publishEquipmentConfigurationChanged(action, equipment = {}) {
 async function publishDataSourceConfigurationChanged(action, datasource = {}) {
     const airportCode = await getAirportCode();
     
-    const payload = {
-        action, // 'add', 'update', 'delete'
-        equipment_id: datasource.equipt_id || datasource.equipmentId || null,
-        datasource_id: datasource.id || null,
-        airport_code: airportCode,
-        datasource_data: action === 'delete' ? null : datasource,
-        changed_at: new Date().toISOString()
-    };
     console.log("[EMS-PAYLOAD]", JSON.stringify(payload));
     return publishCategorizedEvent(
         'Support',
         'datasource.configuration.changed',
-        payload,
+        {
+            action, // 'add', 'update', 'delete'
+            equipment_id: datasource.equipt_id || datasource.equipmentId || null,
+            datasource_id: datasource.id || null,
+            airport_code: airportCode,
+            datasource_data: action === 'delete' ? null : datasource,
+            changed_at: new Date().toISOString()
+        },
         {
             producerService: await getBranchServiceName(),
             producerSiteId: await getLocalSiteId(),

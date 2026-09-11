@@ -197,18 +197,50 @@
         }
     }
 
-    // Centralized color/threshold logic using payload metadata from Cabang
-    function getLimitColor(supCategory, label, value, rowData = {}) {
+    // Centralized color/threshold logic using limitation_config.json
+    function getLimitColor(supCategory, label, value) {
         if (value === null || value === undefined || value === '—' || value === '-') return '#4a7a9a';
-        
-        // Cek Array Indikator Limit (Warna Teks UI) yang dikirim oleh Cabang
-        if (rowData._triggered_alarms && rowData._triggered_alarms.includes(label)) {
-            return '#ff3355'; // Merah (Alarm)
-        } else if (rowData._triggered_warnings && rowData._triggered_warnings.includes(label)) {
-            return '#ffcc00'; // Kuning (Warning)
-        }
-        
-        return '#e8f4ff'; // Putih/Normal (Tidak ada pelanggaran)
+        if (!window.limitationsCache || window.limitationsCache.length === 0) return '#e8f4ff';
+
+        const cleanLabel = normalizeLimitLabel(label);
+        const numVal = parseFloat(value);
+        if (isNaN(numVal)) return '#e8f4ff';
+
+        const matchesLabel = (limitNameRaw) => {
+            const limitName = normalizeLimitLabel(limitNameRaw);
+            return limitName === cleanLabel ||
+                cleanLabel.includes(limitName) ||
+                limitName.includes(cleanLabel);
+        };
+
+        const findLimit = (mode) => window.limitationsCache.find(l => {
+            const limitSup = String(l.sup_category || '').toLowerCase();
+            const targetSup = String(supCategory || '').toLowerCase();
+            const isGenericSup = limitSup === 'generic' || limitSup === 'all' || limitSup === '*';
+
+            if (mode === 'exact') {
+                return !!targetSup && limitSup === targetSup && matchesLabel(l.name);
+            }
+
+            if (mode === 'generic') {
+                return isGenericSup && matchesLabel(l.name);
+            }
+
+            return matchesLabel(l.name);
+        });
+
+        const limit = findLimit('exact') || findLimit('generic') || findLimit('any');
+
+        if (!limit) return '#e8f4ff';
+
+        const minAlarm = limit.min_alarm_limit ? parseFloat(limit.min_alarm_limit) : -Infinity;
+        const maxAlarm = limit.max_alarm_limit ? parseFloat(limit.max_alarm_limit) : Infinity;
+        const minWarn = limit.min_warning_limit ? parseFloat(limit.min_warning_limit) : minAlarm;
+        const maxWarn = limit.max_warning_limit ? parseFloat(limit.max_warning_limit) : maxAlarm;
+
+        if (numVal < minAlarm || numVal > maxAlarm) return '#ff3355'; // Alarm
+        if (numVal < minWarn || numVal > maxWarn) return '#ffcc00';   // Warning
+        return '#00ff88'; // Normal
     }   // equipmentId → [{...source}]
 
     // ── Wait until cabang-app renders ────────────────────────────────────────
@@ -512,21 +544,14 @@
         // Fetch sources + lastData terbaru secara paralel
         try {
             const [srcJson, dataRes] = await Promise.all([
-                fetch(`/api/otentication/${equipmentId}`).then(async r => { const t = await r.text(); return t ? JSON.parse(t) : []; }),
+                fetch(`/api/otentication/${equipmentId}`).then(r => r.json()),
                 fetch(`/api/equipment/${equipmentId}`, { headers: window.getAuthHeaders ? window.getAuthHeaders() : {} })
             ]);
 
             // Update equipmentDataCache dengan lastData terbaru
             if (dataRes.ok) {
-                const eqText = await dataRes.text();
-                if (eqText) {
-                    try {
-                        const eqData = JSON.parse(eqText);
-                        updateEquipmentCacheEntry(eqData);
-                    } catch (err) {
-                        console.warn("Failed to parse equipment data JSON:", err);
-                    }
-                }
+                const eqData = await dataRes.json();
+                updateEquipmentCacheEntry(eqData);
             }
 
             const finalSources = Array.isArray(srcJson) ? srcJson : [];
@@ -679,7 +704,7 @@
                             ? formatSnmpMetricValue(k, rawVal)
                             : rawVal;
                         const eqSup = eq ? eq.sup_category : '';
-                        const valColor = getLimitColor(eqSup, label, rawVal, srcData || {});
+                        const valColor = getLimitColor(eqSup, label, rawVal);
 
                         return `<div class="sp-card-preview-point">
                                 <span class="sp-preview-label" title="${label}">${label}</span>
@@ -843,19 +868,8 @@
 
         const status = data ? (data._status || 'Normal') : 'Disconnect';
         const statusColors = { Normal: '#00ff88', Alarm: '#ff3355', Warning: '#ffcc00', Disconnect: '#3a5a7a' };
-        
-        let pingBadge = '';
-        if (data && data.ping_status) {
-            let pc = '#4a7a9a';
-            if (data.ping_status === 'Normal') pc = '#00ff88';
-            else if (data.ping_status === 'Gagal') pc = '#ff3355';
-            
-            const icon = data.ping_status === 'Normal' ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
-            pingBadge = `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${pc}22;color:${pc};border:1px solid ${pc};margin-right:8px;" title="Status Ping dari Server ke IP Perangkat">${icon} Ping: ${data.ping_status}</span>`;
-        }
-
         document.getElementById('srcDetailStatus').innerHTML =
-            pingBadge + `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${statusColors[status]}22;color:${statusColors[status]};border:1px solid ${statusColors[status]}">${status === 'Alarm' ? 'Offline' : status}</span>`;
+            `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${statusColors[status]}22;color:${statusColors[status]};border:1px solid ${statusColors[status]}">${status}</span>`;
 
         const body = document.getElementById('srcDetailBody');
 
@@ -923,7 +937,7 @@
                     <i class="fas fa-broadcast-tower" style="color:${isRx ? '#00d4ff' : '#e8a000'};font-size:12px;"></i>
                     <span style="font-size:12px;font-weight:bold;color:${isRx ? '#00d4ff' : '#e8a000'};flex:1;">${radioName}</span>
                     <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${isRx ? '#001a33' : '#1a1000'};color:${isRx ? '#00d4ff' : '#e8a000'};border:1px solid ${isRx ? '#00d4ff' : '#e8a000'};font-weight:bold;">${radioType}</span>
-                    <span style="font-size:10px;font-weight:bold;padding:2px 8px;border-radius:4px;background:${sc}22;color:${sc};border:1px solid ${sc};">${status === 'Alarm' ? 'Offline' : status}</span>
+                    <span style="font-size:10px;font-weight:bold;padding:2px 8px;border-radius:4px;background:${sc}22;color:${sc};border:1px solid ${sc};">${status}</span>
                     <span style="font-size:9px;color:#3a6a8a;">${loggedAt}</span>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;padding:10px 12px;background:#080f1e;">
@@ -966,8 +980,8 @@
             sections.push({
                 title: 'Connection Error',
                 params: [
-                    ['Status', 'Disconnect', getLimitColor(data.sup_category || 'Generic', 'Status', 'Disconnect', data)],
-                    ['Detail', data.error, getLimitColor(data.sup_category || 'Generic', 'Detail', data.error, data)]
+                    ['Status', 'Disconnect', '#ff3355'],
+                    ['Detail', data.error, '#ffcc00']
                 ]
             });
             // Tidak me-return agar layout fallback (dengan '-') tetap di-render di bawahnya
@@ -1020,12 +1034,12 @@
                     ['30Hz AM (%)', unflattenedData.mon1?.am_30hz, getLimitColor(sup, 'AM 30Hz', unflattenedData.mon1?.am_30hz)],
                     ['9960Hz AM (%)', unflattenedData.mon1?.am_9960hz, getLimitColor(sup, 'AM 9960Hz', unflattenedData.mon1?.am_9960hz)],
                     ['1020Hz AM (%)', unflattenedData.mon1?.am_1020hz, getLimitColor(sup, 'AM 1020Hz', unflattenedData.mon1?.am_1020hz)],
-                    ['Carrier Freq (MHz)', unflattenedData.mon1?.carrier_freq, getLimitColor(data.sup_category || 'Generic', 'Carrier Freq (MHz)', unflattenedData.mon1?.carrier_freq, data)],
-                    ['USB Freq (MHz)', unflattenedData.mon1?.usb_freq, getLimitColor(data.sup_category || 'Generic', 'USB Freq (MHz)', unflattenedData.mon1?.usb_freq, data)],
-                    ['LSB Freq (MHz)', unflattenedData.mon1?.lsb_freq, getLimitColor(data.sup_category || 'Generic', 'LSB Freq (MHz)', unflattenedData.mon1?.lsb_freq, data)],
-                    ['Ident', unflattenedData.mon1?.ident, getLimitColor(data.sup_category || 'Generic', 'Ident', unflattenedData.mon1?.ident, data)],
-                    ['TSG 30Hz', unflattenedData.mon1?.tsg_30hz, getLimitColor(data.sup_category || 'Generic', 'TSG 30Hz', unflattenedData.mon1?.tsg_30hz, data)],
-                    ['TSG Azimuth', unflattenedData.mon1?.tsg_azimuth, getLimitColor(data.sup_category || 'Generic', 'TSG Azimuth', unflattenedData.mon1?.tsg_azimuth, data)],
+                    ['Carrier Freq (MHz)', unflattenedData.mon1?.carrier_freq, '#e8f4ff'],
+                    ['USB Freq (MHz)', unflattenedData.mon1?.usb_freq, '#e8f4ff'],
+                    ['LSB Freq (MHz)', unflattenedData.mon1?.lsb_freq, '#e8f4ff'],
+                    ['Ident', unflattenedData.mon1?.ident, '#00d4ff'],
+                    ['TSG 30Hz', unflattenedData.mon1?.tsg_30hz, '#e8f4ff'],
+                    ['TSG Azimuth', unflattenedData.mon1?.tsg_azimuth, '#e8f4ff'],
                 ]
             });
 
@@ -1039,59 +1053,59 @@
                     ['30Hz AM (%)', unflattenedData.mon2?.am_30hz, getLimitColor(supCategory || 'DVOR', 'AM 30Hz', unflattenedData.mon2?.am_30hz)],
                     ['9960Hz AM (%)', unflattenedData.mon2?.am_9960hz, getLimitColor(supCategory || 'DVOR', 'AM 9960Hz', unflattenedData.mon2?.am_9960hz)],
                     ['1020Hz AM (%)', unflattenedData.mon2?.am_1020hz, getLimitColor(supCategory || 'DVOR', 'AM 1020Hz', unflattenedData.mon2?.am_1020hz)],
-                    ['Carrier Freq (MHz)', unflattenedData.mon2?.carrier_freq, getLimitColor(data.sup_category || 'Generic', 'Carrier Freq (MHz)', unflattenedData.mon2?.carrier_freq, data)],
-                    ['USB Freq (MHz)', unflattenedData.mon2?.usb_freq, getLimitColor(data.sup_category || 'Generic', 'USB Freq (MHz)', unflattenedData.mon2?.usb_freq, data)],
-                    ['LSB Freq (MHz)', unflattenedData.mon2?.lsb_freq, getLimitColor(data.sup_category || 'Generic', 'LSB Freq (MHz)', unflattenedData.mon2?.lsb_freq, data)],
-                    ['Ident', unflattenedData.mon2?.ident, getLimitColor(data.sup_category || 'Generic', 'Ident', unflattenedData.mon2?.ident, data)],
+                    ['Carrier Freq (MHz)', unflattenedData.mon2?.carrier_freq, '#e8f4ff'],
+                    ['USB Freq (MHz)', unflattenedData.mon2?.usb_freq, '#e8f4ff'],
+                    ['LSB Freq (MHz)', unflattenedData.mon2?.lsb_freq, '#e8f4ff'],
+                    ['Ident', unflattenedData.mon2?.ident, '#00d4ff'],
                 ]
             });
             // Transmitter
             sections.push({
                 title: 'TRANSMITTER', params: [
-                    ['TX Active', unflattenedData.tx_active ? 'TX' + unflattenedData.tx_active : '—', getLimitColor(data.sup_category || 'Generic', 'TX Active', unflattenedData.tx_active ? 'TX' + unflattenedData.tx_active : '—', data)],
-                    ['TX1 Carrier (W)', unflattenedData.tx1?.carrier_power, getLimitColor(data.sup_category || 'Generic', 'TX1 Carrier (W)', unflattenedData.tx1?.carrier_power, data)],
-                    ['TX1 USB Sin', unflattenedData.tx1?.usb_sin, getLimitColor(data.sup_category || 'Generic', 'TX1 USB Sin', unflattenedData.tx1?.usb_sin, data)],
-                    ['TX1 USB Cos', unflattenedData.tx1?.usb_cos, getLimitColor(data.sup_category || 'Generic', 'TX1 USB Cos', unflattenedData.tx1?.usb_cos, data)],
-                    ['TX1 LSB Sin', unflattenedData.tx1?.lsb_sin, getLimitColor(data.sup_category || 'Generic', 'TX1 LSB Sin', unflattenedData.tx1?.lsb_sin, data)],
-                    ['TX1 LSB Cos', unflattenedData.tx1?.lsb_cos, getLimitColor(data.sup_category || 'Generic', 'TX1 LSB Cos', unflattenedData.tx1?.lsb_cos, data)],
-                    ['TX1 Az Offset', unflattenedData.tx1?.az_offset, getLimitColor(data.sup_category || 'Generic', 'TX1 Az Offset', unflattenedData.tx1?.az_offset, data)],
-                    ['TX1 AM 30Hz', unflattenedData.tx1?.am_30hz, getLimitColor(data.sup_category || 'Generic', 'TX1 AM 30Hz', unflattenedData.tx1?.am_30hz, data)],
-                    ['TX1 AM 1020Hz', unflattenedData.tx1?.am_1020hz, getLimitColor(data.sup_category || 'Generic', 'TX1 AM 1020Hz', unflattenedData.tx1?.am_1020hz, data)],
-                    ['TX1 Phase Offset', unflattenedData.tx1?.phase_offset, getLimitColor(data.sup_category || 'Generic', 'TX1 Phase Offset', unflattenedData.tx1?.phase_offset, data)],
-                    ['TX1 CPA Temp (°C)', unflattenedData.tx1?.cpa_temp, getLimitColor(data.sup_category || 'Generic', 'TX1 CPA Temp (°C)', unflattenedData.tx1?.cpa_temp, data)],
-                    ['TX1 MSG Temp (°C)', unflattenedData.tx1?.msg_temp, getLimitColor(data.sup_category || 'Generic', 'TX1 MSG Temp (°C)', unflattenedData.tx1?.msg_temp, data)],
-                    ['TX1 Ident', unflattenedData.tx1?.ident, getLimitColor(data.sup_category || 'Generic', 'TX1 Ident', unflattenedData.tx1?.ident, data)],
-                    ['TX2 Carrier (W)', unflattenedData.tx2?.carrier_power, getLimitColor(data.sup_category || 'Generic', 'TX2 Carrier (W)', unflattenedData.tx2?.carrier_power, data)],
-                    ['TX2 USB Sin', unflattenedData.tx2?.usb_sin, getLimitColor(data.sup_category || 'Generic', 'TX2 USB Sin', unflattenedData.tx2?.usb_sin, data)],
-                    ['TX2 USB Cos', unflattenedData.tx2?.usb_cos, getLimitColor(data.sup_category || 'Generic', 'TX2 USB Cos', unflattenedData.tx2?.usb_cos, data)],
-                    ['TX2 LSB Sin', unflattenedData.tx2?.lsb_sin, getLimitColor(data.sup_category || 'Generic', 'TX2 LSB Sin', unflattenedData.tx2?.lsb_sin, data)],
-                    ['TX2 LSB Cos', unflattenedData.tx2?.lsb_cos, getLimitColor(data.sup_category || 'Generic', 'TX2 LSB Cos', unflattenedData.tx2?.lsb_cos, data)],
-                    ['TX2 Az Offset', unflattenedData.tx2?.az_offset, getLimitColor(data.sup_category || 'Generic', 'TX2 Az Offset', unflattenedData.tx2?.az_offset, data)],
-                    ['TX2 AM 30Hz', unflattenedData.tx2?.am_30hz, getLimitColor(data.sup_category || 'Generic', 'TX2 AM 30Hz', unflattenedData.tx2?.am_30hz, data)],
-                    ['TX2 AM 1020Hz', unflattenedData.tx2?.am_1020hz, getLimitColor(data.sup_category || 'Generic', 'TX2 AM 1020Hz', unflattenedData.tx2?.am_1020hz, data)],
-                    ['TX2 Phase Offset', unflattenedData.tx2?.phase_offset, getLimitColor(data.sup_category || 'Generic', 'TX2 Phase Offset', unflattenedData.tx2?.phase_offset, data)],
-                    ['TX2 CPA Temp (°C)', unflattenedData.tx2?.cpa_temp, getLimitColor(data.sup_category || 'Generic', 'TX2 CPA Temp (°C)', unflattenedData.tx2?.cpa_temp, data)],
-                    ['TX2 MSG Temp (°C)', unflattenedData.tx2?.msg_temp, getLimitColor(data.sup_category || 'Generic', 'TX2 MSG Temp (°C)', unflattenedData.tx2?.msg_temp, data)],
-                    ['TX2 Ident', unflattenedData.tx2?.ident, getLimitColor(data.sup_category || 'Generic', 'TX2 Ident', unflattenedData.tx2?.ident, data)],
+                    ['TX Active', unflattenedData.tx_active ? 'TX' + unflattenedData.tx_active : '—', '#00ffcc'],
+                    ['TX1 Carrier (W)', unflattenedData.tx1?.carrier_power, '#e8f4ff'],
+                    ['TX1 USB Sin', unflattenedData.tx1?.usb_sin, '#e8f4ff'],
+                    ['TX1 USB Cos', unflattenedData.tx1?.usb_cos, '#e8f4ff'],
+                    ['TX1 LSB Sin', unflattenedData.tx1?.lsb_sin, '#e8f4ff'],
+                    ['TX1 LSB Cos', unflattenedData.tx1?.lsb_cos, '#e8f4ff'],
+                    ['TX1 Az Offset', unflattenedData.tx1?.az_offset, '#e8f4ff'],
+                    ['TX1 AM 30Hz', unflattenedData.tx1?.am_30hz, '#e8f4ff'],
+                    ['TX1 AM 1020Hz', unflattenedData.tx1?.am_1020hz, '#e8f4ff'],
+                    ['TX1 Phase Offset', unflattenedData.tx1?.phase_offset, '#e8f4ff'],
+                    ['TX1 CPA Temp (°C)', unflattenedData.tx1?.cpa_temp, '#e8f4ff'],
+                    ['TX1 MSG Temp (°C)', unflattenedData.tx1?.msg_temp, '#e8f4ff'],
+                    ['TX1 Ident', unflattenedData.tx1?.ident, '#00d4ff'],
+                    ['TX2 Carrier (W)', unflattenedData.tx2?.carrier_power, '#e8f4ff'],
+                    ['TX2 USB Sin', unflattenedData.tx2?.usb_sin, '#e8f4ff'],
+                    ['TX2 USB Cos', unflattenedData.tx2?.usb_cos, '#e8f4ff'],
+                    ['TX2 LSB Sin', unflattenedData.tx2?.lsb_sin, '#e8f4ff'],
+                    ['TX2 LSB Cos', unflattenedData.tx2?.lsb_cos, '#e8f4ff'],
+                    ['TX2 Az Offset', unflattenedData.tx2?.az_offset, '#e8f4ff'],
+                    ['TX2 AM 30Hz', unflattenedData.tx2?.am_30hz, '#e8f4ff'],
+                    ['TX2 AM 1020Hz', unflattenedData.tx2?.am_1020hz, '#e8f4ff'],
+                    ['TX2 Phase Offset', unflattenedData.tx2?.phase_offset, '#e8f4ff'],
+                    ['TX2 CPA Temp (°C)', unflattenedData.tx2?.cpa_temp, '#e8f4ff'],
+                    ['TX2 MSG Temp (°C)', unflattenedData.tx2?.msg_temp, '#e8f4ff'],
+                    ['TX2 Ident', unflattenedData.tx2?.ident, '#00d4ff'],
                 ]
             });
 
             // LCU
             sections.push({
                 title: 'LCU — POWER SUPPLY', params: [
-                    ['DC +5V', unflattenedData.lcu?.dc_5v, getLimitColor(data.sup_category || 'Generic', 'DC +5V', unflattenedData.lcu?.dc_5v, data)],
-                    ['DC +7V', unflattenedData.lcu?.dc_7v, getLimitColor(data.sup_category || 'Generic', 'DC +7V', unflattenedData.lcu?.dc_7v, data)],
-                    ['DC +15V', unflattenedData.lcu?.dc_15v, getLimitColor(data.sup_category || 'Generic', 'DC +15V', unflattenedData.lcu?.dc_15v, data)],
-                    ['DC +28V', unflattenedData.lcu?.dc_28v, getLimitColor(data.sup_category || 'Generic', 'DC +28V', unflattenedData.lcu?.dc_28v, data)],
-                    // ['AC +28V', unflattenedData.lcu?.ac_28v, getLimitColor(data.sup_category || 'Generic', 'AC +28V', unflattenedData.lcu?.ac_28v, data)],
-                    ['MSG1 Comm', unflattenedData.lcu?.msg1_comm, getLimitColor(data.sup_category || 'Generic', 'MSG1 Comm', unflattenedData.lcu?.msg1_comm, data)],
-                    ['MSG2 Comm', unflattenedData.lcu?.msg2_comm, getLimitColor(data.sup_category || 'Generic', 'MSG2 Comm', unflattenedData.lcu?.msg2_comm, data)],
-                    ['MON1 Comm', unflattenedData.lcu?.mon1_comm, getLimitColor(data.sup_category || 'Generic', 'MON1 Comm', unflattenedData.lcu?.mon1_comm, data)],
-                    ['MON2 Comm', unflattenedData.lcu?.mon2_comm, getLimitColor(data.sup_category || 'Generic', 'MON2 Comm', unflattenedData.lcu?.mon2_comm, data)],
-                    ['Battery 1', unflattenedData.lcu?.battery1, getLimitColor(data.sup_category || 'Generic', 'Battery 1', unflattenedData.lcu?.battery1, data)],
-                    ['Battery 2', unflattenedData.lcu?.battery2, getLimitColor(data.sup_category || 'Generic', 'Battery 2', unflattenedData.lcu?.battery2, data)],
-                    ['ACDC 1', unflattenedData.lcu?.acdc1, getLimitColor(data.sup_category || 'Generic', 'ACDC 1', unflattenedData.lcu?.acdc1, data)],
-                    ['ACDC 2', unflattenedData.lcu?.acdc2, getLimitColor(data.sup_category || 'Generic', 'ACDC 2', unflattenedData.lcu?.acdc2, data)],
+                    ['DC +5V', unflattenedData.lcu?.dc_5v, '#e8f4ff'],
+                    ['DC +7V', unflattenedData.lcu?.dc_7v, '#e8f4ff'],
+                    ['DC +15V', unflattenedData.lcu?.dc_15v, '#e8f4ff'],
+                    ['DC +28V', unflattenedData.lcu?.dc_28v, '#e8f4ff'],
+                    // ['AC +28V', unflattenedData.lcu?.ac_28v, '#e8f4ff'],
+                    ['MSG1 Comm', unflattenedData.lcu?.msg1_comm, '#00d4ff'],
+                    ['MSG2 Comm', unflattenedData.lcu?.msg2_comm, '#00d4ff'],
+                    ['MON1 Comm', unflattenedData.lcu?.mon1_comm, '#00d4ff'],
+                    ['MON2 Comm', unflattenedData.lcu?.mon2_comm, '#00d4ff'],
+                    ['Battery 1', unflattenedData.lcu?.battery1, '#e8f4ff'],
+                    ['Battery 2', unflattenedData.lcu?.battery2, '#e8f4ff'],
+                    ['ACDC 1', unflattenedData.lcu?.acdc1, '#e8f4ff'],
+                    ['ACDC 2', unflattenedData.lcu?.acdc2, '#e8f4ff'],
                 ]
             });
         }
@@ -1164,68 +1178,68 @@
             const sup = 'DME';
             sections.push({
                 title: 'STATUS', params: [
-                    ['TXP Active', data.txp_active || '—', getLimitColor(data.sup_category || 'Generic', 'TXP Active', data.txp_active || '—', data)],
-                    ['Ident', data.ident || '—', getLimitColor(data.sup_category || 'Generic', 'Ident', data.ident || '—', data)],
+                    ['TXP Active', data.txp_active || '—', '#00ffcc'],
+                    ['Ident', data.ident || '—', '#00d4ff'],
                 ]
             });
             sections.push({
                 title: 'TXP1 — MON1', params: [
                     ['Sys Delay', data.txp1_m1_sys_delay, getLimitColor(sup, 'System Delay', data.txp1_m1_sys_delay)],
                     ['Reply Eff (%)', data.txp1_m1_reply_eff, getLimitColor(sup, 'Reply Efficiency', data.txp1_m1_reply_eff)],
-                    ['Pair Rate', data.txp1_m1_pair_rate, getLimitColor(data.sup_category || 'Generic', 'Pair Rate', data.txp1_m1_pair_rate, data)],
+                    ['Pair Rate', data.txp1_m1_pair_rate, '#e8f4ff'],
                     ['Fwd Power (W)', data.txp1_m1_fwd_power, getLimitColor(sup, 'Forward Power', data.txp1_m1_fwd_power)],
-                    ['Dur A', data.txp1_m1_dur_a, getLimitColor(data.sup_category || 'Generic', 'Dur A', data.txp1_m1_dur_a, data)],
-                    ['Dur B', data.txp1_m1_dur_b, getLimitColor(data.sup_category || 'Generic', 'Dur B', data.txp1_m1_dur_b, data)],
-                    ['Rise A', data.txp1_m1_rise_a, getLimitColor(data.sup_category || 'Generic', 'Rise A', data.txp1_m1_rise_a, data)],
-                    ['Rise B', data.txp1_m1_rise_b, getLimitColor(data.sup_category || 'Generic', 'Rise B', data.txp1_m1_rise_b, data)],
-                    ['Decay A', data.txp1_m1_decay_a, getLimitColor(data.sup_category || 'Generic', 'Decay A', data.txp1_m1_decay_a, data)],
-                    ['Decay B', data.txp1_m1_decay_b, getLimitColor(data.sup_category || 'Generic', 'Decay B', data.txp1_m1_decay_b, data)],
+                    ['Dur A', data.txp1_m1_dur_a, '#e8f4ff'],
+                    ['Dur B', data.txp1_m1_dur_b, '#e8f4ff'],
+                    ['Rise A', data.txp1_m1_rise_a, '#e8f4ff'],
+                    ['Rise B', data.txp1_m1_rise_b, '#e8f4ff'],
+                    ['Decay A', data.txp1_m1_decay_a, '#e8f4ff'],
+                    ['Decay B', data.txp1_m1_decay_b, '#e8f4ff'],
                     ['Spacing', data.txp1_m1_spacing, getLimitColor(sup, 'Pulse Spacing', data.txp1_m1_spacing)],
                 ]
             });
             sections.push({
                 title: 'TXP1 — MON2', params: [
-                    ['Sys Delay', data.txp1_m2_sys_delay, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_sys_delay', data.txp1_m2_sys_delay, data)],
-                    ['Reply Eff (%)', data.txp1_m2_reply_eff, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_reply_eff', data.txp1_m2_reply_eff, data)],
-                    ['Pair Rate', data.txp1_m2_pair_rate, getLimitColor(data.sup_category || 'Generic', 'Pair Rate', data.txp1_m2_pair_rate, data)],
-                    ['Fwd Power (W)', data.txp1_m2_fwd_power, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_fwd_power', data.txp1_m2_fwd_power, data)],
-                    ['Dur A', data.txp1_m2_dur_a, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_dur_a', data.txp1_m2_dur_a, data)],
-                    ['Dur B', data.txp1_m2_dur_b, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_dur_b', data.txp1_m2_dur_b, data)],
-                    ['Rise A', data.txp1_m2_rise_a, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_rise_a', data.txp1_m2_rise_a, data)],
-                    ['Rise B', data.txp1_m2_rise_b, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_rise_b', data.txp1_m2_rise_b, data)],
-                    ['Decay A', data.txp1_m2_decay_a, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_decay_a', data.txp1_m2_decay_a, data)],
-                    ['Decay B', data.txp1_m2_decay_b, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_decay_b', data.txp1_m2_decay_b, data)],
-                    ['Spacing', data.txp1_m2_spacing, getLimitColor(data.sup_category || 'Generic', 'txp1_m2_spacing', data.txp1_m2_spacing, data)],
+                    ['Sys Delay', data.txp1_m2_sys_delay, vc(data.txp1_m2_sys_delay, 49.5, 50.5)],
+                    ['Reply Eff (%)', data.txp1_m2_reply_eff, vc(data.txp1_m2_reply_eff, 70, 100)],
+                    ['Pair Rate', data.txp1_m2_pair_rate, '#e8f4ff'],
+                    ['Fwd Power (W)', data.txp1_m2_fwd_power, vc(data.txp1_m2_fwd_power, 800, 1200)],
+                    ['Dur A', data.txp1_m2_dur_a, vc(data.txp1_m2_dur_a, 3.0, 3.8)],
+                    ['Dur B', data.txp1_m2_dur_b, vc(data.txp1_m2_dur_b, 3.0, 3.8)],
+                    ['Rise A', data.txp1_m2_rise_a, vc(data.txp1_m2_rise_a, 1.5, 2.5)],
+                    ['Rise B', data.txp1_m2_rise_b, vc(data.txp1_m2_rise_b, 1.5, 2.5)],
+                    ['Decay A', data.txp1_m2_decay_a, vc(data.txp1_m2_decay_a, 1.5, 2.5)],
+                    ['Decay B', data.txp1_m2_decay_b, vc(data.txp1_m2_decay_b, 1.5, 2.5)],
+                    ['Spacing', data.txp1_m2_spacing, vc(data.txp1_m2_spacing, 11.5, 12.5)],
                 ]
             });
             sections.push({
                 title: 'TXP2 — MON1', params: [
-                    ['Sys Delay', data.txp2_m1_sys_delay, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_sys_delay', data.txp2_m1_sys_delay, data)],
-                    ['Reply Eff (%)', data.txp2_m1_reply_eff, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_reply_eff', data.txp2_m1_reply_eff, data)],
-                    ['Pair Rate', data.txp2_m1_pair_rate, getLimitColor(data.sup_category || 'Generic', 'Pair Rate', data.txp2_m1_pair_rate, data)],
-                    ['Fwd Power (W)', data.txp2_m1_fwd_power, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_fwd_power', data.txp2_m1_fwd_power, data)],
-                    ['Dur A', data.txp2_m1_dur_a, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_dur_a', data.txp2_m1_dur_a, data)],
-                    ['Dur B', data.txp2_m1_dur_b, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_dur_b', data.txp2_m1_dur_b, data)],
-                    ['Rise A', data.txp2_m1_rise_a, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_rise_a', data.txp2_m1_rise_a, data)],
-                    ['Rise B', data.txp2_m1_rise_b, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_rise_b', data.txp2_m1_rise_b, data)],
-                    ['Decay A', data.txp2_m1_decay_a, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_decay_a', data.txp2_m1_decay_a, data)],
-                    ['Decay B', data.txp2_m1_decay_b, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_decay_b', data.txp2_m1_decay_b, data)],
-                    ['Spacing', data.txp2_m1_spacing, getLimitColor(data.sup_category || 'Generic', 'txp2_m1_spacing', data.txp2_m1_spacing, data)],
+                    ['Sys Delay', data.txp2_m1_sys_delay, vc(data.txp2_m1_sys_delay, 49.5, 50.5)],
+                    ['Reply Eff (%)', data.txp2_m1_reply_eff, vc(data.txp2_m1_reply_eff, 70, 100)],
+                    ['Pair Rate', data.txp2_m1_pair_rate, '#e8f4ff'],
+                    ['Fwd Power (W)', data.txp2_m1_fwd_power, vc(data.txp2_m1_fwd_power, 800, 1200)],
+                    ['Dur A', data.txp2_m1_dur_a, vc(data.txp2_m1_dur_a, 3.0, 3.8)],
+                    ['Dur B', data.txp2_m1_dur_b, vc(data.txp2_m1_dur_b, 3.0, 3.8)],
+                    ['Rise A', data.txp2_m1_rise_a, vc(data.txp2_m1_rise_a, 1.5, 2.5)],
+                    ['Rise B', data.txp2_m1_rise_b, vc(data.txp2_m1_rise_b, 1.5, 2.5)],
+                    ['Decay A', data.txp2_m1_decay_a, vc(data.txp2_m1_decay_a, 1.5, 2.5)],
+                    ['Decay B', data.txp2_m1_decay_b, vc(data.txp2_m1_decay_b, 1.5, 2.5)],
+                    ['Spacing', data.txp2_m1_spacing, vc(data.txp2_m1_spacing, 11.5, 12.5)],
                 ]
             });
             sections.push({
                 title: 'TXP2 — MON2', params: [
-                    ['Sys Delay', data.txp2_m2_sys_delay, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_sys_delay', data.txp2_m2_sys_delay, data)],
-                    ['Reply Eff (%)', data.txp2_m2_reply_eff, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_reply_eff', data.txp2_m2_reply_eff, data)],
-                    ['Pair Rate', data.txp2_m2_pair_rate, getLimitColor(data.sup_category || 'Generic', 'Pair Rate', data.txp2_m2_pair_rate, data)],
-                    ['Fwd Power (W)', data.txp2_m2_fwd_power, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_fwd_power', data.txp2_m2_fwd_power, data)],
-                    ['Dur A', data.txp2_m2_dur_a, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_dur_a', data.txp2_m2_dur_a, data)],
-                    ['Dur B', data.txp2_m2_dur_b, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_dur_b', data.txp2_m2_dur_b, data)],
-                    ['Rise A', data.txp2_m2_rise_a, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_rise_a', data.txp2_m2_rise_a, data)],
-                    ['Rise B', data.txp2_m2_rise_b, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_rise_b', data.txp2_m2_rise_b, data)],
-                    ['Decay A', data.txp2_m2_decay_a, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_decay_a', data.txp2_m2_decay_a, data)],
-                    ['Decay B', data.txp2_m2_decay_b, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_decay_b', data.txp2_m2_decay_b, data)],
-                    ['Spacing', data.txp2_m2_spacing, getLimitColor(data.sup_category || 'Generic', 'txp2_m2_spacing', data.txp2_m2_spacing, data)],
+                    ['Sys Delay', data.txp2_m2_sys_delay, vc(data.txp2_m2_sys_delay, 49.5, 50.5)],
+                    ['Reply Eff (%)', data.txp2_m2_reply_eff, vc(data.txp2_m2_reply_eff, 70, 100)],
+                    ['Pair Rate', data.txp2_m2_pair_rate, '#e8f4ff'],
+                    ['Fwd Power (W)', data.txp2_m2_fwd_power, vc(data.txp2_m2_fwd_power, 800, 1200)],
+                    ['Dur A', data.txp2_m2_dur_a, vc(data.txp2_m2_dur_a, 3.0, 3.8)],
+                    ['Dur B', data.txp2_m2_dur_b, vc(data.txp2_m2_dur_b, 3.0, 3.8)],
+                    ['Rise A', data.txp2_m2_rise_a, vc(data.txp2_m2_rise_a, 1.5, 2.5)],
+                    ['Rise B', data.txp2_m2_rise_b, vc(data.txp2_m2_rise_b, 1.5, 2.5)],
+                    ['Decay A', data.txp2_m2_decay_a, vc(data.txp2_m2_decay_a, 1.5, 2.5)],
+                    ['Decay B', data.txp2_m2_decay_b, vc(data.txp2_m2_decay_b, 1.5, 2.5)],
+                    ['Spacing', data.txp2_m2_spacing, vc(data.txp2_m2_spacing, 11.5, 12.5)],
                 ]
             });
         } else if (parserId === 'dme_mopah_binary') {
@@ -1234,10 +1248,10 @@
             sections.push({
                 title: 'DME STATUS', params: [
                     ['Overall Status', data.overall_status || '—', data.overall_status === 'Normal' ? ok : warn],
-                    ['TX Active', data.tx_active || '—', getLimitColor(data.sup_category || 'Generic', 'TX Active', data.tx_active || '—', data)],
-                    ['Power Output (W)', data.power_watts || '—', getLimitColor(data.sup_category || 'Generic', 'Power Output (W)', data.power_watts || '—', data)],
-                    ['Reply Efficiency (%)', data.reply_efficiency || '—', getLimitColor(data.sup_category || 'Generic', 'Reply Efficiency (%)', data.reply_efficiency || '—', data)],
-                    ['Time Delay (us)', data.time_delay || '—', getLimitColor(data.sup_category || 'Generic', 'Time Delay (us)', data.time_delay || '—', data)]
+                    ['TX Active', data.tx_active || '—', '#00ffcc'],
+                    ['Power Output (W)', data.power_watts || '—', '#e8f4ff'],
+                    ['Reply Efficiency (%)', data.reply_efficiency || '—', '#00d4ff'],
+                    ['Time Delay (us)', data.time_delay || '—', '#e8f4ff']
                 ]
             });
 
@@ -1349,26 +1363,26 @@
             sections.push({
                 title: 'STATUS', params: [
                     ['Tegangan VLN Avg (V)', fn(data.VLN_avg, 1), getLimitColor(sup, 'Van Voltage', data.VLN_avg)],
-                    ['Tegangan VLL Avg (V)', fn(data.VLL_avg, 1), getLimitColor(data.sup_category || 'Generic', 'Tegangan VLL Avg (V)', fn(data.VLL_avg, 1), data)],
+                    ['Tegangan VLL Avg (V)', fn(data.VLL_avg, 1), '#e8f4ff'],
                     ['Frekuensi (Hz)', fn(data.HZ, 2), getLimitColor(sup, 'Frequency', data.HZ)],
                     ['Power Factor', fn(data.PF, 3), getLimitColor(sup, 'Power Factor', Math.abs(data.PF || 0))],
-                    ['Offline', (data.alarmDetail && data.alarmDetail.length > 0) ? data.alarmDetail.join(' | ') : 'Tidak Ada', data.alarmDetail && data.alarmDetail.length > 0 ? '#ff3355' : '#00ff88'],
+                    ['Alarm', (data.alarmDetail && data.alarmDetail.length > 0) ? data.alarmDetail.join(' | ') : 'Tidak Ada', data.alarmDetail && data.alarmDetail.length > 0 ? '#ff3355' : '#00ff88'],
                 ]
             });
 
             sections.push({
                 title: 'TEGANGAN LINE-TO-NEUTRAL (V)', params: [
-                    ['Van (L1-N)', fn(data.VL1N, 1), getLimitColor(data.sup_category || 'Generic', 'VL1N', data.VL1N, data)],
-                    ['Vbn (L2-N)', fn(data.VL2N, 1), getLimitColor(data.sup_category || 'Generic', 'VL2N', data.VL2N, data)],
-                    ['Vcn (L3-N)', fn(data.VL3N, 1), getLimitColor(data.sup_category || 'Generic', 'VL3N', data.VL3N, data)],
+                    ['Van (L1-N)', fn(data.VL1N, 1), vc(data.VL1N, 200, 240)],
+                    ['Vbn (L2-N)', fn(data.VL2N, 1), vc(data.VL2N, 200, 240)],
+                    ['Vcn (L3-N)', fn(data.VL3N, 1), vc(data.VL3N, 200, 240)],
                 ]
             });
 
             sections.push({
                 title: 'TEGANGAN LINE-TO-LINE (V)', params: [
-                    ['Vab (L1-L2)', fn(data.VL12, 1), getLimitColor(data.sup_category || 'Generic', 'VL12', data.VL12, data)],
-                    ['Vbc (L2-L3)', fn(data.VL23, 1), getLimitColor(data.sup_category || 'Generic', 'VL23', data.VL23, data)],
-                    ['Vca (L3-L1)', fn(data.VL31, 1), getLimitColor(data.sup_category || 'Generic', 'VL31', data.VL31, data)],
+                    ['Vab (L1-L2)', fn(data.VL12, 1), vc(data.VL12, 340, 430)],
+                    ['Vbc (L2-L3)', fn(data.VL23, 1), vc(data.VL23, 340, 430)],
+                    ['Vca (L3-L1)', fn(data.VL31, 1), vc(data.VL31, 340, 430)],
                 ]
             });
 
@@ -1385,9 +1399,9 @@
                     ['Real (kW)', fn(data.KW, 3), vn(data.KW)],
                     ['Reaktif (kVAR)', fn(data.KVAR, 3), vn(data.KVAR)],
                     ['Semu (kVA)', fn(data.KVA, 3), vn(data.KVA)],
-                    ['Power Factor', fn(data.PF, 3), getLimitColor(data.sup_category || 'Generic', 'PF', data.PF, data)],
-                    ['Frekuensi (Hz)', fn(data.HZ, 2), getLimitColor(data.sup_category || 'Generic', 'HZ', data.HZ, data)],
-                    ['Energi (kWh)', data.KWH != null ? (+data.KWH).toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '—', getLimitColor(data.sup_category || 'Generic', 'Energi (kWh)', data.KWH != null ? (+data.KWH).toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '—', data)],
+                    ['Power Factor', fn(data.PF, 3), vc(Math.abs(data.PF || 0), 0.8, 1.05)],
+                    ['Frekuensi (Hz)', fn(data.HZ, 2), vc(data.HZ, 49.5, 50.5)],
+                    ['Energi (kWh)', data.KWH != null ? (+data.KWH).toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '—', '#00d4ff'],
                 ]
             });
         } else if (parserId === 'pm5350_modbus') {
@@ -1401,24 +1415,24 @@
 
             sections.push({
                 title: 'STATUS', params: [
-                    ['Frekuensi (Hz)', fn(data.FREQ, 2), getLimitColor(data.sup_category || 'Generic', 'FREQ', data.FREQ, data)],
-                    ['Power Factor', fn(data.PF, 3), getLimitColor(data.sup_category || 'Generic', 'Power Factor', fn(data.PF, 3), data)],
+                    ['Frekuensi (Hz)', fn(data.FREQ, 2), vc(data.FREQ, 49, 51)],
+                    ['Power Factor', fn(data.PF, 3), '#e8f4ff'],
                 ]
             });
 
             sections.push({
                 title: 'TEGANGAN LINE-TO-NEUTRAL (V)', params: [
-                    ['V_RN (L1-N)', fn(data.V_RN, 1), getLimitColor(data.sup_category || 'Generic', 'V_RN', data.V_RN, data)],
-                    ['V_SN (L2-N)', fn(data.V_SN, 1), getLimitColor(data.sup_category || 'Generic', 'V_SN', data.V_SN, data)],
-                    ['V_TN (L3-N)', fn(data.V_TN, 1), getLimitColor(data.sup_category || 'Generic', 'V_TN', data.V_TN, data)],
+                    ['V_RN (L1-N)', fn(data.V_RN, 1), vc(data.V_RN, 200, 240)],
+                    ['V_SN (L2-N)', fn(data.V_SN, 1), vc(data.V_SN, 200, 240)],
+                    ['V_TN (L3-N)', fn(data.V_TN, 1), vc(data.V_TN, 200, 240)],
                 ]
             });
 
             sections.push({
                 title: 'TEGANGAN LINE-TO-LINE (V)', params: [
-                    ['V_RS (L1-L2)', fn(data.V_RS, 1), getLimitColor(data.sup_category || 'Generic', 'V_RS', data.V_RS, data)],
-                    ['V_ST (L2-L3)', fn(data.V_ST, 1), getLimitColor(data.sup_category || 'Generic', 'V_ST', data.V_ST, data)],
-                    ['V_TR (L3-L1)', fn(data.V_TR, 1), getLimitColor(data.sup_category || 'Generic', 'V_TR', data.V_TR, data)],
+                    ['V_RS (L1-L2)', fn(data.V_RS, 1), vc(data.V_RS, 340, 430)],
+                    ['V_ST (L2-L3)', fn(data.V_ST, 1), vc(data.V_ST, 340, 430)],
+                    ['V_TR (L3-L1)', fn(data.V_TR, 1), vc(data.V_TR, 340, 430)],
                 ]
             });
 
@@ -1463,9 +1477,9 @@
             sections.push({
                 title: 'SISTEM', params: [
                     ['Konektivitas', data.connectivity || '—', cc],
-                    ['Hostname', data.sys_name || '—', getLimitColor(data.sup_category || 'Generic', 'Hostname', data.sys_name || '—', data)],
-                    ['Deskripsi', data.sys_descr || '—', getLimitColor(data.sup_category || 'Generic', 'Deskripsi', data.sys_descr || '—', data)],
-                    ['Uptime', data.sys_uptime || '—', getLimitColor(data.sup_category || 'Generic', 'Uptime', data.sys_uptime || '—', data)],
+                    ['Hostname', data.sys_name || '—', '#00d4ff'],
+                    ['Deskripsi', data.sys_descr || '—', '#5a8aaa'],
+                    ['Uptime', data.sys_uptime || '—', '#5a8aaa'],
                 ]
             });
             sections.push({
@@ -1476,33 +1490,33 @@
             sections.push({
                 title: 'TEMPERATURE', params: [
                     ['Temperature', formatSnmpMetricValue('temperature_c', data.temperature_c), getLimitColor(sup, 'Temperature', data.temperature_c)],
-                    ['Sensor Name', data.temperature_sensor_name || '—', getLimitColor(data.sup_category || 'Generic', 'Sensor Name', data.temperature_sensor_name || '—', data)],
-                    ['Sensor Count', formatSnmpMetricValue('temperature_sensor_count', data.temperature_sensor_count), getLimitColor(data.sup_category || 'Generic', 'Sensor Count', formatSnmpMetricValue('temperature_sensor_count', data.temperature_sensor_count), data)],
+                    ['Sensor Name', data.temperature_sensor_name || '—', '#e8f4ff'],
+                    ['Sensor Count', formatSnmpMetricValue('temperature_sensor_count', data.temperature_sensor_count), '#e8f4ff'],
                 ]
             });
             sections.push({
                 title: 'MEMORY (RAM)', params: [
-                    ['RAM Total', formatSnmpMetricValue('ram_total_mb', data.ram_total_mb), getLimitColor(data.sup_category || 'Generic', 'RAM Total', formatSnmpMetricValue('ram_total_mb', data.ram_total_mb), data)],
-                    ['RAM Used [SNMP]', formatSnmpMetricValue('ram_used_mb', data.ram_used_mb), getLimitColor(data.sup_category || 'Generic', 'RAM Used [SNMP]', formatSnmpMetricValue('ram_used_mb', data.ram_used_mb), data)],
-                    ['RAM Used (%) [SNMP]', effectiveRamUsedPct !== null ? `${effectiveRamUsedPct.toFixed(1)} %` : '—', getLimitColor(data.sup_category || 'Generic', 'RAM Used (%) [SNMP]', effectiveRamUsedPct !== null ? `${effectiveRamUsedPct.toFixed(1)} %` : '—', data)],
-                    ['RAM Available', effectiveRamAvailMb !== null ? formatSnmpMetricValue('ram_available_mb', Math.round(effectiveRamAvailMb)) : '—', getLimitColor(data.sup_category || 'Generic', 'RAM Available', effectiveRamAvailMb !== null ? formatSnmpMetricValue('ram_available_mb', Math.round(effectiveRamAvailMb)) : '—', data)],
+                    ['RAM Total', formatSnmpMetricValue('ram_total_mb', data.ram_total_mb), '#e8f4ff'],
+                    ['RAM Used [SNMP]', formatSnmpMetricValue('ram_used_mb', data.ram_used_mb), '#e8f4ff'],
+                    ['RAM Used (%) [SNMP]', effectiveRamUsedPct !== null ? `${effectiveRamUsedPct.toFixed(1)} %` : '—', '#5a8aaa'],
+                    ['RAM Available', effectiveRamAvailMb !== null ? formatSnmpMetricValue('ram_available_mb', Math.round(effectiveRamAvailMb)) : '—', '#e8f4ff'],
                     ['RAM Available (%)', effectiveRamAvailPct !== null ? `${effectiveRamAvailPct.toFixed(1)} %` : '—', getLimitColor('UPS', 'RAM Available', effectiveRamAvailPct)],
                 ]
             });
             sections.push({
                 title: 'MEMORY (PHYSICAL/VIRTUAL)', params: [
-                    ['Physical Total', formatSnmpMetricValue('physical_memory_total_mb', data.physical_memory_total_mb), getLimitColor(data.sup_category || 'Generic', 'Physical Total', formatSnmpMetricValue('physical_memory_total_mb', data.physical_memory_total_mb), data)],
-                    ['Physical Used', formatSnmpMetricValue('physical_memory_used_mb', data.physical_memory_used_mb), getLimitColor(data.sup_category || 'Generic', 'Physical Used', formatSnmpMetricValue('physical_memory_used_mb', data.physical_memory_used_mb), data)],
-                    ['Physical Usage (%)', data.physical_memory_usage_pct !== '—' ? `${data.physical_memory_usage_pct} %` : '—', getLimitColor(data.sup_category || 'Generic', 'Physical Usage (%)', data.physical_memory_usage_pct !== '—' ? `${data.physical_memory_usage_pct} %` : '—', data)],
-                    ['Virtual Total', formatSnmpMetricValue('virtual_memory_total_mb', data.virtual_memory_total_mb), getLimitColor(data.sup_category || 'Generic', 'Virtual Total', formatSnmpMetricValue('virtual_memory_total_mb', data.virtual_memory_total_mb), data)],
-                    ['Virtual Used', formatSnmpMetricValue('virtual_memory_used_mb', data.virtual_memory_used_mb), getLimitColor(data.sup_category || 'Generic', 'Virtual Used', formatSnmpMetricValue('virtual_memory_used_mb', data.virtual_memory_used_mb), data)],
-                    ['Virtual Usage (%)', data.virtual_memory_usage_pct !== '—' ? `${data.virtual_memory_usage_pct} %` : '—', getLimitColor(data.sup_category || 'Generic', 'Virtual Usage (%)', data.virtual_memory_usage_pct !== '—' ? `${data.virtual_memory_usage_pct} %` : '—', data)],
-                    ['Swap Total', formatSnmpMetricValue('swap_total_mb', data.swap_total_mb), getLimitColor(data.sup_category || 'Generic', 'Swap Total', formatSnmpMetricValue('swap_total_mb', data.swap_total_mb), data)],
-                    ['Swap Used', formatSnmpMetricValue('swap_used_mb', data.swap_used_mb), getLimitColor(data.sup_category || 'Generic', 'Swap Used', formatSnmpMetricValue('swap_used_mb', data.swap_used_mb), data)],
-                    ['Swap Usage (%)', data.swap_usage_pct !== '—' ? `${data.swap_usage_pct} %` : '—', getLimitColor(data.sup_category || 'Generic', 'Swap Usage (%)', data.swap_usage_pct !== '—' ? `${data.swap_usage_pct} %` : '—', data)],
-                    ['Buffers', formatSnmpMetricValue('memory_buffers_mb', data.memory_buffers_mb), getLimitColor(data.sup_category || 'Generic', 'Buffers', formatSnmpMetricValue('memory_buffers_mb', data.memory_buffers_mb), data)],
-                    ['Cached', formatSnmpMetricValue('cached_memory_mb', data.cached_memory_mb), getLimitColor(data.sup_category || 'Generic', 'Cached', formatSnmpMetricValue('cached_memory_mb', data.cached_memory_mb), data)],
-                    ['Shared', formatSnmpMetricValue('shared_memory_mb', data.shared_memory_mb), getLimitColor(data.sup_category || 'Generic', 'Shared', formatSnmpMetricValue('shared_memory_mb', data.shared_memory_mb), data)],
+                    ['Physical Total', formatSnmpMetricValue('physical_memory_total_mb', data.physical_memory_total_mb), '#e8f4ff'],
+                    ['Physical Used', formatSnmpMetricValue('physical_memory_used_mb', data.physical_memory_used_mb), '#e8f4ff'],
+                    ['Physical Usage (%)', data.physical_memory_usage_pct !== '—' ? `${data.physical_memory_usage_pct} %` : '—', '#5a8aaa'],
+                    ['Virtual Total', formatSnmpMetricValue('virtual_memory_total_mb', data.virtual_memory_total_mb), '#e8f4ff'],
+                    ['Virtual Used', formatSnmpMetricValue('virtual_memory_used_mb', data.virtual_memory_used_mb), '#e8f4ff'],
+                    ['Virtual Usage (%)', data.virtual_memory_usage_pct !== '—' ? `${data.virtual_memory_usage_pct} %` : '—', '#5a8aaa'],
+                    ['Swap Total', formatSnmpMetricValue('swap_total_mb', data.swap_total_mb), '#e8f4ff'],
+                    ['Swap Used', formatSnmpMetricValue('swap_used_mb', data.swap_used_mb), '#e8f4ff'],
+                    ['Swap Usage (%)', data.swap_usage_pct !== '—' ? `${data.swap_usage_pct} %` : '—', '#5a8aaa'],
+                    ['Buffers', formatSnmpMetricValue('memory_buffers_mb', data.memory_buffers_mb), '#e8f4ff'],
+                    ['Cached', formatSnmpMetricValue('cached_memory_mb', data.cached_memory_mb), '#e8f4ff'],
+                    ['Shared', formatSnmpMetricValue('shared_memory_mb', data.shared_memory_mb), '#e8f4ff'],
                 ]
             });
             if (data.mount_points && data.mount_points.length > 0) {
@@ -1515,9 +1529,9 @@
             } else {
                 sections.push({
                     title: 'DISK', params: [
-                        ['Disk Total', formatSnmpMetricValue('disk_total_gb', data.disk_total_gb), getLimitColor(data.sup_category || 'Generic', 'Disk Total', formatSnmpMetricValue('disk_total_gb', data.disk_total_gb), data)],
-                        ['Disk Used', formatSnmpMetricValue('disk_used_gb', data.disk_used_gb), getLimitColor(data.sup_category || 'Generic', 'Disk Used', formatSnmpMetricValue('disk_used_gb', data.disk_used_gb), data)],
-                        ['Disk Usage (%)', data.disk_usage_pct !== '—' ? `${data.disk_usage_pct} %` : '—', getLimitColor(data.sup_category || 'Generic', 'Disk Usage (%)', data.disk_usage_pct !== '—' ? `${data.disk_usage_pct} %` : '—', data)],
+                        ['Disk Total', formatSnmpMetricValue('disk_total_gb', data.disk_total_gb), '#e8f4ff'],
+                        ['Disk Used', formatSnmpMetricValue('disk_used_gb', data.disk_used_gb), '#e8f4ff'],
+                        ['Disk Usage (%)', data.disk_usage_pct !== '—' ? `${data.disk_usage_pct} %` : '—', '#e8f4ff'],
                     ]
                 });
             }
@@ -1527,27 +1541,27 @@
             sections.push({
                 title: 'SISTEM JARINGAN', params: [
                     ['Konektivitas', data.connectivity || '—', cc],
-                    ['Hostname', data.sys_name || '—', getLimitColor(data.sup_category || 'Generic', 'Hostname', data.sys_name || '—', data)],
-                    ['IP', data.resolved_ip || '—', getLimitColor(data.sup_category || 'Generic', 'IP', data.resolved_ip || '—', data)],
-                    ['Hardware', data.hardware || '—', getLimitColor(data.sup_category || 'Generic', 'Hardware', data.hardware || '—', data)],
-                    ['OS', data.operating_system || '—', getLimitColor(data.sup_category || 'Generic', 'OS', data.operating_system || '—', data)],
-                    ['Uptime', data.sys_uptime || '—', getLimitColor(data.sup_category || 'Generic', 'Uptime', data.sys_uptime || '—', data)],
-                    ['Lokasi', data.sys_location || '—', getLimitColor(data.sup_category || 'Generic', 'Lokasi', data.sys_location || '—', data)],
+                    ['Hostname', data.sys_name || '—', '#00d4ff'],
+                    ['IP', data.resolved_ip || '—', '#e8f4ff'],
+                    ['Hardware', data.hardware || '—', '#e8f4ff'],
+                    ['OS', data.operating_system || '—', '#5a8aaa'],
+                    ['Uptime', data.sys_uptime || '—', '#5a8aaa'],
+                    ['Lokasi', data.sys_location || '—', '#e8f4ff'],
                 ]
             });
             sections.push({
                 title: 'INTERFACE', params: [
-                    ['Total Interface', formatSnmpMetricValue('interface_count', data.interface_count), getLimitColor(data.sup_category || 'Generic', 'Total Interface', formatSnmpMetricValue('interface_count', data.interface_count), data)],
-                    ['Interface Up', formatSnmpMetricValue('active_interface_count', data.active_interface_count), getLimitColor(data.sup_category || 'Generic', 'Interface Up', formatSnmpMetricValue('active_interface_count', data.active_interface_count), data)],
-                    ['Interface Down', formatSnmpMetricValue('down_interface_count', data.down_interface_count), getLimitColor(data.sup_category || 'Switch', 'Interface Down', data.down_interface_count, data)],
-                    ['Port Aktif', data.active_interfaces_summary || '—', getLimitColor(data.sup_category || 'Generic', 'Port Aktif', data.active_interfaces_summary || '—', data)],
-                    ['Port Tidak Aktif', data.down_interfaces_summary || '—', getLimitColor(data.sup_category || 'Switch', 'Port Tidak Aktif', data.down_interface_count, data)],
-                    ['Top Interface', data.top_interface_name || '—', getLimitColor(data.sup_category || 'Generic', 'Top Interface', data.top_interface_name || '—', data)],
-                    ['Status Top Interface', data.top_interface_status || '—', getLimitColor(data.sup_category || 'Generic', 'Status Top Interface', data.top_interface_status || '—', data)],
-                    ['In Octets', formatSnmpMetricValue('top_interface_in_octets', data.top_interface_in_octets), getLimitColor(data.sup_category || 'Generic', 'In Octets', formatSnmpMetricValue('top_interface_in_octets', data.top_interface_in_octets), data)],
-                    ['Out Octets', formatSnmpMetricValue('top_interface_out_octets', data.top_interface_out_octets), getLimitColor(data.sup_category || 'Generic', 'Out Octets', formatSnmpMetricValue('top_interface_out_octets', data.top_interface_out_octets), data)],
+                    ['Total Interface', formatSnmpMetricValue('interface_count', data.interface_count), '#e8f4ff'],
+                    ['Interface Up', formatSnmpMetricValue('active_interface_count', data.active_interface_count), '#00ff88'],
+                    ['Interface Down', formatSnmpMetricValue('down_interface_count', data.down_interface_count), '#ffcc00'],
+                    ['Port Aktif', data.active_interfaces_summary || '—', '#00ff88'],
+                    ['Port Tidak Aktif', data.down_interfaces_summary || '—', '#ffcc00'],
+                    ['Top Interface', data.top_interface_name || '—', '#00d4ff'],
+                    ['Status Top Interface', data.top_interface_status || '—', '#e8f4ff'],
+                    ['In Octets', formatSnmpMetricValue('top_interface_in_octets', data.top_interface_in_octets), '#e8f4ff'],
+                    ['Out Octets', formatSnmpMetricValue('top_interface_out_octets', data.top_interface_out_octets), '#e8f4ff'],
                     ['Temperature', formatSnmpMetricValue('temperature_c', data.temperature_c), getLimitColor('Switch', 'Temperature', data.temperature_c)],
-                    ['Temp Sensor', data.temperature_sensor_name || '—', getLimitColor(data.sup_category || 'Generic', 'Temp Sensor', data.temperature_sensor_name || '—', data)],
+                    ['Temp Sensor', data.temperature_sensor_name || '—', '#e8f4ff'],
                 ]
             });
         } else if (parserId === 'asterix_radar') {
@@ -1556,18 +1570,18 @@
             sections.push({
                 title: 'STATUS RADAR MSSR', params: [
                     ['Konektivitas', data.connectivity || '—', cc],
-                    ['Nama Radar', data.radar_name || '—', getLimitColor(data.sup_category || 'Generic', 'Nama Radar', data.radar_name || '—', data)],
-                    ['SAC', data.sac || '—', getLimitColor(data.sup_category || 'Generic', 'SAC', data.sac || '—', data)],
-                    ['SIC', data.sic || '—', getLimitColor(data.sup_category || 'Generic', 'SIC', data.sic || '—', data)],
-                    ['Radar ID', data.radar_id || '—', getLimitColor(data.sup_category || 'Generic', 'Radar ID', data.radar_id || '—', data)],
-                    ['Message Type', data.msg_type || '—', getLimitColor(data.sup_category || 'Generic', 'Message Type', data.msg_type || '—', data)],
-                    ['Time of Day', data.time_of_day || '—', getLimitColor(data.sup_category || 'Generic', 'Time of Day', data.time_of_day || '—', data)],
-                    ['Sector', data.sector_number || '—', getLimitColor(data.sup_category || 'Generic', 'Sector', data.sector_number || '—', data)],
-                    ['Antenna Rot.', data.antenna_rotation || '—', getLimitColor(data.sup_category || 'Generic', 'Antenna Rot.', data.antenna_rotation || '—', data)],
-                    ['Sys Config', data.system_config || '—', getLimitColor(data.sup_category || 'Generic', 'Sys Config', data.system_config || '—', data)],
-                    ['Last CAT034', data.last_cat034 || '—', getLimitColor(data.sup_category || 'Generic', 'Last CAT034', data.last_cat034 || '—', data)],
-                    ['Koordinat', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', getLimitColor(data.sup_category || 'Generic', 'Koordinat', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', data)],
-                    ['Data Source', data.data_source || '—', getLimitColor(data.sup_category || 'Generic', 'Data Source', data.data_source || '—', data)],
+                    ['Nama Radar', data.radar_name || '—', '#00d4ff'],
+                    ['SAC', data.sac || '—', '#e8f4ff'],
+                    ['SIC', data.sic || '—', '#e8f4ff'],
+                    ['Radar ID', data.radar_id || '—', '#e8f4ff'],
+                    ['Message Type', data.msg_type || '—', '#e8f4ff'],
+                    ['Time of Day', data.time_of_day || '—', '#e8f4ff'],
+                    ['Sector', data.sector_number || '—', '#e8f4ff'],
+                    ['Antenna Rot.', data.antenna_rotation || '—', '#00d4ff'],
+                    ['Sys Config', data.system_config || '—', '#5a8aaa'],
+                    ['Last CAT034', data.last_cat034 || '—', '#5a8aaa'],
+                    ['Koordinat', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', '#5a8aaa'],
+                    ['Data Source', data.data_source || '—', '#3a6a8a'],
                 ]
             });
 
@@ -1577,15 +1591,15 @@
             sections.push({
                 title: 'STATUS ADS-B STATION', params: [
                     ['Konektivitas', data.connectivity || '—', cc],
-                    ['Station', data.station || '—', getLimitColor(data.sup_category || 'Generic', 'Station', data.station || '—', data)],
-                    ['SAC', data.sac || '—', getLimitColor(data.sup_category || 'Generic', 'SAC', data.sac || '—', data)],
-                    ['SIC', data.sic || '—', getLimitColor(data.sup_category || 'Generic', 'SIC', data.sic || '—', data)],
-                    ['Radar ID', data.radar_id || '—', getLimitColor(data.sup_category || 'Generic', 'Radar ID', data.radar_id || '—', data)],
-                    ['Multicast IP', data.multicast_ip || '—', getLimitColor(data.sup_category || 'Generic', 'Multicast IP', data.multicast_ip || '—', data)],
-                    ['Multicast Port', data.multicast_port || '—', getLimitColor(data.sup_category || 'Generic', 'Multicast Port', data.multicast_port || '—', data)],
-                    ['Last CAT021', data.last_cat021 || '—', getLimitColor(data.sup_category || 'Generic', 'Last CAT021', data.last_cat021 || '—', data)],
-                    ['Koordinat', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', getLimitColor(data.sup_category || 'Generic', 'Koordinat', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', data)],
-                    ['Data Source', data.data_source || '—', getLimitColor(data.sup_category || 'Generic', 'Data Source', data.data_source || '—', data)],
+                    ['Station', data.station || '—', '#00d4ff'],
+                    ['SAC', data.sac || '—', '#e8f4ff'],
+                    ['SIC', data.sic || '—', '#e8f4ff'],
+                    ['Radar ID', data.radar_id || '—', '#e8f4ff'],
+                    ['Multicast IP', data.multicast_ip || '—', '#5a8aaa'],
+                    ['Multicast Port', data.multicast_port || '—', '#5a8aaa'],
+                    ['Last CAT021', data.last_cat021 || '—', '#5a8aaa'],
+                    ['Koordinat', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', '#5a8aaa'],
+                    ['Data Source', data.data_source || '—', '#3a6a8a'],
                 ]
             });
 
@@ -1596,26 +1610,26 @@
             sections.push({
                 title: 'SENSOR SUHU & KELEMBABAN', params: [
                     ['Suhu (°C)', isNaN(temp) ? '—' : `${temp.toFixed(1)} °C`, getLimitColor(sup, 'Temperature', temp)],
-                    ['Kelembaban (%)', isNaN(humi) ? '—' : `${humi.toFixed(1)} %`, getLimitColor(data.sup_category || 'Generic', 'Kelembaban (%)', isNaN(humi) ? '—' : `${humi.toFixed(1)} %`, data)],
-                    ['Lokasi', data.location || '—', getLimitColor(data.sup_category || 'Generic', 'Lokasi', data.location || '—', data)],
+                    ['Kelembaban (%)', isNaN(humi) ? '—' : `${humi.toFixed(1)} %`, '#00d4ff'],
+                    ['Lokasi', data.location || '—', '#00d4ff'],
                     ['Status', data.status_text || '—',
                         data.status_text === 'Alarm' ? '#ff3355' : data.status_text === 'Warning' ? '#ffcc00' : '#00ff88'],
                 ]
             });
             sections.push({
                 title: 'THRESHOLD', params: [
-                    ['Warning threshold', '≥ 30.0 °C', getLimitColor(data.sup_category || 'Generic', 'Warning threshold', '≥ 30.0 °C', data)],
-                    ['Alarm threshold', '≥ 35.0 °C', getLimitColor(data.sup_category || 'Generic', 'Alarm threshold', '≥ 35.0 °C', data)],
+                    ['Warning threshold', '≥ 30.0 °C', '#ffcc00'],
+                    ['Alarm threshold', '≥ 35.0 °C', '#ff3355'],
                 ]
             });
         } else if (parserId === 'ils_gp_thales421' || parserId === 'ils_gp_normac') {
             const sup = 'ILS-GP';
             sections.push({
                 title: 'SYSTEM STATUS', params: [
-                    ['TX MAIN', data.tx_main_label || '—', getLimitColor(data.sup_category || 'Generic', 'TX MAIN', data.tx_main_label || '—', data)],
-                    ['TX STANDBY', data.tx_stby_label || '—', getLimitColor(data.sup_category || 'Generic', 'TX STANDBY', data.tx_stby_label || '—', data)],
+                    ['TX MAIN', data.tx_main_label || '—', '#00ffcc'],
+                    ['TX STANDBY', data.tx_stby_label || '—', '#5a8aaa'],
                     ['MODE', data.status_label || '—', data.is_remote ? '#ffcc00' : '#00d4ff'],
-                    ['DATA SOURCE', data.tx_data || '—', getLimitColor(data.sup_category || 'Generic', 'DATA SOURCE', data.tx_data || '—', data)],
+                    ['DATA SOURCE', data.tx_data || '—', '#3a6a8a'],
                 ]
             });
 
@@ -1639,8 +1653,8 @@
             const sup = 'ILS-LLZ';
             sections.push({
                 title: 'SYSTEM STATUS', params: [
-                    ['TX MAIN', data.tx_main_label || '—', getLimitColor(data.sup_category || 'Generic', 'TX MAIN', data.tx_main_label || '—', data)],
-                    ['TX STANDBY', data.tx_stby_label || '—', getLimitColor(data.sup_category || 'Generic', 'TX STANDBY', data.tx_stby_label || '—', data)],
+                    ['TX MAIN', data.tx_main_label || '—', '#00ffcc'],
+                    ['TX STANDBY', data.tx_stby_label || '—', '#5a8aaa'],
                 ]
             });
 
@@ -1771,7 +1785,7 @@
                     }
                     
                     if (sections.length === 0) {
-                        sections.push({ title: 'DATA', params: [['No data available', '—', getLimitColor(data.sup_category || 'Generic', 'No data available', '—', data)]] });
+                        sections.push({ title: 'DATA', params: [['No data available', '—', '#4a7a9a']] });
                     }
                 }
             }

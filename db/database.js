@@ -978,40 +978,28 @@ async function deleteSnmpTemplate(id) {
 
 // --- SUP CATEGORIES ---
 async function getAllSupCategories() {
-  try {
-    const [rows] = await centralDb.queryWithRetry('SELECT * FROM equipment_templates ORDER BY name');
-    // Group by equipment_type to match the old structure
-    const grouped = {};
-    for (const row of rows) {
-      const cat = row.equipment_type || 'Support';
-      if (!grouped[cat]) grouped[cat] = [];
-      grouped[cat].push(row.name);
-    }
-    return Object.keys(grouped).map(cat => ({
-      id: cat,
-      category: cat,
-      sub_categories: grouped[cat]
-    }));
-  } catch (err) {
-    console.warn('[DB] Failed to fetch sup categories from Central DB, falling back to local JSON:', err.message);
-    return await readJson(SUP_CATEGORY_PATH, []);
+  const [rows] = await centralDb.queryWithRetry('SELECT * FROM equipment_templates ORDER BY name');
+  // Group by equipment_type to match the old structure
+  const grouped = {};
+  for (const row of rows) {
+    const cat = row.equipment_type || 'Support';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(row.name);
   }
+  return Object.keys(grouped).map(cat => ({
+    id: cat,
+    category: cat,
+    sub_categories: grouped[cat]
+  }));
 }
 
 async function getSupCategoriesByCategory(category) {
-  try {
-    const [rows] = await centralDb.queryWithRetry('SELECT * FROM equipment_templates WHERE equipment_type = ? ORDER BY name', [category]);
-    if (!category) return await getAllSupCategories();
-    return {
-      category: category,
-      sub_categories: rows.map(r => r.name)
-    };
-  } catch (err) {
-    console.warn(`[DB] Failed to fetch sup categories for ${category} from Central DB, falling back to local JSON:`, err.message);
-    const data = await readJson(SUP_CATEGORY_PATH, []);
-    if (!category) return data;
-    return data.find(c => c.category === category) || { category, sub_categories: [] };
-  }
+  const [rows] = await centralDb.queryWithRetry('SELECT * FROM equipment_templates WHERE equipment_type = ? ORDER BY name', [category]);
+  if (!category) return await getAllSupCategories();
+  return {
+    category: category,
+    sub_categories: rows.map(r => r.name)
+  };
 }
 
 async function createSupCategory(data) {
@@ -1147,33 +1135,28 @@ async function deleteOtenticationByEquipment(equipmentId) {
 
 // --- LIMITATION CONFIGS ---
 async function getAllLimitations() {
-  try {
-    const [rows] = await centralDb.queryWithRetry(`
-      SELECT p.*, t.name as template_name, t.equipment_type as category 
-      FROM template_parameters p
-      LEFT JOIN equipment_templates t ON p.template_id = t.id
-    `);
-    return rows.map(row => ({
-      id: row.id,
-      name: row.label,
-      source: row.source,
-      category: row.category || 'Support',
-      sup_category: row.template_name,
-      value_type: row.unit === '%' ? 'percent' : 'numeric',
-      unit: row.unit,
-      min_alarm_limit: row.alarm_min,
-      max_alarm_limit: row.alarm_max,
-      min_warning_limit: row.warning_min,
-      max_warning_limit: row.warning_max,
-      alv: row.alarm_min,
-      ahv: row.alarm_max,
-      wlv: row.warning_min,
-      whv: row.warning_max
-    }));
-  } catch (err) {
-    console.warn('[DB] Failed to fetch limitations from Central DB, falling back to local JSON:', err.message);
-    return await readJson(LIMITATION_CONFIG_PATH, []);
-  }
+  const [rows] = await centralDb.queryWithRetry(`
+    SELECT p.*, t.name as template_name, t.equipment_type as category 
+    FROM template_parameters p
+    LEFT JOIN equipment_templates t ON p.template_id = t.id
+  `);
+  return rows.map(row => ({
+    id: row.id,
+    name: row.label,
+    source: row.source,
+    category: row.category || 'Support',
+    sup_category: row.template_name,
+    value_type: row.unit === '%' ? 'percent' : 'numeric',
+    unit: row.unit,
+    min_alarm_limit: row.alarm_min,
+    max_alarm_limit: row.alarm_max,
+    min_warning_limit: row.warning_min,
+    max_warning_limit: row.warning_max,
+    alv: row.alarm_min,
+    ahv: row.alarm_max,
+    wlv: row.warning_min,
+    whv: row.warning_max
+  }));
 }
 
 async function getLimitationsByEquipment(equipmentId) {

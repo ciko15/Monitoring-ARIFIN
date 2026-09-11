@@ -26,72 +26,25 @@ export const isValidOID = (oid: string): boolean => {
 };
 
 /**
- * Concurrency Limiter Queue to prevent Thundering Herd ping failures
- */
-class AsyncQueue {
-    private concurrency: number;
-    private running: number = 0;
-    private queue: Array<{task: () => Promise<any>, resolve: (v: any) => void, reject: (err: any) => void}> = [];
-
-    constructor(concurrency: number) {
-        this.concurrency = concurrency;
-    }
-
-    enqueue(task: () => Promise<any>): Promise<any> {
-        return new Promise((resolve, reject) => {
-            this.queue.push({ task, resolve, reject });
-            this.processNext();
-        });
-    }
-
-    private processNext() {
-        if (this.running >= this.concurrency || this.queue.length === 0) return;
-        this.running++;
-        const { task, resolve, reject } = this.queue.shift()!;
-        task()
-            .then(resolve)
-            .catch(reject)
-            .finally(() => {
-                this.running--;
-                this.processNext();
-            });
-    }
-}
-
-// Batasi maksimal 5 proses ping berjalan bersamaan di sistem operasi
-const pingQueue = new AsyncQueue(5);
-
-/**
  * Standard ping function using node-ping
  */
-export function pingHost(ip: string, timeout: number = 3): Promise<any> {
-    return pingQueue.enqueue(async () => {
-        const ping = require('ping');
-        try {
-            const result = await ping.promise.probe(ip, { timeout });
-            
-            // Fix Windows Ping Pitfall:
-            // Kadang "Destination host unreachable" dianggap 0% loss dan alive = true
-            let isAlive = result.alive;
-            const outputText = (result.output || '').toLowerCase();
-            if (outputText.includes('unreachable') || outputText.includes('tidak dapat dijangkau')) {
-                isAlive = false;
-            }
-
-            return {
-                alive: isAlive,
-                time: result.time,
-                min: result.min,
-                max: result.max,
-                avg: result.avg,
-                packetLoss: result.packetLoss,
-                timestamp: new Date().toISOString()
-            };
-        } catch (error: any) {
-            console.error(`[PING-ERROR] ${ip}:`, error.message);
-            return { alive: false, error: error.message, timestamp: new Date().toISOString() };
-        }
-    });
+export async function pingHost(ip: string, timeout: number = 3): Promise<any> {
+    const ping = require('ping');
+    try {
+        const result = await ping.promise.probe(ip, { timeout });
+        return {
+            alive: result.alive,
+            time: result.time,
+            min: result.min,
+            max: result.max,
+            avg: result.avg,
+            packetLoss: result.packetLoss,
+            timestamp: new Date().toISOString()
+        };
+    } catch (error: any) {
+        console.error(`[PING-ERROR] ${ip}:`, error.message);
+        return { alive: false, error: error.message, timestamp: new Date().toISOString() };
+    }
 }
 
 
