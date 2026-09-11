@@ -48,28 +48,56 @@ const TYPE_RAM  = '1.3.6.1.2.1.25.2.1.2';  // Physical memory
 const TYPE_VMEM = '1.3.6.1.2.1.25.2.1.3';  // Virtual memory
 const TYPE_DISK = '1.3.6.1.2.1.25.2.1.4';  // Fixed disk / filesystem
 
-const WARN_PCT  = 80;
-const ALARM_PCT = 95;
-const RAM_AVAIL_WARN_PCT  = 20;
-const RAM_AVAIL_ALARM_PCT = 5;
-const WARN_TEMP_C = 65;
-const ALARM_TEMP_C = 75;
+// Default threshold values — digunakan jika tidak ada konfigurasi alarm limit di database.
+// Untuk mengubah batas ini, tambahkan parameter pada halaman Alarm Limit perangkat:
+//   cpu_usage_warn, cpu_usage_alarm
+//   ram_available_pct_warn, ram_available_pct_alarm
+//   disk_usage_pct_warn, disk_usage_pct_alarm
+//   temperature_warn, temperature_alarm
+const DEFAULT_LIMITS = {
+    cpu_usage_warn:          80,
+    cpu_usage_alarm:         95,
+    ram_available_pct_warn:  20,
+    ram_available_pct_alarm: 5,
+    disk_usage_pct_warn:     80,
+    disk_usage_pct_alarm:    95,
+    temperature_warn:        65,
+    temperature_alarm:       75,
+};
 
-function statusFromPct(pct) {
-    if (pct >= ALARM_PCT) return 'Alarm';
-    if (pct >= WARN_PCT)  return 'Warning';
+/**
+ * Ambil nilai limit dari objek limits kustom (dari DB) dengan fallback ke DEFAULT_LIMITS.
+ * @param {Object} limits - Objek limits dari DB, formatnya: { [param]: { warn_value, alarm_value } }
+ * @param {string} param - Nama parameter (mis. 'cpu_usage')
+ * @returns {{ warn: number, alarm: number }}
+ */
+function getLimit(limits, param) {
+    const entry = limits && limits[param];
+    return {
+        warn:  (entry && entry.warn_value  != null) ? Number(entry.warn_value)  : DEFAULT_LIMITS[`${param}_warn`]  ?? DEFAULT_LIMITS.temperature_warn,
+        alarm: (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : DEFAULT_LIMITS[`${param}_alarm`] ?? DEFAULT_LIMITS.temperature_alarm,
+    };
+}
+
+function statusFromPct(pct, limits, param) {
+    const { warn, alarm } = getLimit(limits, param);
+    if (pct >= alarm) return 'Alarm';
+    if (pct >= warn)  return 'Warning';
     return 'Normal';
 }
-function statusFromAvailablePct(pct) {
-    if (pct <= RAM_AVAIL_ALARM_PCT) return 'Alarm';
-    if (pct <= RAM_AVAIL_WARN_PCT)  return 'Warning';
+function statusFromAvailablePct(pct, limits) {
+    const entry = limits && limits['ram_available_pct'];
+    const warnLim  = (entry && entry.warn_value  != null) ? Number(entry.warn_value)  : DEFAULT_LIMITS.ram_available_pct_warn;
+    const alarmLim = (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : DEFAULT_LIMITS.ram_available_pct_alarm;
+    if (pct <= alarmLim) return 'Alarm';
+    if (pct <= warnLim)  return 'Warning';
     return 'Normal';
 }
-function statusFromTemperature(tempC, sysObjectID, sysDescr) {
+function statusFromTemperature(tempC, sysObjectID, sysDescr, limits) {
     const sysObjectIdText = Array.isArray(sysObjectID) ? sysObjectID.join('.') : String(sysObjectID || '');
     const descr = String(sysDescr || '').toLowerCase();
     
-    // Identifikasi apakah perangkat adalah Switch
+    // Identifikasi apakah perangkat adalah Switch (untuk menentukan default batas suhu yang lebih tinggi)
     const isSwitch = sysObjectIdText.startsWith('1.3.6.1.4.1.6486.') || // Alcatel
                      sysObjectIdText.startsWith('1.3.6.1.4.1.9.') || // Cisco
                      sysObjectIdText.startsWith('1.3.6.1.4.1.14823.') || // Aruba
@@ -77,8 +105,11 @@ function statusFromTemperature(tempC, sysObjectID, sysDescr) {
                      sysObjectIdText.startsWith('1.3.6.1.4.1.4881.') || // Ruijie
                      descr.includes('switch');
 
-    const warnLimit = isSwitch ? 65 : WARN_TEMP_C;
-    const alarmLimit = isSwitch ? 75 : ALARM_TEMP_C;
+    // Jika ada konfigurasi alarm limit di DB untuk 'temperature', gunakan itu.
+    // Jika tidak, gunakan default berbasis tipe perangkat (Switch vs Server).
+    const entry = limits && limits['temperature'];
+    const warnLimit  = (entry && entry.warn_value  != null) ? Number(entry.warn_value)  : (isSwitch ? 65 : DEFAULT_LIMITS.temperature_warn);
+    const alarmLimit = (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : (isSwitch ? 75 : DEFAULT_LIMITS.temperature_alarm);
 
     if (tempC >= alarmLimit) return 'Alarm';
     if (tempC >= warnLimit) return 'Warning';
@@ -189,6 +220,9 @@ async function readDeviceTemperature(session, sysObjectID, sysDescr) {
 }
 
 async function pollSNMP(host, community = 'public', options = {}) {
+    // limits: objek dari DB alarm limit, format { [param_name]: { warn_value, alarm_value } }
+    // Diteruskan dari network_listener.js saat memanggil pollSNMP.
+    const limits = options.limits || null;
     const session = createSession(host, community, options);
     try {
         // Memecah menjadi dua batch agar paket UDP tidak terlalu besar dan di-drop oleh network switch
@@ -290,11 +324,11 @@ async function pollSNMP(host, community = 'public', options = {}) {
             status: sensor.status,
         }));
 
-        const s_cpu  = cpu_pct  !== null ? statusFromPct(cpu_pct)  : 'Normal';
-        const s_ram  = ram_available_pct !== null ? statusFromAvailablePct(ram_available_pct) : 'Normal';
-        const s_disk = disk_pct !== null ? statusFromPct(disk_pct) : 'Normal';
+        const s_cpu  = cpu_pct  !== null ? statusFromPct(cpu_pct, limits, 'cpu_usage')  : 'Normal';
+        const s_ram  = ram_available_pct !== null ? statusFromAvailablePct(ram_available_pct, limits) : 'Normal';
+        const s_disk = disk_pct !== null ? statusFromPct(disk_pct, limits, 'disk_usage_pct') : 'Normal';
         const s_temp = tempInfo.hottest !== null
-            ? statusFromTemperature(tempInfo.hottest.value_c, sysObjectID, sysDescr)
+            ? statusFromTemperature(tempInfo.hottest.value_c, sysObjectID, sysDescr, limits)
             : 'Normal';
         const status = worstStatus(s_cpu, s_ram, s_disk, s_temp);
 

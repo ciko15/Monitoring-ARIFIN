@@ -663,7 +663,21 @@ class NetworkListenerService {
             isPolling = true;
             console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
             try {
-                const result = await pollSNMP(ip_address, comm, { port, version });
+                // Ambil alarm limits dari DB untuk alat ini, agar threshold tidak hardcode di parser
+                let limitsMap = null;
+                try {
+                    const rawLimits = await this.equipmentService.db.getLimitationsByEquipment(equipt_id);
+                    if (Array.isArray(rawLimits) && rawLimits.length > 0) {
+                        // Ubah format array [{ parameter, warn_value, alarm_value }] ke { [parameter]: { warn_value, alarm_value } }
+                        limitsMap = {};
+                        for (const lim of rawLimits) {
+                            limitsMap[lim.parameter] = { warn_value: lim.warn_value, alarm_value: lim.alarm_value };
+                        }
+                    }
+                } catch (limErr) {
+                    // Jika gagal ambil limits, gunakan default — tidak perlu crash
+                }
+                const result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap });
                 const logLine = `[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error || 'none'}`;
                 if (String(result.status || '').toLowerCase() === 'disconnect') {
                     this._logThrottled('log', `snmp-system:disconnect:${id}`, logLine);
