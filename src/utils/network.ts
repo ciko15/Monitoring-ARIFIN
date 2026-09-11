@@ -299,7 +299,11 @@ export async function determineStatus(data: any, templateId: string, equipmentId
                 alarm_max: param.alarm_max
             };
 
-            const status = thresholdEvaluator.checkThreshold(valueObj.value, config);
+            let status = thresholdEvaluator.checkThreshold(valueObj.value, config);
+            
+            // Force status to never exceed Warning for threshold breaches
+            if (status === 'Alert') status = 'Warning';
+
             if (status === 'Warning' || status === 'Alert') {
                 triggeredParameters.push(param.source || param.label);
             }
@@ -337,7 +341,11 @@ export async function determineStatus(data: any, templateId: string, equipmentId
                             alarm_max: limit.max_alarm_limit || limit.ahv
                         };
 
-                        const status = thresholdEvaluator.checkThreshold(value, config);
+                        let status = thresholdEvaluator.checkThreshold(value, config);
+                        
+                        // Force status to never exceed Warning for threshold breaches
+                        if (status === 'Alert') status = 'Warning';
+
                         if (status === 'Warning' || status === 'Alert') {
                             if (!triggeredParameters.includes(key)) triggeredParameters.push(key);
                         }
