@@ -297,7 +297,7 @@ class EquipmentService {
             if (lowerStatus === 'disconnect') {
                 finalStatus = 'Disconnect';
             } else if (isEmpty) {
-                finalStatus = 'Disconnect'; // Jaringan hidup, tapi data kosong = Disconnect
+                finalStatus = 'Alarm'; // Jaringan hidup (Ping Normal), tapi data SNMP/Modbus kosong = Alarm
             } else {
                 // Evaluasi Threshold Limits
                 const limitations = await this.db.getLimitationsByEquipment(equipmentId);

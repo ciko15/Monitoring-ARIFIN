@@ -315,7 +315,7 @@ async function checkEquipmentWatchdog() {
                         } else if (lowerStatuses.every(s => s === 'disconnect' || s === 'offline')) {
                             finalStatus = 'Disconnect';
                         } else if (lowerStatuses.some(s => s === 'disconnect' || s === 'offline')) {
-                            finalStatus = 'Disconnect';
+                            finalStatus = 'Warning';
                         } else {
                             finalStatus = 'Normal';
                         }
@@ -2046,6 +2046,15 @@ async function startServices() {
         }
 
         if (SHOULD_START_PROCESSOR) {
+            // Run watchdog immediately on startup so statuses are not stale
+            setTimeout(async () => {
+                try {
+                    await checkEquipmentWatchdog();
+                } catch (e) {
+                    console.error('[WATCHDOG] Startup Error:', e);
+                }
+            }, 5000); // 5 seconds delay to allow listeners to bind
+
             setInterval(async () => {
                 try {
                     await checkEquipmentWatchdog();

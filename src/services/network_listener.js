@@ -692,8 +692,8 @@ class NetworkListenerService {
         // Add random jitter (0 to 15 seconds) to prevent 'Thundering Herd'
         // di mana puluhan server ditembak SNMP secara bersamaan yang membuat
         // UDP packet terbuang (drop) oleh switch/buffer.
-        const jitterMs = Math.floor(Math.random() * 15000);
-        const initialDelay = 2000 + jitterMs;
+        const jitterMs = Math.floor(Math.random() * 3000);
+        const initialDelay = 500 + jitterMs;
 
         setTimeout(() => {
             doPoll();
