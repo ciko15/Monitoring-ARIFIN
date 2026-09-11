@@ -291,7 +291,11 @@ class EquipmentService {
             }
 
             if (isEmpty) {
-                status = 'Alarm';
+                // Jika kosong melompong: Jadikan Alarm HANYA JIKA ping masih Normal (nyala tapi hang)
+                // Jika benar-benar Disconnect (atau ping gagal), biarkan menjadi Disconnect.
+                if (status !== 'Disconnect' || (parsedData.data && parsedData.data.ping_status === 'Normal')) {
+                    status = 'Alarm';
+                }
             } else if (status === 'Alarm' || status === 'Alert') {
                 status = 'Warning';
             }
