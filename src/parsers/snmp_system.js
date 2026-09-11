@@ -23,28 +23,28 @@ const snmp = require('snmp-native');
 const { readAlcatelTemperature, readTemperatureSensors, readUcdTemperatureSensors } = require('./snmp_sensor_utils');
 
 const OID = {
-    sysDescr:        [1,3,6,1,2,1,1,1,0],
-    sysObjectID:     [1,3,6,1,2,1,1,2,0],
-    sysContact:      [1,3,6,1,2,1,1,4,0],
-    sysName:         [1,3,6,1,2,1,1,5,0],
-    sysLocation:     [1,3,6,1,2,1,1,6,0],
-    sysUpTime:       [1,3,6,1,2,1,1,3,0],
-    hrProcessorLoad: [1,3,6,1,2,1,25,3,3,1,2],
-    hrStorageType:   [1,3,6,1,2,1,25,2,3,1,2],
-    hrStorageSize:   [1,3,6,1,2,1,25,2,3,1,5],
-    hrStorageUsed:   [1,3,6,1,2,1,25,2,3,1,6],
-    hrStorageAlloc:  [1,3,6,1,2,1,25,2,3,1,4],
-    memTotalSwap:    [1,3,6,1,4,1,2021,4,3,0],
-    memAvailSwap:    [1,3,6,1,4,1,2021,4,4,0],
-    memTotalReal:    [1,3,6,1,4,1,2021,4,5,0],
-    memAvailReal:    [1,3,6,1,4,1,2021,4,6,0],
-    memShared:       [1,3,6,1,4,1,2021,4,13,0],
-    memBuffer:       [1,3,6,1,4,1,2021,4,14,0],
-    memCached:       [1,3,6,1,4,1,2021,4,15,0],
+    sysDescr: [1, 3, 6, 1, 2, 1, 1, 1, 0],
+    sysObjectID: [1, 3, 6, 1, 2, 1, 1, 2, 0],
+    sysContact: [1, 3, 6, 1, 2, 1, 1, 4, 0],
+    sysName: [1, 3, 6, 1, 2, 1, 1, 5, 0],
+    sysLocation: [1, 3, 6, 1, 2, 1, 1, 6, 0],
+    sysUpTime: [1, 3, 6, 1, 2, 1, 1, 3, 0],
+    hrProcessorLoad: [1, 3, 6, 1, 2, 1, 25, 3, 3, 1, 2],
+    hrStorageType: [1, 3, 6, 1, 2, 1, 25, 2, 3, 1, 2],
+    hrStorageSize: [1, 3, 6, 1, 2, 1, 25, 2, 3, 1, 5],
+    hrStorageUsed: [1, 3, 6, 1, 2, 1, 25, 2, 3, 1, 6],
+    hrStorageAlloc: [1, 3, 6, 1, 2, 1, 25, 2, 3, 1, 4],
+    memTotalSwap: [1, 3, 6, 1, 4, 1, 2021, 4, 3, 0],
+    memAvailSwap: [1, 3, 6, 1, 4, 1, 2021, 4, 4, 0],
+    memTotalReal: [1, 3, 6, 1, 4, 1, 2021, 4, 5, 0],
+    memAvailReal: [1, 3, 6, 1, 4, 1, 2021, 4, 6, 0],
+    memShared: [1, 3, 6, 1, 4, 1, 2021, 4, 13, 0],
+    memBuffer: [1, 3, 6, 1, 4, 1, 2021, 4, 14, 0],
+    memCached: [1, 3, 6, 1, 4, 1, 2021, 4, 15, 0],
 };
 
 // Storage type OID suffixes — nilai persis dari snmp-native (dot-separated string)
-const TYPE_RAM  = '1.3.6.1.2.1.25.2.1.2';  // Physical memory
+const TYPE_RAM = '1.3.6.1.2.1.25.2.1.2';  // Physical memory
 const TYPE_VMEM = '1.3.6.1.2.1.25.2.1.3';  // Virtual memory
 const TYPE_DISK = '1.3.6.1.2.1.25.2.1.4';  // Fixed disk / filesystem
 
@@ -55,14 +55,14 @@ const TYPE_DISK = '1.3.6.1.2.1.25.2.1.4';  // Fixed disk / filesystem
 //   disk_usage_pct_warn, disk_usage_pct_alarm
 //   temperature_warn, temperature_alarm
 const DEFAULT_LIMITS = {
-    cpu_usage_warn:          80,
-    cpu_usage_alarm:         95,
-    ram_available_pct_warn:  20,
-    ram_available_pct_alarm: 5,
-    disk_usage_pct_warn:     80,
-    disk_usage_pct_alarm:    95,
-    temperature_warn:        65,
-    temperature_alarm:       75,
+    // cpu_usage_warn:          80,
+    // cpu_usage_alarm:         95,
+    // ram_available_pct_warn:  20,
+    // ram_available_pct_alarm: 5,
+    // disk_usage_pct_warn:     80,
+    // disk_usage_pct_alarm:    95,
+    // temperature_warn:        65,
+    // temperature_alarm:       75,
 };
 
 /**
@@ -74,7 +74,7 @@ const DEFAULT_LIMITS = {
 function getLimit(limits, param) {
     const entry = limits && limits[param];
     return {
-        warn:  (entry && entry.warn_value  != null) ? Number(entry.warn_value)  : DEFAULT_LIMITS[`${param}_warn`]  ?? DEFAULT_LIMITS.temperature_warn,
+        warn: (entry && entry.warn_value != null) ? Number(entry.warn_value) : DEFAULT_LIMITS[`${param}_warn`] ?? DEFAULT_LIMITS.temperature_warn,
         alarm: (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : DEFAULT_LIMITS[`${param}_alarm`] ?? DEFAULT_LIMITS.temperature_alarm,
     };
 }
@@ -82,33 +82,33 @@ function getLimit(limits, param) {
 function statusFromPct(pct, limits, param) {
     const { warn, alarm } = getLimit(limits, param);
     if (pct >= alarm) return 'Alarm';
-    if (pct >= warn)  return 'Warning';
+    if (pct >= warn) return 'Warning';
     return 'Normal';
 }
 function statusFromAvailablePct(pct, limits) {
     const entry = limits && limits['ram_available_pct'];
-    const warnLim  = (entry && entry.warn_value  != null) ? Number(entry.warn_value)  : DEFAULT_LIMITS.ram_available_pct_warn;
+    const warnLim = (entry && entry.warn_value != null) ? Number(entry.warn_value) : DEFAULT_LIMITS.ram_available_pct_warn;
     const alarmLim = (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : DEFAULT_LIMITS.ram_available_pct_alarm;
     if (pct <= alarmLim) return 'Alarm';
-    if (pct <= warnLim)  return 'Warning';
+    if (pct <= warnLim) return 'Warning';
     return 'Normal';
 }
 function statusFromTemperature(tempC, sysObjectID, sysDescr, limits) {
     const sysObjectIdText = Array.isArray(sysObjectID) ? sysObjectID.join('.') : String(sysObjectID || '');
     const descr = String(sysDescr || '').toLowerCase();
-    
+
     // Identifikasi apakah perangkat adalah Switch (untuk menentukan default batas suhu yang lebih tinggi)
     const isSwitch = sysObjectIdText.startsWith('1.3.6.1.4.1.6486.') || // Alcatel
-                     sysObjectIdText.startsWith('1.3.6.1.4.1.9.') || // Cisco
-                     sysObjectIdText.startsWith('1.3.6.1.4.1.14823.') || // Aruba
-                     sysObjectIdText.startsWith('1.3.6.1.4.1.2011.') || // Huawei
-                     sysObjectIdText.startsWith('1.3.6.1.4.1.4881.') || // Ruijie
-                     descr.includes('switch');
+        sysObjectIdText.startsWith('1.3.6.1.4.1.9.') || // Cisco
+        sysObjectIdText.startsWith('1.3.6.1.4.1.14823.') || // Aruba
+        sysObjectIdText.startsWith('1.3.6.1.4.1.2011.') || // Huawei
+        sysObjectIdText.startsWith('1.3.6.1.4.1.4881.') || // Ruijie
+        descr.includes('switch');
 
     // Jika ada konfigurasi alarm limit di DB untuk 'temperature', gunakan itu.
     // Jika tidak, gunakan default berbasis tipe perangkat (Switch vs Server).
     const entry = limits && limits['temperature'];
-    const warnLimit  = (entry && entry.warn_value  != null) ? Number(entry.warn_value)  : (isSwitch ? 65 : DEFAULT_LIMITS.temperature_warn);
+    const warnLimit = (entry && entry.warn_value != null) ? Number(entry.warn_value) : (isSwitch ? 65 : DEFAULT_LIMITS.temperature_warn);
     const alarmLimit = (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : (isSwitch ? 75 : DEFAULT_LIMITS.temperature_alarm);
 
     if (tempC >= alarmLimit) return 'Alarm';
@@ -228,7 +228,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
         // Memecah menjadi dua batch agar paket UDP tidak terlalu besar dan di-drop oleh network switch
         const oids1 = [OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation, OID.sysUpTime];
         const oids2 = [OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal, OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached];
-        
+
         const [
             [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw],
             [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb],
@@ -274,30 +274,30 @@ async function pollSNMP(host, community = 'public', options = {}) {
         let disk_total_gb = null, disk_used_gb = null;
 
         for (const idx of Object.keys(tm)) {
-            const typeStr  = oidToStr(tm[idx]);  // Array → "1.3.6.1.2.1.25.2.1.x"
-            const alloc    = parseInt(am[idx]) || 1024;
-            const total    = (parseInt(sm[idx]) || 0) * alloc;
-            const used     = (parseInt(um[idx]) || 0) * alloc;
+            const typeStr = oidToStr(tm[idx]);  // Array → "1.3.6.1.2.1.25.2.1.x"
+            const alloc = parseInt(am[idx]) || 1024;
+            const total = (parseInt(sm[idx]) || 0) * alloc;
+            const used = (parseInt(um[idx]) || 0) * alloc;
 
             if (typeStr === TYPE_RAM) {
                 ram_total_mb += total / (1024 * 1024);
-                ram_used_mb  += used  / (1024 * 1024);
+                ram_used_mb += used / (1024 * 1024);
                 ram_entries++;
             } else if (typeStr === TYPE_DISK) {
                 // Ambil disk terbesar (skip filesystem virtual kecil)
                 const totalGb = total / (1024 * 1024 * 1024);
                 if (totalGb > 1.0 && totalGb > (disk_total_gb || 0)) {
                     disk_total_gb = totalGb;
-                    disk_used_gb  = used / (1024 * 1024 * 1024);
+                    disk_used_gb = used / (1024 * 1024 * 1024);
                 }
             }
         }
 
         // RAM: sum semua entry TYPE_RAM (biasanya hanya 1 entry = Physical memory)
         const ram_total_final = ram_total_mb > 0 ? ram_total_mb : null;
-        const ram_used_final  = ram_used_mb  > 0 ? ram_used_mb  : null;
+        const ram_used_final = ram_used_mb > 0 ? ram_used_mb : null;
 
-        const ram_pct  = (ram_total_final && ram_total_final > 0)
+        const ram_pct = (ram_total_final && ram_total_final > 0)
             ? (ram_used_final / ram_total_final * 100) : null;
         const ram_available_mb = (ram_total_final !== null && ram_used_final !== null)
             ? Math.max(0, ram_total_final - ram_used_final) : null;
@@ -324,8 +324,8 @@ async function pollSNMP(host, community = 'public', options = {}) {
             status: sensor.status,
         }));
 
-        const s_cpu  = cpu_pct  !== null ? statusFromPct(cpu_pct, limits, 'cpu_usage')  : 'Normal';
-        const s_ram  = ram_available_pct !== null ? statusFromAvailablePct(ram_available_pct, limits) : 'Normal';
+        const s_cpu = cpu_pct !== null ? statusFromPct(cpu_pct, limits, 'cpu_usage') : 'Normal';
+        const s_ram = ram_available_pct !== null ? statusFromAvailablePct(ram_available_pct, limits) : 'Normal';
         const s_disk = disk_pct !== null ? statusFromPct(disk_pct, limits, 'disk_usage_pct') : 'Normal';
         const s_temp = tempInfo.hottest !== null
             ? statusFromTemperature(tempInfo.hottest.value_c, sysObjectID, sysDescr, limits)
@@ -337,22 +337,22 @@ async function pollSNMP(host, community = 'public', options = {}) {
             success: true,
             status,
             data: {
-                connectivity:   'Connected',
-                resolved_ip:    host,
-                sys_name:       String(sysName  || '—'),
-                sys_descr:      String(sysDescr || '—').substring(0, 80),
-                hardware:       parseHardware(sysDescr),
+                connectivity: 'Connected',
+                resolved_ip: host,
+                sys_name: String(sysName || '—'),
+                sys_descr: String(sysDescr || '—').substring(0, 80),
+                hardware: parseHardware(sysDescr),
                 operating_system: parseOperatingSystem(sysDescr),
-                sys_object_id:  Array.isArray(sysObjectID) ? sysObjectID.join('.') : String(sysObjectID || '—'),
-                sys_contact:    String(sysContact || '—'),
-                sys_location:   String(sysLocation || '—'),
-                sys_uptime:     sysUpRaw !== null ? formatUptime(sysUpRaw) : '—',
+                sys_object_id: Array.isArray(sysObjectID) ? sysObjectID.join('.') : String(sysObjectID || '—'),
+                sys_contact: String(sysContact || '—'),
+                sys_location: String(sysLocation || '—'),
+                sys_uptime: sysUpRaw !== null ? formatUptime(sysUpRaw) : '—',
                 processor_count,
-                cpu_usage:      cpu_pct  !== null ? cpu_pct.toFixed(1)           : '—',
-                ram_total_mb:   ram_total_final  !== null ? ram_total_final.toFixed(0)  : '—',
-                ram_used_mb:    ram_used_final   !== null ? ram_used_final.toFixed(0)   : '—',
-                ram_usage_pct:  ram_pct          !== null ? ram_pct.toFixed(1)          : '—',
-                ram_available_mb:  ram_available_mb  !== null ? ram_available_mb.toFixed(0)  : '—',
+                cpu_usage: cpu_pct !== null ? cpu_pct.toFixed(1) : '—',
+                ram_total_mb: ram_total_final !== null ? ram_total_final.toFixed(0) : '—',
+                ram_used_mb: ram_used_final !== null ? ram_used_final.toFixed(0) : '—',
+                ram_usage_pct: ram_pct !== null ? ram_pct.toFixed(1) : '—',
+                ram_available_mb: ram_available_mb !== null ? ram_available_mb.toFixed(0) : '—',
                 ram_available_pct: ram_available_pct !== null ? ram_available_pct.toFixed(1) : '—',
                 physical_memory_total_mb: memTotalRealMbRaw !== null ? memTotalRealMbRaw.toFixed(0) : '—',
                 physical_memory_used_mb: memUsedRealMbRaw !== null ? memUsedRealMbRaw.toFixed(0) : '—',
@@ -366,26 +366,26 @@ async function pollSNMP(host, community = 'public', options = {}) {
                 swap_total_mb: memTotalSwapMb !== null ? memTotalSwapMb.toFixed(0) : '—',
                 swap_used_mb: memUsedSwapMb !== null ? memUsedSwapMb.toFixed(0) : '—',
                 swap_usage_pct: memSwapPct !== null ? memSwapPct.toFixed(1) : '—',
-                disk_total_gb:  disk_total_gb    !== null ? disk_total_gb.toFixed(1)    : '—',
-                disk_used_gb:   disk_used_gb     !== null ? disk_used_gb.toFixed(1)     : '—',
-                disk_usage_pct: disk_pct         !== null ? disk_pct.toFixed(1)         : '—',
+                disk_total_gb: disk_total_gb !== null ? disk_total_gb.toFixed(1) : '—',
+                disk_used_gb: disk_used_gb !== null ? disk_used_gb.toFixed(1) : '—',
+                disk_usage_pct: disk_pct !== null ? disk_pct.toFixed(1) : '—',
                 temperature_c: tempInfo.hottest ? tempInfo.hottest.value_c.toFixed(1) : '—',
                 temperature_sensor_name: tempInfo.hottest ? tempInfo.hottest.name : '—',
                 temperature_sensor_count: String(temperatureSensors.length),
                 temperature_sensors: temperatureSensors,
             },
-            alarms:          status === 'Alarm'   ? ['Resource usage critical or temperature high'] : [],
-            warnings:        status === 'Warning' ? ['Resource usage high or temperature elevated']     : [],
+            alarms: status === 'Alarm' ? ['Resource usage critical or temperature high'] : [],
+            warnings: status === 'Warning' ? ['Resource usage high or temperature elevated'] : [],
             triggeredParams: [],
             timestamp: new Date().toISOString(),
         };
 
     } catch (err) {
-        try { session.close(); } catch(e) {}
+        try { session.close(); } catch (e) { }
         return {
             success: false,
             status: 'Disconnect',
-            error:  err.message,
+            error: err.message,
             data: {
                 connectivity: 'Disconnected',
                 resolved_ip: host,
@@ -422,61 +422,61 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
         // Ini sangat krusial dan aman untuk mencegah UDP Flooding (Thundering Herd) 
         // ketika puluhan PC di-poll secara serentak di milidetik yang sama.
         const jitterMs = Math.floor(Math.random() * 2500);
-        
+
         setTimeout(() => {
             const timer = setTimeout(() => {
                 resolve({
-                success: false,
-                status: 'Disconnect',
-                error:  `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
-                data: {
-                    connectivity: 'Disconnected',
-                    resolved_ip: host,
-                    sys_name: '—', sys_descr: '—', sys_uptime: '—',
-                    hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
-                    processor_count: '—',
-                    cpu_usage: '—',
-                    ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
-                    ram_available_mb: '—', ram_available_pct: '—',
-                    physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
-                    virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
-                    memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
-                    swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
-                    disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
-                    temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
-                },
-                timestamp: new Date().toISOString(),
-            });
-        }, effectiveTimeoutMs);
+                    success: false,
+                    status: 'Disconnect',
+                    error: `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
+                    data: {
+                        connectivity: 'Disconnected',
+                        resolved_ip: host,
+                        sys_name: '—', sys_descr: '—', sys_uptime: '—',
+                        hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
+                        processor_count: '—',
+                        cpu_usage: '—',
+                        ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+                        ram_available_mb: '—', ram_available_pct: '—',
+                        physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
+                        virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
+                        memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
+                        swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
+                        disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
+                        temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
+                    },
+                    timestamp: new Date().toISOString(),
+                });
+            }, effectiveTimeoutMs);
 
-        pollSNMP(host, community, snmpOptions).then(result => {
-            clearTimeout(timer);
-            resolve(result);
-        }).catch(err => {
-            clearTimeout(timer);
-            resolve({
-                success: false,
-                status: 'Disconnect',
-                error:  err.message,
-                data: {
-                    connectivity: 'Disconnected',
-                    resolved_ip: host,
-                    sys_name: '—', sys_descr: '—', sys_uptime: '—',
-                    hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
-                    processor_count: '—',
-                    cpu_usage: '—',
-                    ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
-                    ram_available_mb: '—', ram_available_pct: '—',
-                    physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
-                    virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
-                    memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
-                    swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
-                    disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
-                    temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
-                },
-                timestamp: new Date().toISOString(),
+            pollSNMP(host, community, snmpOptions).then(result => {
+                clearTimeout(timer);
+                resolve(result);
+            }).catch(err => {
+                clearTimeout(timer);
+                resolve({
+                    success: false,
+                    status: 'Disconnect',
+                    error: err.message,
+                    data: {
+                        connectivity: 'Disconnected',
+                        resolved_ip: host,
+                        sys_name: '—', sys_descr: '—', sys_uptime: '—',
+                        hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
+                        processor_count: '—',
+                        cpu_usage: '—',
+                        ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+                        ram_available_mb: '—', ram_available_pct: '—',
+                        physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
+                        virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
+                        memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
+                        swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
+                        disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
+                        temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
+                    },
+                    timestamp: new Date().toISOString(),
+                });
             });
-        });
         }, jitterMs); // Akhir dari blok Jitter Delay
     });
 }
