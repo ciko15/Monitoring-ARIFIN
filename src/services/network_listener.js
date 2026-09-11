@@ -113,6 +113,8 @@ class NetworkListenerService {
                 parsedData.data = JSON.parse(JSON.stringify(prevData));
             }
         } else if (!isDisconnect && parsedData && parsedData.data) {
+            // Jika bisa connect SNMP/API, berarti secara logika network normal. Reset ping_status agar tidak nyangkut 'Gagal'
+            parsedData.data.ping_status = 'Normal';
             // Simpan data terakhir yang SUKSES BENERAN ke dalam cache
             this._lkgvCache.set(source.id, JSON.parse(JSON.stringify(parsedData.data)));
         } else if (isDisconnect && parsedData) {

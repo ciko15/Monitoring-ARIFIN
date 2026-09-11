@@ -868,8 +868,16 @@
 
         const status = data ? (data._status || 'Normal') : 'Disconnect';
         const statusColors = { Normal: '#00ff88', Alarm: '#ff3355', Warning: '#ffcc00', Disconnect: '#3a5a7a' };
+        
+        let pingBadge = '';
+        if (data && data.ping_status) {
+            const pc = data.ping_status === 'Normal' ? '#00ff88' : '#ff3355';
+            const icon = data.ping_status === 'Normal' ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
+            pingBadge = `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${pc}22;color:${pc};border:1px solid ${pc};margin-right:8px;" title="Status Ping dari Server ke IP Perangkat">${icon} Ping: ${data.ping_status}</span>`;
+        }
+
         document.getElementById('srcDetailStatus').innerHTML =
-            `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${statusColors[status]}22;color:${statusColors[status]};border:1px solid ${statusColors[status]}">${status}</span>`;
+            pingBadge + `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${statusColors[status]}22;color:${statusColors[status]};border:1px solid ${statusColors[status]}">${status}</span>`;
 
         const body = document.getElementById('srcDetailBody');
 
