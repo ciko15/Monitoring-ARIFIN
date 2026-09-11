@@ -275,6 +275,28 @@ class EquipmentService {
             const sourceName = parsedData.source || (parsedData._sources && parsedData._sources.length > 0 ? parsedData._sources[0].name : 'default');
             const sourceId = parsedData.source_id || sourceName; // Gunakan ID sebagai penanda utama jika ada
 
+            // =========================================================================
+            // OVERRIDE STATUS: 
+            // 1. Data kosong melompong -> Wajib Alarm
+            // 2. Data ada isinya tapi Alarm/Alert -> Turunkan jadi Warning
+            // =========================================================================
+            let isEmpty = true;
+            for (const key of Object.keys(parsedData.data || {})) {
+                if (key.startsWith('_') || ['status', 'alarms', 'warnings', 'triggeredParams', 'connectivity', 'reachability', 'source', 'source_name', 'source_id', 'timestamp'].includes(key)) continue;
+                const v = parsedData.data[key];
+                if (v !== '-' && v !== '—' && v !== null && v !== undefined && v !== '') {
+                    isEmpty = false;
+                    break;
+                }
+            }
+
+            if (isEmpty) {
+                status = 'Alarm';
+            } else if (status === 'Alarm' || status === 'Alert') {
+                status = 'Warning';
+            }
+            // =========================================================================
+
             const gateDecision = this.statusGate.evaluate(
                 {
                     id: `${equipmentId}:${sourceName}`,
