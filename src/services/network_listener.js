@@ -97,7 +97,7 @@ class NetworkListenerService {
             return;
         }
 
-        const finalStatus = decision.status;
+        let finalStatus = decision.status;
         const isFrozen = decision.reason === 'Frozen (Pending Disconnect)';
 
         // LKGV (Last Known Good Value) & Dash Conversion
@@ -134,6 +134,10 @@ class NetworkListenerService {
             if (!parsedData.data) parsedData.data = {};
             const isPingable = await checkIcmpPing(source.ip_address);
             parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
+            
+            if (isPingable) {
+                finalStatus = 'Alarm';
+            }
         }
 
         if (this._isSplitCollectorMode()) {

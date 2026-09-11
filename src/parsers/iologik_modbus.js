@@ -128,15 +128,7 @@ async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, 
             for (let i = 0; i < 14; i++) dvor2Bits.push(bitArray[i + 32]);
             data.devices['DVOR 2'] = parse14Bits(dvor2Bits);
 
-            // Cek Alarms fallback
-            for (const [deviceName, out] of Object.entries(data.devices)) {
-                if (out['STATUS'] !== 'Normal' && out['STATUS'] !== '-') // alarms.push (removed hardcode)(`${deviceName} Status: ${out['STATUS']}`);
-                if (out['DESCRIPTION'] !== '-') // alarms.push (removed hardcode)(`${deviceName} Info: ${out['DESCRIPTION']}`);
-                if (out['Battery Charge 1'] === 'Alarm') // alarms.push (removed hardcode)(`${deviceName} Battery Charge 1 Alarm`);
-                if (out['Battery Charge 2'] === 'Alarm') // alarms.push (removed hardcode)(`${deviceName} Battery Charge 2 Alarm`);
-                if (out['Mains OK'] === 'Alarm') // alarms.push (removed hardcode)(`${deviceName} Mains OK Alarm`);
-                if (out['Normal AC Power'] === 'Alarm') // alarms.push (removed hardcode)(`${deviceName} Normal AC Power Alarm`);
-            }
+            // Cek Alarms fallback (removed)
         }
 
         return {
