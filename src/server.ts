@@ -292,7 +292,7 @@ async function checkEquipmentWatchdog() {
                             if (ipToPing) {
                                 try {
                                     const { pingHost } = require('./utils/network');
-                                    const pingRes = await pingHost(ipToPing, 1);
+                                    const pingRes = await pingHost(ipToPing, 3);
                                     if (pingRes && pingRes.alive) {
                                         pingErrorMsgs.push(`${name}: Reachable (${pingRes.time || '<1'}ms) but no data`);
                                         return 'Alarm';
