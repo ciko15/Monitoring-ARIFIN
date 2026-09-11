@@ -35,67 +35,67 @@ const PKT_C_SIZE = 92;
 
 // Protokol Mandiri Thales 421 (Hasil Sniffing)
 const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
-const HBEAT_RECV   = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
-const HBEAT_REPLY  = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
+const HBEAT_RECV = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari device
+const HBEAT_REPLY = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
 
 function isPktCSync(buf, i) {
     return i + 3 < buf.length &&
-           buf[i] === 0x11 && buf[i+1] === 0x8D && buf[i+3] === 0x0C;
+        buf[i] === 0x11 && buf[i + 1] === 0x8D && buf[i + 3] === 0x0C;
 }
 
 const OFFSETS = {
-    RF_POWER:    15,
-    DDM_COURSE:  19,
+    RF_POWER: 15,
+    DDM_COURSE: 19,
     CARRIER_PWR: 23,
-    CSB_POWER:   31,
-    DDM_CLR:     35,
-    SBO_POWER:   39,
-    CLR_POWER:   43,
-    CLR_DDM:     47,
-    CLR_SDM:     51,
-    RF_OUT:      57,
-    DDM_MON:     61,
-    MON_POWER:   65,
-    GP_ANGLE:    66,
+    CSB_POWER: 31,
+    DDM_CLR: 35,
+    SBO_POWER: 39,
+    CLR_POWER: 43,
+    CLR_DDM: 47,
+    CLR_SDM: 51,
+    RF_OUT: 57,
+    DDM_MON: 61,
+    MON_POWER: 65,
+    GP_ANGLE: 66,
 };
 
 const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'DDM_MON']);
 
 const LIMITS = {
-    GP_ANGLE:    [2.75,  3.25 ],
-    RF_POWER:    [90.0,  110.0],
-    CSB_POWER:   [85.0,  110.0],
-    CLR_POWER:   [85.0,  120.0],
-    RF_OUT:      [70.0,  125.0],
-    CARRIER_PWR: [65.0,  82.0 ],
-    SBO_POWER:   [65.0,  82.0 ],
-    CLR_SDM:     [65.0,  82.0 ],
-    MON_POWER:   [65.0,  90.0 ],
-    DDM_COURSE:  [-4.0,  4.0  ],
-    DDM_CLR:     [10.0,  22.0 ],
-    CLR_DDM:     [20.0,  35.0 ],
-    DDM_MON:     [-4.0,  4.0  ],
+    // GP_ANGLE:    [2.75,  3.25 ],
+    // RF_POWER:    [90.0,  110.0],
+    // CSB_POWER:   [85.0,  110.0],
+    // CLR_POWER:   [85.0,  120.0],
+    // RF_OUT:      [70.0,  125.0],
+    // CARRIER_PWR: [65.0,  82.0 ],
+    // SBO_POWER:   [65.0,  82.0 ],
+    // CLR_SDM:     [65.0,  82.0 ],
+    // MON_POWER:   [65.0,  90.0 ],
+    // DDM_COURSE:  [-4.0,  4.0  ],
+    // DDM_CLR:     [10.0,  22.0 ],
+    // CLR_DDM:     [20.0,  35.0 ],
+    // DDM_MON:     [-4.0,  4.0  ],
 };
 
 const PARAM_LABELS = {
-    RF_POWER:    ['CRS Pos. RF Level',  '%'],
-    DDM_COURSE:  ['CRS Pos. DDM',       '%'],
-    CARRIER_PWR: ['CRS Pos. SDM',       '%'],
-    CSB_POWER:   ['CRS Width RF Level', '%'],
-    DDM_CLR:     ['CRS Width DDM',      '%'],
-    SBO_POWER:   ['CRS Width SDM',      '%'],
-    CLR_POWER:   ['CLR Width RF Level', '%'],
-    CLR_DDM:     ['CLR Width DDM',      '%'],
-    CLR_SDM:     ['CLR Width SDM',      '%'],
-    RF_OUT:      ['Nearfield Pos. RF',  '%'],
-    DDM_MON:     ['Nearfield Pos. DDM', '%'],
-    MON_POWER:   ['Monitor Power',      '%'],
-    GP_ANGLE:    ['GP Angle',           '°'],
+    RF_POWER: ['CRS Pos. RF Level', '%'],
+    DDM_COURSE: ['CRS Pos. DDM', '%'],
+    CARRIER_PWR: ['CRS Pos. SDM', '%'],
+    CSB_POWER: ['CRS Width RF Level', '%'],
+    DDM_CLR: ['CRS Width DDM', '%'],
+    SBO_POWER: ['CRS Width SDM', '%'],
+    CLR_POWER: ['CLR Width RF Level', '%'],
+    CLR_DDM: ['CLR Width DDM', '%'],
+    CLR_SDM: ['CLR Width SDM', '%'],
+    RF_OUT: ['Nearfield Pos. RF', '%'],
+    DDM_MON: ['Nearfield Pos. DDM', '%'],
+    MON_POWER: ['Monitor Power', '%'],
+    GP_ANGLE: ['GP Angle', '°'],
 };
 
 const PASSIVE_TIMEOUT = 4000; // Dikurangi dari 30s ke 4s untuk LLZ-style polling
-const POLL_INTERVAL   = 2000;
-const POLL_REQ_DELAY  = 150;
+const POLL_INTERVAL = 2000;
+const POLL_REQ_DELAY = 150;
 
 function readFloat(buf, offset) {
     try {
@@ -109,10 +109,10 @@ function decodePktC(pkt) {
     if (!pkt || pkt.length < PKT_C_SIZE) return null;
     if (!isPktCSync(pkt, 0)) return null;
 
-    const byte2     = pkt[2];
-    const isRemote  = !!(byte2 & 0x80);
+    const byte2 = pkt[2];
+    const isRemote = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
-    const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
+    const txData = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
     for (const [key, offset] of Object.entries(OFFSETS)) {
@@ -124,8 +124,10 @@ function decodePktC(pkt) {
         params[key] = val;
     }
 
-    return { tx_main: tx1IsMain ? 'TX1' : 'TX2', tx_stby: tx1IsMain ? 'TX2' : 'TX1',
-             is_remote: isRemote, tx_data: txData, params };
+    return {
+        tx_main: tx1IsMain ? 'TX1' : 'TX2', tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+        is_remote: isRemote, tx_data: txData, params
+    };
 }
 
 function extractFrames(buf) {
@@ -185,9 +187,11 @@ class IlsGpThales421Parser extends BaseParser {
                 if (this._buf.length > 1024) {
                     this._buf = this._buf.slice(this._buf.length - 512);
                 }
-                return { success: false, error: 'No valid GP frames', status: 'Waiting',
-                         _mode: this._mode,
-                         data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
+                return {
+                    success: false, error: 'No valid GP frames', status: 'Waiting',
+                    _mode: this._mode,
+                    data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null
+                };
             }
 
             const latest = frames[frames.length - 1];
@@ -210,7 +214,7 @@ class IlsGpThales421Parser extends BaseParser {
                 _mode: this._mode, _stale: isStale,
                 tx_main: d.tx_main, tx_stby: d.tx_stby,
                 is_remote: d.is_remote, tx_data: d.tx_data,
-                status_label:  d.is_remote ? 'Remote Maintenance' : 'Normal',
+                status_label: d.is_remote ? 'Remote Maintenance' : 'Normal',
                 tx_main_label: `${d.tx_main} MAIN`,
                 tx_stby_label: `${d.tx_stby} STBY`,
                 ...d.params,
@@ -231,7 +235,7 @@ class IlsGpThales421Parser extends BaseParser {
         }
         return [];
     }
-    
+
     isHeartbeat(chunk) {
         return chunk && chunk.length >= 4 && chunk.slice(0, 4).equals(HBEAT_RECV);
     }
@@ -244,12 +248,12 @@ class IlsGpThales421Parser extends BaseParser {
         }
         return this._mode;
     }
-    
-    getLastData()     { return this._lastDecoded ? this._lastDecoded.params : {}; }
-    reset()           { this._buf = Buffer.alloc(0); }
+
+    getLastData() { return this._lastDecoded ? this._lastDecoded.params : {}; }
+    reset() { this._buf = Buffer.alloc(0); }
 }
 
 module.exports = IlsGpThales421Parser;
-module.exports.OFFSETS      = OFFSETS;
-module.exports.LIMITS       = LIMITS;
+module.exports.OFFSETS = OFFSETS;
+module.exports.LIMITS = LIMITS;
 module.exports.PARAM_LABELS = PARAM_LABELS;
