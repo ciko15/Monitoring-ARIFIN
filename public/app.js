@@ -1241,6 +1241,13 @@ async function loadEquipmentMarkers() {
     const result = await res.json();
     const equipment = result.data || result;
 
+    const currentDataHash = JSON.stringify(equipment);
+    if (window._lastMapEquipmentHash === currentDataHash) {
+      // Data hasn't changed, skip redrawing markers
+      return;
+    }
+    window._lastMapEquipmentHash = currentDataHash;
+
     console.log(`[MAP] Received ${Array.isArray(equipment) ? equipment.length : 0} equipment items for map`);
     window.equipmentMarkersLayer.clearLayers();
 
@@ -1309,6 +1316,12 @@ async function loadStats() {
   try {
     const res = await fetch(`${API_URL}/equipment/stats`);
     const stats = await res.json();
+
+    const statsHash = JSON.stringify(stats);
+    if (window._lastStatsHash === statsHash) {
+      return;
+    }
+    window._lastStatsHash = statsHash;
 
     document.getElementById('totalEquipment').textContent = stats.total || 0;
     if (document.getElementById('normalEquipment')) document.getElementById('normalEquipment').textContent = stats.normal || 0;
@@ -1387,45 +1400,50 @@ function renderEquipmentTable(data) {
   const tbody = document.getElementById('equipmentTableBody');
   if (!tbody) return;
 
+  let newHtml = '';
   if (data.length === 0) {
     const hasActiveFilters = Boolean(
       normalizeEquipmentSearchValue(document.getElementById('searchEquipment')?.value) ||
       normalizeEquipmentSearchValue(document.getElementById('filterCategory')?.value)
     );
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${hasActiveFilters ? 'No equipment match the current search/filter' : 'No equipment available'}</td></tr>`;
-    return;
+    newHtml = `<tr><td colspan="7" class="empty-state">${hasActiveFilters ? 'No equipment match the current search/filter' : 'No equipment available'}</td></tr>`;
+  } else {
+    newHtml = data.map(item => {
+      const airport = (window.airportsData || []).find(a => String(a.id) === String(item.airportId || item.branch_id));
+      const airportName = airport ? airport.name : '-';
+
+      return `
+        <tr>
+          <td style="text-align: center;">
+            <span class="status-badge ${item.isActive !== false ? 'Active' : 'Inactive'}">
+              ${item.isActive !== false ? 'Active' : 'Inactive'}
+            </span>
+          </td>
+          <td style="text-align: center;">${item.name}</td>
+          <td style="text-align: center;">${item.category} (${item.sup_category || '-'})</td>
+          <td style="text-align: center;">${airportName}</td>
+          <td style="text-align: center;">${item.merk || '-'} / ${item.type || '-'}</td>
+          <td style="text-align: center;">${item.lat}, ${item.lng}</td>
+          <td style="text-align: center; white-space: nowrap;">
+            <button class="btn-view" title="View Details" onclick="viewEquipmentDetail('${item.id}')">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button class="btn-edit" title="Edit" onclick="editEquipment('${item.id}')">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn-delete" title="Delete" onclick="deleteEquipment('${item.id}')">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
-
-  tbody.innerHTML = data.map(item => {
-    const airport = (window.airportsData || []).find(a => String(a.id) === String(item.airportId || item.branch_id));
-    const airportName = airport ? airport.name : '-';
-
-    return `
-      <tr>
-        <td style="text-align: center;">
-          <span class="status-badge ${item.isActive !== false ? 'Active' : 'Inactive'}">
-            ${item.isActive !== false ? 'Active' : 'Inactive'}
-          </span>
-        </td>
-        <td style="text-align: center;">${item.name}</td>
-        <td style="text-align: center;">${item.category} (${item.sup_category || '-'})</td>
-        <td style="text-align: center;">${airportName}</td>
-        <td style="text-align: center;">${item.merk || '-'} / ${item.type || '-'}</td>
-        <td style="text-align: center;">${item.lat}, ${item.lng}</td>
-        <td style="text-align: center; white-space: nowrap;">
-          <button class="btn-view" title="View Details" onclick="viewEquipmentDetail('${item.id}')">
-            <i class="fas fa-eye"></i>
-          </button>
-          <button class="btn-edit" title="Edit" onclick="editEquipment('${item.id}')">
-            <i class="fas fa-edit"></i>
-          </button>
-          <button class="btn-delete" title="Delete" onclick="deleteEquipment('${item.id}')">
-            <i class="fas fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+  
+  if (window._lastEquipmentTableHtml !== newHtml) {
+    tbody.innerHTML = newHtml;
+    window._lastEquipmentTableHtml = newHtml;
+  }
 }
 
 async function handleEquipmentSubmit(e) {
@@ -1837,7 +1855,7 @@ window.viewEquipmentDetail = async function (id) {
     }
 
     // 4. Update Modal Content
-    content.innerHTML = `
+    const newModalHtml = `
       <div class="detail-grid">
         ${generalInfoHtml}
         <div class="detail-card" style="${matchingLimits.length > 2 ? 'grid-column: 1 / -1;' : ''}">
@@ -1847,6 +1865,11 @@ window.viewEquipmentDetail = async function (id) {
         ${sourcesHtml}
       </div>
     `;
+    
+    if (window._lastEquipmentDetailHtml !== newModalHtml) {
+      content.innerHTML = newModalHtml;
+      window._lastEquipmentDetailHtml = newModalHtml;
+    }
   } catch (err) {
     console.error('Detail error:', err);
     content.innerHTML = `
