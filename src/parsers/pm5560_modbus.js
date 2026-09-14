@@ -75,15 +75,7 @@ function sanity(key, val) {
 }
 
 function checkAlarms(d) {
-    const a = [];
-    const fn = (v, dec) => (v != null && typeof v === 'number') ? v.toFixed(dec) : '—';
-    
-    if (d.VL1N != null && typeof d.VL1N === 'number' && !(200 <= d.VL1N && d.VL1N <= 240)) a.push(`Van=${d.VL1N.toFixed(1)}V`);
-    if (d.VL2N != null && typeof d.VL2N === 'number' && !(200 <= d.VL2N && d.VL2N <= 240)) a.push(`Vbn=${d.VL2N.toFixed(1)}V`);
-    if (d.VL3N != null && typeof d.VL3N === 'number' && !(200 <= d.VL3N && d.VL3N <= 240)) a.push(`Vcn=${d.VL3N.toFixed(1)}V`);
-    if (d.HZ   != null && typeof d.HZ   === 'number' && !(49.5 <= d.HZ && d.HZ <= 50.5))  a.push(`Hz=${d.HZ.toFixed(2)}`);
-    if (d.PF   != null && typeof d.PF   === 'number' && Math.abs(d.PF) < 0.8)              a.push(`PF=${d.PF.toFixed(3)}`);
-    return a;
+    return [];
 }
 
 class Pm5560ModbusParser extends BaseParser {

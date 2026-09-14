@@ -67,17 +67,7 @@ async function pollPM5350(host, port = 26, slaveId = 5, timeoutMs = 4000) {
         const warnings = [];
         const triggeredParams = [];
 
-        // Evaluasi sederhana
-        if (V_RN < 200 || V_RN > 240) {
-            alarms.push(`Tegangan R-N Tidak Normal (${V_RN.toFixed(1)}V)`);
-            triggeredParams.push('V_RN');
-        }
-        if (FREQ < 49 || FREQ > 51) {
-            warnings.push(`Frekuensi Tidak Stabil (${FREQ.toFixed(2)}Hz)`);
-            triggeredParams.push('FREQ');
-        }
-
-        let status = alarms.length > 0 ? 'Alarm' : (warnings.length > 0 ? 'Warning' : 'Normal');
+        let status = 'Normal';
 
         return {
             success: true,

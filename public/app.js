@@ -2998,7 +2998,14 @@ window.renderConfigFields = function (type, item, container) {
         </div>
       </div>
     `;
-    if (!item) setTimeout(() => updateSubCategoryDropdown('Communication', 'modalSubCat'), 100);
+    const initialCategory = item?.category || 'Communication';
+    setTimeout(() => {
+      updateSubCategoryDropdown(initialCategory, 'modalSubCat');
+      if (item?.sup_category) {
+        const select = document.getElementById('modalSubCat');
+        if (select) select.value = item.sup_category;
+      }
+    }, 100);
   } else if (type === 'authentication') {
     container.innerHTML = `
       <div class="form-row-ux">

@@ -169,9 +169,28 @@ class VhfT6tvSnmpCollector extends EventEmitter {
                 });
                 allVarbinds = allVarbinds.concat(varbinds);
             } catch (err) {
-                hasError = true;
-                lastError = err;
-                break;
+                // Jika error karena timeout, langsung batalkan semua (perangkat mati/RTO)
+                if (String(err).toLowerCase().includes('timeout') || String(err).toLowerCase().includes('not responding')) {
+                    hasError = true;
+                    lastError = err;
+                    break;
+                }
+
+                // Jika error karena NoSuchName (OID tidak didukung firmware), 
+                // fallback request satu per satu agar OID yang valid tetap bisa diambil.
+                for (const oid of chunk) {
+                    try {
+                        const vb = await new Promise((res, rej) => {
+                            this._session.get([oid], (e, v) => {
+                                if (e) rej(e);
+                                else res(v[0]);
+                            });
+                        });
+                        allVarbinds.push(vb);
+                    } catch (e) {
+                        // Abaikan OID yang gagal
+                    }
+                }
             }
         }
 
