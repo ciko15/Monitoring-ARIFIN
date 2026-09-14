@@ -1157,11 +1157,15 @@ async function loadSupCategories() {
   }
 }
 
-window.handleCategoryChange = function (category) {
+window.handleCategoryChange = async function (category) {
   const select = document.getElementById('equipmentSupCategory');
   if (!select) return;
 
   select.innerHTML = '<option value="">Select Sub Category</option>';
+
+  if (!supCategoriesData || supCategoriesData.length === 0) {
+    await loadSupCategories();
+  }
 
   const group = supCategoriesData.find(c => c.category === category);
   if (group && group.sub_categories) {
@@ -1538,7 +1542,7 @@ window.editEquipment = async function (id) {
   const equipmentCategory = getElement('equipmentCategory');
   if (equipmentCategory) {
     equipmentCategory.value = item.category;
-    handleCategoryChange(item.category);
+    await handleCategoryChange(item.category);
   }
 
   const equipmentSupCategory = getElement('equipmentSupCategory');
@@ -3191,9 +3195,13 @@ window.deleteConfigData = async function (type, id) {
   }
 }
 
-window.updateSubCategoryDropdown = function (category, selectId) {
+window.updateSubCategoryDropdown = async function (category, selectId) {
   const select = document.getElementById(selectId);
   if (!select) return;
+
+  if (!supCategoriesData || supCategoriesData.length === 0) {
+    await loadSupCategories();
+  }
 
   const group = supCategoriesData.find(c => c.category === category);
   const options = group ? (group.sub_categories || []) : [];
