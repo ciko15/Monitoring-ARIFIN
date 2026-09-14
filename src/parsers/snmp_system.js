@@ -73,46 +73,36 @@ const DEFAULT_LIMITS = {
  */
 function getLimit(limits, param) {
     const entry = limits && limits[param];
+    if (!entry) return { warn: undefined, alarm: undefined };
     return {
-        warn: (entry && entry.warn_value != null) ? Number(entry.warn_value) : DEFAULT_LIMITS[`${param}_warn`] ?? DEFAULT_LIMITS.temperature_warn,
-        alarm: (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : DEFAULT_LIMITS[`${param}_alarm`] ?? DEFAULT_LIMITS.temperature_alarm,
+        warn: entry.warn_value != null ? Number(entry.warn_value) : undefined,
+        alarm: entry.alarm_value != null ? Number(entry.alarm_value) : undefined,
     };
 }
 
 function statusFromPct(pct, limits, param) {
     const { warn, alarm } = getLimit(limits, param);
-    if (pct >= alarm) return 'Alarm';
-    if (pct >= warn) return 'Warning';
+    if (alarm !== undefined && pct >= alarm) return 'Alarm';
+    if (warn !== undefined && pct >= warn) return 'Warning';
     return 'Normal';
 }
 function statusFromAvailablePct(pct, limits) {
     const entry = limits && limits['ram_available_pct'];
-    const warnLim = (entry && entry.warn_value != null) ? Number(entry.warn_value) : DEFAULT_LIMITS.ram_available_pct_warn;
-    const alarmLim = (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : DEFAULT_LIMITS.ram_available_pct_alarm;
-    if (pct <= alarmLim) return 'Alarm';
-    if (pct <= warnLim) return 'Warning';
+    if (!entry) return 'Normal';
+    const warnLim = entry.warn_value != null ? Number(entry.warn_value) : undefined;
+    const alarmLim = entry.alarm_value != null ? Number(entry.alarm_value) : undefined;
+    if (alarmLim !== undefined && pct <= alarmLim) return 'Alarm';
+    if (warnLim !== undefined && pct <= warnLim) return 'Warning';
     return 'Normal';
 }
 function statusFromTemperature(tempC, sysObjectID, sysDescr, limits) {
-    const sysObjectIdText = Array.isArray(sysObjectID) ? sysObjectID.join('.') : String(sysObjectID || '');
-    const descr = String(sysDescr || '').toLowerCase();
-
-    // Identifikasi apakah perangkat adalah Switch (untuk menentukan default batas suhu yang lebih tinggi)
-    const isSwitch = sysObjectIdText.startsWith('1.3.6.1.4.1.6486.') || // Alcatel
-        sysObjectIdText.startsWith('1.3.6.1.4.1.9.') || // Cisco
-        sysObjectIdText.startsWith('1.3.6.1.4.1.14823.') || // Aruba
-        sysObjectIdText.startsWith('1.3.6.1.4.1.2011.') || // Huawei
-        sysObjectIdText.startsWith('1.3.6.1.4.1.4881.') || // Ruijie
-        descr.includes('switch');
-
-    // Jika ada konfigurasi alarm limit di DB untuk 'temperature', gunakan itu.
-    // Jika tidak, gunakan default berbasis tipe perangkat (Switch vs Server).
     const entry = limits && limits['temperature'];
-    const warnLimit = (entry && entry.warn_value != null) ? Number(entry.warn_value) : (isSwitch ? 65 : DEFAULT_LIMITS.temperature_warn);
-    const alarmLimit = (entry && entry.alarm_value != null) ? Number(entry.alarm_value) : (isSwitch ? 75 : DEFAULT_LIMITS.temperature_alarm);
+    if (!entry) return 'Normal';
+    const warnLimit = entry.warn_value != null ? Number(entry.warn_value) : undefined;
+    const alarmLimit = entry.alarm_value != null ? Number(entry.alarm_value) : undefined;
 
-    if (tempC >= alarmLimit) return 'Alarm';
-    if (tempC >= warnLimit) return 'Warning';
+    if (alarmLimit !== undefined && tempC >= alarmLimit) return 'Alarm';
+    if (warnLimit !== undefined && tempC >= warnLimit) return 'Warning';
     return 'Normal';
 }
 function worstStatus(...s) {

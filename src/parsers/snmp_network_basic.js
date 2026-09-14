@@ -225,9 +225,21 @@ async function pollSNMP(host, community = 'public', options = {}) {
             status: sensor.status,
         }));
 
+        let finalStatus = 'Normal';
+        const limits = options.limits || {};
+        const tempLimit = limits['temperature'];
+        if (tempLimit && tempInfo.hottest) {
+            const tempC = tempInfo.hottest.value_c;
+            if (tempLimit.alarm_value != null && tempC >= Number(tempLimit.alarm_value)) {
+                finalStatus = 'Alarm';
+            } else if (tempLimit.warn_value != null && tempC >= Number(tempLimit.warn_value)) {
+                finalStatus = 'Warning';
+            }
+        }
+
         return {
             success: true,
-            status: 'Normal',
+            status: finalStatus,
             data: {
                 connectivity: 'Connected',
                 resolved_ip: host,
@@ -271,8 +283,8 @@ async function pollSNMP(host, community = 'public', options = {}) {
                 ram_usage_pct: '—',
                 disk_usage_pct: '—',
             },
-            alarms: [],
-            warnings: [],
+            alarms: finalStatus === 'Alarm' ? ['Temperature high'] : [],
+            warnings: finalStatus === 'Warning' ? ['Temperature elevated'] : [],
             triggeredParams: [],
             timestamp: new Date().toISOString(),
         };

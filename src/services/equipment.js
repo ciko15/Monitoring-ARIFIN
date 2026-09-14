@@ -275,31 +275,7 @@ class EquipmentService {
             const sourceName = parsedData.source || (parsedData._sources && parsedData._sources.length > 0 ? parsedData._sources[0].name : 'default');
             const sourceId = parsedData.source_id || sourceName; // Gunakan ID sebagai penanda utama jika ada
 
-            // =========================================================================
-            // OVERRIDE STATUS: 
-            // 1. Data kosong melompong -> Wajib Alarm
-            // 2. Data ada isinya tapi Alarm/Alert -> Turunkan jadi Warning
-            // =========================================================================
-            let isEmpty = true;
-            for (const key of Object.keys(parsedData.data || {})) {
-                if (key.startsWith('_') || ['status', 'alarms', 'warnings', 'triggeredParams', 'connectivity', 'reachability', 'source', 'source_name', 'source_id', 'timestamp'].includes(key)) continue;
-                const v = parsedData.data[key];
-                if (v !== '-' && v !== '—' && v !== null && v !== undefined && v !== '') {
-                    isEmpty = false;
-                    break;
-                }
-            }
-
-            if (isEmpty) {
-                // Jika kosong melompong: Jadikan Alarm HANYA JIKA ping masih Normal (nyala tapi hang)
-                // Jika benar-benar Disconnect (atau ping gagal), biarkan menjadi Disconnect.
-                if (status !== 'Disconnect' || (parsedData.data && parsedData.data.ping_status === 'Normal')) {
-                    status = 'Alarm';
-                }
-            } else if (status === 'Alarm' || status === 'Alert') {
-                status = 'Warning';
-            }
-            // =========================================================================
+            // Status dipertahankan dari evaluasi sebelumnya (tidak di-override secara paksa)
 
             const gateDecision = this.statusGate.evaluate(
                 {
