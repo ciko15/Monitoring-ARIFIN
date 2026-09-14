@@ -13,13 +13,11 @@ try {
   console.warn('Gagal membaca db/airport_config.json, menggunakan default SITE_ID =', defaultSiteId);
 }
 
-let bunPath = 'bun';
+let interpreterPath = 'tsx';
 if (os.platform() === 'win32') {
-  const userHome = process.env.USERPROFILE || process.env.HOME;
-  bunPath = path.join(userHome, '.bun', 'bin', 'bun.exe');
-} else if (os.platform() === 'darwin') {
-  const userHome = process.env.HOME;
-  bunPath = path.join(userHome, '.bun', 'bin', 'bun');
+  interpreterPath = path.join(__dirname, 'node_modules', '.bin', 'tsx.cmd');
+} else {
+  interpreterPath = path.join(__dirname, 'node_modules', '.bin', 'tsx');
 }
 
 const stabilityEnv = {
@@ -70,7 +68,7 @@ module.exports = {
       name: 'monitoring-web',
       script: 'src/web.ts',
       cwd: './',
-      interpreter: bunPath,
+      interpreter: interpreterPath,
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
@@ -91,7 +89,7 @@ module.exports = {
       name: 'monitoring-collector',
       script: 'src/collector.ts',
       cwd: './',
-      interpreter: bunPath,
+      interpreter: interpreterPath,
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
@@ -111,7 +109,7 @@ module.exports = {
       name: 'monitoring-processor',
       script: 'src/processor.ts',
       cwd: './',
-      interpreter: bunPath,
+      interpreter: interpreterPath,
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
