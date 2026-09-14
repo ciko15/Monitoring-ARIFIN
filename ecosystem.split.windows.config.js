@@ -13,12 +13,7 @@ try {
   console.warn('Gagal membaca db/airport_config.json, menggunakan default SITE_ID =', defaultSiteId);
 }
 
-let interpreterPath = 'tsx';
-if (os.platform() === 'win32') {
-  interpreterPath = path.join(__dirname, 'node_modules', '.bin', 'tsx.cmd');
-} else {
-  interpreterPath = path.join(__dirname, 'node_modules', '.bin', 'tsx');
-}
+let interpreterPath = 'node';
 
 const stabilityEnv = {
   EMS_ENABLED: process.env.EMS_ENABLED || 'true',
@@ -69,6 +64,7 @@ module.exports = {
       script: 'src/web.ts',
       cwd: './',
       interpreter: interpreterPath,
+      node_args: '--import tsx',
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
@@ -90,6 +86,7 @@ module.exports = {
       script: 'src/collector.ts',
       cwd: './',
       interpreter: interpreterPath,
+      node_args: '--import tsx',
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
@@ -110,6 +107,7 @@ module.exports = {
       script: 'src/processor.ts',
       cwd: './',
       interpreter: interpreterPath,
+      node_args: '--import tsx',
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
