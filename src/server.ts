@@ -1962,7 +1962,7 @@ async function startServices() {
         }
 
         // 3. Start Background Schedulers
-        if (PIPELINE_MODE === 'inline' && SHOULD_START_PROCESSOR) {
+        if (SHOULD_START_COLLECTOR) {
             const collector = new DataCollectorScheduler(new EquipmentService(db));
 
             // Run testing every 60 seconds as requested
