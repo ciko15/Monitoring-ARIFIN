@@ -143,10 +143,10 @@ class OteDtr100Parser extends BaseParser {
             case 7:
                 if (this.isTx) {
                     // Lower 16-bit = Forward Power, Upper 16-bit = Reverse Power
-                    this.latestData.fwd_power_w = valueLE & 0xFFFF; 
-                    this.latestData.refl_power_w = (valueLE >>> 16) & 0xFFFF;
+                    this.latestData.forward_power_w = valueLE & 0xFFFF; 
+                    this.latestData.reverse_power_w = (valueLE >>> 16) & 0xFFFF;
                 } else {
-                    this.latestData.rx_power_dbm = (valueLE & 0xFFFF) - 111; 
+                    this.latestData.rf_input_power_dbm = (valueLE & 0xFFFF) - 111; 
                 }
                 break;
             case 29:
