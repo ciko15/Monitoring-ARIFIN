@@ -22,6 +22,11 @@ class OteDtr100Parser extends BaseParser {
         this.mode = 'ACTIVE'; // Mulai dari active sampai ada passive data
         this.PASSIVE_TIMEOUT_MS = 5000;
         
+        // Detect if this is TX or RX based on the configuration name
+        const configName = String(config.name || '').toUpperCase();
+        this.isTx = configName.includes('TX');
+        this.isRx = configName.includes('RX') || !this.isTx; // Default to RX if not specified
+        
         // Data buffer terakhir yang akan dikembalikan oleh parse()
         this.latestData = { _status: 'Normal' };
     }
@@ -119,17 +124,27 @@ class OteDtr100Parser extends BaseParser {
 
     mapParameter(id, dataBytes) {
         let value = 0;
-        // Parse Little Endian
+        // Parse Little Endian (safely to avoid negative overflow)
         for (let i = 0; i < dataBytes.length; i++) {
-            value |= (dataBytes[i] << (i * 8));
+            value = (value | (dataBytes[i] << (i * 8))) >>> 0;
         }
+        
+        let hexStr = dataBytes.toString('hex').toUpperCase();
 
         switch (id) {
             case 4:
                 this.latestData.modulation_pct = value;
                 break;
             case 7:
-                this.latestData.fwd_power_w = value; // placeholder based on limits
+                if (this.isTx) {
+                    // ID 7 returns 4 bytes in TX. 
+                    // Lower 16-bit = Forward Power, Upper 16-bit = Reverse Power
+                    this.latestData.fwd_power_w = value & 0xFFFF; 
+                    this.latestData.refl_power_w = (value >>> 16) & 0xFFFF;
+                } else {
+                    // For RX, value might be a placeholder or calibration
+                    this.latestData.rx_power_dbm = (value & 0xFFFF) - 111; 
+                }
                 break;
             case 29:
                 this.latestData.frequency_mhz = value / 1000.0;
@@ -144,7 +159,9 @@ class OteDtr100Parser extends BaseParser {
                 this.latestData.rssi_dbm = value;
                 break;
             default:
+                // Include both numeric value and raw hex for unknown parameters
                 this.latestData[`raw_id_${id}`] = value;
+                this.latestData[`hex_id_${id}`] = hexStr;
                 break;
         }
         this.latestData._status = 'Normal';
