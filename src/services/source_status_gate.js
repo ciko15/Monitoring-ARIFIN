@@ -9,11 +9,16 @@ function parsePositiveInt(value, fallback) {
 }
 
 function normalizeStatus(status) {
-    const value = String(status || 'Normal').trim();
+    if (!status) return 'Normal';
+    const value = String(status).trim();
     const lower = value.toLowerCase();
 
-    if (lower === 'disconnected' || lower === 'disconnect' || lower === 'offline' || lower === 'error') {
+    if (lower === 'disconnected' || lower === 'disconnect' || lower === 'error') {
         return 'Disconnect';
+    }
+
+    if (lower === 'offline') {
+        return 'Offline';
     }
 
     if (lower === 'alarm' || lower === 'alert' || lower === 'critical' || lower === 'fail') {

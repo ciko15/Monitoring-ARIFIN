@@ -1,231 +1,284 @@
 [
-  {
-    "id": "dvor_maru_220",
-    "name": "DVOR MARU 220",
-    "category": "Navigation",
-    "files": "/src/parsers/asterix.js",
-    "configId": "dvor_maru_220",
-    "configType": "parsing",
-    "updatedAt": "2026-04-06T03:35:17.534Z"
-  },
-  {
-    "id": "dme_maru_310_320",
-    "name": "DME Maru 310/320",
-    "category": "Navigation",
-    "files": "/src/parsers/dme_maru_310_320.js",
-    "createdAt": "2026-04-06T03:40:08.830Z"
-  },
-  {
-    "id": "custom_1775512889323",
-    "name": "RADAR",
-    "category": "Surveillance",
-    "files": "/src/parsers/asterix.js",
-    "createdAt": "2026-04-06T22:01:29.323Z"
-  },
-  {
-    "id": "custom_1775563814757",
-    "name": "VHF Merk PAE",
-    "category": "Communication",
-    "files": "/src/parsers/factory.js",
-    "createdAt": "2026-04-07T12:10:14.758Z",
-    "configId": "custom_1775563814757",
-    "configType": "parsing",
-    "configMode": "edit",
-    "updatedAt": "2026-04-07T12:46:07.463Z"
-  },
-  {
-    "id": "snmp_host_resources_01",
-    "name": "Host Resources",
-    "description": "Parser untuk membaca kapasitas RAM, Disk, dan CPU via SNMP",
-    "files": "/src/parsers/snmp_host_resources.js",
-    "category": "Data Processing"
-  },
-  {
-    "id": "vhf_t6tv",
-    "name": "VHF T6TV (WebSocket)",
-    "category": "Communication",
-    "files": "/src/parsers/vhf_t6tv.js",
-    "createdAt": "2026-04-20T00:00:00.000Z"
-  },
-  {
-    "id": "vhf_t6tv_snmp",
-    "name": "VHF T6TV (SNMP)",
-    "category": "Communication",
-    "files": "/src/parsers/vhf_t6tv_snmp.js",
-    "createdAt": "2026-08-11T00:00:00.000Z"
-  },
-  {
-    "id": "pm5560_modbus",
-    "name": "PM5560 Modbus TCP",
-    "description": "Parser untuk Schneider PowerLogic PM5560 — Voltage, Current, Power, PF, Hz, KWh via Modbus FC03",
-    "files": "/src/parsers/pm5560_modbus.js",
-    "category": "Support",
-    "createdAt": "2026-04-25T01:50:44.000Z"
-  },
-  {
-    "id": "ils_gp_thales421",
-    "name": "ILS GlidePath Thales 421",
-    "description": "Parser biner PKT_C 92-byte untuk GP Thales 421 via Moxa NPort TCP. Sync 0x118D[b2]0C, float32 LE, DDM×100.",
-    "category": "Navigation",
-    "files": "/src/parsers/ils_gp_thales421.js",
-    "createdAt": "2026-04-28T00:00:00.000Z"
-  },
-  {
-    "id": "ils_llz_thales421",
-    "name": "ILS Localizer Thales 421",
-    "description": "Parser biner PKT_C 92-byte untuk LLZ Thales 421 via Moxa NPort TCP. Sync 0x118D[b2]0C, float32 LE, DDM×100.",
-    "category": "Navigation",
-    "files": "/src/parsers/ils_llz_thales421.js",
-    "createdAt": "2026-04-28T00:00:00.000Z"
-  },
-  {
-    "id": "vhf_marc_rse",
-    "name": "VHF MARC RSE (TCP/SLIP)",
-    "description": "Parser binary MARC/RSE protocol via Moxa NPort TCP port 950. SLIP framing, CRC-16/CCITT. Polling aktif T6 command ke radio T6T/T6R. Satu koneksi TCP shared antar equipment.",
-    "category": "Communication",
-    "files": "/src/parsers/vhf_marc_rse.js",
-    "createdAt": "2026-04-28T00:00:00.000Z"
-  },
-  {
-    "id": "temp_humidity_modbus",
-    "name": "Temp/Humidity Sensor (Modbus TCP)",
-    "description": "Parser sensor suhu & kelembaban via Modbus TCP FC03 port 502. Register 0=temp×10, 1=humidity×10. Threshold WARN≥30°C, ALARM≥35°C.",
-    "category": "Support",
-    "files": "/src/parsers/temp_humidity_modbus.js",
-    "createdAt": "2026-04-29T00:00:00.000Z"
-  },
-  {
-    "id": "asterix_radar",
-    "name": "ASTERIX CAT034 Radar MSSR",
-    "description": "Parser ASTERIX CAT034 untuk Radar MSSR via UDP Multicast. Status connectivity, SAC/SIC, last update per radar site.",
-    "category": "Navigation",
-    "files": "/src/parsers/asterix_radar.js",
-    "createdAt": "2026-04-28T00:00:00.000Z"
-  },
-  {
-    "id": "asterix_adsb",
-    "name": "ASTERIX CAT021 ADS-B",
-    "description": "Parser ASTERIX CAT021 untuk ADS-B via UDP Multicast 239.71.40.2:50000. Identifikasi station by SAC/SIC.",
-    "category": "Navigation",
-    "files": "/src/parsers/asterix_adsb.js",
-    "createdAt": "2026-04-28T00:00:00.000Z"
-  },
-  {
-    "id": "snmp_system",
-    "name": "System Monitor (Server/Workstation/Switch)",
-    "description": "SNMP v2c HOST-RESOURCES-MIB. CPU, RAM, Disk usage via snmpwalk. Threshold Warning>=80%, Alarm>=95%.",
-    "category": "Data Processing",
-    "files": "/src/parsers/snmp_system.js",
-    "createdAt": "2026-04-29T00:00:00.000Z"
-  },
-  {
-    "id": "snmp_network_basic",
-    "name": "Network Device Monitor",
-    "description": "SNMP v2c basic network parser. System info, uptime, location, and interface count for switches/routers/network devices.",
-    "category": "Data Processing",
-    "files": "/src/parsers/snmp_network_basic.js",
-    "createdAt": "2026-06-03T00:00:00.000Z"
-  },
-  {
-    "id": "ils_gp_normac",
-    "name": "ILS GP Normarc",
-    "description": "ILS Glide Path (GP) Parser untuk Normarc via HDLC/Binary.",
-    "category": "Navigation",
-    "files": "/src/parsers/ils_gp_normac.js",
-    "createdAt": "2026-07-08T00:00:00.000Z"
-  },
-  {
-    "id": "ils_llz_normac",
-    "name": "ILS Localizer Normarc 7000",
-    "description": "Parser untuk LLZ Normarc 7000 via Moxa NPort TCP",
-    "category": "Navigation",
-    "files": "/src/parsers/ils_llz_normac.js",
-    "createdAt": "2026-07-09T00:00:00.000Z"
-  },
-  {
-    "id": "ups_netagent_snmp",
-    "name": "UPS NetAgent Monitor",
-    "description": "SNMP v2c UPS MIB (RFC 1628). Battery, Voltage, Load via snmpwalk/snmpget.",
-    "category": "Support",
-    "files": "/src/parsers/ups_netagent_snmp.js",
-    "createdAt": "2026-07-13T00:00:00.000Z"
-  },
-  {
-    "id": "dvor_maru_binary",
-    "name": "DVOR MARU Binary (Merauke)",
-    "description": "Parser Binary Skeleton untuk DVOR Maru di Merauke",
-    "category": "Navigation",
-    "files": "/src/parsers/dvor_maru_binary.js",
-    "createdAt": "2026-07-24T10:00:00.000Z"
-  },
-  {
-    "id": "dme_mopah_binary",
-    "name": "DME MOPAH Binary (Merauke)",
-    "description": "Parser Binary Skeleton untuk DME Mopah",
-    "category": "Navigation",
-    "files": "/src/parsers/dme_mopah_binary.js",
-    "createdAt": "2026-07-24T10:45:00.000Z"
-  },
-  {
-    "id": "pm5350_modbus",
-    "name": "PM5350 Modbus TCP",
-    "description": "Parser untuk Schneider PowerLogic PM5350 — Voltage, Current, Power, PF, Hz via Modbus RTU-over-TCP",
-    "files": "/src/parsers/pm5350_modbus.js",
-    "category": "Support",
-    "createdAt": "2026-08-03T13:12:04.082Z"
-  },
-  {
-    "id": "temp_humidity_modbus",
-    "name": "Temperature & Humidity Modbus",
-    "description": "Parser Modbus TCP untuk Sensor Suhu dan Kelembapan (Slave ID custom, Holding Register base-0).",
-    "category": "Environment",
-    "files": "/src/parsers/temp_humidity_modbus.js",
-    "createdAt": "2026-08-04T01:24:00.000Z"
-  },
-  {
-    "id": "iologik_modbus",
-    "name": "Moxa ioLogik 4000",
-    "description": "Parser Modbus TCP untuk Moxa ioLogik 4000 (32 Digital Inputs). 1 = Normal, 0 = Alarm.",
-    "category": "Data Processing",
-    "files": "/src/parsers/iologik_modbus.js",
-    "createdAt": "2026-08-06T00:00:00.000Z"
-  },
-  {
-    "id": "diris_a20",
-    "name": "DIRIS A20 Power Meter",
-    "description": "Parser Modbus RTU TCP pasif untuk DIRIS A20",
-    "category": "Support",
-    "files": "/src/parsers/diris_a20.js",
-    "createdAt": "2026-08-07T00:00:00.000Z"
-  },
-  {
-    "id": "marc_pae",
-    "name": "MARC PAE",
-    "type": "binary_tcp",
-    "has_snmp": false
-  },
-  {
-    "id": "datakom_d700_modbus",
-    "name": "Datakom D700 Modbus TCP",
-    "description": "Parser Modbus TCP untuk Genset Datakom D700 (Membaca bulk 8 Holding Registers)",
-    "category": "Support",
-    "files": "/src/parsers/datakom_d700_modbus.js",
-    "createdAt": "2026-08-09T00:00:00.000Z"
-  },
-  {
-    "id": "dse7320_modbus",
-    "name": "DSE7320 Modbus TCP",
-    "description": "Parser Modbus TCP untuk Genset Deep Sea Electronics 7320 (Volt, Hz, RPM, Baterai, Suhu, Tekanan Oli). Mendukung kustomisasi Unit ID / Slave ID.",
-    "category": "Support",
-    "files": "/src/parsers/dse7320_modbus.js",
-    "createdAt": "2026-08-14T00:00:00.000Z"
-  },
-  {
-    "id": "universal_api",
-    "name": "Universal API Pull",
-    "description": "Parser dinamis menggunakan HTTP GET/POST ke Endpoint API (Support placeholder {ip} & {port}).",
-    "category": "Support",
-    "files": "/src/parsers/universal_api.js",
-    "createdAt": "2026-08-31T00:00:00.000Z"
-  }
+    {
+        "id": "dvor_maru_220",
+        "name": "DVOR MARU 220",
+        "category": "Navigation",
+        "files": "/src/parsers/asterix.js",
+        "configId": "dvor_maru_220",
+        "configType": "parsing",
+        "updatedAt": "2026-04-06T03:35:17.534Z"
+    },
+    {
+        "id": "dme_maru_310_320",
+        "name": "DME Maru 310/320",
+        "category": "Navigation",
+        "files": "/src/parsers/dme_maru_310_320.js",
+        "createdAt": "2026-04-06T03:40:08.830Z"
+    },
+    {
+        "id": "custom_1775512889323",
+        "name": "RADAR",
+        "category": "Surveillance",
+        "files": "/src/parsers/asterix.js",
+        "createdAt": "2026-04-06T22:01:29.323Z"
+    },
+    {
+        "id": "custom_1775563814757",
+        "name": "VHF Merk PAE",
+        "category": "Communication",
+        "files": "/src/parsers/factory.js",
+        "createdAt": "2026-04-07T12:10:14.758Z",
+        "configId": "custom_1775563814757",
+        "configType": "parsing",
+        "configMode": "edit",
+        "updatedAt": "2026-04-07T12:46:07.463Z"
+    },
+    {
+        "id": "snmp_host_resources_01",
+        "name": "Host Resources",
+        "description": "Parser untuk membaca kapasitas RAM, Disk, dan CPU via SNMP",
+        "files": "/src/parsers/snmp_host_resources.js",
+        "category": "Data Processing"
+    },
+    {
+        "id": "vhf_t6tv",
+        "name": "VHF T6TV (WebSocket)",
+        "category": "Communication",
+        "files": "/src/parsers/vhf_t6tv.js",
+        "createdAt": "2026-04-20T00:00:00.000Z"
+    },
+    {
+        "id": "vhf_t6tv_snmp",
+        "name": "VHF T6TV (SNMP)",
+        "category": "Communication",
+        "files": "/src/parsers/vhf_t6tv_snmp.js",
+        "createdAt": "2026-08-11T00:00:00.000Z"
+    },
+    {
+        "id": "pm5560_modbus",
+        "name": "PM5560 Modbus TCP",
+        "description": "Parser untuk Schneider PowerLogic PM5560 — Voltage, Current, Power, PF, Hz, KWh via Modbus FC03",
+        "files": "/src/parsers/pm5560_modbus.js",
+        "category": "Support",
+        "createdAt": "2026-04-25T01:50:44.000Z"
+    },
+    {
+        "id": "ils_gp_thales421",
+        "name": "ILS GlidePath Thales 421",
+        "description": "Parser biner PKT_C 92-byte untuk GP Thales 421 via Moxa NPort TCP. Sync 0x118D[b2]0C, float32 LE, DDM×100.",
+        "category": "Navigation",
+        "files": "/src/parsers/ils_gp_thales421.js",
+        "createdAt": "2026-04-28T00:00:00.000Z"
+    },
+    {
+        "id": "ils_llz_thales421",
+        "name": "ILS Localizer Thales 421",
+        "description": "Parser biner PKT_C 92-byte untuk LLZ Thales 421 via Moxa NPort TCP. Sync 0x118D[b2]0C, float32 LE, DDM×100.",
+        "category": "Navigation",
+        "files": "/src/parsers/ils_llz_thales421.js",
+        "createdAt": "2026-04-28T00:00:00.000Z"
+    },
+    {
+        "id": "vhf_marc_rse",
+        "name": "VHF MARC RSE (TCP/SLIP)",
+        "description": "Parser binary MARC/RSE protocol via Moxa NPort TCP port 950. SLIP framing, CRC-16/CCITT. Polling aktif T6 command ke radio T6T/T6R. Satu koneksi TCP shared antar equipment.",
+        "category": "Communication",
+        "files": "/src/parsers/vhf_marc_rse.js",
+        "createdAt": "2026-04-28T00:00:00.000Z"
+    },
+    {
+        "id": "temp_humidity_modbus",
+        "name": "Temp/Humidity Sensor (Modbus TCP)",
+        "description": "Parser sensor suhu & kelembaban via Modbus TCP FC03 port 502. Register 0=temp×10, 1=humidity×10. Threshold WARN≥30°C, ALARM≥35°C.",
+        "category": "Support",
+        "files": "/src/parsers/temp_humidity_modbus.js",
+        "createdAt": "2026-04-29T00:00:00.000Z"
+    },
+    {
+        "id": "asterix_radar",
+        "name": "ASTERIX CAT034 Radar MSSR",
+        "description": "Parser ASTERIX CAT034 untuk Radar MSSR via UDP Multicast. Status connectivity, SAC/SIC, last update per radar site.",
+        "category": "Navigation",
+        "files": "/src/parsers/asterix_radar.js",
+        "createdAt": "2026-04-28T00:00:00.000Z"
+    },
+    {
+        "id": "asterix_adsb",
+        "name": "ASTERIX CAT021 ADS-B",
+        "description": "Parser ASTERIX CAT021 untuk ADS-B via UDP Multicast 239.71.40.2:50000. Identifikasi station by SAC/SIC.",
+        "category": "Navigation",
+        "files": "/src/parsers/asterix_adsb.js",
+        "createdAt": "2026-04-28T00:00:00.000Z"
+    },
+    {
+        "id": "snmp_system",
+        "name": "System Monitor (Server/Workstation/Switch)",
+        "description": "SNMP v2c HOST-RESOURCES-MIB. CPU, RAM, Disk usage via snmpwalk. Threshold Warning>=80%, Alarm>=95%.",
+        "category": "Data Processing",
+        "files": "/src/parsers/snmp_system.js",
+        "createdAt": "2026-04-29T00:00:00.000Z"
+    },
+    {
+        "id": "snmp_network_basic",
+        "name": "Network Device Monitor",
+        "description": "SNMP v2c basic network parser. System info, uptime, location, and interface count for switches/routers/network devices.",
+        "category": "Data Processing",
+        "files": "/src/parsers/snmp_network_basic.js",
+        "createdAt": "2026-06-03T00:00:00.000Z"
+    },
+    {
+        "id": "ils_gp_normac",
+        "name": "ILS GP Normarc",
+        "description": "ILS Glide Path (GP) Parser untuk Normarc via HDLC/Binary.",
+        "category": "Navigation",
+        "files": "/src/parsers/ils_gp_normac.js",
+        "createdAt": "2026-07-08T00:00:00.000Z"
+    },
+    {
+        "id": "ils_llz_normac",
+        "name": "ILS Localizer Normarc 7000",
+        "description": "Parser untuk LLZ Normarc 7000 via Moxa NPort TCP",
+        "category": "Navigation",
+        "files": "/src/parsers/ils_llz_normac.js",
+        "createdAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+        "id": "ups_netagent_snmp",
+        "name": "UPS NetAgent Monitor",
+        "description": "SNMP v2c UPS MIB (RFC 1628). Battery, Voltage, Load via snmpwalk/snmpget.",
+        "category": "Support",
+        "files": "/src/parsers/ups_netagent_snmp.js",
+        "createdAt": "2026-07-13T00:00:00.000Z"
+    },
+    {
+        "id": "dvor_maru_binary",
+        "name": "DVOR MARU Binary (Merauke)",
+        "description": "Parser Binary Skeleton untuk DVOR Maru di Merauke",
+        "category": "Navigation",
+        "files": "/src/parsers/dvor_maru_binary.js",
+        "createdAt": "2026-07-24T10:00:00.000Z"
+    },
+    {
+        "id": "dme_mopah_binary",
+        "name": "DME MOPAH Binary (Merauke)",
+        "description": "Parser Binary Skeleton untuk DME Mopah",
+        "category": "Navigation",
+        "files": "/src/parsers/dme_mopah_binary.js",
+        "createdAt": "2026-07-24T10:45:00.000Z"
+    },
+    {
+        "id": "pm5350_modbus",
+        "name": "PM5350 Modbus TCP",
+        "description": "Parser untuk Schneider PowerLogic PM5350 — Voltage, Current, Power, PF, Hz via Modbus RTU-over-TCP",
+        "files": "/src/parsers/pm5350_modbus.js",
+        "category": "Support",
+        "createdAt": "2026-08-03T13:12:04.082Z"
+    },
+    {
+        "id": "temp_humidity_modbus",
+        "name": "Temperature & Humidity Modbus",
+        "description": "Parser Modbus TCP untuk Sensor Suhu dan Kelembapan (Slave ID custom, Holding Register base-0).",
+        "category": "Environment",
+        "files": "/src/parsers/temp_humidity_modbus.js",
+        "createdAt": "2026-08-04T01:24:00.000Z"
+    },
+    {
+        "id": "iologik_modbus",
+        "name": "Moxa ioLogik 4000",
+        "description": "Parser Modbus TCP untuk Moxa ioLogik 4000 (32 Digital Inputs). 1 = Normal, 0 = Alarm.",
+        "category": "Data Processing",
+        "files": "/src/parsers/iologik_modbus.js",
+        "createdAt": "2026-08-06T00:00:00.000Z"
+    },
+    {
+        "id": "diris_a20",
+        "name": "DIRIS A20 Power Meter",
+        "description": "Parser Modbus RTU TCP pasif untuk DIRIS A20",
+        "category": "Support",
+        "files": "/src/parsers/diris_a20.js",
+        "createdAt": "2026-08-07T00:00:00.000Z"
+    },
+    {
+        "id": "marc_pae",
+        "name": "MARC PAE",
+        "type": "binary_tcp",
+        "has_snmp": false
+    },
+    {
+        "id": "datakom_d700_modbus",
+        "name": "Datakom D700 Modbus TCP",
+        "description": "Parser Modbus TCP untuk Genset Datakom D700 (Membaca bulk 8 Holding Registers)",
+        "category": "Support",
+        "files": "/src/parsers/datakom_d700_modbus.js",
+        "createdAt": "2026-08-09T00:00:00.000Z"
+    },
+    {
+        "id": "dse7320_modbus",
+        "name": "DSE7320 Modbus TCP",
+        "description": "Parser Modbus TCP untuk Genset Deep Sea Electronics 7320 (Volt, Hz, RPM, Baterai, Suhu, Tekanan Oli). Mendukung kustomisasi Unit ID / Slave ID.",
+        "category": "Support",
+        "files": "/src/parsers/dse7320_modbus.js",
+        "createdAt": "2026-08-14T00:00:00.000Z"
+    },
+    {
+        "id": "universal_api",
+        "name": "Universal API Pull",
+        "description": "Parser dinamis menggunakan HTTP GET/POST ke Endpoint API (Support placeholder {ip} & {port}).",
+        "category": "Support",
+        "files": "/src/parsers/universal_api.js",
+        "createdAt": "2026-08-31T00:00:00.000Z"
+    },
+    {
+        "id": "ote_dtr100",
+        "name": "OTE DTR100 VHF Radio",
+        "description": "Parser for OTE DTR100 radio via TCP port 950 (Active/Passive)",
+        "defaultPort": 950,
+        "supportedTypes": [
+            "VHF"
+        ],
+        "fields": [
+            {
+                "key": "rx_power_dbm",
+                "name": "RF Input Power (dBm)",
+                "type": "number",
+                "unit": "dBm"
+            },
+            {
+                "key": "squelch_dbm",
+                "name": "Squelch (dBm)",
+                "type": "number",
+                "unit": "dBm"
+            },
+            {
+                "key": "sensitivity_dbm",
+                "name": "Sensitivity (dBm)",
+                "type": "number",
+                "unit": "dBm"
+            },
+            {
+                "key": "rssi_dbm",
+                "name": "RSSI (dBm)",
+                "type": "number",
+                "unit": "dBm"
+            },
+            {
+                "key": "fwd_power_w",
+                "name": "Fwd Power (W)",
+                "type": "number",
+                "unit": "W"
+            },
+            {
+                "key": "frequency_mhz",
+                "name": "Frequency (MHz)",
+                "type": "number",
+                "unit": "MHz"
+            },
+            {
+                "key": "modulation_pct",
+                "name": "Modulation (%)",
+                "type": "number",
+                "unit": "%"
+            }
+        ]
+    }
 ]

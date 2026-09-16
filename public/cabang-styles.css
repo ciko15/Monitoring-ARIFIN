@@ -266,18 +266,24 @@
 
 /* Keyframe animations for status glow */
 @keyframes warningPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
   }
+
   50% {
     box-shadow: 0 0 25px rgba(245, 158, 11, 0.4);
   }
 }
 
 @keyframes alertPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
   }
+
   50% {
     box-shadow: 0 0 35px rgba(239, 68, 68, 0.5);
   }
@@ -297,10 +303,13 @@
 }
 
 @keyframes warningDot {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.6;
     transform: scale(1.2);
@@ -308,10 +317,13 @@
 }
 
 @keyframes alertDot {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.5;
     transform: scale(1.4);
@@ -322,7 +334,8 @@
 .equipment-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center; /* Membuat status badge dan icon persis sejajar di tengah */
+  align-items: center;
+  /* Membuat status badge dan icon persis sejajar di tengah */
   margin-bottom: 15px;
 }
 
@@ -400,7 +413,8 @@
 }
 
 .equipment-status::before {
-  display: none; /* Menghilangkan dot/titik sebelum status */
+  display: none;
+  /* Menghilangkan dot/titik sebelum status */
 }
 
 /* Stale Data Styling */
@@ -422,7 +436,8 @@
 /* Card Body */
 .equipment-card-body {
   margin-bottom: 15px;
-  flex: 1; /* Membiarkan konten memanjang dan menekan footer merata ke bawah */
+  flex: 1;
+  /* Membiarkan konten memanjang dan menekan footer merata ke bawah */
 }
 
 .equipment-name {
@@ -466,10 +481,21 @@
   background: var(--monitoring-success);
 }
 
-.signal-bar:nth-child(1) { height: 8px; }
-.signal-bar:nth-child(2) { height: 12px; }
-.signal-bar:nth-child(3) { height: 16px; }
-.signal-bar:nth-child(4) { height: 20px; }
+.signal-bar:nth-child(1) {
+  height: 8px;
+}
+
+.signal-bar:nth-child(2) {
+  height: 12px;
+}
+
+.signal-bar:nth-child(3) {
+  height: 16px;
+}
+
+.signal-bar:nth-child(4) {
+  height: 20px;
+}
 
 /* Empty State */
 .monitoring-empty-state {
@@ -507,14 +533,14 @@
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .monitoring-filters {
     width: 100%;
     overflow-x: auto;
     padding-bottom: 10px;
     flex-wrap: nowrap;
   }
-  
+
   .equipment-grid {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
@@ -524,15 +550,15 @@
   .monitoring-section {
     padding: 15px;
   }
-  
+
   .monitoring-header-left h2 {
     font-size: 1.2rem;
   }
-  
+
   .equipment-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .filter-btn {
     padding: 6px 12px;
     font-size: 0.8rem;
@@ -548,6 +574,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -558,17 +585,37 @@
   animation: fadeInUp 0.4s ease-out;
 }
 
-.equipment-card:nth-child(1) { animation-delay: 0.05s; }
-.equipment-card:nth-child(2) { animation-delay: 0.1s; }
-.equipment-card:nth-child(3) { animation-delay: 0.15s; }
-.equipment-card:nth-child(4) { animation-delay: 0.2s; }
-.equipment-card:nth-child(5) { animation-delay: 0.25s; }
-.equipment-card:nth-child(6) { animation-delay: 0.3s; }
+.equipment-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.equipment-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.equipment-card:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.equipment-card:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+.equipment-card:nth-child(5) {
+  animation-delay: 0.25s;
+}
+
+.equipment-card:nth-child(6) {
+  animation-delay: 0.3s;
+}
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -635,7 +682,8 @@
 /* Cabang Grid - Airport Cards - 4 columns layout */
 .cabang-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* Diubah menjadi 3 kolom per baris */
+  grid-template-columns: repeat(3, 1fr);
+  /* Diubah menjadi 3 kolom per baris */
   gap: 20px;
 }
 
@@ -1039,13 +1087,15 @@
 /* Force specific column counts for different screen sizes */
 @media (min-width: 1400px) {
   .equipment-cards-container {
-    grid-template-columns: repeat(3, 1fr); /* Diubah menjadi maks 3 kolom */
+    grid-template-columns: repeat(3, 1fr);
+    /* Diubah menjadi maks 3 kolom */
   }
 }
 
 @media (min-width: 1024px) and (max-width: 1399px) {
   .equipment-cards-container {
-    grid-template-columns: repeat(3, 1fr); /* Tetap 3 kolom */
+    grid-template-columns: repeat(3, 1fr);
+    /* Tetap 3 kolom */
   }
 }
 
@@ -1109,12 +1159,12 @@
   .monitoring-layout {
     grid-template-columns: 1fr;
   }
-  
+
   .branch-list-sidebar {
     max-height: 300px;
     order: 2;
   }
-  
+
   .equipment-display {
     order: 1;
   }
@@ -1124,25 +1174,25 @@
   .cabang-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .monitoring-layout {
     gap: 15px;
   }
-  
+
   .branch-list-sidebar {
     padding: 12px;
   }
-  
+
   .branch-item {
     padding: 8px 10px;
   }
-  
+
   .branch-icon {
     width: 28px;
     height: 28px;
     font-size: 0.8rem;
   }
-  
+
   .branch-name {
     font-size: 0.85rem;
   }
@@ -1453,8 +1503,13 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Empty State */
@@ -1476,7 +1531,7 @@
     width: 100%;
     right: -100%;
   }
-  
+
   .detail-info-grid {
     grid-template-columns: 1fr;
   }
@@ -1557,11 +1612,30 @@
   display: inline-block;
 }
 
-.category-badge.communication { background: rgba(37, 99, 235, 0.2); color: #60a5fa; }
-.category-badge.navigation { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
-.category-badge.surveillance { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
-.category-badge.data-processing { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-.category-badge.support { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.category-badge.communication {
+  background: rgba(37, 99, 235, 0.2);
+  color: #60a5fa;
+}
+
+.category-badge.navigation {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+}
+
+.category-badge.surveillance {
+  background: rgba(236, 72, 153, 0.2);
+  color: #f472b6;
+}
+
+.category-badge.data-processing {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.category-badge.support {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
 
 .empty-state {
   text-align: center;
@@ -1604,11 +1678,15 @@
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  pointer-events: auto; /* Ensure card itself always receives clicks */
-  -webkit-tap-highlight-color: rgba(0, 180, 255, 0.1); /* Mobile tap feedback */
-  touch-action: manipulation; /* Prevent double-tap delay on mobile */
+  pointer-events: auto;
+  /* Ensure card itself always receives clicks */
+  -webkit-tap-highlight-color: rgba(0, 180, 255, 0.1);
+  /* Mobile tap feedback */
+  touch-action: manipulation;
+  /* Prevent double-tap delay on mobile */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  height: 480px; /* Fixed height for uniformity */
+  height: 480px;
+  /* Fixed height for uniformity */
 }
 
 .cabang-card:hover {
@@ -1617,10 +1695,25 @@
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-.cabang-card.alarm { border-left: 4px solid var(--monitoring-danger); }
-.cabang-card.warning { border-left: 4px solid var(--monitoring-warning); }
-.cabang-card.normal { border-left: 4px solid var(--monitoring-success); }
-.cabang-card.offline { border-left: 4px solid var(--monitoring-text-muted); }
+.cabang-card.alarm {
+  border-left: 4px solid var(--monitoring-danger);
+}
+
+.cabang-card.offline {
+  border-left: 4px solid var(--monitoring-danger);
+}
+
+.cabang-card.warning {
+  border-left: 4px solid var(--monitoring-warning);
+}
+
+.cabang-card.normal {
+  border-left: 4px solid var(--monitoring-success);
+}
+
+.cabang-card.disconnect {
+  border-left: 4px solid var(--monitoring-text-muted);
+}
 
 .card-top {
   display: flex;
@@ -1652,10 +1745,30 @@
   letter-spacing: 0.5px;
 }
 
-.status-badge.normal { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-.status-badge.alarm { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-.status-badge.warning { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-.status-badge.offline { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+.status-badge.normal {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.status-badge.alarm {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.status-badge.offline {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.status-badge.warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.status-badge.disconnect {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
 
 .card-location {
   display: flex;
@@ -1665,7 +1778,10 @@
   color: var(--monitoring-text-muted);
 }
 
-.card-location i { font-size: 0.75rem; color: var(--monitoring-accent); }
+.card-location i {
+  font-size: 0.75rem;
+  color: var(--monitoring-accent);
+}
 
 .card-data-grid {
   display: grid;
@@ -1763,17 +1879,27 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* Status Pulse Animations */
 @keyframes status-pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
-.status-badge.normal, .status-badge.alarm, .status-badge.warning {
+.status-badge.normal,
+.status-badge.alarm,
+.status-badge.warning {
   animation: status-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
@@ -1784,8 +1910,9 @@
 
 .cabang-card h3 {
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
+
 /* ============================================
    SOURCE GROUPS & DATA DISPLAY
    ============================================ */
@@ -1796,9 +1923,11 @@
   gap: 12px;
   margin-top: 10px;
   flex: 1;
-  overflow: visible; /* No inner scroll — prevents touch/click interception */
+  overflow: visible;
+  /* No inner scroll — prevents touch/click interception */
   padding-right: 0;
-  pointer-events: none; /* Let clicks pass through to the card */
+  pointer-events: none;
+  /* Let clicks pass through to the card */
 }
 
 /* Custom Scrollbar for Card Sources */
@@ -1827,12 +1956,24 @@
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   transition: var(--monitoring-transition);
-  pointer-events: none; /* Pass clicks up to .cabang-card */
+  pointer-events: none;
+  /* Pass clicks up to .cabang-card */
 }
 
-.source-group.warning { border-left: 2px solid var(--monitoring-warning); }
-.source-group.alarm, .source-group.fail { border-left: 2px solid var(--monitoring-danger); }
-.source-group.disconnect { opacity: 0.7; border-left: 2px solid var(--monitoring-text-muted); }
+.source-group.warning {
+  border-left: 2px solid var(--monitoring-warning);
+}
+
+.source-group.alarm,
+.source-group.fail,
+.source-group.offline {
+  border-left: 2px solid var(--monitoring-danger);
+}
+
+.source-group.disconnect {
+  opacity: 0.7;
+  border-left: 2px solid var(--monitoring-text-muted);
+}
 
 .source-header {
   margin-bottom: 8px;
@@ -1862,10 +2003,22 @@
   color: #FFFFFF;
 }
 
-.source-status-pill.normal { background: var(--monitoring-success); }
-.source-status-pill.warning { background: var(--monitoring-warning); }
-.source-status-pill.alarm, .source-status-pill.fail { background: var(--monitoring-danger); }
-.source-status-pill.disconnect { background: var(--monitoring-text-muted); }
+.source-status-pill.normal {
+  background: var(--monitoring-success);
+}
+
+.source-status-pill.warning {
+  background: var(--monitoring-warning);
+}
+
+.source-status-pill.alarm,
+.source-status-pill.fail {
+  background: var(--monitoring-danger);
+}
+
+.source-status-pill.disconnect {
+  background: var(--monitoring-text-muted);
+}
 
 .source-header-time {
   font-size: 0.7rem;
@@ -1986,11 +2139,23 @@
   border-radius: 8px 0 0 8px;
 }
 
-.sp-source-card.normal::before   { background: var(--monitoring-success); }
+.sp-source-card.normal::before {
+  background: var(--monitoring-success);
+}
+
 .sp-source-card.alarm::before,
-.sp-source-card.fail::before     { background: var(--monitoring-danger); }
-.sp-source-card.warning::before  { background: var(--monitoring-warning); }
-.sp-source-card.disconnect::before { background: var(--monitoring-text-muted); opacity: 0.5; }
+.sp-source-card.fail::before {
+  background: var(--monitoring-danger);
+}
+
+.sp-source-card.warning::before {
+  background: var(--monitoring-warning);
+}
+
+.sp-source-card.disconnect::before {
+  background: var(--monitoring-text-muted);
+  opacity: 0.5;
+}
 
 .sp-source-card:hover {
   border-color: var(--monitoring-accent);
@@ -2158,6 +2323,7 @@
     width: 100vw !important;
     right: -100vw !important;
   }
+
   .equipment-detail-panel.open {
     right: 0 !important;
   }
@@ -2169,68 +2335,72 @@
    ============================================ */
 
 .source-cards-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
-    padding: 5px;
-    max-height: 350px; /* Limit height to prevent card from becoming too long */
-    overflow-y: auto;  /* Enable vertical scroll */
-    padding-right: 8px; /* Space for scrollbar */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 5px;
+  max-height: 350px;
+  /* Limit height to prevent card from becoming too long */
+  overflow-y: auto;
+  /* Enable vertical scroll */
+  padding-right: 8px;
+  /* Space for scrollbar */
 }
 
 /* Modern Scrollbar for Source Cards */
 .source-cards-container::-webkit-scrollbar {
-    width: 4px;
+  width: 4px;
 }
 
 .source-cards-container::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
 }
 
 .source-cards-container::-webkit-scrollbar-thumb {
-    background: rgba(0, 212, 255, 0.2);
-    border-radius: 10px;
+  background: rgba(0, 212, 255, 0.2);
+  border-radius: 10px;
 }
 
 .source-cards-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 212, 255, 0.4);
+  background: rgba(0, 212, 255, 0.4);
 }
 
 .source-cards-title {
-    grid-column: 1 / -1;
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: #4a7a9a;
-    letter-spacing: 1.5px;
-    margin-bottom: 5px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    opacity: 0.8;
+  grid-column: 1 / -1;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #4a7a9a;
+  letter-spacing: 1.5px;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.8;
 }
 
 .source-card {
-    background: rgba(30, 41, 59, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--monitoring-radius-sm);
-    padding: 12px;
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 95px; /* Fixed height for uniformity */
-    backdrop-filter: blur(10px);
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--monitoring-radius-sm);
+  padding: 12px;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 95px;
+  /* Fixed height for uniformity */
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .source-card:hover {
-    transform: translateY(-3px);
-    background: rgba(30, 41, 59, 0.7);
-    border-color: rgba(0, 212, 255, 0.3);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+  transform: translateY(-3px);
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(0, 212, 255, 0.3);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
 }
 
 .source-card::before {
@@ -2243,10 +2413,25 @@
   background: transparent;
 }
 
-.source-card.normal::before { background: var(--monitoring-success); }
-.source-card.warning::before { background: var(--monitoring-warning); }
-.source-card.alarm::before { background: var(--monitoring-danger); }
-.source-card.offline::before { background: var(--monitoring-text-muted); }
+.source-card.normal::before {
+  background: var(--monitoring-success);
+}
+
+.source-card.warning::before {
+  background: var(--monitoring-warning);
+}
+
+.source-card.alarm::before {
+  background: var(--monitoring-danger);
+}
+
+.source-card.offline::before {
+  background: var(--monitoring-danger);
+}
+
+.source-card.disconnect::before {
+  background: var(--monitoring-text-muted);
+}
 
 .source-card-header {
   display: flex;
@@ -2256,12 +2441,13 @@
 }
 
 .source-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-    min-width: 0;
-    margin-bottom: 4px; /* Space between title and footer */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 4px;
+  /* Space between title and footer */
 }
 
 .source-name {
@@ -2283,10 +2469,30 @@
   white-space: nowrap;
 }
 
-.status-pill.normal { background: rgba(16, 185, 129, 0.15); color: var(--monitoring-success); }
-.status-pill.warning { background: rgba(245, 158, 11, 0.15); color: var(--monitoring-warning); }
-.status-pill.alarm { background: rgba(239, 68, 68, 0.15); color: var(--monitoring-danger); }
-.status-pill.offline { background: rgba(148, 163, 184, 0.15); color: var(--monitoring-text-muted); }
+.status-pill.normal {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--monitoring-success);
+}
+
+.status-pill.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--monitoring-warning);
+}
+
+.status-pill.alarm {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--monitoring-danger);
+}
+
+.status-pill.offline {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--monitoring-danger);
+}
+
+.status-pill.disconnect {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--monitoring-text-muted);
+}
 
 .source-card-footer {
   display: flex;
@@ -2303,7 +2509,8 @@
 }
 
 .update-time {
-  color: #a5b4fc; /* Brighter indigo/blue for better contrast */
+  color: #a5b4fc;
+  /* Brighter indigo/blue for better contrast */
   font-size: 0.75rem;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-weight: 600;
@@ -2319,22 +2526,34 @@
 }
 
 /* Status Dot Animations */
-.status-dot.normal { box-shadow: 0 0 8px var(--monitoring-success); }
+.status-dot.normal {
+  box-shadow: 0 0 8px var(--monitoring-success);
+}
+
 .status-dot.normal::after {
   content: '';
   position: absolute;
-  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
   border-radius: 50%;
   border: 1px solid var(--monitoring-success);
   animation: dotPulse 2s infinite;
   opacity: 0;
 }
 
-.status-dot.alarm { box-shadow: 0 0 8px var(--monitoring-danger); }
+.status-dot.alarm {
+  box-shadow: 0 0 8px var(--monitoring-danger);
+}
+
 .status-dot.alarm::after {
   content: '';
   position: absolute;
-  top: -3px; left: -3px; right: -3px; bottom: -3px;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
   border-radius: 50%;
   background: var(--monitoring-danger);
   animation: dotAlarmPulse 1s infinite;
@@ -2342,11 +2561,17 @@
   z-index: -1;
 }
 
-.status-dot.warning { box-shadow: 0 0 8px var(--monitoring-warning); }
+.status-dot.warning {
+  box-shadow: 0 0 8px var(--monitoring-warning);
+}
+
 .status-dot.warning::after {
   content: '';
   position: absolute;
-  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
   border-radius: 50%;
   background: var(--monitoring-warning);
   animation: dotWarningPulse 1.5s infinite;
@@ -2355,22 +2580,42 @@
 }
 
 @keyframes dotPulse {
-  0% { transform: scale(1); opacity: 0.8; }
-  100% { transform: scale(2.5); opacity: 0; }
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
 }
 
 @keyframes dotAlarmPulse {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(3); opacity: 0; }
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
 }
 
 @keyframes dotWarningPulse {
-  0% { transform: scale(1); opacity: 0.5; }
-  100% { transform: scale(2.2); opacity: 0; }
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
 
 /* Ensure card can fit the cards */
 .cabang-card {
   min-width: 350px;
 }
-

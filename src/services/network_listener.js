@@ -79,9 +79,26 @@ class NetworkListenerService {
         return false;
     }
 
-    async _handleLogOutput(source, parsedData, connectionType, status) {
-        const decision = this.statusGate.evaluate(source, status, {
-            confirmDisconnect: true,
+    async _handleLogOutput(source, parsedData, connectionType, initialStatus) {
+        let statusToEvaluate = initialStatus;
+        const isInitialDisconnect = String(initialStatus || '').toLowerCase() === 'disconnect' || String(initialStatus || '').toLowerCase() === 'error';
+        let isPingable = false;
+
+        if (isInitialDisconnect) {
+            // Cek status Ping (ICMP) lebih awal
+            // Sesuai aturan: jika ping normal tapi data kosong (SNMP gagal), maka status menjadi Offline (mati)
+            isPingable = await checkIcmpPing(source.ip_address);
+            if (!parsedData.data) parsedData.data = {};
+            parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
+
+            if (isPingable) {
+                statusToEvaluate = 'Offline';
+            }
+        }
+
+        const decision = this.statusGate.evaluate(source, statusToEvaluate, {
+            now: Date.now(),
+            confirmDisconnect: true, 
             connectionType
         });
 
@@ -97,8 +114,8 @@ class NetworkListenerService {
             return;
         }
 
-        const finalStatus = decision.status;
-        const isFrozen = decision.reason === 'Frozen (Pending Disconnect)';
+        let finalStatus = decision.status;
+        const isFrozen = decision.reason === 'disconnect-not-confirmed' || decision.reason === 'Frozen (Pending Disconnect)';
 
         // LKGV (Last Known Good Value) & Dash Conversion
         if (!this._lkgvCache) this._lkgvCache = new Map();
@@ -113,12 +130,19 @@ class NetworkListenerService {
                 parsedData.data = JSON.parse(JSON.stringify(prevData));
             }
         } else if (!isDisconnect && parsedData && parsedData.data) {
-            // Jika bisa connect SNMP/API, berarti secara logika network normal. Reset ping_status agar tidak nyangkut 'Gagal'
-            parsedData.data.ping_status = 'Normal';
-            // Simpan data terakhir yang SUKSES BENERAN ke dalam cache
-            this._lkgvCache.set(source.id, JSON.parse(JSON.stringify(parsedData.data)));
-        } else if (isDisconnect && parsedData) {
-            // Karena statusGate sudah menahan emit selama 2 menit, jika sampai di sini berarti sudah fix Disconnect.
+            // Jika bisa connect SNMP/API dan bukan Offline murni, berarti secara logika network normal. 
+            // Tapi jika Offline (karena SNMP gagal tapi Ping sukses), kita sudah isi ping_status di atas.
+            if (finalStatus !== 'Offline') {
+                parsedData.data.ping_status = 'Normal';
+            }
+            // Simpan data terakhir yang SUKSES BENERAN ke dalam cache (Hanya jika Normal/Warning)
+            if (finalStatus === 'Normal' || finalStatus === 'Warning' || finalStatus === 'Alarm') {
+                this._lkgvCache.set(source.id, JSON.parse(JSON.stringify(parsedData.data)));
+            }
+        }
+
+        // Jika Disconnect (Ping Gagal) atau Offline (Ping Sukses tapi SNMP Gagal)
+        if (isDisconnect || finalStatus === 'Offline') {
             // Ubah semua nilai menjadi garis putus-putus (-) berdasarkan bentuk data terakhir.
             const prevData = this._lkgvCache.get(source.id);
             if (prevData) {
@@ -129,10 +153,7 @@ class NetworkListenerService {
                 dashData.connectivity = 'Disconnected';
                 parsedData.data = { ...parsedData.data, ...dashData };
             }
-
-            // Cek status Ping (ICMP)
-            if (!parsedData.data) parsedData.data = {};
-            const isPingable = await checkIcmpPing(source.ip_address);
+            // Pastikan ping_status tidak tertimpa garis putus-putus
             parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
         }
 

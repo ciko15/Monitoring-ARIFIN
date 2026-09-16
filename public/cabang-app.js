@@ -285,9 +285,9 @@ const cabangModule = (function () {
     if (!window.normalizeSourceStatus) {
       window.normalizeSourceStatus = function (rawStatus) {
         const s = String(rawStatus || '').toLowerCase();
-        if (s === 'alarm' || s === 'alert' || s === 'fail' || s === 'critical') return 'Alarm';
+        if (s === 'alarm' || s === 'alert' || s === 'fail' || s === 'critical' || s === 'offline') return 'Offline';
         if (s === 'warning') return 'Warning';
-        if (s === 'disconnect' || s === 'offline') return 'Disconnect';
+        if (s === 'disconnect') return 'Disconnect';
         return 'Normal';
       };
     }
@@ -297,17 +297,17 @@ const cabangModule = (function () {
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
         const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status).toLowerCase());
 
-        if (sourceStatuses.some(st => st === 'alarm')) return 'alarm';
+        if (sourceStatuses.some(st => st === 'offline')) return 'offline';
         if (sourceStatuses.some(st => st === 'warning')) return 'warning';
         if (sourceStatuses.every(st => st === 'disconnect')) return 'disconnect';
         if (sourceStatuses.some(st => st === 'disconnect')) return 'warning';
         return 'normal';
       }
 
-      const fallback = String(item?.status || 'offline').toLowerCase();
-      return ['normal', 'alarm', 'alert', 'warning', 'offline', 'disconnect'].includes(fallback)
-        ? (fallback === 'disconnect' ? 'offline' : (fallback === 'alert' ? 'alarm' : fallback))
-        : 'offline';
+      const fallback = String(item?.status || 'disconnect').toLowerCase();
+      return ['normal', 'offline', 'warning', 'disconnect'].includes(fallback)
+        ? fallback
+        : (['alarm', 'alert', 'fail', 'critical'].includes(fallback) ? 'offline' : 'disconnect');
     }
 
     let filtered = equipmentData;
@@ -368,7 +368,7 @@ const cabangModule = (function () {
 
     cabangGrid.innerHTML = filtered.map(item => {
       const status = deriveEquipmentStatus(item);
-      const statusClass = ['normal', 'alarm', 'warning'].includes(status) ? status : 'offline';
+      const statusClass = ['normal', 'offline', 'warning', 'disconnect'].includes(status) ? status : 'disconnect';
 
       // Action Data
       let dataHtml = '';
@@ -394,13 +394,14 @@ const cabangModule = (function () {
             // Map status to color
             let dotColor = '#10b981'; // normal
             let statusClass = normalizeSourceStatus(srcStatus).toLowerCase();
-            if (statusClass === 'alarm') {
-              dotColor = '#ef4444';
-            } else if (statusClass === 'warning') {
+            if (statusClass === 'warning') {
               dotColor = '#f59e0b';
-            } else if (statusClass === 'offline' || statusClass === 'disconnect') {
-              dotColor = '#94a3b8';
+            } else if (statusClass === 'offline') {
+              dotColor = '#ef4444';
               statusClass = 'offline';
+            } else if (statusClass === 'disconnect') {
+              dotColor = '#94a3b8';
+              statusClass = 'disconnect';
             } else {
               statusClass = 'normal';
             }

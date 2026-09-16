@@ -1,0 +1,15 @@
+{
+  "name": "scratch",
+  "version": "1.0.0",
+  "description": "",
+  "main": "analyze_bcd.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "pcap-parser": "^0.2.1"
+  }
+}

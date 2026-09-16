@@ -699,7 +699,7 @@
                         } else {
                             rawVal = valObj ?? '—';
                         }
-                        
+
                         const val = src.parsing_id.startsWith('snmp_')
                             ? formatSnmpMetricValue(k, rawVal)
                             : rawVal;
@@ -774,11 +774,13 @@
         const eqCard = document.querySelector(`.cabang-card[data-id="${equipmentId}"]`);
         if (eqCard) {
             eqCard.classList.remove('has-alarm', 'has-warning');
-            if (statuses.length > 0 && statuses.every(st => st === 'alarm')) {
+            if (statuses.length > 0 && statuses.every(st => st === 'alarm' || st === 'offline')) {
                 eqCard.classList.add('has-alarm');
-            } else if (statuses.length > 0 && statuses.every(st => st === 'offline' || st === 'disconnect')) {
+            } else if (statuses.length > 0 && statuses.every(st => st === 'disconnect')) {
                 // Biarkan abu-abu
-            } else if (statuses.includes('alarm') || statuses.includes('warning') || statuses.includes('disconnect') || statuses.includes('offline')) {
+            } else if (statuses.includes('alarm') || statuses.includes('offline')) {
+                eqCard.classList.add('has-alarm');
+            } else if (statuses.includes('warning') || statuses.includes('disconnect')) {
                 eqCard.classList.add('has-warning');
             }
         }
@@ -867,8 +869,8 @@
         document.getElementById('srcDetailTitle').textContent = src.name + ' — ' + (src.ip_address || '');
 
         const status = data ? (data._status || 'Normal') : 'Disconnect';
-        const statusColors = { Normal: '#00ff88', Alarm: '#ff3355', Warning: '#ffcc00', Disconnect: '#3a5a7a' };
-        
+        const statusColors = { Normal: '#00ff88', Alarm: '#ff3355', Offline: '#ff3355', Warning: '#ffcc00', Disconnect: '#3a5a7a' };
+
         let pingBadge = '';
         if (data && data.ping_status) {
             const pc = data.ping_status === 'Normal' ? '#00ff88' : '#ff3355';
@@ -1766,7 +1768,7 @@
                     const flatParams = [];
                     Object.entries(data).forEach(([k, v]) => {
                         if (k.startsWith('_') || isMetricPlaceholder(v)) return;
-                        
+
                         if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
                             // This is a nested group!
                             const groupParams = Object.entries(v)
@@ -1787,11 +1789,11 @@
                             flatParams.push([label, displayValue, getLimitColor(supCategory, label, v)]);
                         }
                     });
-                    
+
                     if (flatParams.length > 0) {
                         sections.unshift({ title: sections.length > 0 ? 'GENERAL' : 'DATA', params: flatParams });
                     }
-                    
+
                     if (sections.length === 0) {
                         sections.push({ title: 'DATA', params: [['No data available', '—', '#4a7a9a']] });
                     }
@@ -1897,6 +1899,7 @@
             }
             .source-status-pill.normal   { background: #005533; color: #00ff88; border: 1px solid #00ff88; }
             .source-status-pill.alarm    { background: #660022; color: #ff3355; border: 1px solid #ff3355; }
+            .source-status-pill.offline    { background: #660022; color: #ff3355; border: 1px solid #ff3355; }
             .source-status-pill.warning  { background: #332200; color: #ffcc00; border: 1px solid #ffcc00; }
             .source-status-pill.disconnect { background: #0f1e35; color: #3a5a7a; border: 1px solid #1a3a5c; }
 
@@ -1941,8 +1944,8 @@
             }
             .sp-source-card.warning:hover { border-color: #ffcc00; }
 
-            /* ALARM — border merah tebal + background merah gelap + pulse */
-            .sp-source-card.alarm {
+            /* ALARM / OFFLINE — border merah tebal + background merah gelap + pulse */
+            .sp-source-card.alarm, .sp-source-card.offline {
                 border: 2px solid #ff3355 !important;
                 background: #1a0810 !important;
                 box-shadow: 0 0 12px #ff335544, inset 0 0 20px #ff335511;
@@ -1960,8 +1963,8 @@
                 opacity: 0.6;
             }
 
-            /* Alarm indicator dot di pojok kiri atas */
-            .sp-source-card.alarm::before {
+            /* Alarm/Offline indicator dot di pojok kiri atas */
+            .sp-source-card.alarm::before, .sp-source-card.offline::before {
                 content: '';
                 position: absolute;
                 top: 8px; left: 8px;
@@ -2018,12 +2021,12 @@
             .sp-card-title { display: flex; align-items: center; gap: 8px; }
             .sp-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4a7a9a; flex-shrink: 0; }
             .sp-status-dot.normal { background: #00ff88; box-shadow: 0 0 8px #00ff8844; }
-            .sp-status-dot.alarm { background: #ff3355; box-shadow: 0 0 8px #ff335544; }
+            .sp-status-dot.alarm, .sp-status-dot.offline { background: #ff3355; box-shadow: 0 0 8px #ff335544; }
             .sp-status-dot.warning { background: #ffcc00; box-shadow: 0 0 8px #ffcc0044; }
             .sp-source-name { font-size: 13px; font-weight: 600; color: #e8f4ff; word-break: break-word; }
             .sp-status-pill { font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; flex-shrink: 0; }
             .sp-status-pill.normal { background: #005533; color: #00ff88; }
-            .sp-status-pill.alarm { background: #660022; color: #ff3355; }
+            .sp-status-pill.alarm, .sp-status-pill.offline { background: #660022; color: #ff3355; }
             .sp-status-pill.warning { background: #332200; color: #ffcc00; }
 
             .sp-card-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }

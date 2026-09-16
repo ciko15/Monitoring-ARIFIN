@@ -208,7 +208,8 @@
                   <option value="">Pilih Sub Kategori</option>
                 </select>
               </div>
-              <button type="button" class="btn btn-secondary btn-sm" id="addNewDataSourceSupCategory" title="Add custom subcategory">
+              <button type="button" class="btn btn-secondary btn-sm" id="addNewDataSourceSupCategory"
+                title="Add custom subcategory">
                 <i class="fas fa-plus"></i>
               </button>
             </div>
@@ -224,12 +225,15 @@
             </div>
 
             <!-- SNMP Extra Fields — shown only when template = snmp_* -->
-            <div id="snmpExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">SNMP COMMUNICATION</div>
+            <div id="snmpExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">SNMP
+                COMMUNICATION</div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                 <div>
                   <label style="font-size:11px;" for="snmpCommunity">Community</label>
-                  <input type="text" id="snmpCommunity" value="public" placeholder="public" style="width:100%; box-sizing:border-box;">
+                  <input type="text" id="snmpCommunity" value="public" placeholder="public"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div>
                   <label style="font-size:11px;" for="snmpVersion">SNMP Version</label>
@@ -240,25 +244,31 @@
                 </div>
                 <div>
                   <label style="font-size:11px;" for="snmpPort">SNMP Port</label>
-                  <input type="number" id="snmpPort" value="161" min="1" max="65535" style="width:100%; box-sizing:border-box;">
+                  <input type="number" id="snmpPort" value="161" min="1" max="65535"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div>
                   <label style="font-size:11px;" for="snmpPollInterval">Poll Interval (detik)</label>
-                  <input type="number" id="snmpPollInterval" value="60" min="5" max="3600" style="width:100%; box-sizing:border-box;">
+                  <input type="number" id="snmpPollInterval" value="60" min="5" max="3600"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
               </div>
             </div>
 
             <!-- Universal API Extra Fields -->
-            <div id="universalApiExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center;">
+            <div id="universalApiExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div
+                style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center;">
                 🌐 UNIVERSAL API PULL CONFIG
               </div>
-              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Gunakan placeholder {ip} dan {port} pada URL.</div>
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Gunakan placeholder {ip} dan {port} pada
+                URL.</div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                 <div style="grid-column: span 2;">
                   <label style="font-size:11px;">Endpoint URL</label>
-                  <input type="text" id="univApiUrl" value="http://{ip}:{port}/api" style="width:100%; box-sizing:border-box;">
+                  <input type="text" id="univApiUrl" value="http://{ip}:{port}/api"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div>
                   <label style="font-size:11px;">HTTP Method</label>
@@ -269,49 +279,64 @@
                 </div>
                 <div>
                   <label style="font-size:11px;">Poll Interval (detik)</label>
-                  <input type="number" id="univApiInterval" value="15" min="1" style="width:100%; box-sizing:border-box;">
+                  <input type="number" id="univApiInterval" value="15" min="1"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div style="grid-column: span 2;">
                   <label style="font-size:11px;">Custom Headers (JSON) - Opsional</label>
-                  <input type="text" id="univApiHeaders" placeholder='{"Authorization": "Bearer token..."}' style="width:100%; box-sizing:border-box;">
+                  <input type="text" id="univApiHeaders" placeholder='{"Authorization": "Bearer token..."}'
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div style="grid-column: span 2; display:flex; align-items:flex-end; gap:8px;">
-                  <button type="button" class="btn btn-primary btn-sm" id="btnSyncUniversalApi" style="flex:1; padding:8px 12px; height:32px;">
+                  <button type="button" class="btn btn-primary btn-sm" id="btnSyncUniversalApi"
+                    style="flex:1; padding:8px 12px; height:32px;">
                     <i class="fas fa-sync" id="syncApiIcon"></i> Sync Data
                   </button>
-                  <button type="button" class="btn btn-secondary btn-sm" id="btnViewRawUniversalApi" style="padding:8px 12px; height:32px; flex:0 0 auto;" title="Lihat Raw JSON untuk mencari ID alat dll">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btnViewRawUniversalApi"
+                    style="padding:8px 12px; height:32px; flex:0 0 auto;"
+                    title="Lihat Raw JSON untuk mencari ID alat dll">
                     <i class="fas fa-code"></i> Raw JSON
                   </button>
                 </div>
-                <div id="univApiRawContainer" style="display:none; margin-top:8px; max-height:200px; overflow:auto; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:8px; background:#000; font-family:monospace; font-size:10px; color:#0f0; white-space:pre-wrap;">
+                <div id="univApiRawContainer"
+                  style="display:none; margin-top:8px; max-height:200px; overflow:auto; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:8px; background:#000; font-family:monospace; font-size:10px; color:#0f0; white-space:pre-wrap;">
                 </div>
               </div>
               <div style="margin-top:12px; border-top:1px dashed #1a3a5c; padding-top:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                   <div style="font-size:11px; color:#00d4ff;">MAPPED FIELDS (Tarik Parameter ke dalam Grup)</div>
-                  <input type="text" id="univApiFilter" placeholder="Cari path (misal: .value)" style="font-size:10px; padding:2px 4px; width:130px; background:#0a1628; color:#fff; border:1px solid #1a3a5c; border-radius:3px;">
+                  <input type="text" id="univApiFilter" placeholder="Cari path (misal: .value)"
+                    style="font-size:10px; padding:2px 4px; width:130px; background:#0a1628; color:#fff; border:1px solid #1a3a5c; border-radius:3px;">
                 </div>
-                
+
                 <div style="display:flex; gap:12px; min-height: 250px; margin-top:10px;">
                   <!-- Kiri: Available Parameters -->
-                  <div style="flex:1; border:1px solid #1a3a5c; border-radius:4px; display:flex; flex-direction:column; background:#0a1628;">
-                    <div style="padding:6px 8px; background:#112238; border-bottom:1px solid #1a3a5c; font-size:10px; font-weight:bold; color:#a0b4c4; text-align:center;">
+                  <div
+                    style="flex:1; border:1px solid #1a3a5c; border-radius:4px; display:flex; flex-direction:column; background:#0a1628;">
+                    <div
+                      style="padding:6px 8px; background:#112238; border-bottom:1px solid #1a3a5c; font-size:10px; font-weight:bold; color:#a0b4c4; text-align:center;">
                       AVAILABLE PARAMETERS
                     </div>
-                    <div id="univApiAvailableFields" class="sortable-list" style="flex:1; padding:8px; overflow-y:auto; max-height:300px; display:flex; flex-direction:column; gap:6px;">
-                      <div style="font-size:10px; color:#a0b4c4; text-align:center; padding-top:20px;">Klik "Sync Data" untuk memuat struktur JSON dari alat.</div>
+                    <div id="univApiAvailableFields" class="sortable-list"
+                      style="flex:1; padding:8px; overflow-y:auto; max-height:300px; display:flex; flex-direction:column; gap:6px;">
+                      <div style="font-size:10px; color:#a0b4c4; text-align:center; padding-top:20px;">Klik "Sync Data"
+                        untuk memuat struktur JSON dari alat.</div>
                     </div>
                   </div>
 
                   <!-- Kanan: Grouping Board -->
-                  <div style="flex:1.5; border:1px solid #1a3a5c; border-radius:4px; display:flex; flex-direction:column; background:#0a1628;">
-                    <div style="padding:6px 8px; background:#112238; border-bottom:1px solid #1a3a5c; display:flex; justify-content:space-between; align-items:center;">
+                  <div
+                    style="flex:1.5; border:1px solid #1a3a5c; border-radius:4px; display:flex; flex-direction:column; background:#0a1628;">
+                    <div
+                      style="padding:6px 8px; background:#112238; border-bottom:1px solid #1a3a5c; display:flex; justify-content:space-between; align-items:center;">
                       <span style="font-size:10px; font-weight:bold; color:#00ff88;">GROUPS</span>
-                      <button type="button" class="btn btn-secondary btn-sm" onclick="addUnivApiGroup()" style="padding:2px 6px; font-size:9px;">
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="addUnivApiGroup()"
+                        style="padding:2px 6px; font-size:9px;">
                         <i class="fas fa-plus"></i> Tambah Grup
                       </button>
                     </div>
-                    <div id="univApiGroupsContainer" style="flex:1; padding:8px; overflow-y:auto; max-height:300px; display:flex; flex-direction:column; gap:12px;">
+                    <div id="univApiGroupsContainer"
+                      style="flex:1; padding:8px; overflow-y:auto; max-height:300px; display:flex; flex-direction:column; gap:12px;">
                       <!-- Custom groups will be added here dynamically -->
                     </div>
                   </div>
@@ -320,74 +345,96 @@
             </div>
 
             <!-- MARC PAE Extra Fields -->
-            <div id="marcPaeExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">MARC PAE DISCOVERY</div>
+            <div id="marcPaeExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">MARC
+                PAE DISCOVERY</div>
               <div style="display:flex; gap:8px; align-items:flex-end;">
                 <div style="flex:1;">
                   <label style="font-size:11px;" for="marcPaeRange">RSE Scan Range</label>
-                  <input type="text" id="marcPaeRange" value="1-127" placeholder="e.g., 90-100" style="width:100%; box-sizing:border-box;">
+                  <input type="text" id="marcPaeRange" value="1-127" placeholder="e.g., 90-100"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
-                <button type="button" class="btn btn-primary btn-sm" id="btnDiscoverMarcPae" style="padding:8px 12px; height:32px;">
+                <button type="button" class="btn btn-primary btn-sm" id="btnDiscoverMarcPae"
+                  style="padding:8px 12px; height:32px;">
                   <i class="fas fa-search" id="marcPaeSearchIcon"></i> Discover
                 </button>
               </div>
-              <div id="marcPaeDiscoveryResults" style="margin-top:10px; font-size:12px; color:#fff; display:none; max-height:200px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:8px;">
+              <div id="marcPaeDiscoveryResults"
+                style="margin-top:10px; font-size:12px; color:#fff; display:none; max-height:200px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:8px;">
                 <!-- Results rendered here by app.js -->
               </div>
             </div>
 
 
             <!-- T6TV Extra Fields — shown only when template = vhf_t6tv -->
-            <div id="t6tvExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">⚡ WEBSOCKET / DIGEST AUTH</div>
+            <div id="t6tvExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00d4ff; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">⚡
+                WEBSOCKET / DIGEST AUTH</div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                 <div>
                   <label style="font-size:11px;">WS Path</label>
-                  <input type="text" id="t6tvWsPath" value="/ws" placeholder="/ws" style="width:100%; box-sizing:border-box;">
+                  <input type="text" id="t6tvWsPath" value="/ws" placeholder="/ws"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div>
                   <label style="font-size:11px;">Interval (detik)</label>
-                  <input type="number" id="t6tvInterval" value="5" min="1" max="60" style="width:100%; box-sizing:border-box;">
+                  <input type="number" id="t6tvInterval" value="5" min="1" max="60"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div>
                   <label style="font-size:11px;">Username</label>
-                  <input type="text" id="t6tvUsername" value="admin" placeholder="admin" style="width:100%; box-sizing:border-box;">
+                  <input type="text" id="t6tvUsername" value="admin" placeholder="admin"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div>
                   <label style="font-size:11px;">Password</label>
-                  <input type="password" id="t6tvPassword" value="admin" placeholder="password" style="width:100%; box-sizing:border-box;">
+                  <input type="password" id="t6tvPassword" value="admin" placeholder="password"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
               </div>
             </div>
 
             <!-- MARC RSE Extra Fields — shown only when template = vhf_marc_rse -->
-            <div id="marcExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">⚡ MARC RSE — PILIH PORT RADIO</div>
-              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Centang port radio yang masuk dalam equipment ini (port 2-9)</div>
+            <div id="marcExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">⚡
+                MARC RSE — PILIH PORT RADIO</div>
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Centang port radio yang masuk dalam
+                equipment ini (port 2-9)</div>
               <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:10px;">
                 <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
-                  <input type="checkbox" id="marcPort2" value="2"> <span>Port 2 <span style="color:#5a8aaa;font-size:9px;">(RX)</span></span>
+                  <input type="checkbox" id="marcPort2" value="2"> <span>Port 2 <span
+                      style="color:#5a8aaa;font-size:9px;">(RX)</span></span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
-                  <input type="checkbox" id="marcPort3" value="3"> <span>Port 3 <span style="color:#5a8aaa;font-size:9px;">(RX)</span></span>
+                  <input type="checkbox" id="marcPort3" value="3"> <span>Port 3 <span
+                      style="color:#5a8aaa;font-size:9px;">(RX)</span></span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
-                  <input type="checkbox" id="marcPort4" value="4"> <span>Port 4 <span style="color:#e8a000;font-size:9px;">(TX)</span></span>
+                  <input type="checkbox" id="marcPort4" value="4"> <span>Port 4 <span
+                      style="color:#e8a000;font-size:9px;">(TX)</span></span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
-                  <input type="checkbox" id="marcPort5" value="5"> <span>Port 5 <span style="color:#e8a000;font-size:9px;">(TX)</span></span>
+                  <input type="checkbox" id="marcPort5" value="5"> <span>Port 5 <span
+                      style="color:#e8a000;font-size:9px;">(TX)</span></span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
-                  <input type="checkbox" id="marcPort6" value="6"> <span>Port 6 <span style="color:#e8a000;font-size:9px;">(TX)</span></span>
+                  <input type="checkbox" id="marcPort6" value="6"> <span>Port 6 <span
+                      style="color:#e8a000;font-size:9px;">(TX)</span></span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
-                  <input type="checkbox" id="marcPort7" value="7"> <span>Port 7 <span style="color:#e8a000;font-size:9px;">(TX)</span></span>
+                  <input type="checkbox" id="marcPort7" value="7"> <span>Port 7 <span
+                      style="color:#e8a000;font-size:9px;">(TX)</span></span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
-                  <input type="checkbox" id="marcPort8" value="8"> <span>Port 8 <span style="color:#e8a000;font-size:9px;">(TX)</span></span>
+                  <input type="checkbox" id="marcPort8" value="8"> <span>Port 8 <span
+                      style="color:#e8a000;font-size:9px;">(TX)</span></span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
-                  <input type="checkbox" id="marcPort9" value="9"> <span>Port 9 <span style="color:#e8a000;font-size:9px;">(TX)</span></span>
+                  <input type="checkbox" id="marcPort9" value="9"> <span>Port 9 <span
+                      style="color:#e8a000;font-size:9px;">(TX)</span></span>
                 </label>
               </div>
               <div style="font-size:10px; color:#3a6a8a; margin-top:4px;">
@@ -397,61 +444,85 @@
             </div>
 
             <!-- ASTERIX Extra Fields — shown only when template = asterix_adsb or asterix_radar -->
-            <div id="asterixExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">📡 ASTERIX — SAC / SIC</div>
-              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Kode area untuk identifikasi stasiun ADS-B / Radar (Misal: SAC 255, SIC 129)</div>
+            <div id="asterixExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">📡
+                ASTERIX — SAC / SIC</div>
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Kode area untuk identifikasi stasiun ADS-B
+                / Radar (Misal: SAC 255, SIC 129)</div>
               <div style="display:flex; gap:10px;">
                 <div style="flex:1;">
-                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">SAC (System Area Code)</label>
-                  <input type="number" id="asterixSac" placeholder="0 - 255" min="0" max="255" style="width:100%; box-sizing:border-box;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">SAC (System Area
+                    Code)</label>
+                  <input type="number" id="asterixSac" placeholder="0 - 255" min="0" max="255"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div style="flex:1;">
-                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">SIC (System ID Code)</label>
-                  <input type="number" id="asterixSic" placeholder="0 - 255" min="0" max="255" style="width:100%; box-sizing:border-box;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">SIC (System ID
+                    Code)</label>
+                  <input type="number" id="asterixSic" placeholder="0 - 255" min="0" max="255"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
               </div>
             </div>
 
             <!-- PM5350 Modbus Extra Fields — shown only when template = pm5350_modbus -->
-            <div id="pm5350ExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">⚡ PM5350 MODBUS — KONFIGURASI</div>
-              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Sesuaikan Slave ID Modbus perangkat PM5350 (default: 5). Bisa dilihat dari display meter atau konfigurasi alat.</div>
+            <div id="pm5350ExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">⚡
+                PM5350 MODBUS — KONFIGURASI</div>
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Sesuaikan Slave ID Modbus perangkat PM5350
+                (default: 5). Bisa dilihat dari display meter atau konfigurasi alat.</div>
               <div style="display:flex; gap:10px;">
                 <div style="flex:1;">
-                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Modbus Slave ID</label>
-                  <input type="number" id="pm5350SlaveId" placeholder="5" min="1" max="247" value="5" style="width:100%; box-sizing:border-box;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Modbus Slave
+                    ID</label>
+                  <input type="number" id="pm5350SlaveId" placeholder="5" min="1" max="247" value="5"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
                 <div style="flex:1;">
-                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Poll Interval (detik)</label>
-                  <input type="number" id="pm5350PollInterval" placeholder="60" min="10" max="300" value="60" style="width:100%; box-sizing:border-box;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Poll Interval
+                    (detik)</label>
+                  <input type="number" id="pm5350PollInterval" placeholder="60" min="10" max="300" value="60"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
               </div>
             </div>
 
             <!-- Temp Humidity Modbus Extra Fields -->
-            <div id="tempHumidityExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">🌡️ TEMP/HUMIDITY MODBUS — KONFIGURASI</div>
-              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Sesuaikan Slave ID Modbus sensor (default: 1).</div>
+            <div id="tempHumidityExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px;">🌡️
+                TEMP/HUMIDITY MODBUS — KONFIGURASI</div>
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:8px;">Sesuaikan Slave ID Modbus sensor (default:
+                1).</div>
               <div style="display:flex; gap:10px;">
                 <div style="flex:1;">
-                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Modbus Slave ID</label>
-                  <input type="number" id="tempHumiditySlaveId" placeholder="1" min="1" max="247" value="1" style="width:100%; box-sizing:border-box;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Modbus Slave
+                    ID</label>
+                  <input type="number" id="tempHumiditySlaveId" placeholder="1" min="1" max="247" value="1"
+                    style="width:100%; box-sizing:border-box;">
                 </div>
               </div>
             </div>
 
             <!-- ioLogik Extra Fields — shown only when template = iologik_modbus -->
-            <div id="iologikExtraFields" style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
-              <div style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center;">
+            <div id="iologikExtraFields"
+              style="display:none; border:1px solid #1a3a5c; border-radius:6px; padding:12px; margin-top:8px; background:#0a1628;">
+              <div
+                style="font-size:11px; color:#00ff88; font-weight:bold; margin-bottom:10px; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center;">
                 🔌 IOLOGIK — DYNAMIC PIN MAPPING
-                <button type="button" class="btn btn-secondary btn-sm" onclick="addIoDevice()" style="padding:4px 8px; font-size:10px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addIoDevice()"
+                  style="padding:4px 8px; font-size:10px;">
                   <i class="fas fa-plus"></i> Tambah Alat
                 </button>
               </div>
-              <div style="font-size:10px; color:#5a8aaa; margin-bottom:12px;">Tambahkan alat dan petakan fungsinya ke PIN Modbus (0-47). Jika dibiarkan kosong, akan menggunakan template bawaan.</div>
-              
+              <div style="font-size:10px; color:#5a8aaa; margin-bottom:12px;">Tambahkan alat dan petakan fungsinya ke
+                PIN Modbus (0-47). Jika dibiarkan kosong, akan menggunakan template bawaan.</div>
+
               <!-- Container for dynamic device blocks -->
-              <div id="iologikDynamicBuilder" style="display:flex; flex-direction:column; gap:12px; margin-bottom:12px;"></div>
+              <div id="iologikDynamicBuilder"
+                style="display:flex; flex-direction:column; gap:12px; margin-bottom:12px;"></div>
 
               <!-- Hidden textarea to store the JSON string (syncs automatically) -->
               <textarea id="iologikExtraConfigJson" style="display:none;"></textarea>
@@ -468,7 +539,8 @@
               <label for="dataSourceLongitude">Longitude</label>
               <div style="display: flex; gap: 8px;">
                 <input type="text" id="dataSourceLongitude" placeholder="e.g. 106.8272" style="flex: 1;">
-                <button type="button" class="btn btn-secondary" onclick="enableMapPick('dataSource')" title="Pick from map">
+                <button type="button" class="btn btn-secondary" onclick="enableMapPick('dataSource')"
+                  title="Pick from map">
                   <i class="fas fa-map-marker-alt"></i>
                 </button>
               </div>
@@ -516,13 +588,11 @@
           <div class="form-row-ux">
             <div class="form-group-ux">
               <label for="airportCode">Airport Code</label>
-              <input type="text" id="airportCode" name="airportCode" autocomplete="off"
-                placeholder="e.g., WAJJ">
+              <input type="text" id="airportCode" name="airportCode" autocomplete="off" placeholder="e.g., WAJJ">
             </div>
             <div class="form-group-ux">
               <label for="airportSiteId">Site ID</label>
-              <input type="text" id="airportSiteId" name="airportSiteId" autocomplete="off"
-                placeholder="e.g., WAJJ">
+              <input type="text" id="airportSiteId" name="airportSiteId" autocomplete="off" placeholder="e.g., WAJJ">
             </div>
           </div>
           <div class="form-row-ux">
@@ -552,26 +622,31 @@
             <input type="text" id="airportIpBranch" name="airportIpBranch" autocomplete="off"
               placeholder="e.g., 192.168.1.1">
           </div>
-          
+
           <!-- Solace AMQP Connection Settings -->
-          <div style="border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; margin-bottom: 15px; background: var(--bg-secondary);">
-            <div style="font-size: 12px; font-weight: 600; color: var(--accent-primary); margin-bottom: 10px; letter-spacing: 0.5px;">
+          <div
+            style="border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; margin-bottom: 15px; background: var(--bg-secondary);">
+            <div
+              style="font-size: 12px; font-weight: 600; color: var(--accent-primary); margin-bottom: 10px; letter-spacing: 0.5px;">
               <i class="fas fa-network-wired"></i> SOLACE / AMQP SETTINGS
             </div>
             <div class="form-row-ux">
               <div class="form-group-ux">
                 <label for="airportSolaceHost">Solace Host (IP)</label>
-                <input type="text" id="airportSolaceHost" name="airportSolaceHost" autocomplete="off" placeholder="e.g., 172.20.16.123">
+                <input type="text" id="airportSolaceHost" name="airportSolaceHost" autocomplete="off"
+                  placeholder="e.g., 172.20.16.123">
               </div>
             </div>
             <div class="form-row-ux">
               <div class="form-group-ux">
                 <label for="airportSolaceUsername">Username</label>
-                <input type="text" id="airportSolaceUsername" name="airportSolaceUsername" autocomplete="off" placeholder="e.g., dce-wadd">
+                <input type="text" id="airportSolaceUsername" name="airportSolaceUsername" autocomplete="off"
+                  placeholder="e.g., dce-wadd">
               </div>
               <div class="form-group-ux">
                 <label for="airportSolacePassword">Password</label>
-                <input type="password" id="airportSolacePassword" name="airportSolacePassword" autocomplete="new-password" placeholder="Password">
+                <input type="password" id="airportSolacePassword" name="airportSolacePassword"
+                  autocomplete="new-password" placeholder="Password">
               </div>
             </div>
           </div>
@@ -1055,7 +1130,7 @@
             <div class="stat-card">
               <div class="stat-icon maintenance"><i class="fas fa-times-circle"></i></div>
               <div class="stat-info">
-                <h3>Alert</h3>
+                <h3>Offline</h3>
                 <p class="stat-number" id="alertEquipment">0</p>
               </div>
             </div>
@@ -1802,10 +1877,12 @@
                 <div class="config-content-display">
                   <!-- Limitations Tab -->
                   <div id="configLimitationContent" class="config-content-item">
-                    <div class="card-header" style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <div class="card-header"
+                      style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                       <h3><i class="fas fa-exclamation-triangle"></i> Standard Limitations</h3>
                       <div class="filter-group" style="display: flex; align-items: center; gap: 10px;">
-                        <select id="filterLimitationSupCategory" class="btn btn-outline btn-sm" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer;">
+                        <select id="filterLimitationSupCategory" class="btn btn-outline btn-sm"
+                          style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer;">
                           <option value="">All Sub-Categories</option>
                         </select>
                         <button class="btn btn-primary btn-sm" onclick="showAddConfigModal('limitation')">
@@ -1835,10 +1912,12 @@
 
                   <!-- Authentication Tab -->
                   <div id="configAuthenticationContent" class="config-content-item hidden">
-                    <div class="card-header" style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <div class="card-header"
+                      style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                       <h3><i class="fas fa-network-wired"></i> Global Components / IP Config</h3>
                       <div class="filter-group" style="display: flex; align-items: center; gap: 10px;">
-                        <select id="filterAuthenticationLinkedEquipment" class="btn btn-outline btn-sm" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer;">
+                        <select id="filterAuthenticationLinkedEquipment" class="btn btn-outline btn-sm"
+                          style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer;">
                           <option value="">All Equipment</option>
                           <option value="global">Global (No Link)</option>
                         </select>

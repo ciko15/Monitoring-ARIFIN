@@ -20,6 +20,7 @@ const DvorMaruBinaryParser = require('./dvor_maru_binary');
 const DmeMopahBinaryParser = require('./dme_mopah_binary');
 const DatakomD700Parser = require('./datakom_d700_modbus');
 const UniversalApiParser = require('./universal_api');
+const OteDtr100Parser = require('./ote_dtr100');
 
 class ParserFactory {
     /**
@@ -86,6 +87,9 @@ class ParserFactory {
 
         // --- STATIC FALLBACK ---
         switch (moduleName) {
+            case 'ote_dtr100':
+                return new OteDtr100Parser(config);
+
             case 'rcms':
                 return new RcmsParser(config);
             

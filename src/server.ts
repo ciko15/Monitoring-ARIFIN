@@ -185,6 +185,20 @@ async function collectEquipmentData() {
                 const config = item.snmpConfig || item.snmp_config;
 
                 try {
+                    // Cek apakah equipment ini memiliki parsing_id khusus yang dipoll oleh network_listener
+                    const auths = await db.getOtenticationByEquipment(item.id);
+                    const isHandledByNetworkListener = auths.some(src => 
+                        src.is_active !== 0 && src.is_active !== false && src.is_active !== '0' &&
+                        src.parsing_id && 
+                        src.parsing_id !== 'ping_monitor' &&
+                        src.parsing_id !== 'api_arifin'
+                    );
+                    
+                    if (isHandledByNetworkListener) {
+                        // Skip polling dari sini karena status & data sudah diurus oleh network_listener.js
+                        continue;
+                    }
+
                     const { parsedData, status, triggeredParameters, isProcessed } = await fetchAndParseData(item);
 
                     // Only update status and logs if we actually had sources to monitor
@@ -318,14 +332,14 @@ async function checkEquipmentWatchdog() {
                     if (now - lastUpdate > TIMEOUT_MS) {
                         const category = String(item.category || item.sup_category || '').toLowerCase();
                         if (category.includes('radar') || category.includes('adsb')) {
-                            finalStatus = 'Alarm';
+                            finalStatus = 'Offline';
                         } else {
                             const ipToPing = item.ip_address || null;
                             if (ipToPing) {
                                 try {
                                     const { pingHost } = require('./utils/network');
                                     const pingRes = await pingHost(ipToPing, 1);
-                                    if (pingRes && pingRes.alive) finalStatus = 'Alarm';
+                                    if (pingRes && pingRes.alive) finalStatus = 'Offline';
                                     else finalStatus = 'Disconnect';
                                 } catch (e) {
                                     finalStatus = 'Disconnect';
