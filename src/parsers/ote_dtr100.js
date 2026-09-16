@@ -123,45 +123,48 @@ class OteDtr100Parser extends BaseParser {
     }
 
     mapParameter(id, dataBytes) {
-        let value = 0;
-        // Parse Little Endian (safely to avoid negative overflow)
+        // Prepare different reading formats
+        let valueLE = 0;
+        let valueBE = 0;
+        
         for (let i = 0; i < dataBytes.length; i++) {
-            value = (value | (dataBytes[i] << (i * 8))) >>> 0;
+            valueLE = (valueLE | (dataBytes[i] << (i * 8))) >>> 0;
+            valueBE = ((valueBE << 8) | dataBytes[i]) >>> 0;
         }
         
         let hexStr = dataBytes.toString('hex').toUpperCase();
 
         switch (id) {
             case 4:
-                this.latestData.modulation_pct = value;
+                // ID 4 is consistently 000004d4 in both TX and RX
+                // Big Endian: 1236 -> 12.36V (Power Supply Voltage)
+                this.latestData.supply_voltage_v = valueBE / 100.0;
                 break;
             case 7:
                 if (this.isTx) {
-                    // ID 7 returns 4 bytes in TX. 
                     // Lower 16-bit = Forward Power, Upper 16-bit = Reverse Power
-                    this.latestData.fwd_power_w = value & 0xFFFF; 
-                    this.latestData.refl_power_w = (value >>> 16) & 0xFFFF;
+                    this.latestData.fwd_power_w = valueLE & 0xFFFF; 
+                    this.latestData.refl_power_w = (valueLE >>> 16) & 0xFFFF;
                 } else {
-                    // For RX, value might be a placeholder or calibration
-                    this.latestData.rx_power_dbm = (value & 0xFFFF) - 111; 
+                    this.latestData.rx_power_dbm = (valueLE & 0xFFFF) - 111; 
                 }
                 break;
             case 29:
-                this.latestData.frequency_mhz = value / 1000.0;
+                this.latestData.frequency_mhz = valueLE / 1000.0;
                 break;
             case 45:
-                this.latestData.squelch_dbm = value;
+                this.latestData.squelch_dbm = valueLE;
                 break;
             case 48:
-                this.latestData.sensitivity_dbm = value;
+                this.latestData.sensitivity_dbm = valueLE;
                 break;
             case 104:
-                this.latestData.rssi_dbm = value;
+                this.latestData.rssi_dbm = valueLE;
                 break;
             default:
-                // Include both numeric value and raw hex for unknown parameters
-                this.latestData[`raw_id_${id}`] = value;
-                this.latestData[`hex_id_${id}`] = hexStr;
+                // Hide unknown parameters from the UI by prefixing with underscore
+                this.latestData[`_raw_id_${id}`] = valueLE;
+                this.latestData[`_hex_id_${id}`] = hexStr;
                 break;
         }
         this.latestData._status = 'Normal';
