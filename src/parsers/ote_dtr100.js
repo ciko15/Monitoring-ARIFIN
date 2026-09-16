@@ -1,6 +1,5 @@
 'use strict';
 
-const net = require('net');
 const BaseParser = require('./base');
 
 // Known poll frames derived from PCAP
@@ -18,118 +17,85 @@ const POLL_IDS = Object.keys(KNOWN_POLLS).map(Number);
 class OteDtr100Parser extends BaseParser {
     constructor(config) {
         super(config);
-        this.ip = config.ip;
-        this.port = config.port || 950;
-        this.socket = null;
-        
         this.buffer = Buffer.alloc(0);
-        
-        this.lastReceiveTime = 0;
-        this.activeMode = false;
-        this.activeModeCheckInterval = null;
-        this.pollTimer = null;
-        this.currentPollIndex = 0;
-        
-        // Timeout to assume passive mode failed (e.g., LMT disconnected)
+        this.lastReceiveTime = Date.now();
+        this.mode = 'ACTIVE'; // Mulai dari active sampai ada passive data
         this.PASSIVE_TIMEOUT_MS = 5000;
-        this.POLL_INTERVAL_MS = 1000;
-    }
-
-    start() {
-        this.connect();
         
-        // Monitor if we need to switch to Active mode
-        this.activeModeCheckInterval = setInterval(() => {
-            const now = Date.now();
-            if (!this.activeMode && (now - this.lastReceiveTime > this.PASSIVE_TIMEOUT_MS)) {
-                this.logger.info(`[OTE DTR100] No passive data for ${this.PASSIVE_TIMEOUT_MS}ms. Switching to ACTIVE mode.`);
-                this.activeMode = true;
-                this.startPolling();
-            }
-        }, 2000);
+        // Data buffer terakhir yang akan dikembalikan oleh parse()
+        this.latestData = { _status: 'Normal' };
     }
 
-    stop() {
-        if (this.activeModeCheckInterval) clearInterval(this.activeModeCheckInterval);
-        if (this.pollTimer) clearInterval(this.pollTimer);
-        if (this.socket) {
-            this.socket.destroy();
-            this.socket = null;
+    reset() {
+        this.buffer = Buffer.alloc(0);
+        this.lastReceiveTime = Date.now();
+        this.mode = 'ACTIVE';
+        this.latestData = { _status: 'Normal' };
+    }
+
+    getMode() {
+        return this.mode;
+    }
+
+    checkTimeout() {
+        if (this.mode === 'PASSIVE' && (Date.now() - this.lastReceiveTime > this.PASSIVE_TIMEOUT_MS)) {
+            this.mode = 'ACTIVE';
         }
-        this.logger.info(`[OTE DTR100] Stopped.`);
     }
 
-    connect() {
-        if (this.socket) this.socket.destroy();
-        this.socket = new net.Socket();
-        this.socket.setTimeout(10000);
+    getPollRequests() {
+        // Kembalikan array berisi semua frame buffer polling
+        return POLL_IDS.map(id => KNOWN_POLLS[id]);
+    }
+
+    parse(rawData) {
+        if (!rawData) {
+            return { success: false, error: 'No data' };
+        }
+
+        this.lastReceiveTime = Date.now();
+        if (this.mode === 'ACTIVE') {
+            this.mode = 'PASSIVE';
+        }
+
+        this.buffer = Buffer.concat([this.buffer, rawData]);
         
-        this.socket.on('connect', () => {
-            this.logger.info(`[OTE DTR100] Connected to ${this.ip}:${this.port}`);
-            this.lastReceiveTime = Date.now();
-        });
-
-        this.socket.on('data', (data) => {
-            this.lastReceiveTime = Date.now();
-            this.buffer = Buffer.concat([this.buffer, data]);
-            this.processBuffer();
-        });
-
-        this.socket.on('timeout', () => {
-            this.logger.warn(`[OTE DTR100] Socket timeout.`);
-            this.socket.destroy();
-        });
-
-        this.socket.on('error', (err) => {
-            this.logger.error(`[OTE DTR100] Socket error: ${err.message}`);
-        });
-
-        this.socket.on('close', () => {
-            this.logger.info(`[OTE DTR100] Connection closed. Reconnecting in 5s...`);
-            setTimeout(() => this.connect(), 5000);
-        });
-
-        this.socket.connect(this.port, this.ip);
-    }
-
-    startPolling() {
-        if (this.pollTimer) clearInterval(this.pollTimer);
-        this.pollTimer = setInterval(() => {
-            if (!this.activeMode || !this.socket || this.socket.readyState !== 'open') return;
-            
-            const id = POLL_IDS[this.currentPollIndex];
-            const frame = KNOWN_POLLS[id];
-            
-            if (frame) {
-                this.socket.write(frame);
-            }
-            
-            this.currentPollIndex = (this.currentPollIndex + 1) % POLL_IDS.length;
-        }, this.POLL_INTERVAL_MS);
-    }
-
-    processBuffer() {
+        let framesParsed = 0;
         while (this.buffer.length > 0) {
             const stxIdx = this.buffer.indexOf(0x02);
             if (stxIdx === -1) {
                 this.buffer = Buffer.alloc(0);
-                return;
+                break;
             }
             
             if (stxIdx > 0) {
                 this.buffer = this.buffer.slice(stxIdx);
             }
 
-            if (this.buffer.length < 3) return;
+            if (this.buffer.length < 3) break;
 
             const lenByte = this.buffer[2];
             const totalFrameSize = 1 + 1 + 1 + lenByte + 2;
 
-            if (this.buffer.length < totalFrameSize) return;
+            if (this.buffer.length < totalFrameSize) break; // Incomplete
 
             const frame = this.buffer.slice(0, totalFrameSize);
             this.buffer = this.buffer.slice(totalFrameSize);
             this.parseFrame(frame);
+            framesParsed++;
+        }
+
+        if (framesParsed > 0) {
+            return {
+                success: true,
+                status: this.latestData._status || 'Normal',
+                data: {
+                    ...this.latestData,
+                    _mode: this.mode
+                }
+            };
+        } else {
+            return { success: false, error: 'Incomplete frame' };
         }
     }
 
@@ -137,6 +103,7 @@ class OteDtr100Parser extends BaseParser {
         const len = frame[2];
         const payload = frame.slice(3, 3 + len);
         
+        // 19 = Response byte (as seen in PCAP)
         if (payload.length >= 7 && payload[0] === 0x19) {
             const dataLen = payload[6];
             if (payload.length >= 7 + 3 + (dataLen - 3)) {
@@ -152,38 +119,39 @@ class OteDtr100Parser extends BaseParser {
 
     mapParameter(id, dataBytes) {
         let value = 0;
+        // Parse Little Endian
         for (let i = 0; i < dataBytes.length; i++) {
             value |= (dataBytes[i] << (i * 8));
         }
 
-        const data = {};
         switch (id) {
             case 4:
-                data.modulation_pct = value;
+                this.latestData.modulation_pct = value;
                 break;
             case 7:
-                data.fwd_power_w = value; // Needs validation with LMT
+                this.latestData.fwd_power_w = value; // placeholder based on limits
                 break;
             case 29:
-                data.frequency_mhz = value / 1000.0;
+                this.latestData.frequency_mhz = value / 1000.0;
                 break;
             case 45:
-                data.squelch_dbm = value;
+                this.latestData.squelch_dbm = value;
                 break;
             case 48:
-                data.sensitivity_dbm = value;
+                this.latestData.sensitivity_dbm = value;
                 break;
             case 104:
-                data.rssi_dbm = value;
+                this.latestData.rssi_dbm = value;
                 break;
             default:
-                data[`raw_id_${id}`] = value;
+                this.latestData[`raw_id_${id}`] = value;
                 break;
         }
-
-        data._status = 'Normal';
-        this.emit('data', data);
+        this.latestData._status = 'Normal';
     }
 }
 
+// Ekspor kelas dan konstanta untuk timer Polling di NetworkListener
 module.exports = OteDtr100Parser;
+module.exports.POLL_INTERVAL = 3000; // Poll setiap 3 detik di mode ACTIVE
+module.exports.POLL_REQ_DELAY = 100; // Jeda 100ms antar command ID
