@@ -113,7 +113,7 @@ class DmeMopahBinaryParser extends BaseParser {
             };
         } catch (error) {
             console.error('[DME Mopah Binary] Parsing Error:', error.message);
-            return { success: false, error: error.message, status: 'Error', _mode: this._mode };
+            return { success: false, error: error.message, status: 'Disconnect', _mode: this._mode };
         }
     }
 

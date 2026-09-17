@@ -17,20 +17,33 @@ const RAW_DEBUG = String(process.env.RAW_DEBUG || 'false').toLowerCase() === 'tr
 const _pingCache = new Map();
 async function checkIcmpPing(ip) {
     if (!ip) return false;
+    ip = String(ip).trim();
     const now = Date.now();
     if (_pingCache.has(ip)) {
         const cached = _pingCache.get(ip);
         if (now - cached.time < 30000) return cached.result; // Cache 30 detik
     }
     return new Promise(resolve => {
+        const { exec } = require('child_process');
         const isWin = process.platform === 'win32';
-        // -n 1 (Win) or -c 1 (Linux)
-        const cmd = isWin ? `ping -n 1 -w 1000 ${ip}` : `ping -c 1 -W 1 ${ip}`;
-        exec(cmd, (err) => {
+        
+        // Windows: -n 1 (1 packet). Linux/Mac: -n (no DNS lookup, mencegah hang 20+ detik) -c 1 (1 packet)
+        const cmd = isWin ? `ping -n 1 ${ip}` : `ping -n -c 1 ${ip}`;
+        
+        const child = exec(cmd, (err, stdout, stderr) => {
             const result = !err;
+            require('fs').appendFileSync('ping-debug-mac.log', `[${new Date().toISOString()}] CMD: ${cmd} | ERR: ${err ? err.message : 'null'} | STDOUT: ${stdout} | RESULT: ${result}\n`);
             _pingCache.set(ip, { time: now, result });
             resolve(result);
         });
+
+        // Timeout di level Node.js jika ping menggantung
+        setTimeout(() => {
+            try { child.kill(); } catch (e) {}
+            require('fs').appendFileSync('ping-debug-mac.log', `[${new Date().toISOString()}] CMD: ${cmd} TIMEOUT 3s\n`);
+            _pingCache.set(ip, { time: now, result: false });
+            resolve(false);
+        }, 3000);
     });
 }
 
@@ -81,7 +94,8 @@ class NetworkListenerService {
 
     async _handleLogOutput(source, parsedData, connectionType, initialStatus) {
         let statusToEvaluate = initialStatus;
-        const isInitialDisconnect = String(initialStatus || '').toLowerCase() === 'disconnect' || String(initialStatus || '').toLowerCase() === 'error';
+        const initialLower = String(initialStatus || '').toLowerCase();
+        const isInitialDisconnect = initialLower === 'disconnect' || initialLower === 'error' || initialLower === 'offline';
         let isPingable = false;
 
         if (isInitialDisconnect) {

@@ -69,7 +69,7 @@ class RcmsParser extends BaseParser {
             return {
                 success: false,
                 error: error.message,
-                status: 'Error',
+                status: 'Disconnect',
                 timestamp: new Date().toISOString()
             };
         }

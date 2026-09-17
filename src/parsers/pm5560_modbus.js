@@ -197,7 +197,7 @@ class Pm5560ModbusParser extends BaseParser {
             };
         } catch (err) {
             console.error('[PM5560] Parse error:', err.message);
-            return { success: false, error: err.message, status: 'Error' };
+            return { success: false, error: err.message, status: 'Disconnect' };
         }
     }
 

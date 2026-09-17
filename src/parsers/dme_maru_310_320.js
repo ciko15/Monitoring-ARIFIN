@@ -298,7 +298,7 @@ class DmeMaru310320Parser extends BaseParser {
 
         } catch (error) {
             console.error(`[DME Maru 310/320] Parse error: ${error.message}`);
-            return { success: false, error: error.message, status: 'Error', timestamp: new Date().toISOString() };
+            return { success: false, error: error.message, status: 'Disconnect', timestamp: new Date().toISOString() };
         }
     }
 

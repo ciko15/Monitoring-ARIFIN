@@ -425,7 +425,7 @@ class VhfT6tvParser extends BaseParser {
 
         } catch (error) {
             console.error(`[VHF T6TV] Parse error: ${error.message}`);
-            return { success: false, error: error.message, status: 'Error', timestamp: new Date().toISOString() };
+            return { success: false, error: error.message, status: 'Disconnect', timestamp: new Date().toISOString() };
         }
     }
 }

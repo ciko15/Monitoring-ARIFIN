@@ -664,7 +664,7 @@ class MarcPaeParser extends BaseParser {
             return {
                 success: false,
                 error: err.message,
-                status: 'Error',
+                status: 'Disconnect',
                 timestamp: new Date().toISOString(),
             };
         }

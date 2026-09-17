@@ -288,7 +288,7 @@ class DvorMaru220Parser extends BaseParser {
 
         } catch (error) {
             console.error(`[DVOR Maru 220] Parse error: ${error.message}`);
-            return { success: false, error: error.message, status: 'Error', timestamp: new Date().toISOString() };
+            return { success: false, error: error.message, status: 'Disconnect', timestamp: new Date().toISOString() };
         }
     }
 

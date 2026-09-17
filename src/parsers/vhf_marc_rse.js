@@ -552,7 +552,7 @@ class VhfMarcRseParser extends BaseParser {
                 return {
                     success: false,
                     error:   'No marc_ports configured',
-                    status:  'Error',
+                    status: 'Disconnect',
                     timestamp: new Date().toISOString(),
                 };
             }
@@ -618,7 +618,7 @@ class VhfMarcRseParser extends BaseParser {
             return {
                 success: false,
                 error:   err.message,
-                status:  'Error',
+                status: 'Disconnect',
                 timestamp: new Date().toISOString(),
             };
         }

@@ -224,7 +224,7 @@ class IlsLlzThales421Parser extends BaseParser {
 
             return this._buildOutput(latest.decoded, false);
         } catch (err) {
-            return { success: false, error: err.message, status: 'Error', timestamp: new Date().toISOString() };
+            return { success: false, error: err.message, status: 'Disconnect', timestamp: new Date().toISOString() };
         }
     }
 
