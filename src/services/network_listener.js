@@ -30,9 +30,9 @@ async function checkIcmpPing(ip) {
         // Windows: -n 1 (1 packet). Linux/Mac: -n (no DNS lookup, mencegah hang 20+ detik) -c 1 (1 packet)
         const cmd = isWin ? `ping -n 1 ${ip}` : `ping -n -c 1 ${ip}`;
         
-        const child = exec(cmd, (err, stdout, stderr) => {
+        // Tambahkan windowsHide: true agar tidak muncul popup CMD hitam di Windows
+        const child = exec(cmd, { windowsHide: true }, (err, stdout, stderr) => {
             const result = !err;
-            require('fs').appendFileSync('ping-debug-mac.log', `[${new Date().toISOString()}] CMD: ${cmd} | ERR: ${err ? err.message : 'null'} | STDOUT: ${stdout} | RESULT: ${result}\n`);
             _pingCache.set(ip, { time: now, result });
             resolve(result);
         });
@@ -40,7 +40,6 @@ async function checkIcmpPing(ip) {
         // Timeout di level Node.js jika ping menggantung
         setTimeout(() => {
             try { child.kill(); } catch (e) {}
-            require('fs').appendFileSync('ping-debug-mac.log', `[${new Date().toISOString()}] CMD: ${cmd} TIMEOUT 3s\n`);
             _pingCache.set(ip, { time: now, result: false });
             resolve(false);
         }, 3000);
