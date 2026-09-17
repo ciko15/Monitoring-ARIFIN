@@ -113,11 +113,18 @@ async function pollDse7320(host, port = 502, slaveId = 10) {
     const isRunning = (rpm > 500) || hasPower;
 
     deviceStatus = isRunning ? 'RUNNING' : 'STANDBY';
+    if (!isRunning && vol < 10 && freq < 10 && rpm < 10) {
+        deviceStatus = 'STOPPED';
+    }
+
+    // Tambahkan status mesin ke parameter data agar bisa ditampilkan di kotak kecil UI
+    parsedData.engine_status = deviceStatus;
 
     let alarms = [];
     let warnings = [];
 
-    const finalStatus = alarms.length > 0 ? 'Alarm' : deviceStatus;
+    // Status utama hanya boleh Normal, Warning, Alarm, Disconnect, Offline
+    const finalStatus = alarms.length > 0 ? 'Alarm' : 'Normal';
 
     return {
         success: true,

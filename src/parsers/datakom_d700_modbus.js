@@ -173,7 +173,12 @@ async function pollDatakomD700(host, port = 502, slaveId = 1) {
 
     if (hasPower) {
         deviceStatus = hasLoad ? 'RUNNING' : 'STANDBY';
+    } else {
+        deviceStatus = 'STOPPED';
     }
+
+    // Tambahkan status mesin ke parameter data agar bisa ditampilkan di kotak kecil UI
+    parsedData.engine_status = deviceStatus;
 
     let alarms = [];
     let warnings = [];
@@ -182,7 +187,8 @@ async function pollDatakomD700(host, port = 502, slaveId = 1) {
         alarms.push(`Genset Alarm Code: ${parsedData.Alarm}`);
     }
 
-    const finalStatus = alarms.length > 0 ? 'Alarm' : deviceStatus;
+    // Status utama hanya boleh Normal, Warning, Alarm, Disconnect, Offline
+    const finalStatus = alarms.length > 0 ? 'Alarm' : 'Normal';
 
     return {
         success: true,
