@@ -20,17 +20,18 @@ async function pushSyncToTOC() {
     // Auth info is likely merged in getAllEquipment if not we fetch it
     const equipmentData = equipment.data || equipment;
     
-    // We fetch auth info separately just in case and attach it
+    // Fetch all auth configs once to avoid reading the file in a loop
+    const allAuths = await db.getAllOtentication();
+    
+    // Attach auth info
     for (let eq of equipmentData) {
-       const authInfo = await db.getOtenticationByEquipment(eq.id);
-       if (authInfo && authInfo.length > 0) {
-          // Merge auth
-          const auth = authInfo[0];
-          eq.ipAddress = auth.ip_address;
-          eq.tcp_port = auth.tcp_port;
-          eq.udp_port = auth.udp_port;
-          eq.parsing_id = auth.parsing_id;
-          eq.extra_config = auth.extra_config;
+       const authInfo = allAuths.find((a: any) => a.equipt_id == eq.id);
+       if (authInfo) {
+          eq.ipAddress = authInfo.ip_address;
+          eq.tcp_port = authInfo.tcp_port;
+          eq.udp_port = authInfo.udp_port;
+          eq.parsing_id = authInfo.parsing_id;
+          eq.extra_config = authInfo.extra_config;
        }
     }
 
