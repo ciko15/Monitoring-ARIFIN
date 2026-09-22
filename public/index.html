@@ -1075,10 +1075,14 @@
         </a> -->
       </nav>
       <div class="sidebar-footer">
-
-        <button id="themeToggle" class="theme-toggle">
-          <i class="fas fa-moon"></i>
-          <span>Dark Mode</span>
+        <div class="user-panel hidden" id="sidebarUserPanel" style="display: flex; flex-direction: column; align-items: center; width: 100%; padding: 10px 0;">
+          <div id="sidebarUserName" style="font-weight: 600; margin-bottom: 10px;"></div>
+          <button id="sidebarLogoutBtn" class="btn btn-danger" style="width: 100%;">
+            <i class="fas fa-sign-out-alt"></i> Logout
+          </button>
+        </div>
+        <button id="sidebarLoginBtn" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+          <i class="fas fa-sign-in-alt"></i> Login
         </button>
       </div>
     </aside>
@@ -2104,10 +2108,37 @@
     </div>
   </div>
 
+  <!-- Login Modal -->
+  <div class="modal-overlay hidden" id="loginModal" style="z-index: 12000;">
+    <div class="modal-container" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-lock"></i> Login</h3>
+        <button class="modal-close" onclick="document.getElementById('loginModal').classList.add('hidden')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="loginForm" autocomplete="off">
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label for="sidebarUsername">Username</label>
+            <input type="text" id="sidebarUsername" class="form-control" required placeholder="Enter username">
+          </div>
+          <div class="form-group" style="margin-bottom: 25px;">
+            <label for="sidebarPassword">Password</label>
+            <input type="password" id="sidebarPassword" class="form-control" required placeholder="Enter password">
+          </div>
+          <div class="modal-footer" style="padding: 0;">
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px;">Login</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
   <script src="cabang-app.js"></script>
   <script src="enhancements.js?v=8"></script>
   <script src="snmp-tools.js"></script>

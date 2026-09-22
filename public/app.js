@@ -2,10 +2,14 @@
 const API_URL = '/api';
 
 // State
-localStorage.setItem('authToken', 'admin_token');
-localStorage.setItem('currentUser', JSON.stringify({ username: 'admin', role: 'superadmin' }));
-let authToken = 'admin_token';
-let currentUser = { username: 'admin', role: 'superadmin' };
+let authToken = localStorage.getItem('authToken') || null;
+let currentUser = null;
+try {
+  const storedUser = localStorage.getItem('currentUser');
+  if (storedUser) currentUser = JSON.parse(storedUser);
+} catch(e) {
+  console.warn('Failed to parse currentUser from cache');
+}
 let equipmentData = [];
 let airportsData = [];
 let supCategoriesData = [];
@@ -146,22 +150,11 @@ window.showConfirm = showConfirm;
 
 // Theme init
 function initTheme() {
-  const theme = localStorage.getItem('theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', 'dark');
+  document.documentElement.setAttribute('data-theme', 'dark');
   const themeToggle = document.getElementById('themeToggle');
   if (themeToggle) {
-    themeToggle.innerHTML = theme === 'dark' ? '<i class="fas fa-sun"></i> <span>Light Mode</span>' : '<i class="fas fa-moon"></i> <span>Dark Mode</span>';
-  }
-}
-
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('theme', next);
-  const themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) {
-    themeToggle.innerHTML = next === 'dark' ? '<i class="fas fa-sun"></i> <span>Light Mode</span>' : '<i class="fas fa-moon"></i> <span>Dark Mode</span>';
+    themeToggle.style.display = 'none'; // Hide if still in HTML
   }
 }
 
@@ -1349,10 +1342,25 @@ async function loadStats() {
 async function loadEquipment() {
   if (pollState.equipment) return;
   pollState.equipment = true;
+  
+  // Optimistic load from local storage
+  if (!equipmentData || equipmentData.length === 0) {
+    try {
+      const cached = localStorage.getItem('equipment_app_cache');
+      if (cached) {
+        equipmentData = JSON.parse(cached);
+        applyEquipmentFilters();
+      }
+    } catch (e) {
+      console.warn('Failed to parse equipment cache', e);
+    }
+  }
+  
   try {
     const res = await fetch(`${API_URL}/equipment?isActive=all`, { headers: getAuthHeaders() });
     const result = await res.json();
     equipmentData = result.data || result;
+    localStorage.setItem('equipment_app_cache', JSON.stringify(equipmentData));
     applyEquipmentFilters();
     updateLogEquipmentFilterOptions();
   } catch (err) { console.error('Equipment load error:', err); }
@@ -1949,12 +1957,26 @@ window.deleteEquipment = async function (id) {
 async function loadAirports() {
   if (pollState.airports) return;
   pollState.airports = true;
+
+  // Optimistic load from local storage
+  if (!airportsData || airportsData.length === 0) {
+    try {
+      const cached = localStorage.getItem('airports_app_cache');
+      if (cached) {
+        airportsData = JSON.parse(cached);
+      }
+    } catch (e) {
+      console.warn('Failed to parse airports cache', e);
+    }
+  }
+
   try {
     const res = await fetch(`${API_URL}/airports`, {
       headers: getAuthHeaders()
     });
     const result = await res.json();
     airportsData = result.data || result;
+    localStorage.setItem('airports_app_cache', JSON.stringify(airportsData));
 
     const detailView = document.getElementById('singleAirportDetailView');
     const editBtn = document.getElementById('editSingleAirportBtn');
@@ -2092,9 +2114,9 @@ function updateAuthUI() {
   };
 
   if (currentUser) {
-    if (sidebarLoginBtn) sidebarLoginBtn.style.display = 'none';
-    if (logoutBtn) logoutBtn.style.display = 'none'; // Sembunyikan tombol logout
-    if (userNameEl) userNameEl.textContent = 'Admin Mode';
+    if (sidebarLoginBtn) sidebarLoginBtn.classList.add('hidden');
+    if (sidebarPanel) sidebarPanel.classList.remove('hidden');
+    if (userNameEl) userNameEl.textContent = currentUser.name || currentUser.username || 'User Mode';
     if (loginModal) loginModal.classList.add('hidden');
 
     // Show/Hide menu items based on role
@@ -2117,7 +2139,6 @@ function updateAuthUI() {
   } else {
     if (sidebarLoginBtn) sidebarLoginBtn.classList.remove('hidden');
     if (sidebarPanel) sidebarPanel.classList.add('hidden');
-    if (logoutBtn) logoutBtn.classList.add('hidden');
 
     document.querySelectorAll('.nav-item[data-section]').forEach(item => {
       const section = item.getAttribute('data-section');
@@ -2426,14 +2447,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
   if (sidebarLogoutBtn) {
-    sidebarLogoutBtn.addEventListener('click', () => {
-      document.getElementById('logoutModal').classList.remove('hidden');
-    });
-  }
-
-  const confirmLogout = document.getElementById('confirmLogout');
-  if (confirmLogout) {
-    confirmLogout.addEventListener('click', () => {
+    sidebarLogoutBtn.addEventListener('click', async () => {
+      if (typeof showConfirm === 'function') {
+        const confirm = await showConfirm('Logout', 'Are you sure you want to logout?');
+        if (!confirm) return;
+      } else {
+        if (!confirm('Are you sure you want to logout?')) return;
+      }
       localStorage.removeItem('authToken');
       localStorage.removeItem('currentUser');
       localStorage.removeItem('cabang_equipment_cache'); // Clear cache on logout
@@ -2459,7 +2479,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    themeToggle.style.display = 'none';
+  }
 
   document.getElementById('menuToggle').addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('active');

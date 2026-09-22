@@ -707,12 +707,22 @@ async function getAllEquipment(filters = {}) {
           item.status = 'Alert';
         } else if (sourceStatuses.some(s => s === 'warning')) {
           item.status = 'Warning';
-        } else if (sourceStatuses.every(s => s === 'disconnect' || s === 'offline')) {
-          item.status = 'Disconnect';
-        } else if (sourceStatuses.some(s => s === 'disconnect' || s === 'offline')) {
-          item.status = 'Warning';
         } else {
-          item.status = 'Normal';
+          const allOfflineOrDisconnect = sourceStatuses.every(s => s === 'offline' || s === 'disconnect');
+          if (allOfflineOrDisconnect) {
+            if (sourceStatuses.some(s => s === 'offline')) {
+              item.status = 'Offline';
+            } else {
+              item.status = 'Disconnect';
+            }
+          } else {
+            const hasOfflineOrDisconnect = sourceStatuses.some(s => s === 'offline' || s === 'disconnect');
+            if (hasOfflineOrDisconnect) {
+              item.status = 'Warning';
+            } else {
+              item.status = 'Normal';
+            }
+          }
         }
       }
     }

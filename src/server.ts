@@ -1996,6 +1996,14 @@ async function startServices() {
                     console.error('[SCHEDULER] Initial collectEquipmentData error:', e);
                 }
             }, 5000);
+
+            // Start Branch Heartbeat
+            try {
+                const { startHeartbeat } = require('./services/heartbeat');
+                startHeartbeat();
+            } catch (e) {
+                console.error('[SYSTEM] heartbeat init error:', e);
+            }
         }
 
         if (SHOULD_START_PROCESSOR) {

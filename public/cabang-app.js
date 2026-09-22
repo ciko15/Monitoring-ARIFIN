@@ -296,11 +296,17 @@ const cabangModule = (function () {
     function deriveEquipmentStatus(item) {
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
         const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status).toLowerCase());
-
-        if (sourceStatuses.some(st => st === 'offline')) return 'offline';
         if (sourceStatuses.some(st => st === 'warning')) return 'warning';
-        if (sourceStatuses.every(st => st === 'disconnect')) return 'disconnect';
-        if (sourceStatuses.some(st => st === 'disconnect')) return 'warning';
+        
+        const allOfflineOrDisconnect = sourceStatuses.every(st => st === 'offline' || st === 'disconnect');
+        if (allOfflineOrDisconnect) {
+          if (sourceStatuses.some(st => st === 'offline')) return 'offline';
+          return 'disconnect';
+        }
+        
+        const hasOfflineOrDisconnect = sourceStatuses.some(st => st === 'offline' || st === 'disconnect');
+        if (hasOfflineOrDisconnect) return 'warning';
+        
         return 'normal';
       }
 

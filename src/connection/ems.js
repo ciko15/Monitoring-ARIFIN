@@ -135,7 +135,7 @@ const MessagingTopology = {
         'configuration.threshold.failed': 'EVT.CONFIG.RESULT',
         'collector.refresh.completed': 'EVT.COLLECTOR.RESULT',
         'collector.refresh.failed': 'EVT.COLLECTOR.RESULT',
-        'branch.heartbeat.sent': 'EVT.BRANCH.HEARTBEAT'
+        'branch.heartbeat.sent': 'Q.BRANCH.HEARTBEAT'
     },
     COMMAND: {
         'configuration.threshold.apply': targetSiteId => `CMD.CONFIG.${targetSiteId}`,
