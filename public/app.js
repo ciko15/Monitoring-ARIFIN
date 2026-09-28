@@ -2875,6 +2875,8 @@ window.renderConfigTable = function (tab, data, tbody) {
       tr.innerHTML = `
         <td><strong>${item.name}</strong></td>
         <td><span class="badge badge-secondary">${item.category}</span></td>
+        <td style="max-width: 250px; white-space: normal;">${item.description || '-'}</td>
+        <td style="max-width: 250px; white-space: normal;">${item.how_to_use || '-'}</td>
         <td><code>${item.files || '-'}</code></td>
         <td>
           <div class="action-buttons">
@@ -3145,11 +3147,19 @@ window.renderConfigFields = function (type, item, container) {
       <div class="form-group-ux">
         <label>Parser File Path</label>
         <div style="display: flex; gap: 8px;">
-          <input type="text" name="files" value="${item?.files || ''}" required placeholder="/public/parsers/name.js" style="flex: 1;">
+          <input type="text" name="files" value="${item?.files || ''}" required placeholder="/src/parsers/name.js" style="flex: 1;">
           <button type="button" class="btn btn-secondary btn-sm" onclick="window.openFilePicker('files')" title="Pilih File dari Folder">
             <i class="fas fa-folder-open"></i> Browse
           </button>
         </div>
+      </div>
+      <div class="form-group-ux">
+        <label>Keterangan (Description)</label>
+        <textarea name="description" rows="3" placeholder="Penjelasan singkat mengenai parser ini...">${item?.description || ''}</textarea>
+      </div>
+      <div class="form-group-ux">
+        <label>Cara Menggunakan (How to Use)</label>
+        <textarea name="how_to_use" rows="3" placeholder="Langkah-langkah atau panduan menggunakan parser ini...">${item?.how_to_use || ''}</textarea>
       </div>
 
     `;

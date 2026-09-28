@@ -302,7 +302,7 @@ async function checkEquipmentWatchdog() {
                             if (ipToPing) {
                                 try {
                                     const { pingHost } = require('./utils/network');
-                                    const pingRes = await pingHost(ipToPing, 1);
+                                    const pingRes = await pingHost(ipToPing, 4);
                                     if (pingRes && pingRes.alive) return 'Alarm';
                                 } catch (e) {}
                             }
@@ -338,7 +338,7 @@ async function checkEquipmentWatchdog() {
                             if (ipToPing) {
                                 try {
                                     const { pingHost } = require('./utils/network');
-                                    const pingRes = await pingHost(ipToPing, 1);
+                                    const pingRes = await pingHost(ipToPing, 4);
                                     if (pingRes && pingRes.alive) finalStatus = 'Offline';
                                     else finalStatus = 'Disconnect';
                                 } catch (e) {
