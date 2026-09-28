@@ -7,7 +7,8 @@ const config = {
   database: process.env.CENTRAL_DB_NAME || 'smart_toc',
   user: process.env.CENTRAL_DB_USER || 'smarttoc',
   password: process.env.CENTRAL_DB_PASS || 'OrangHebat3rnap!',
-  connectionLimit: 10
+  connectionLimit: 10,
+  connectTimeout: 3000
 };
 
 const pool = mysql.createPool(config);

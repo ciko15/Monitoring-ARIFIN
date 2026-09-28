@@ -453,9 +453,11 @@
         stopSourceDetailLiveUpdates();
     }
 
+    let _isFetchingSourceDetail = false;
     async function refreshSourceDetailModal(src, forceRender = false) {
-        if (!src) return;
-
+        if (!src || _isFetchingSourceDetail) return;
+        
+        _isFetchingSourceDetail = true;
         try {
             const res = await fetch(`/api/equipment/${src.equipt_id}`, {
                 headers: window.getAuthHeaders ? window.getAuthHeaders() : {}
@@ -467,6 +469,8 @@
             }
         } catch (e) {
             console.warn('[Enhancements] Failed to refresh source detail:', e);
+        } finally {
+            _isFetchingSourceDetail = false;
         }
 
         // Cegah popup terbuka kembali jika sudah ditutup saat fetch berlangsung

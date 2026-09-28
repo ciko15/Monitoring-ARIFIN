@@ -1,4 +1,6 @@
-'use strict';
+const fs = require('fs');
+
+const content = `'use strict';
 
 const net = require('net');
 
@@ -52,7 +54,7 @@ function readAllModbusRegisters(host, port, unitId, timeoutMs = 3000) {
         const timeoutTimer = setTimeout(() => {
             if (!resolved) {
                 resolved = true;
-                console.warn(`[Datakom] Modbus timeout ${host}:${port}`);
+                console.warn(\`[Datakom] Modbus timeout \${host}:\${port}\`);
                 cleanup();
                 resolve(null);
             }
@@ -68,7 +70,7 @@ function readAllModbusRegisters(host, port, unitId, timeoutMs = 3000) {
             // Expected Response length = 9 bytes header + 16 bytes data = 25 bytes
             if (data.length >= 9) {
                 if (data[7] === (0x03 + 0x80)) {
-                    console.warn(`[Datakom] Exception response: 0x${data[8].toString(16)}`);
+                    console.warn(\`[Datakom] Exception response: 0x\${data[8].toString(16)}\`);
                     resolved = true;
                     clearTimeout(timeoutTimer);
                     cleanup();
@@ -93,7 +95,7 @@ function readAllModbusRegisters(host, port, unitId, timeoutMs = 3000) {
 
         client.on('error', (err) => {
             if (!resolved) {
-                console.warn(`[Datakom] TCP Error ${host}:${port} ->`, err.message);
+                console.warn(\`[Datakom] TCP Error \${host}:\${port} ->\`, err.message);
                 resolved = true;
                 clearTimeout(timeoutTimer);
                 cleanup();
@@ -169,7 +171,7 @@ async function pollDatakomD700(host, port = 502, slaveId = 1) {
     let warnings = [];
 
     if (parsedData.Alarm !== '-' && parsedData.Alarm > 0) {
-        alarms.push(`Genset Alarm Code: ${parsedData.Alarm}`);
+        alarms.push(\`Genset Alarm Code: \${parsedData.Alarm}\`);
     }
 
     const finalStatus = alarms.length > 0 ? 'Alarm' : 'Normal';
@@ -186,3 +188,7 @@ async function pollDatakomD700(host, port = 502, slaveId = 1) {
 }
 
 module.exports = { pollDatakomD700 };
+`;
+
+fs.writeFileSync('src/parsers/datakom_d700_modbus.js', content);
+console.log('Datakom optimized.');

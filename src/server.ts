@@ -313,14 +313,23 @@ async function checkEquipmentWatchdog() {
 
                     // Rule-based consolidation
                     if (sourceStatuses.length > 0) {
-                        const lowerStatuses = sourceStatuses.map(s => String(s).toLowerCase());
-                        if (lowerStatuses.some(s => s === 'alert' || s === 'alarm' || s === 'fail' || s === 'critical')) {
-                            finalStatus = 'Alarm';
-                        } else if (lowerStatuses.some(s => s === 'warning')) {
+                        const lowerStatuses = sourceStatuses.map(s => {
+                            const str = String(s).toLowerCase();
+                            if (str === 'alarm' || str === 'alert' || str === 'fail' || str === 'critical' || str === 'offline') return 'offline';
+                            if (str === 'warning') return 'warning';
+                            if (str === 'disconnect') return 'disconnect';
+                            return 'normal';
+                        });
+
+                        if (lowerStatuses.some(s => s === 'warning')) {
                             finalStatus = 'Warning';
-                        } else if (lowerStatuses.every(s => s === 'disconnect' || s === 'offline')) {
-                            finalStatus = 'Disconnect';
-                        } else if (lowerStatuses.some(s => s === 'disconnect' || s === 'offline')) {
+                        } else if (lowerStatuses.every(s => s === 'offline' || s === 'disconnect')) {
+                            if (lowerStatuses.some(s => s === 'offline')) {
+                                finalStatus = 'Offline';
+                            } else {
+                                finalStatus = 'Disconnect';
+                            }
+                        } else if (lowerStatuses.some(s => s === 'offline' || s === 'disconnect')) {
                             finalStatus = 'Warning';
                         } else {
                             finalStatus = 'Normal';
