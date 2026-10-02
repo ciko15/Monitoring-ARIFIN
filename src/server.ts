@@ -2085,6 +2085,13 @@ async function startServices() {
             scheduleCleanup();
         }
 
+        // Memory Usage Monitor
+        setInterval(() => {
+            const memoryUsage = process.memoryUsage();
+            const formatMemory = (bytes: number) => (bytes / 1024 / 1024).toFixed(2) + ' MB';
+            console.log(`[SYS-MEM] RSS: ${formatMemory(memoryUsage.rss)}, HeapTotal: ${formatMemory(memoryUsage.heapTotal)}, HeapUsed: ${formatMemory(memoryUsage.heapUsed)}`);
+        }, 300000); // 5 minutes
+
         if (PIPELINE_MODE === 'split' && SHOULD_START_PROCESSOR) {
             try {
                 const QueuedDataProcessor = require('./services/queued_data_processor');

@@ -94,6 +94,7 @@ class T6tvConnector {
         this._running     = false;
         this._connected   = false;
         this._pollTimer   = null;
+        this._startPollTimeout = null;
         this._pollCount   = 0;
         this._portIndex   = 0;
         this._reconnectTimer = null;
@@ -117,9 +118,16 @@ class T6tvConnector {
             clearTimeout(this._reconnectTimer);
             this._reconnectTimer = null;
         }
+        if (this._startPollTimeout) clearTimeout(this._startPollTimeout);
         if (this._pollTimer) clearInterval(this._pollTimer);
         if (this._ws) {
-            try { this._ws.terminate(); } catch(e) {}
+            try { 
+                this._ws.onopen = null;
+                this._ws.onmessage = null;
+                this._ws.onerror = null;
+                this._ws.onclose = null;
+                this._ws.terminate(); 
+            } catch(e) {}
         }
     }
 
@@ -146,6 +154,11 @@ class T6tvConnector {
 
     _scheduleReconnect(opened, reason) {
         if (!this._running || this._reconnectTimer) return;
+
+        if (this._startPollTimeout) {
+            clearTimeout(this._startPollTimeout);
+            this._startPollTimeout = null;
+        }
 
         if (this._pollTimer) {
             clearInterval(this._pollTimer);
@@ -198,6 +211,18 @@ class T6tvConnector {
             // menolak custom headers (atau menganggapnya sebagai parameter subprotocols).
             const WebSocketClient = require('ws');
             const url = `ws://${this.host}:${port}${this.wsPath}`;
+            
+            // Cleanup existing socket if any before recreating
+            if (this._ws) {
+                try {
+                    this._ws.onopen = null;
+                    this._ws.onmessage = null;
+                    this._ws.onerror = null;
+                    this._ws.onclose = null;
+                    this._ws.terminate();
+                } catch(e) {}
+            }
+
             this._ws = new WebSocketClient(url, { headers });
             let opened = false;
             let lastError = null;
@@ -217,7 +242,8 @@ class T6tvConnector {
                 });
                 // Start poll loop setelah semua initial request terkirim
                 const startDelay = ALL_PANES.length * 300 + 500;
-                setTimeout(() => {
+                this._startPollTimeout = setTimeout(() => {
+                    this._startPollTimeout = null;
                     this._pollTimer = setInterval(() => this._pollCycle(), this.pollInterval);
                 }, startDelay);
             };
