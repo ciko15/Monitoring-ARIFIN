@@ -244,6 +244,12 @@ class NetworkListenerService {
         }
 
         const dataToSave = { ...parsedData, source: source.name, source_id: source.id, source_name: source.name };
+        if (dataToSave.data) {
+            dataToSave.data.source_id = source.id;
+            dataToSave.data.source_name = source.name;
+            // Jika ada field equipment dari parser, override agar konsisten dengan DB config
+            if (dataToSave.data.equipment) dataToSave.data.equipment = source.name;
+        }
 
         await this.equipmentService.saveToLogs(
             source.equipt_id,
@@ -701,7 +707,7 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[TempHumidity] Poll error ${name}:`, err.message);
-                throw err; // Lempar untuk dihitung circuit breaker
+                throw err;
             } finally {
                 isPolling = false;
             }
@@ -782,6 +788,8 @@ class NetworkListenerService {
                     source.parsing_id || 'snmp_system',
                     result.status || 'Disconnect'
                 );
+            } catch (err) {
+                console.error(`[SNMP System] Poll error ${name}:`, err.message);
                 throw err;
             } finally {
                 isPolling = false;
@@ -825,7 +833,7 @@ class NetworkListenerService {
                     port, 
                     version, 
                     name: source.name, 
-                    equipment_name: source.equipt_name 
+                    equipment_name: source.equipment_name || source.name 
                 });
                 await this._handleLogOutput(
                     source,
@@ -833,6 +841,8 @@ class NetworkListenerService {
                     'ups_netagent_snmp',
                     result.status || 'Disconnect'
                 );
+            } catch (err) {
+                console.error(`[UPS SNMP] Poll error ${name}:`, err.message);
                 throw err;
             } finally {
                 isPolling = false;
@@ -885,6 +895,7 @@ class NetworkListenerService {
                     result.status || 'Disconnect'
                 );
             } catch (err) {
+                console.error(`[PM5350] Poll error ${name}:`, err.message);
                 throw err;
             } finally {
                 isPolling = false;
@@ -941,7 +952,7 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[ioLogik] Poll error ${name}:`, err.message);
-                throw err; // Circuit Breaker tangkap ini
+                throw err;
             } finally {
                 isPolling = false;
             }
@@ -1355,7 +1366,6 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[DSE7320] Poll error ${name}:`, err.message);
-                // Teruskan pelemparan error agar Circuit Breaker menghitung kegagalan
                 throw err;
             } finally {
                 isPolling = false;

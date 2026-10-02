@@ -340,15 +340,17 @@ async function checkEquipmentWatchdog() {
                             return 'normal';
                         });
 
-                        if (lowerStatuses.some(s => s === 'warning')) {
-                            finalStatus = 'Warning';
-                        } else if (lowerStatuses.every(s => s === 'offline' || s === 'disconnect')) {
+                        if (lowerStatuses.every(s => s === 'offline' || s === 'disconnect')) {
                             if (lowerStatuses.some(s => s === 'offline')) {
-                                finalStatus = 'Offline';
+                                finalStatus = 'Alarm';
                             } else {
                                 finalStatus = 'Disconnect';
                             }
-                        } else if (lowerStatuses.some(s => s === 'offline' || s === 'disconnect')) {
+                        } else if (lowerStatuses.some(s => s === 'offline')) {
+                            finalStatus = 'Alarm';
+                        } else if (lowerStatuses.some(s => s === 'warning')) {
+                            finalStatus = 'Warning';
+                        } else if (lowerStatuses.some(s => s === 'disconnect')) {
                             finalStatus = 'Warning';
                         } else {
                             finalStatus = 'Normal';
