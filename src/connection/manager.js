@@ -30,10 +30,17 @@ class ConnectionManager {
             const socket = new net.Socket();
             socket.setTimeout(10000); // 10 second timeout
 
+            let isConnected = false;
+            let hasResolved = false;
+
             socket.connect(port, host, () => {
                 console.log(`[Connection] TCP connected to ${host}:${port} (equipment: ${equipmentId})`);
                 this.connections.set(equipmentId, { socket, type: 'tcp', host, port });
-                resolve(true);
+                isConnected = true;
+                if (!hasResolved) {
+                    hasResolved = true;
+                    resolve(true);
+                }
             });
 
             // Universal TCP stream buffer
@@ -118,12 +125,20 @@ class ConnectionManager {
 
             socket.on('error', (error) => {
                 console.error(`[Connection] TCP error for equipment ${equipmentId}:`, error.message);
+                if (!hasResolved) {
+                    hasResolved = true;
+                    resolve(false);
+                }
                 if (onError) onError(error);
             });
 
             socket.on('timeout', () => {
                 console.error(`[Connection] TCP timeout for equipment ${equipmentId}`);
                 socket.destroy();
+                if (!hasResolved) {
+                    hasResolved = true;
+                    resolve(false);
+                }
                 if (onError) onError(new Error('Connection timeout'));
             });
 

@@ -449,7 +449,6 @@ class NetworkListenerService {
         const parser = new ParserModule({ equipt_id });
 
         let socket = null;
-        let reconnectTimer = null;
         let stopped = false;
         let lastReceivedTime = 0;
 
@@ -490,11 +489,10 @@ class NetworkListenerService {
             });
 
             socket.on('close', () => {
-                this._logThrottled('log', `${moduleName}:close:${id}`, `[NetworkListener] ${moduleName} disconnected ${source.name}, retry in 15s`);
+                this._logThrottled('log', `${moduleName}:close:${id}`, `[NetworkListener] ${moduleName} disconnected ${source.name}, watchdog will restart listener`);
                 reportDisconnect('close');
                 this.activeListeners.delete(id);
                 parser.reset();
-                if (!stopped) reconnectTimer = setTimeout(connect, 15000);
             });
         };
 
@@ -538,7 +536,6 @@ class NetworkListenerService {
         this._modbusTcpCleanup = this._modbusTcpCleanup || new Map();
         this._modbusTcpCleanup.set(id, () => {
             stopped = true;
-            if (reconnectTimer) clearTimeout(reconnectTimer);
             if (pollTimer) clearInterval(pollTimer);
             if (socket) socket.destroy();
         });
@@ -570,7 +567,6 @@ class NetworkListenerService {
         console.log(`[LLZ-TRACE] startBinaryTcpListener called for ${name} (${ip_address}:${port}), hasTriggerProtocol=${hasTriggerProtocol}`);
 
         let socket = null;
-        let reconnectTimer = null;
         let stopped = false;
 
         const connect = () => {
@@ -637,12 +633,11 @@ class NetworkListenerService {
             });
 
             socket.on('close', () => {
-                this._logThrottled('log', `ils:close:${id}`, `[NetworkListener] ILS binary TCP disconnected ${name}, retry in 15s`);
+                this._logThrottled('log', `ils:close:${id}`, `[NetworkListener] ILS binary TCP disconnected ${name}, watchdog will restart listener`);
                 reportDisconnect('close');
                 if (pollTimer) clearInterval(pollTimer);
                 this.activeListeners.delete(id);
                 if (typeof parser.reset === 'function') parser.reset();
-                if (!stopped) reconnectTimer = setTimeout(connect, 15000);
             });
         };
 
@@ -651,7 +646,6 @@ class NetworkListenerService {
         this._binaryTcpCleanup = this._binaryTcpCleanup || new Map();
         this._binaryTcpCleanup.set(id, () => {
             stopped = true;
-            if (reconnectTimer) clearTimeout(reconnectTimer);
             if (socket) socket.destroy();
         });
 
@@ -1599,15 +1593,11 @@ class NetworkListenerService {
         const onError = (error) => {
             console.error(`[NetworkListener] Error for source ${source.name} (${id}):`, error.message);
 
-            // Auto-reconnect for TCP after 10s
+            // _pollDevices (watchdog) will auto-restart listeners missing from activeListeners
+            // Do NOT use setTimeout here to prevent exponential blowup!
             if (protocol === 'tcp') {
-                // Hapus dari activeListeners agar loop generasi ini berhenti
                 this.activeListeners.delete(id);
-                setTimeout(() => {
-                    console.log(`[NetworkListener] Reconnecting TCP for ${source.name}...`);
-                    if (parser && typeof parser.reset === 'function') parser.reset();
-                    this.startListener(source);
-                }, 10000);
+                if (parser && typeof parser.reset === 'function') parser.reset();
             }
         };
 
