@@ -11,14 +11,33 @@ dotenv.config();
 import ping from 'ping';
 
 // Global error handlers for better stability
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ [FATAL] Unhandled Rejection at:', promise, 'reason:', reason);
+const isNetworkError = (err: any) => {
+    if (!err) return false;
+    const msg = String(err.message || err).toLowerCase();
+    const code = String(err.code || '').toLowerCase();
+    return (
+        msg.includes('econnrefused') || code.includes('econnrefused') ||
+        msg.includes('etimedout') || code.includes('etimedout') ||
+        msg.includes('ehostunreach') || code.includes('ehostunreach') ||
+        msg.includes('timed out') || msg.includes('timeout') || msg.includes('socket hang up')
+    );
+};
+
+process.on('unhandledRejection', (reason: any, promise) => {
+    if (isNetworkError(reason)) {
+        console.warn(`⚠️ [WARN] Unhandled Network Rejection: ${reason.message || reason} (Ignored)`);
+    } else {
+        console.error('❌ [FATAL] Unhandled Rejection at:', promise, 'reason:', reason);
+    }
 });
 
-process.on('uncaughtException', (err) => {
-    console.error('❌ [FATAL] Uncaught Exception:', err);
-    // Kita tidak keluar (process.exit) agar PM2 tidak masuk ke restart loop yang terlalu cepat jika memungkinkan
-    // Namun biasanya uncaughtException sebaiknya exit. Kita biarkan PM2 yang menangani restart.
+process.on('uncaughtException', (err: any) => {
+    if (isNetworkError(err)) {
+        console.warn(`⚠️ [WARN] Uncaught Network Exception: ${err.message || err} (Ignored)`);
+    } else {
+        console.error('❌ [FATAL] Uncaught Exception:', err);
+    }
+    // Let PM2 handle restarts for true fatal errors, but we don't exit for network errors.
 });
 
 process.on('SIGINT', () => {

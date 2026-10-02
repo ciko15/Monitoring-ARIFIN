@@ -1,6 +1,6 @@
 'use strict';
 
-const ModbusRTU = require("modbus-serial");
+const { executeModbus } = require("../utils/modbus_wrapper");
 
 /**
  * Moxa ioLogik 4000 Modbus/TCP Parser
@@ -9,27 +9,24 @@ const ModbusRTU = require("modbus-serial");
  * Sesuai request:
  * - 1 = Normal
  * - 0 = Alarm
+ * Menggunakan modbus-serial wrapper untuk perlindungan.
  */
 
 async function pollIoLogik(host, port = 502, slaveId = 1, devicesConfig = null, timeoutMs = 4000) {
-    const client = new ModbusRTU();
+    let diData = [];
 
     try {
-        client.setTimeout(timeoutMs);
-        await client.connectTCP(host, { port: port });
-        client.setID(slaveId);
-
-        // Membaca input secara dinamis (mencoba hingga 48 bit) agar tidak timeout jika alat hanya punya 32 DI
-        let diData = [];
-        for (let i = 8; i <= 48; i += 8) {
-            try {
-                const res = await client.readDiscreteInputs(0, i);
-                diData = res.data;
-            } catch (e) {
-                break; // Stop jika mentok
+        await executeModbus({ host, port, type: 'tcp', slaveId, timeout: timeoutMs }, async (client) => {
+            // Membaca input secara dinamis (mencoba hingga 48 bit) agar tidak timeout jika alat hanya punya 32 DI
+            for (let i = 8; i <= 48; i += 8) {
+                try {
+                    const res = await client.readDiscreteInputs(0, i);
+                    diData = res.data;
+                } catch (e) {
+                    break; // Stop jika mentok
+                }
             }
-        }
-        client.close();
+        });
 
         if (diData.length === 0) {
             throw new Error('Failed to read any Discrete Inputs from device (Timeout or Refused)');

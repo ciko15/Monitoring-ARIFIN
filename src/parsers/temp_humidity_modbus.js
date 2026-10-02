@@ -1,11 +1,11 @@
 'use strict';
 
-const ModbusRTU = require("modbus-serial");
+const { executeModbus } = require("../utils/modbus_wrapper");
 
 /**
  * TempHumidity Modbus Parser
  * Membaca sensor Suhu & Kelembapan via RTU-over-TCP / Modbus TCP.
- * Mendukung konfigurasi Slave ID dari extra_config.
+ * Menggunakan modbus-serial wrapper untuk perlindungan unhandled rejection.
  */
 
 const WARN_TEMP  = 30.0;
@@ -15,54 +15,26 @@ const ALARM_TEMP = 35.0;
 const ipLocks = new Map();
 
 async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
-    // Validasi nilai default jika tidak ada parameter yang di-passing
     if (!port) port = 502;
     if (!slaveId) slaveId = 1;
 
-    // Delay acak / terstruktur berdasarkan ID untuk mencegah tabrakan data (Collision) 
-    // jika 2 sensor di-poll di milidetik yang sama pada 1 IP Modbus Gateway.
-    // Tunggu sampai IP ini sedang tidak di-poll oleh sensor lain (Antrian)
-    while (ipLocks.get(host)) {
-        await new Promise(r => setTimeout(r, 100));
-    }
-    // Kunci IP ini
-    ipLocks.set(host, true);
-
-    const client = new ModbusRTU();
-    
-    // Cegah Unhandled Rejection dari library modbus-serial jika koneksi terputus (ECONNREFUSED)
-    client.on('error', (err) => {
-        // Error akan ditangkap oleh try-catch di bawah, 
-        // tapi listener ini mencegah NodeJS crash (Unhandled Rejection)
-    });
-
     let tempC, humiP;
     try {
-        client.setTimeout(timeoutMs); 
-        
         try {
             // 1. Coba mode RAW RTU-over-TCP (seperti konfigurasi di Biak)
-            await client.connectTelnet(host, { port: port });
-            client.setID(slaveId);
-            const res = await client.readHoldingRegisters(0, 2);
-            tempC = (res.data[0] / 10.0);
-            humiP = (res.data[1] / 10.0);
-            client.close();
-        } catch (err) {
-            try { client.close(); } catch(e) {}
-            
-            // 2. Jika gagal karena CRC Error (Protocol Mismatch) atau Timeout, 
-            // otomatis coba mode Modbus TCP murni (seperti konfigurasi asli di Sentani)
-            if (err.message.includes('CRC') || err.message.includes('Timed out')) {
-                const tcpClient = new ModbusRTU();
-                tcpClient.setTimeout(timeoutMs);
-                
-                await tcpClient.connectTCP(host, { port: port });
-                tcpClient.setID(slaveId);
-                const res = await tcpClient.readHoldingRegisters(0, 2);
+            await executeModbus({ host, port, type: 'telnet', slaveId, timeout: timeoutMs }, async (client) => {
+                const res = await client.readHoldingRegisters(0, 2);
                 tempC = (res.data[0] / 10.0);
                 humiP = (res.data[1] / 10.0);
-                tcpClient.close();
+            });
+        } catch (err) {
+            // 2. Jika gagal, otomatis coba mode Modbus TCP murni (seperti konfigurasi asli di Sentani)
+            if (err.message.includes('CRC') || String(err.message).toLowerCase().includes('time')) {
+                await executeModbus({ host, port, type: 'tcp', slaveId, timeout: timeoutMs }, async (client) => {
+                    const res = await client.readHoldingRegisters(0, 2);
+                    tempC = (res.data[0] / 10.0);
+                    humiP = (res.data[1] / 10.0);
+                });
             } else {
                 throw err;
             }
@@ -105,7 +77,6 @@ async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
         };
 
     } catch (err) {
-        try { client.close(); } catch(e) {}
         return {
             success: false,
             status: 'Disconnect',
@@ -120,9 +91,6 @@ async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
             triggeredParams: [],
             timestamp: new Date().toISOString(),
         };
-    } finally {
-        // Selalu buka kunci IP saat selesai (berhasil ataupun error)
-        ipLocks.set(host, false);
     }
 }
 

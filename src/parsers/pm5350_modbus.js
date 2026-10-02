@@ -1,26 +1,23 @@
 'use strict';
 
-const ModbusRTU = require("modbus-serial");
+const { executeModbus } = require("../utils/modbus_wrapper");
 
 /**
  * PM5350 Modbus Parser
  * Schneider Electric PowerLogic PM5350
  * 
- * Melakukan polling data secara aktif menggunakan protokol RTU-over-TCP.
+ * Melakukan polling data secara aktif menggunakan protokol RTU-over-TCP dengan wrapper aman.
  */
 
 async function pollPM5350(host, port = 26, slaveId = 5, timeoutMs = 4000) {
-    const client = new ModbusRTU();
+    let result = null;
 
     try {
-        client.setTimeout(timeoutMs);
-        await client.connectTelnet(host, { port: port });
-        client.setID(slaveId);
-
-        // Fungsi khusus membaca Float32 dari 2 Register
-        async function readFloat32(addr) {
-            const res = await client.readHoldingRegisters(addr - 1, 2);
-            const buffer = Buffer.alloc(4);
+        result = await executeModbus({ host, port, type: 'telnet', slaveId, timeout: timeoutMs }, async (client) => {
+            // Fungsi khusus membaca Float32 dari 2 Register
+            async function readFloat32(addr) {
+                const res = await client.readHoldingRegisters(addr - 1, 2);
+                const buffer = Buffer.alloc(4);
             buffer.writeUInt16BE(res.buffer.readUInt16BE(0), 0);
             buffer.writeUInt16BE(res.buffer.readUInt16BE(2), 2);
             return buffer.readFloatBE(0);
@@ -61,8 +58,6 @@ async function pollPM5350(host, port = 26, slaveId = 5, timeoutMs = 4000) {
         if (PF > 1) PF = 1;
         if (PF < 0) PF = 0;
 
-        client.close();
-
         const alarms = [];
         const warnings = [];
         const triggeredParams = [];
@@ -94,9 +89,11 @@ async function pollPM5350(host, port = 26, slaveId = 5, timeoutMs = 4000) {
             triggeredParams,
             timestamp: new Date().toISOString(),
         };
+        });
+        
+        return result;
 
     } catch (err) {
-        try { client.close(); } catch (e) { }
         return {
             success: false,
             status: 'Disconnect',

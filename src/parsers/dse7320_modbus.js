@@ -1,11 +1,10 @@
 'use strict';
 
-const ModbusRTU = require("modbus-serial");
+const { executeModbus } = require("../utils/modbus_wrapper");
 
 /**
  * DSE7320 Modbus TCP Parser
- * Ditulis ulang menggunakan modbus-serial untuk menjaga satu koneksi terbuka (Keep-Alive)
- * Mencegah Modbus Gateway terkunci akibat connect/disconnect berulang kali secara cepat.
+ * Ditulis ulang menggunakan modbus-serial wrapper untuk menjaga koneksi dan mencegah unhandled rejection.
  */
 
 const PARAMS = [
@@ -27,37 +26,18 @@ const PARAMS = [
     { key: 'EarthCurrent', addr: 1082, scale: 0.1 }
 ];
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-// Mutex lock global per IP agar 2 request tidak tabrakan
-const ipLocks = new Map();
-
 async function pollDse7320(host, port = 502, slaveId = 10) {
     let parsedData = {};
     let hasValidData = false;
     const timeoutMs = 3000;
 
-    // Tunggu jika ada proses poll Modbus lain yang sedang jalan di IP ini
-    while (ipLocks.get(host)) {
-        await sleep(100);
-    }
-    ipLocks.set(host, true);
-
-    const client = new ModbusRTU();
-    
-    // Cegah Unhandled Rejection jika koneksi terputus
-    client.on('error', (err) => {});
-
     try {
-        client.setTimeout(timeoutMs);
-        await client.connectTCP(host, { port: port });
-        client.setID(slaveId);
-
-        // Ambil data dalam 1 siklus koneksi!
-        for (const p of PARAMS) {
-            try {
-                // Baca 2 Register (32-bit)
-                const res = await client.readHoldingRegisters(p.addr, 2);
+        await executeModbus({ host, port, type: 'tcp', slaveId, timeout: timeoutMs }, async (client) => {
+            // Ambil data dalam 1 siklus koneksi!
+            for (const p of PARAMS) {
+                try {
+                    // Baca 2 Register (32-bit)
+                    const res = await client.readHoldingRegisters(p.addr, 2);
                 if (res && res.data && res.data.length >= 2) {
                     const msw = res.data[0];
                     const lsw = res.data[1];
@@ -82,13 +62,10 @@ async function pollDse7320(host, port = 502, slaveId = 10) {
             // Jeda 50ms sangat kecil agar Modbus slave DSE tidak kewalahan
             await sleep(50);
         }
-        
-        client.close();
+    });
     } catch (e) {
-        if (client.isOpen) client.close();
-        console.error(`[DSE7320] Modbus error for ${host}: ${e.message}`);
-    } finally {
-        ipLocks.set(host, false);
+        // Biarkan ditangkap caller agar ditangani tanpa unhandled rejection
+        throw e;
     }
 
     if (!hasValidData) {
