@@ -330,6 +330,7 @@ class EquipmentService {
                         equipmentId,
                         equipment_name: equipName,
                         status: finalStatus,
+                        source_status: status, // Status spesifik dari source ini
                         data: { ...cache.mergedData },
                         source: sourceName,
                         source_id: sourceId,
@@ -354,6 +355,7 @@ class EquipmentService {
                         equipmentId,
                         equipment_name: equipName,
                         status: finalStatus,
+                        source_status: status, // Status spesifik dari source ini
                         data: { ...cache.mergedData },
                         source: sourceName,
                         source_id: sourceId,
