@@ -91,6 +91,61 @@ class NetworkListenerService {
         return false;
     }
 
+    /**
+     * Helper untuk Polling dengan Circuit Breaker & Jitter.
+     * @param {Object} options
+     * @param {string} options.id - equipment ID
+     * @param {string} options.name - equipment name
+     * @param {number} options.pollSec - interval dalam detik
+     * @param {Map} options.timersMap - map untuk menyimpan reference ke timer (misal: this._dseTimers)
+     * @param {Function} options.doPoll - fungsi async yang melempar error jika gagal
+     * @param {number} [options.maxFailures=3] - batas gagal berturut-turut
+     * @param {number} [options.backoffMs=120000] - lama jeda setelah trip (default 2 menit)
+     */
+    _startCircuitBreakerPolling({ id, name, pollSec, timersMap, doPoll, maxFailures = 3, backoffMs = 120000 }) {
+        let failureCount = 0;
+        let isTripped = false;
+        
+        const execute = async () => {
+            try {
+                await doPoll();
+                // Jika sukses tanpa error:
+                failureCount = 0;
+                if (isTripped) {
+                    console.log(`[CircuitBreaker] ${name} (${id}) is BACK ONLINE. Circuit CLOSED.`);
+                    isTripped = false;
+                }
+            } catch (err) {
+                failureCount++;
+                if (!isTripped && failureCount >= maxFailures) {
+                    isTripped = true;
+                    console.warn(`[CircuitBreaker] ${name} (${id}) failed ${failureCount}x. Circuit TRIPPED! Sleeping for ${backoffMs/1000}s.`);
+                    
+                    const currentTimer = timersMap.get(id);
+                    if (currentTimer) clearInterval(currentTimer);
+                    
+                    const backoffTimer = setTimeout(() => {
+                        console.log(`[CircuitBreaker] ${name} (${id}) backoff finished. Resuming polling...`);
+                        const newTimer = setInterval(execute, pollSec * 1000);
+                        timersMap.set(id, newTimer);
+                        execute();
+                    }, backoffMs);
+                    
+                    timersMap.set(id, backoffTimer);
+                }
+            }
+        };
+
+        const initialDelay = 1000 + Math.floor(Math.random() * 5000); // Jitter 1-6 detik
+        const startTimer = setTimeout(() => {
+            execute();
+            const timer = setInterval(execute, pollSec * 1000);
+            timersMap.set(id, timer);
+        }, initialDelay);
+        
+        timersMap.set(id, startTimer);
+    }
+
     async _handleLogOutput(source, parsedData, connectionType, initialStatus) {
         let statusToEvaluate = initialStatus;
         const initialLower = String(initialStatus || '').toLowerCase();
@@ -646,19 +701,20 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[TempHumidity] Poll error ${name}:`, err.message);
+                throw err; // Lempar untuk dihitung circuit breaker
             } finally {
                 isPolling = false;
             }
         };
 
-        const initialDelay = 1000 + Math.floor(Math.random() * 5000);
-        setTimeout(() => {
-            doPoll();
-            const timer = setInterval(doPoll, pollSec * 1000);
-
-            if (!this._tempHumidityTimers) this._tempHumidityTimers = new Map();
-            this._tempHumidityTimers.set(id, timer);
-        }, initialDelay);
+        if (!this._tempHumidityTimers) this._tempHumidityTimers = new Map();
+        this._startCircuitBreakerPolling({
+            id,
+            name,
+            pollSec,
+            timersMap: this._tempHumidityTimers,
+            doPoll
+        });
 
         // Cleanup handle
         this._tempHumidityCleanup = this._tempHumidityCleanup || new Map();
@@ -726,26 +782,20 @@ class NetworkListenerService {
                     source.parsing_id || 'snmp_system',
                     result.status || 'Disconnect'
                 );
-            } catch (err) {
-                console.error(`[SNMP System] Poll error ${name}:`, err.message);
+                throw err;
             } finally {
                 isPolling = false;
             }
         };
 
-        // Add random jitter (0 to 15 seconds) to prevent 'Thundering Herd'
-        // di mana puluhan server ditembak SNMP secara bersamaan yang membuat
-        // UDP packet terbuang (drop) oleh switch/buffer.
-        const jitterMs = Math.floor(Math.random() * 15000);
-        const initialDelay = 2000 + jitterMs;
-
-        setTimeout(() => {
-            doPoll();
-            const timer = setInterval(doPoll, pollSec * 1000);
-
-            if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
-            this._snmpSystemTimers.set(id, timer);
-        }, initialDelay);
+        if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
+        this._startCircuitBreakerPolling({
+            id,
+            name,
+            pollSec,
+            timersMap: this._snmpSystemTimers,
+            doPoll
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -783,21 +833,20 @@ class NetworkListenerService {
                     'ups_netagent_snmp',
                     result.status || 'Disconnect'
                 );
-            } catch (err) {
-                console.error(`[UPS SNMP] Poll error ${name}:`, err.message);
+                throw err;
             } finally {
                 isPolling = false;
             }
         };
 
-        const initialDelay = 1000 + Math.floor(Math.random() * 5000);
-        setTimeout(() => {
-            doPoll();
-            const timer = setInterval(doPoll, pollSec * 1000);
-
-            if (!this._upsNetagentTimers) this._upsNetagentTimers = new Map();
-            this._upsNetagentTimers.set(id, timer);
-        }, initialDelay);
+        if (!this._upsNetagentTimers) this._upsNetagentTimers = new Map();
+        this._startCircuitBreakerPolling({
+            id,
+            name,
+            pollSec,
+            timersMap: this._upsNetagentTimers,
+            doPoll
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -836,20 +885,20 @@ class NetworkListenerService {
                     result.status || 'Disconnect'
                 );
             } catch (err) {
-                console.error(`[PM5350] Poll error ${name}:`, err.message);
+                throw err;
             } finally {
                 isPolling = false;
             }
         };
 
-        const initialDelay = 1000 + Math.floor(Math.random() * 5000);
-        setTimeout(() => {
-            doPoll();
-            const timer = setInterval(doPoll, pollSec * 1000);
-
-            if (!this._pm5350Timers) this._pm5350Timers = new Map();
-            this._pm5350Timers.set(id, timer);
-        }, initialDelay);
+        if (!this._pm5350Timers) this._pm5350Timers = new Map();
+        this._startCircuitBreakerPolling({
+            id,
+            name,
+            pollSec,
+            timersMap: this._pm5350Timers,
+            doPoll
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -892,18 +941,20 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[ioLogik] Poll error ${name}:`, err.message);
+                throw err; // Circuit Breaker tangkap ini
             } finally {
                 isPolling = false;
             }
         };
 
-        const initialDelay = 1000 + Math.floor(Math.random() * 2000);
-        setTimeout(() => {
-            doPoll();
-            const timer = setInterval(doPoll, pollSec * 1000);
-            if (!this._iologikTimers) this._iologikTimers = new Map();
-            this._iologikTimers.set(id, timer);
-        }, initialDelay);
+        if (!this._iologikTimers) this._iologikTimers = new Map();
+        this._startCircuitBreakerPolling({
+            id,
+            name,
+            pollSec,
+            timersMap: this._iologikTimers,
+            doPoll
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1304,19 +1355,21 @@ class NetworkListenerService {
                 );
             } catch (err) {
                 console.error(`[DSE7320] Poll error ${name}:`, err.message);
+                // Teruskan pelemparan error agar Circuit Breaker menghitung kegagalan
+                throw err;
             } finally {
                 isPolling = false;
             }
         };
 
-        const initialDelay = 1000 + Math.floor(Math.random() * 2000);
-        setTimeout(() => {
-            doPoll();
-            const timer = setInterval(doPoll, pollSec * 1000);
-
-            if (!this._dseTimers) this._dseTimers = new Map();
-            this._dseTimers.set(id, timer);
-        }, initialDelay);
+        if (!this._dseTimers) this._dseTimers = new Map();
+        this._startCircuitBreakerPolling({
+            id,
+            name,
+            pollSec,
+            timersMap: this._dseTimers,
+            doPoll
+        });
     }
 
     _getParserModule(parsing_id) {
