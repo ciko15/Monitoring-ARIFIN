@@ -49,7 +49,7 @@ class ParserFactory {
                         moduleName = basename;
                     }
                 }
-            } catch(e) {
+            } catch (e) {
                 console.warn(`[ParserFactory] Error resolving custom parser ${moduleName}:`, e.message);
             }
         }
@@ -62,14 +62,14 @@ class ParserFactory {
                 const path = require('path');
                 // Security: Prevent path traversal by only taking the basename
                 const safeFileName = path.basename(parserFile);
-                
+
                 // Only allow .js files
                 if (!safeFileName.endsWith('.js')) {
                     throw new Error('Only .js parser files are allowed');
                 }
 
                 const absolutePath = path.resolve(__dirname, safeFileName);
-                
+
                 // Verify file exists before requiring
                 const fs = require('fs');
                 if (fs.existsSync(absolutePath)) {
@@ -92,7 +92,7 @@ class ParserFactory {
 
             case 'rcms':
                 return new RcmsParser(config);
-            
+
             case 'vhf_t6tv':
                 return new VhfT6tvParser(config);
 
@@ -104,20 +104,20 @@ class ParserFactory {
 
             case 'dme_mopah_binary':
                 return new DmeMopahBinaryParser(config);
-                
+
             case 'dme_maru_310_320':
                 return new DmeMaru310320Parser(config);
-            
+
             case 'asterix':
                 return new AsterixParser(config);
-            
+
             case 'snmp':
                 console.warn('[ParserFactory] SNMP uses SNMP service, not parser');
                 return null;
-            
+
             case 'snmp_host_resources_01':
                 return SnmpHostResourcesParser;
-            
+
             case 'temp_humidity_modbus':
                 return new TempHumidityParser(config);
 
@@ -129,7 +129,7 @@ class ParserFactory {
 
             case 'datakom_d700_modbus':
                 return new DatakomD700Parser(config);
-                
+
             case 'iologik_modbus':
                 const IoLogikModbusParser = require('./iologik_modbus');
                 return new IoLogikModbusParser(config);
@@ -151,14 +151,14 @@ class ParserFactory {
 
             case 'json':
                 return new JsonParser(config);
-            
+
             case 'universal_api':
                 return new UniversalApiParser(config);
-            
+
             case 'tcp':
             case 'udp':
                 return new RcmsParser(config);
-            
+
             default:
                 console.warn(`[ParserFactory] Unknown connection type: ${connectionType}`);
                 return null;
@@ -220,7 +220,7 @@ class JsonParser {
     parse(rawData) {
         try {
             let dataObj;
-            
+
             if (typeof rawData === 'string') {
                 const trimmed = rawData.trim();
 
@@ -244,19 +244,19 @@ class JsonParser {
 
             // Extract fields based on mappings
             const parsed = {};
-            
+
             for (const mapping of this.mappings) {
                 const value = this.getNestedValue(dataObj, mapping.json_path || mapping.name);
                 if (value !== undefined && value !== null) {
                     let finalValue = value;
-                    
+
                     // Apply divisor if specified
                     if (mapping.divisor && !isNaN(value)) {
                         finalValue = parseFloat((value / mapping.divisor).toFixed(2));
                     }
-                    
+
                     parsed[mapping.name] = finalValue;
-                    
+
                     if (mapping.unit) {
                         parsed[`${mapping.name}_unit`] = mapping.unit;
                     }
@@ -351,7 +351,7 @@ class JsonParser {
                     threshold: rule.value,
                     message: rule.message
                 };
-                
+
                 if (rule.severity === 'alarm') {
                     alarms.push(info);
                 } else {

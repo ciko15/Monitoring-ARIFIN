@@ -4044,22 +4044,29 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
             if (container) {
                 container.innerHTML = '';
                 
+                // Cari atau buat grup otomatis
+                let targetGroupDiv = document.querySelector('.univ-api-group-box');
+                if (!targetGroupDiv) {
+                    targetGroupDiv = window.addUnivApiGroup('Auto Generated');
+                }
+                const dropzone = targetGroupDiv.querySelector('.univ-api-group-dropzone');
+                
                 flatKeys.forEach(key => {
-                    // Karena sudah di-reset, semua key pasti masuk ke Available Fields
                     let defaultName = key.split('.').pop();
                     const pathParts = key.split('.');
                     if ((defaultName === 'value' || defaultName === 'string_value') && pathParts.length >= 2) {
                         defaultName = pathParts[pathParts.length - 2]; 
                     }
                     
-                    const row = createUnivApiMappingRow(key, defaultName, 1, false);
+                    // Set showInputs = true karena kita langsung menaruhnya di dalam group!
+                    const row = createUnivApiMappingRow(key, defaultName, 1, true);
                     
                     const filterTerm = document.getElementById('univApiFilter')?.value?.toLowerCase();
                     if (filterTerm && !key.toLowerCase().includes(filterTerm)) {
                         row.style.display = 'none';
                     }
                     
-                    container.appendChild(row);
+                    dropzone.appendChild(row);
                 });
             }
         } else {
