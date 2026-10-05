@@ -1,0 +1,1 @@
+[TAILING] Tailing last 100 lines for [0] process (change the value with --lines option)

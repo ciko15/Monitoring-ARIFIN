@@ -47,17 +47,17 @@ class UniversalApiParser extends BaseParser {
      */
     _parseJsonMapping(dataObj) {
         const parsed = {};
-        
+
         for (const mapping of this.mappings) {
             const value = this.getNestedValue(dataObj, mapping.json_path || mapping.name);
             if (value !== undefined && value !== null) {
                 let finalValue = value;
-                
+
                 // Apply divisor if specified
                 if (mapping.divisor && !isNaN(value)) {
                     finalValue = parseFloat((value / mapping.divisor).toFixed(2));
                 }
-                
+
                 if (mapping.group) {
                     if (!parsed[mapping.group]) {
                         parsed[mapping.group] = {};
@@ -113,10 +113,10 @@ class UniversalApiParser extends BaseParser {
             }
 
             const rawJson = await response.json();
-            
+
             // Map values
             const parsedData = this._parseJsonMapping(rawJson);
-            
+
             // Check alarms
             const alarmResult = this.checkAlarms(parsedData);
 
@@ -129,6 +129,7 @@ class UniversalApiParser extends BaseParser {
                 timestamp: new Date().toISOString()
             };
         } catch (error) {
+            console.error(`[Universal API] fetchApiData error for ${ip}:${port} - ${error.message}`);
             return {
                 success: false,
                 error: error.message,

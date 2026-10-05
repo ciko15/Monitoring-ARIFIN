@@ -26,10 +26,10 @@ async function checkIcmpPing(ip) {
     return new Promise(resolve => {
         const { exec } = require('child_process');
         const isWin = process.platform === 'win32';
-        
+
         // Windows: -n 1 (1 packet). Linux/Mac: -n (no DNS lookup, mencegah hang 20+ detik) -c 1 (1 packet)
         const cmd = isWin ? `ping -n 1 ${ip}` : `ping -n -c 1 ${ip}`;
-        
+
         // Tambahkan windowsHide: true agar tidak muncul popup CMD hitam di Windows
         const child = exec(cmd, { windowsHide: true }, (err, stdout, stderr) => {
             const result = !err;
@@ -39,7 +39,7 @@ async function checkIcmpPing(ip) {
 
         // Timeout di level Node.js jika ping menggantung
         setTimeout(() => {
-            try { child.kill(); } catch (e) {}
+            try { child.kill(); } catch (e) { }
             _pingCache.set(ip, { time: now, result: false });
             resolve(false);
         }, 3000);
@@ -105,7 +105,7 @@ class NetworkListenerService {
     _startCircuitBreakerPolling({ id, name, pollSec, timersMap, doPoll, maxFailures = 3, backoffMs = 120000 }) {
         let failureCount = 0;
         let isTripped = false;
-        
+
         const execute = async () => {
             try {
                 await doPoll();
@@ -119,18 +119,18 @@ class NetworkListenerService {
                 failureCount++;
                 if (!isTripped && failureCount >= maxFailures) {
                     isTripped = true;
-                    console.warn(`[CircuitBreaker] ${name} (${id}) failed ${failureCount}x. Circuit TRIPPED! Sleeping for ${backoffMs/1000}s.`);
-                    
+                    console.warn(`[CircuitBreaker] ${name} (${id}) failed ${failureCount}x. Circuit TRIPPED! Sleeping for ${backoffMs / 1000}s.`);
+
                     const currentTimer = timersMap.get(id);
                     if (currentTimer) clearInterval(currentTimer);
-                    
+
                     const backoffTimer = setTimeout(() => {
                         console.log(`[CircuitBreaker] ${name} (${id}) backoff finished. Resuming polling...`);
                         const newTimer = setInterval(execute, pollSec * 1000);
                         timersMap.set(id, newTimer);
                         execute();
                     }, backoffMs);
-                    
+
                     timersMap.set(id, backoffTimer);
                 }
             }
@@ -142,7 +142,7 @@ class NetworkListenerService {
             const timer = setInterval(execute, pollSec * 1000);
             timersMap.set(id, timer);
         }, initialDelay);
-        
+
         timersMap.set(id, startTimer);
     }
 
@@ -166,7 +166,7 @@ class NetworkListenerService {
 
         const decision = this.statusGate.evaluate(source, statusToEvaluate, {
             now: Date.now(),
-            confirmDisconnect: true, 
+            confirmDisconnect: true,
             connectionType
         });
 
@@ -188,7 +188,7 @@ class NetworkListenerService {
         // LKGV (Last Known Good Value) & Dash Conversion
         if (!this._lkgvCache) this._lkgvCache = new Map();
         const isDisconnect = String(finalStatus || '').toLowerCase() === 'disconnect' || String(finalStatus || '').toLowerCase() === 'error';
-        
+
         if (isFrozen) {
             // Jika sedang dibekukan (karena aslinya Disconnect tapi belum 2 menit), 
             // JANGAN simpan data kosong/putus-putus dari parser ke cache.
@@ -474,7 +474,7 @@ class NetworkListenerService {
             });
 
             const reportDisconnect = (reason) => {
-                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => {});
+                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
             };
 
             socket.on('error', (err) => {
@@ -618,7 +618,7 @@ class NetworkListenerService {
             });
 
             const reportDisconnect = (reason) => {
-                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => {});
+                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
             };
 
             socket.on('error', (err) => {
@@ -823,11 +823,11 @@ class NetworkListenerService {
             }
             isPolling = true;
             try {
-                const result = await pollUPSNetagent(ip_address, comm, { 
-                    port, 
-                    version, 
-                    name: source.name, 
-                    equipment_name: source.equipment_name || source.name 
+                const result = await pollUPSNetagent(ip_address, comm, {
+                    port,
+                    version,
+                    name: source.name,
+                    equipment_name: source.equipment_name || source.name
                 });
                 await this._handleLogOutput(
                     source,
@@ -1315,7 +1315,7 @@ class NetworkListenerService {
         const { id, equipt_id, ip_address, tcp_port, name, poll_interval, extra_config } = source;
         const pollSec = parseInt(poll_interval) || 5;
         const port = parseInt(tcp_port) || 502;
-        
+
         let slaveId = 10; // Default DSE7320 unit ID
         if (extra_config) {
             try {
@@ -1403,16 +1403,17 @@ class NetworkListenerService {
     async startHttpPullListener(source, parser) {
         const { id, name, ip_address, tcp_port, udp_port } = source;
         const port = tcp_port || udp_port || 80;
-        
+
         this.activeListeners.add(id);
         console.log(`[HTTP Pull] Listener started: ${name} (${ip_address}:${port})`);
 
         let isPolling = false;
-        
+
         // Use POLL_INTERVAL if available in parser config, otherwise default to 15 seconds
-        const pollIntervalMs = (parser.parserConfig && parser.parserConfig.poll_interval) 
-                                ? parseInt(parser.parserConfig.poll_interval) 
-                                : 15000;
+        let pollIntervalMs = (parser.parserConfig && parser.parserConfig.poll_interval)
+            ? parseInt(parser.parserConfig.poll_interval)
+            : 15000;
+        if (pollIntervalMs < 1000) pollIntervalMs *= 1000;
 
         const doPoll = async () => {
             if (isPolling || !this.activeListeners.has(id)) return;
@@ -1422,7 +1423,7 @@ class NetworkListenerService {
                 if (String(result.status || '').toLowerCase() === 'error') {
                     this._logThrottled('log', `http-pull:error:${id}`, `[HTTP Pull] ${name}: Error ${result.error}`, 30000);
                 }
-                
+
                 await this._handleLogOutput(
                     source,
                     { data: result.data, source: name, _ip: ip_address },
@@ -1441,7 +1442,7 @@ class NetworkListenerService {
         setTimeout(() => {
             doPoll();
             const timerId = setInterval(doPoll, pollIntervalMs);
-            
+
             // Store timer if we need to clean it up later (optional)
             if (!this._httpTimers) this._httpTimers = new Map();
             if (this._httpTimers.has(id)) clearInterval(this._httpTimers.get(id));
@@ -1777,7 +1778,7 @@ class NetworkListenerService {
                 for (const [id, timer] of this[mapName]) {
                     clearInterval(timer);
                     // Also clear timeout if any (some might be timeouts)
-                    clearTimeout(timer); 
+                    clearTimeout(timer);
                 }
                 this[mapName].clear();
             }

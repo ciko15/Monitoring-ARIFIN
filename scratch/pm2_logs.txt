@@ -1,0 +1,1 @@
+[TAILING] Tailing last 50 lines for [monitoring-arifin] process (change the value with --lines option)
