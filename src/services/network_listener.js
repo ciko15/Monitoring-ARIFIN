@@ -142,7 +142,7 @@ class NetworkListenerService {
             const timer = setInterval(execute, pollSec * 1000);
             timersMap.set(id, timer);
         }, initialDelay);
-
+        
         timersMap.set(id, startTimer);
     }
 

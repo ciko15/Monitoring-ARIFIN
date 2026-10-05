@@ -168,22 +168,20 @@ async function readSwitchTemperature(session, sysObjectID) {
 async function pollSNMP(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     try {
-        const [sysName, sysDescr, sysObjectID, sysContact, sysUpTime, sysLocation, ifNumber, ifDescrVbs, ifNameVbs, ifOperStatusVbs, ifInOctetsVbs, ifOutOctetsVbs, ifHCInOctetsVbs, ifHCOutOctetsVbs] = await Promise.all([
-            snmpGet(session, OID.sysName),
-            snmpGet(session, OID.sysDescr),
-            snmpGet(session, OID.sysObjectID),
-            snmpGet(session, OID.sysContact),
-            snmpGet(session, OID.sysUpTime),
-            snmpGet(session, OID.sysLocation),
-            snmpGet(session, OID.ifNumber),
-            snmpWalk(session, OID.ifDescr),
-            snmpWalk(session, OID.ifName),
-            snmpWalk(session, OID.ifOperStatus),
-            snmpWalk(session, OID.ifInOctets),
-            snmpWalk(session, OID.ifOutOctets),
-            snmpWalk(session, OID.ifHCInOctets),
-            snmpWalk(session, OID.ifHCOutOctets),
-        ]);
+        const sysName = await snmpGet(session, OID.sysName);
+        const sysDescr = await snmpGet(session, OID.sysDescr);
+        const sysObjectID = await snmpGet(session, OID.sysObjectID);
+        const sysContact = await snmpGet(session, OID.sysContact);
+        const sysUpTime = await snmpGet(session, OID.sysUpTime);
+        const sysLocation = await snmpGet(session, OID.sysLocation);
+        const ifNumber = await snmpGet(session, OID.ifNumber);
+        const ifDescrVbs = await snmpWalk(session, OID.ifDescr);
+        const ifNameVbs = await snmpWalk(session, OID.ifName);
+        const ifOperStatusVbs = await snmpWalk(session, OID.ifOperStatus);
+        const ifInOctetsVbs = await snmpWalk(session, OID.ifInOctets);
+        const ifOutOctetsVbs = await snmpWalk(session, OID.ifOutOctets);
+        const ifHCInOctetsVbs = await snmpWalk(session, OID.ifHCInOctets);
+        const ifHCOutOctetsVbs = await snmpWalk(session, OID.ifHCOutOctets);
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
@@ -333,7 +331,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 
 const lastKnownSnmpData = new Map();
 
-async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 15000) {
+async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 60000) {
     if (typeof options === 'number') {
         timeoutMs = options;
         options = {};
