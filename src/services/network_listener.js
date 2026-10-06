@@ -281,6 +281,13 @@ class NetworkListenerService {
      * Initialize listeners for all active equipment sources
      */
     async initialize() {
+        if (this._isInitializing) {
+            console.log('[NetworkListener] Already initializing, scheduling a reload...');
+            this._pendingReload = true;
+            return;
+        }
+        this._isInitializing = true;
+
         console.log('[NetworkListener] Initializing listeners...');
         this.stopAll();
 
@@ -312,6 +319,12 @@ class NetworkListenerService {
             console.log(`[NetworkListener] Finished initializing ${this.activeListeners.size} active listeners`);
         } catch (error) {
             console.error('[NetworkListener] Initialization error:', error);
+        } finally {
+            this._isInitializing = false;
+            if (this._pendingReload) {
+                this._pendingReload = false;
+                this.initialize();
+            }
         }
     }
 
