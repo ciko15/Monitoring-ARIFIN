@@ -3,7 +3,7 @@ const path = require('path');
 
 let interpreterPath = 'bun'; // default
 if (os.platform() === 'win32') {
-  interpreterPath = 'bun.cmd';
+  interpreterPath = 'bun';
 }
 
 const stabilityEnv = {

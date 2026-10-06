@@ -16,7 +16,7 @@ try {
 // Deteksi OS dan tentukan interpreter path
 let interpreterPath = 'bun'; // default
 if (os.platform() === 'win32') {
-  interpreterPath = 'bun.cmd';
+  interpreterPath = 'bun'; // PM2 will look for 'bun.exe' in PATH natively
 }
 
 const stabilityEnv = {
