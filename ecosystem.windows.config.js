@@ -1,3 +1,12 @@
+const os = require('os');
+const path = require('path');
+
+let interpreterPath = 'bun'; // default
+if (os.platform() === 'win32') {
+  const userHome = process.env.USERPROFILE || process.env.HOME;
+  interpreterPath = path.join(userHome, '.bun', 'bin', 'bun.exe');
+}
+
 const stabilityEnv = {
   EMS_ENABLED: process.env.EMS_ENABLED || 'true',
   EMS_PUBLISH_TIMEOUT_MS: process.env.EMS_PUBLISH_TIMEOUT_MS || 2000,
@@ -18,10 +27,9 @@ const stabilityEnv = {
 module.exports = {
   apps: [{
     name: 'monitoring-arifin',
-    script: 'bun',
-    args: ['src/server.ts'],
+    script: 'src/server.ts',
     cwd: './',
-    interpreter: 'none',
+    interpreter: interpreterPath,
     exec_mode: 'fork',
     instances: 1,
     autorestart: true,

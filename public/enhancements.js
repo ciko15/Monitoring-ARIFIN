@@ -2056,12 +2056,41 @@
         document.head.appendChild(style);
     }
 
+    // ── Global Connection Monitor ──────────────────────────────────────────────
+    let _connectionFails = 0;
+    let _connCheckInterval = null;
+
+    function initConnectionMonitor() {
+        if (_connCheckInterval) clearInterval(_connCheckInterval);
+        _connCheckInterval = setInterval(async () => {
+            try {
+                // Ping endpoint to check backend health
+                const res = await _origFetch('/api/test-chain');
+                if (res.ok) {
+                    _connectionFails = 0;
+                    const overlay = document.getElementById('globalConnectionOverlay');
+                    if (overlay) overlay.style.display = 'none';
+                } else {
+                    throw new Error('Server returned ' + res.status);
+                }
+            } catch (e) {
+                _connectionFails++;
+                // If failed 2 times (10 seconds total disconnected), show overlay
+                if (_connectionFails >= 2) {
+                    const overlay = document.getElementById('globalConnectionOverlay');
+                    if (overlay) overlay.style.display = 'flex';
+                }
+            }
+        }, 5000); // Check every 5 seconds
+    }
+
     // ── INIT ──────────────────────────────────────────────────────────────────
     function init() {
         addStyles();
         initClosePanel();
         loadTemplates();   // Load templates for schemas
         loadLimitations(); // Load dynamic limits
+        initConnectionMonitor(); // Start checking server health
         waitForGrid(() => {
             observeGrid();
         });

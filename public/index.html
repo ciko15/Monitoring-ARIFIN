@@ -2137,6 +2137,14 @@
     </div>
   </div>
 
+  <!-- Server Disconnect Overlay -->
+  <div id="globalConnectionOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 999999; flex-direction: column; justify-content: center; align-items: center; color: white; backdrop-filter: blur(5px);">
+    <i class="fas fa-plug-circle-xmark fa-5x" style="color: #ef4444; margin-bottom: 20px;"></i>
+    <h1 style="font-size: 2.5rem; margin-bottom: 10px; font-weight: 600;">Server Terputus</h1>
+    <p style="font-size: 1.2rem; color: #cbd5e1; margin-bottom: 30px;">Koneksi ke backend monitoring terputus. Mencoba menghubungkan kembali...</p>
+    <i class="fas fa-circle-notch fa-spin fa-3x" style="color: #3b82f6;"></i>
+  </div>
+
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
