@@ -54,7 +54,7 @@ module.exports = {
     autorestart: true,
     watch: false,
     ignore_watch: ["data", "logs", "db", "*.sqlite", "*.log", "node_modules"],
-    max_memory_restart: '1G',
+    max_memory_restart: '2G',
     env: {
       NODE_ENV: 'production',
       PORT: process.env.PORT || 3100,
@@ -107,10 +107,10 @@ module.exports = {
       RABBITMQ_VHOST: process.env.RABBITMQ_VHOST || '/',
       ...stabilityEnv
     },
-    error_file: '/dev/null',
-    out_file: '/dev/null',
-    log_file: '/dev/null',
-    merge_logs: false,
+    error_file: 'logs/pm2-error.log',
+    out_file: 'logs/pm2-out.log',
+    log_file: 'logs/pm2-combined.log',
+    merge_logs: true,
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     time: true,
     // Restart aplikasi jika crash

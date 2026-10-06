@@ -27,7 +27,7 @@ module.exports = {
     autorestart: true,
     watch: false,
     ignore_watch: ["data", "logs", "db", "*.sqlite", "*.log", "node_modules"],
-    max_memory_restart: '1G',
+    max_memory_restart: '2G',
     env: {
       NODE_ENV: 'production',
       PORT: process.env.PORT || 3100,
@@ -79,10 +79,10 @@ module.exports = {
       ...stabilityEnv
     },
     // Menggunakan path relatif agar aman di Windows
-    error_file: 'NUL',
-    out_file: 'NUL',
-    log_file: 'NUL',
-    merge_logs: false,
+    error_file: 'logs/pm2-error.log',
+    out_file: 'logs/pm2-out.log',
+    log_file: 'logs/pm2-combined.log',
+    merge_logs: true,
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     time: true,
     max_restarts: 10,
