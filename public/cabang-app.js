@@ -285,7 +285,8 @@ const cabangModule = (function () {
     if (!window.normalizeSourceStatus) {
       window.normalizeSourceStatus = function (rawStatus) {
         const s = String(rawStatus || '').toLowerCase();
-        if (s === 'alarm' || s === 'alert' || s === 'fail' || s === 'critical' || s === 'offline') return 'Offline';
+        if (s === 'offline' || s === 'fail' || s === 'critical') return 'Offline';
+        if (s === 'alarm' || s === 'alert') return 'Alarm';
         if (s === 'warning') return 'Warning';
         if (s === 'disconnect') return 'Disconnect';
         return 'Normal';
