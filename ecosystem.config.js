@@ -14,16 +14,9 @@ try {
 }
 
 // Deteksi OS dan tentukan interpreter path
-let interpreterPath = 'bun'; // default, gunakan bun dari PATH
-
+let interpreterPath = 'bun'; // default
 if (os.platform() === 'win32') {
-  // Windows: gunakan full path ke bun.exe
-  const userHome = process.env.USERPROFILE || process.env.HOME;
-  interpreterPath = path.join(userHome, '.bun', 'bin', 'bun.exe');
-} else if (os.platform() === 'darwin') {
-  // macOS: gunakan full path ke bun
-  const userHome = process.env.HOME;
-  interpreterPath = path.join(userHome, '.bun', 'bin', 'bun');
+  interpreterPath = 'bun.cmd';
 }
 
 const stabilityEnv = {
