@@ -1830,7 +1830,7 @@
     // Hook into existing data refresh
     const _origFetch = window.fetch;
     window.fetch = function (url, opts) {
-        return _origFetch(url, opts).then(res => {
+        return _origFetch.call(window, url, opts).then(res => {
             const clone = res.clone();
             if (typeof url === 'string' && url.includes('/api/equipment') && !url.includes('otentication')) {
                 clone.json().then(data => {
@@ -2065,7 +2065,7 @@
         _connCheckInterval = setInterval(async () => {
             try {
                 // Ping endpoint to check backend health
-                const res = await _origFetch('/api/test-chain');
+                const res = await _origFetch.call(window, '/api/test-chain');
                 if (res.ok) {
                     _connectionFails = 0;
                     const overlay = document.getElementById('globalConnectionOverlay');
