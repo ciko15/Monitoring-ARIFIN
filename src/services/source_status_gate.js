@@ -106,14 +106,14 @@ class SourceStatusGate {
             this.states.set(key, state);
         }
 
-        if (normalizedStatus === 'Disconnect') {
+        if (normalizedStatus === 'Disconnect' || normalizedStatus === 'Offline') {
             state.failCount += 1;
             state.successCount = 0;
 
             // If it never succeeded, calculate time since the state was created (startup)
             const timeSinceLastSuccess = state.lastSuccessAt ? (now - state.lastSuccessAt) : (now - state.lastStatusChangedAt);
 
-            if (confirmDisconnect && state.status !== null && state.status !== 'Disconnect' && timeSinceLastSuccess < 120000) {
+            if (confirmDisconnect && state.status !== null && state.status !== 'Disconnect' && state.status !== 'Offline' && timeSinceLastSuccess < 120000) {
                 return {
                     shouldEmit: false,
                     status: state.status || 'Warning',
@@ -122,16 +122,16 @@ class SourceStatusGate {
                 };
             }
 
-            const wasDisconnect = state.status === 'Disconnect';
-            if (!wasDisconnect) {
-                state.status = 'Disconnect';
+            const wasDead = state.status === 'Disconnect' || state.status === 'Offline';
+            if (!wasDead || state.status !== normalizedStatus) {
+                state.status = normalizedStatus;
                 state.lastStatusChangedAt = now;
                 state.lastDisconnectSentAt = now;
                 state.lastTelemetrySentAt = now;
 
                 return {
                     shouldEmit: true,
-                    status: 'Disconnect',
+                    status: normalizedStatus,
                     reason: 'disconnect-transition',
                     state
                 };
@@ -143,7 +143,7 @@ class SourceStatusGate {
 
                 return {
                     shouldEmit: true,
-                    status: 'Disconnect',
+                    status: normalizedStatus,
                     reason: 'disconnect-heartbeat',
                     state
                 };
@@ -151,7 +151,7 @@ class SourceStatusGate {
 
             return {
                 shouldEmit: false,
-                status: 'Disconnect',
+                status: normalizedStatus,
                 reason: 'disconnect-throttled',
                 state
             };
@@ -161,7 +161,7 @@ class SourceStatusGate {
         state.successCount += 1;
         state.lastSuccessAt = now;
 
-        if (state.status === 'Disconnect' && state.successCount < this.recoveryCountToNormal) {
+        if ((state.status === 'Disconnect' || state.status === 'Offline') && state.successCount < this.recoveryCountToNormal) {
             return {
                 shouldEmit: false,
                 status: state.status,

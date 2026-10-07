@@ -313,6 +313,18 @@ class EquipmentService {
             // kita harus selalu melakukan merge agar EMS/DB menerima garis putus-putus tersebut
             // setelah threshold 2 menit terlewati.
             cache.mergedData = deepMerge({}, cache.mergedData, (parsedData.data || {}));
+            
+            // BUGFIX: Jika statusnya Offline/Disconnect tapi network_listener gagal mengirimkan dashData 
+            // (misal karena _lkgvCache kosong saat baru restart), paksa ubah cache.mergedData menjadi '-'
+            const isDead = String(finalStatus || '').toLowerCase() === 'disconnect' || String(finalStatus || '').toLowerCase() === 'offline' || String(finalStatus || '').toLowerCase() === 'error';
+            if (isDead) {
+                for (const key of Object.keys(cache.mergedData)) {
+                    if (key !== 'connectivity' && key !== 'source_name' && !key.startsWith('_')) {
+                        cache.mergedData[key] = '—';
+                    }
+                }
+                cache.mergedData.connectivity = 'Disconnected';
+            }
 
             // Injeksi source_name selalu, meskipun statusnya Disconnect, agar nama baru tetap terkirim ke EMS
             if (parsedData.source_name) {
