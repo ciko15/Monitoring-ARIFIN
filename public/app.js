@@ -4038,22 +4038,36 @@ document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async 
                 }
                 // Hapus semua parameter dari dalam grup (kembali kosong)
                 existingItems.forEach(r => r.remove());
+                
+                // Hapus juga box group custom agar bersih sebelum auto-generate
+                const customGroups = document.querySelectorAll('.univ-api-group-box');
+                customGroups.forEach(g => g.remove());
             }
 
             const flatKeys = flattenObjectKeys(data.data);
             if (container) {
                 container.innerHTML = '';
                 
-                // Cari atau buat grup otomatis
-                let targetGroupDiv = document.querySelector('.univ-api-group-box');
-                if (!targetGroupDiv) {
-                    targetGroupDiv = window.addUnivApiGroup('Auto Generated');
-                }
-                const dropzone = targetGroupDiv.querySelector('.univ-api-group-dropzone');
+                const groupMap = {};
                 
                 flatKeys.forEach(key => {
-                    let defaultName = key.split('.').pop();
                     const pathParts = key.split('.');
+                    
+                    // Intelligent Grouping: Gunakan top-level object key sebagai nama grup
+                    let groupName = 'General';
+                    if (pathParts.length > 1) {
+                        // Contoh: "system.cpu.temp" -> "System"
+                        groupName = pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1);
+                        groupName = groupName.replace(/_/g, ' ');
+                    }
+                    
+                    if (!groupMap[groupName]) {
+                        const box = window.addUnivApiGroup(groupName);
+                        groupMap[groupName] = box.querySelector('.univ-api-group-dropzone');
+                    }
+                    const dropzone = groupMap[groupName];
+                    
+                    let defaultName = pathParts[pathParts.length - 1];
                     if ((defaultName === 'value' || defaultName === 'string_value') && pathParts.length >= 2) {
                         defaultName = pathParts[pathParts.length - 2]; 
                     }
