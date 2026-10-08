@@ -89,22 +89,35 @@ function snmpGetAll(session, oids) {
 }
 
 async function snmpGetAllChunked(session, oids, chunkSize = 5) {
-    const results = [];
+    const chunkPromises = [];
+    
     for (let i = 0; i < oids.length; i += chunkSize) {
         const chunk = oids.slice(i, i + chunkSize);
-        let chunkResults = await snmpGetAll(session, chunk);
         
-        // JIKA GAGAL (karena SNMPv1 noSuchName pada salah satu OID di dalam chunk),
-        // fallback ke individual GET agar OID yang valid tetap terbaca (misal UPS 1-Phase tidak punya Phase S & T)
-        if (chunkResults.every(r => r === null)) {
-            chunkResults = [];
-            for (const oid of chunk) {
-                chunkResults.push(await snmpGet(session, oid));
+        const chunkPromise = (async () => {
+            let chunkResults = await snmpGetAll(session, chunk);
+            
+            // JIKA GAGAL (karena SNMPv1 noSuchName pada salah satu OID di dalam chunk),
+            // fallback ke individual GET secara paralel agar OID yang valid tetap terbaca
+            if (chunkResults.every(r => r === null)) {
+                const fallbackPromises = chunk.map(oid => snmpGet(session, oid));
+                chunkResults = await Promise.all(fallbackPromises);
             }
-        }
+            return chunkResults;
+        })();
         
-        results.push(...chunkResults);
+        chunkPromises.push(chunkPromise);
     }
+    
+    // Tunggu semua chunk selesai secara paralel
+    const resolvedChunks = await Promise.all(chunkPromises);
+    
+    // Gabungkan hasilnya menjadi satu array flat
+    const results = [];
+    for (const res of resolvedChunks) {
+        results.push(...res);
+    }
+    
     return results;
 }
 
