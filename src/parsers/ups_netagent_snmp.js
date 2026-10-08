@@ -155,44 +155,8 @@ async function pollUPSNetagent(host, community = 'public', options = {}) {
         const warnings = [];
         const triggeredParams = [];
 
-        // Evaluasi Baterai
-        if (chargeRemaining !== null) {
-            if (chargeRemaining < 30) {
-                status = 'Alarm';
-                alarms.push('Kapasitas Baterai Sangat Rendah (<30%)');
-                triggeredParams.push('battery_capacity');
-            } else if (chargeRemaining <= 50) {
-                if (status !== 'Alarm') status = 'Warning';
-                warnings.push('Kapasitas Baterai Menengah (<=50%)');
-                triggeredParams.push('battery_capacity');
-            }
-        }
-        
-        if (batteryStatusRaw === 3 || batteryStatusRaw === 4) { // Low atau Depleted
-            status = 'Alarm';
-            alarms.push('Status Baterai Lemah/Kosong (Low/Depleted)');
-            triggeredParams.push('battery_status');
-        }
-
-        // Evaluasi Input Tegangan (asumsi mati lampu jika input < 150V)
-        const avgInputVoltage = (inputVoltageR !== null) ? inputVoltageR : 0; // Deteksi drop di Phase R
-        if (inputVoltageR !== null && inputVoltageR < 150) {
-            status = 'Alarm';
-            alarms.push('Listrik Input Mati / Drop (On Battery)');
-            triggeredParams.push('input_voltage_r');
-        }
-
-        // Evaluasi Load Beban
-        const maxLoad = Math.max(outputPercentLoadR || 0, outputPercentLoadS || 0, outputPercentLoadT || 0);
-        if (maxLoad > 90) {
-            status = 'Alarm';
-            alarms.push('Beban UPS Overload (>90%)');
-            triggeredParams.push('output_load_percent');
-        } else if (maxLoad > 80) {
-            if (status !== 'Alarm') status = 'Warning';
-            warnings.push('Beban UPS Tinggi (>80%)');
-            triggeredParams.push('output_load_percent');
-        }
+        // Evaluasi Status Hardcoded Dihapus
+        // Sesuai permintaan user, fitur Alarm akan ditangani oleh sistem Alarm Limit di aplikasi (bukan dari parser)
 
         // Map status baterai ke teks string
         let batteryStatusStr = 'Unknown';
