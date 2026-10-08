@@ -135,7 +135,10 @@ class NetworkMonitor {
    */
   async pingHost(host, count = 4) {
     try {
-      const timeout = process.platform === 'win32' ? '-w 2000' : '-W 2000';
+      let timeout = '-W 2'; // Default Linux uses seconds for -W
+      if (process.platform === 'win32') timeout = '-w 2000';
+      else if (process.platform === 'darwin') timeout = '-W 2000'; // macOS uses ms
+      
       const countFlag = process.platform === 'win32' ? `-n ${count}` : `-c ${count}`;
       const cmd = `ping ${timeout} ${countFlag} ${host}`;
 

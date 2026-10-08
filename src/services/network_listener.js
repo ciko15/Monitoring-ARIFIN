@@ -105,8 +105,11 @@ class NetworkListenerService {
     _startCircuitBreakerPolling({ id, name, pollSec, timersMap, doPoll, maxFailures = 3, backoffMs = 120000 }) {
         let failureCount = 0;
         let isTripped = false;
+        let isExecuting = false;
 
         const execute = async () => {
+            if (isExecuting) return;
+            isExecuting = true;
             try {
                 await doPoll();
                 // Jika sukses tanpa error:
@@ -133,6 +136,8 @@ class NetworkListenerService {
 
                     timersMap.set(id, backoffTimer);
                 }
+            } finally {
+                isExecuting = false;
             }
         };
 
