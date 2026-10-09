@@ -54,7 +54,8 @@ function decodeCat034(data, radarName, radarLat, radarLon) {
             time_of_day: '—',
             sector_number: '—',
             antenna_rotation: '—',
-            system_config: '—'
+            system_config: '—',
+            system_status: 'Normal' // Jamming, Overload, dll
         };
 
         // Read fields based on FSPEC
@@ -91,12 +92,29 @@ function decodeCat034(data, radarName, radarLat, radarLon) {
                 // I034/050 - System Configuration and Status (Variable)
                 let ext = true;
                 let statusVal = [];
+                let byteIdx = 0;
+                let malfunctions = [];
+                
                 while (ext && offset < data.length) {
-                    statusVal.push(data[offset].toString(16).padStart(2,'0'));
-                    ext = (data[offset] & 0x01) !== 0;
+                    let b = data[offset];
+                    statusVal.push(b.toString(16).padStart(2,'0'));
+                    
+                    // Decode System Status (berdasarkan ASTERIX Eurocontrol)
+                    if (byteIdx === 0) {
+                        if (b & 0x80) malfunctions.push('COM Fail');
+                        if (b & 0x40) malfunctions.push('STAT Fail');
+                        if (b & 0x02) malfunctions.push('OVERLOAD'); // OVL bit
+                    } else if (byteIdx === 1) {
+                        if (b & 0x02) malfunctions.push('JAMMING'); // JMM bit
+                        if (b & 0x08) malfunctions.push('Time Sync Fail');
+                    }
+                    
+                    ext = (b & 0x01) !== 0;
                     offset += 1;
+                    byteIdx++;
                 }
                 result.system_config = `0x${statusVal.join('')}`;
+                result.system_status = malfunctions.length > 0 ? malfunctions.join(', ') : 'Normal';
             } else if (item === 7) {
                 // I034/060 - System Processing Mode (Variable)
                 let ext = true;
@@ -145,6 +163,10 @@ class AsterixRadarParser extends BaseParser {
         this._lastData  = null;
         this._lastSeen  = null;
         this._connected = false;
+        
+        // Simpan jumlah pesawat dari CAT048
+        this._lastTargetCount = 0;
+        this._lastCat048Time = null;
     }
 
     /**
@@ -160,9 +182,23 @@ class AsterixRadarParser extends BaseParser {
         const isStale = this._lastSeen && (Date.now() - this._lastSeen) > this._timeout;
         this._connected = !isStale;
 
-        // Proses hanya CAT034
+        // Proses CAT048 (Target Reports)
+        if (rawData[0] === 48) {
+            this._lastCat048Time = new Date().toISOString();
+            
+            // Estimasi heuristik jumlah pesawat berdasarkan ukuran paket
+            // (Karena struktur CAT048 sangat dinamis, 1 target rata-rata = ~22-30 bytes)
+            const totalLength = (rawData[1] << 8) | rawData[2];
+            const estimatedTargets = Math.max(1, Math.floor((totalLength - 3) / 25));
+            this._lastTargetCount = estimatedTargets;
+            
+            // Return last state (CAT034) dengan update target_count terbaru
+            return this._buildResult();
+        }
+
+        // Proses hanya CAT034 (Status Radar)
         if (rawData[0] !== 34) {
-            // Bukan CAT034 — update last seen tapi return last state
+            // Bukan CAT034 / 048 — abaikan
             return this._buildResult();
         }
 
@@ -177,6 +213,7 @@ class AsterixRadarParser extends BaseParser {
             if (decoded.time_of_day === '—') decoded.time_of_day = this._lastData.time_of_day;
             if (decoded.sector_number === '—') decoded.sector_number = this._lastData.sector_number;
             if (decoded.system_config === '—') decoded.system_config = this._lastData.system_config;
+            if (decoded.system_status === 'Normal') decoded.system_status = this._lastData.system_status;
         }
 
         this._lastData  = decoded;
@@ -207,9 +244,12 @@ class AsterixRadarParser extends BaseParser {
                 sector_number: this._lastData && this._lastData.sector_number !== null ? String(this._lastData.sector_number) : '—',
                 antenna_rotation: this._lastData ? this._lastData.antenna_rotation : '—',
                 system_config: this._lastData ? this._lastData.system_config : '—',
+                system_status: this._lastData ? this._lastData.system_status : 'Normal', // Menampilkan Overload/Jamming
                 lat:           String(this._lat),
                 lon:           String(this._lon),
                 last_cat034:   this._lastData ? this._lastData.last_cat034 : '—',
+                target_count:  String(this._lastTargetCount || 0), // Jumlah pesawat dari CAT 048
+                last_cat048:   this._lastCat048Time || '—',
                 data_source:   this._lastData ? this._lastData.data_source : '—'
             },
             alarms:          [],

@@ -32,6 +32,7 @@ const ADSB_SAC_SIC = {
     'Wamena':    { sac: 32, sic: 164 },
     'Kaimana':   { sac: 32, sic: 180 },
     'Manokwari': { sac: 32, sic: 179 },
+    'Surabaya':  { sac: 32, sic: 157 }, // Ditambahkan dari file adsb sby.pcapng
 };
 
 // Reverse lookup SIC → station name
@@ -40,16 +41,51 @@ for (const [name, ids] of Object.entries(ADSB_SAC_SIC)) {
     SIC_TO_STATION[ids.sic] = name;
 }
 
-// ── CAT021 Decoder ────────────────────────────────────────────────────────────
+// ── CAT021 Decoder (Custom Heuristic) ─────────────────────────────────────────
 function decodeCat021(data) {
     try {
-        if (!data || data[0] !== 21) return null;
-        if (data.length < 8) return null;
+        if (!data || data.length < 8) return null;
+        if (data[0] !== 21) return null; // Hanya proses ASTERIX CAT 021
 
-        const sac = data[6];
-        const sic = data[7];
+        const totalLength = (data[1] << 8) | data[2];
+        if (data.length < totalLength || totalLength < 4) return null;
 
-        return { sac, sic };
+        // 1. Baca FSPEC dari record pertama untuk mendapatkan offset SAC & SIC yang benar
+        let fspecLen = 0;
+        let offset = 3;
+        while (offset < data.length) {
+            let f = data[offset];
+            fspecLen++;
+            offset++;
+            if ((f & 0x01) === 0) break; // End of FSPEC (bit FX = 0)
+            if (fspecLen > 7) break;     // Safety limit
+        }
+
+        let sac = 0, sic = 0;
+        // Data Source ID (SAC/SIC) ada jika bit pertama dari FSPEC byte 1 adalah 1 (0x80)
+        if (data[3] & 0x80) {
+            sac = data[3 + fspecLen];
+            sic = data[3 + fspecLen + 1];
+        }
+
+        // 2. Heuristic sederhana untuk menghitung target unik (ICAO Address Indonesia: 8Axxxx)
+        // Karena struktur ASTERIX dinamis, kita lakukan scanning byte yang aman
+        let targets = new Set();
+        for (let i = 4; i < totalLength - 2; i++) {
+            if (data[i] === 0x8A) {
+                // Kemungkinan besar ICAO Address wilayah Indonesia
+                let hex = (data[i].toString(16) + 
+                           data[i+1].toString(16).padStart(2, '0') + 
+                           data[i+2].toString(16).padStart(2, '0')).toUpperCase();
+                targets.add(hex);
+            }
+        }
+
+        return { 
+            sac, 
+            sic,
+            targets: Array.from(targets)
+        };
     } catch (e) {
         return null;
     }
@@ -116,6 +152,8 @@ class AsterixAdsbParser extends BaseParser {
             lon:             this._lon,
             last_cat021:     new Date().toISOString(),
             data_source:     'asterix_cat021',
+            target_count:    decoded.targets.length,
+            targets:         decoded.targets
         };
 
         return this._buildResult();
@@ -142,6 +180,8 @@ class AsterixAdsbParser extends BaseParser {
                 multicast_port:  String(this._mcastPort),
                 lat:             this._lastData ? String(this._lastData.lat) : String(this._lat),
                 lon:             this._lastData ? String(this._lastData.lon) : String(this._lon),
+                target_count:    this._lastData ? String(this._lastData.target_count) : '0',
+                targets_list:    this._lastData ? this._lastData.targets.join(', ') : '',
                 last_cat021:     this._lastData ? this._lastData.last_cat021 : '—',
                 data_source:     'asterix_cat021',
             },
