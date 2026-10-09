@@ -145,6 +145,7 @@ class ConnectionManager {
             socket.on('close', () => {
                 console.log(`[Connection] TCP disconnected for equipment ${equipmentId}`);
                 this.connections.delete(equipmentId);
+                if (onError) onError(new Error('Connection closed by remote host'));
             });
         });
     }
