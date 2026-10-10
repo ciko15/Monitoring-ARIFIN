@@ -1642,19 +1642,32 @@
             //     ]
             // });
         } else if (parserId === 'ote_dtr100') {
-            const isTx = data._mode && data.forward_power_w !== undefined;
-            sections.push({
-                title: 'Transmitter Parameters',
-                params: [
-                    ['MODE', data._mode || 'ACTIVE', '#00ffcc'],
-                    ['STATUS', data._status || 'Normal', data._status === 'FAULT' ? '#ff3355' : '#00d4ff'],
-                    ['FREQUENCY', data.frequency_mhz !== undefined ? `${data.frequency_mhz.toFixed(3)} MHz` : '—', '#5a8aaa'],
-                    ['OUTPUT POWER', data.forward_power_w !== undefined ? `${data.forward_power_w} W` : '—', '#3a6a8a'],
-                    ['VSWR', data.vswr !== undefined ? data.vswr : '—', data.vswr > 1.5 ? '#ff3355' : '#a0c8e8'],
-                    ['SQUELCH', data.squelch_dbm !== undefined ? `${data.squelch_dbm} dBm` : '—', '#3a6a8a'],
-                    ['SUPPLY VOLTAGE', data.supply_voltage_v !== undefined ? `${data.supply_voltage_v.toFixed(2)} V` : '—', '#a0c8e8']
-                ]
-            });
+            const isTx = data.forward_power_w !== undefined || String(srcName).toUpperCase().includes('TX');
+            if (isTx) {
+                sections.push({
+                    title: 'Transmitter Parameters',
+                    params: [
+                        ['MODE', data._mode || 'ACTIVE', '#00ffcc'],
+                        ['STATUS', data._status || 'Normal', data._status === 'FAULT' ? '#ff3355' : '#00d4ff'],
+                        ['FREQUENCY', data.frequency_mhz !== undefined ? `${data.frequency_mhz.toFixed(3)} MHz` : '—', '#5a8aaa'],
+                        ['OUTPUT POWER', data.forward_power_w !== undefined ? `${data.forward_power_w} W` : '—', '#3a6a8a'],
+                        ['VSWR', data.vswr !== undefined ? data.vswr : '—', data.vswr > 1.5 ? '#ff3355' : '#a0c8e8'],
+                        ['SUPPLY VOLTAGE', data.supply_voltage_v !== undefined ? `${data.supply_voltage_v.toFixed(2)} V` : '—', '#a0c8e8']
+                    ]
+                });
+            } else {
+                sections.push({
+                    title: 'Receiver Parameters',
+                    params: [
+                        ['MODE', data._mode || 'ACTIVE', '#00ffcc'],
+                        ['STATUS', data._status || 'Normal', data._status === 'FAULT' ? '#ff3355' : '#00d4ff'],
+                        ['FREQUENCY', data.frequency_mhz !== undefined ? `${data.frequency_mhz.toFixed(3)} MHz` : '—', '#5a8aaa'],
+                        ['RF INPUT PWR', data.rf_input_power_dbm !== undefined ? `${data.rf_input_power_dbm} dBm` : '—', '#3a6a8a'],
+                        ['SQUELCH', data.squelch_dbm !== undefined ? `${data.squelch_dbm} dBm` : '—', '#a0c8e8'],
+                        ['SUPPLY VOLTAGE', data.supply_voltage_v !== undefined ? `${data.supply_voltage_v.toFixed(2)} V` : '—', '#a0c8e8']
+                    ]
+                });
+            }
         } else if (parserId === 'ils_mm_normac') {
             const sup = 'ILS-MM';
             sections.push({

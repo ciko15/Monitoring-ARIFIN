@@ -578,11 +578,12 @@ class NetworkListenerService {
         const ParserModule = require('../parsers/' + moduleName);
         const parser = new ParserModule({ equipt_id });
 
-        // Cek apakah parser support protokol trigger+heartbeat (Thales 421)
+        // Cek apakah parser support protokol trigger+heartbeat atau polling
         const hasTriggerProtocol = typeof parser.isHeartbeat === 'function' &&
             typeof parser.getHeartbeatReply === 'function';
+        const hasPollRequests = typeof parser.getPollRequests === 'function';
 
-        console.log(`[LLZ-TRACE] startBinaryTcpListener called for ${name} (${ip_address}:${port}), hasTriggerProtocol=${hasTriggerProtocol}`);
+        console.log(`[LLZ-TRACE] startBinaryTcpListener called for ${name} (${ip_address}:${port}), hasTriggerProtocol=${hasTriggerProtocol}, hasPollRequests=${hasPollRequests}`);
 
         let socket = null;
         let stopped = false;
@@ -601,12 +602,20 @@ class NetworkListenerService {
                 this._binaryTcpSockets.set(id, socket);
 
                 // Kirim trigger secara berkala agar aliran data tidak terputus walau direbut ADRACS
-                if (hasTriggerProtocol) {
+                if (hasTriggerProtocol || hasPollRequests) {
                     const doPoll = () => {
-                        const triggerReqs = parser.getPollRequests();
+                        let triggerReqs = [];
+                        if (hasTriggerProtocol && typeof parser.getHeartbeatReply === 'function') {
+                            triggerReqs = [parser.getHeartbeatReply()]; // fallback
+                        }
+                        if (hasPollRequests) {
+                            triggerReqs = parser.getPollRequests();
+                        }
+
                         for (const req of triggerReqs) {
                             try {
-                                socket.write(req.bytes);
+                                const bytes = req.bytes ? req.bytes : req;
+                                socket.write(bytes);
                             } catch (e) {
                                 console.warn(`[NetworkListener] ILS trigger write error ${name}: ${e.message}`);
                             }
