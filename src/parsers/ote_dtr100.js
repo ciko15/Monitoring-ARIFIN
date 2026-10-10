@@ -77,9 +77,8 @@ class OteDtr100Parser extends BaseParser {
         }
 
         this.lastReceiveTime = Date.now();
-        if (this.mode === 'ACTIVE') {
-            this.mode = 'PASSIVE';
-        }
+        // OTE DTR100 memerlukan polling terus-menerus untuk mendapatkan data pengukuran
+        // Jadi kita tidak pernah pindah ke PASSIVE
 
         this.buffer = Buffer.concat([this.buffer, rawData]);
         
@@ -126,8 +125,8 @@ class OteDtr100Parser extends BaseParser {
         const len = frame[2];
         const payload = frame.slice(3, 3 + len);
         
-        // 19 = Response byte (as seen in PCAP)
-        if (payload.length >= 7 && payload[0] === 0x19) {
+        // 19 = Response byte, tapi kadang ada header lain
+        if (payload.length >= 10) {
             const dataLen = payload[6];
             if (payload.length >= 7 + 3 + (dataLen - 3)) {
                 const id = payload[9]; 
@@ -160,9 +159,15 @@ class OteDtr100Parser extends BaseParser {
                 break;
             case 7:
                 if (this.isTx) {
-                    // Lower 16-bit = Forward Power, Upper 16-bit = Reverse Power
-                    this.latestData.forward_power_w = valueLE & 0xFFFF; 
-                    this.latestData.reverse_power_w = (valueLE >>> 16) & 0xFFFF;
+                    // Berdasarkan analisa PCAP, byte ke-1 adalah Forward Power dalam Watt,
+                    // dan byte ke-3 adalah Reverse Power dalam Watt.
+                    if (dataBytes && dataBytes.length >= 4) {
+                        this.latestData.forward_power_w = dataBytes[1]; 
+                        this.latestData.reverse_power_w = dataBytes[3];
+                    } else {
+                        this.latestData.forward_power_w = valueLE & 0xFFFF;
+                        this.latestData.reverse_power_w = (valueLE >>> 16) & 0xFFFF;
+                    }
                     
                     // Hitung VSWR
                     if (this.latestData.forward_power_w > 0) {

@@ -232,53 +232,16 @@
         "id": "ote_dtr100",
         "name": "OTE DTR100 VHF Radio",
         "description": "Parser for OTE DTR100 radio via TCP port 950 (Active/Passive)",
-        "defaultPort": 950,
-        "supportedTypes": [
-            "VHF"
-        ],
-        "fields": [
-            {
-                "key": "rx_power_dbm",
-                "name": "RF Input Power (dBm)",
-                "type": "number",
-                "unit": "dBm"
-            },
-            {
-                "key": "squelch_dbm",
-                "name": "Squelch (dBm)",
-                "type": "number",
-                "unit": "dBm"
-            },
-            {
-                "key": "sensitivity_dbm",
-                "name": "Sensitivity (dBm)",
-                "type": "number",
-                "unit": "dBm"
-            },
-            {
-                "key": "rssi_dbm",
-                "name": "RSSI (dBm)",
-                "type": "number",
-                "unit": "dBm"
-            },
-            {
-                "key": "fwd_power_w",
-                "name": "Fwd Power (W)",
-                "type": "number",
-                "unit": "W"
-            },
-            {
-                "key": "frequency_mhz",
-                "name": "Frequency (MHz)",
-                "type": "number",
-                "unit": "MHz"
-            },
-            {
-                "key": "modulation_pct",
-                "name": "Modulation (%)",
-                "type": "number",
-                "unit": "%"
-            }
-        ]
+        "category": "Radio",
+        "files": "/src/parsers/ote_dtr100.js",
+        "createdAt": "2026-08-01T00:00:00.000Z"
+    },
+    {
+        "id": "ils_mm_normac",
+        "name": "ILS MM Normarc 7000",
+        "description": "Parser TCP untuk Middle Marker Normarc NM7050",
+        "category": "Navigation",
+        "files": "/src/parsers/ils_mm_normac.js",
+        "createdAt": "2026-10-10T06:15:05.036Z"
     }
 ]
