@@ -80,16 +80,16 @@ class IlsMmNormacParser extends BaseParser {
                 // MON 1
                 parsedResult.mon1_mod_depth = validPacket.readUInt16LE(8) / 10.0;
                 parsedResult.mon1_keying = validPacket.readUInt16LE(10) === 1 ? 'On' : 'Off';
-                parsedResult.mon1_rf_level = validPacket.readUInt16LE(12) / 12500.0;
+                parsedResult.mon1_rf_level = validPacket.readUInt16LE(15) / 1000.0;
                 
                 // MON 2
                 parsedResult.mon2_mod_depth = validPacket.readUInt16LE(25) / 10.0;
                 parsedResult.mon2_keying = validPacket.readUInt16LE(27) === 1 ? 'On' : 'Off';
-                parsedResult.mon2_rf_level = validPacket.readUInt16LE(29) / 12500.0;
+                parsedResult.mon2_rf_level = validPacket.readUInt16LE(32) / 1000.0;
 
-                // TX Status (asumsi sementara bit 1 pada byte 1)
+                // TX Status
                 const txStatusByte = validPacket[4]; // 0x26
-                const isTx2Main = (txStatusByte & 0x02) !== 0; 
+                const isTx2Main = (txStatusByte & 0x01) !== 0; 
                 parsedResult.tx_main_label = isTx2Main ? '2 MAIN' : '1 MAIN';
                 parsedResult.tx_stby_label = isTx2Main ? '1 STBY' : '2 STBY';
             } catch (e) {
