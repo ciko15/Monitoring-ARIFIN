@@ -43,6 +43,8 @@ function startHeartbeat() {
             // publishMessage(messagePattern, messageName, payload, options)
             publishMessage('EVENT', 'branch.heartbeat.sent', payload, {
                 requestType: 'branch.heartbeat.sent'
+            }).catch(e => {
+                console.error('[Heartbeat] Failed to send heartbeat (promise rejected):', e.message);
             });
             
         } catch (e) {
