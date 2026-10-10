@@ -74,24 +74,48 @@ class IlsGpNormacParser extends BaseParser {
         
         let validPacket = null;
         let startIndex = -1;
-        let frameSize = 44; 
+        let frameSize = 44; // Default fallback
 
-        if (hdlcIndex !== -1 && this.buffer.length >= hdlcIndex + frameSize) {
-            startIndex = hdlcIndex;
-            validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
+        if (hdlcIndex !== -1) {
+            // Find the NEXT 7E 7E 7E to determine dynamic frame length
+            const nextHdlcIndex = this.buffer.indexOf(header, hdlcIndex + 3);
+            
+            if (nextHdlcIndex !== -1) {
+                startIndex = hdlcIndex;
+                frameSize = nextHdlcIndex - hdlcIndex;
+                validPacket = this.buffer.subarray(startIndex, nextHdlcIndex);
+            } else if (this.buffer.length > hdlcIndex + 120) {
+                // Max length reached, extract 120 bytes as a guess for long packets (like 104-byte GP)
+                startIndex = hdlcIndex;
+                frameSize = 120;
+                validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
+            } else if (this.buffer.length >= hdlcIndex + 44 && this.buffer[hdlcIndex + 3] === 0x89) {
+                // Fallback for LLZ 44-byte frames if next header isn't found yet
+                startIndex = hdlcIndex;
+                frameSize = 44;
+                validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
+            }
         }
 
         if (validPacket) {
-            parsedResult.frame_type = `NORMARC_${frameSize}`;
+            parsedResult.frame_type = `NORMARC_DYN_${frameSize}`;
             parsedResult.raw_hex = validPacket.toString('hex').toUpperCase();
 
             // Ekstrak parameter penting
             try {
-                // Sesuai koneksi MM (Little Endian), dummy values for now
-                parsedResult.csb_forward_power = validPacket.readUInt16LE(8) / 10.0;
-                parsedResult.csb_reverse_power = validPacket.readUInt16LE(10) / 10.0;
-                
-                parsedResult.crs_pos_rf_level = parsedResult.csb_forward_power;
+                if (validPacket.length >= 80) {
+                    // Coba baca float32 (Little Endian) dari posisi GP Angle di packet 104 bytes
+                    try {
+                        parsedResult.gp_angle = validPacket.readFloatLE(76);
+                    } catch(e) {}
+                    
+                    parsedResult.csb_forward_power = validPacket[8] || 0;
+                    parsedResult.crs_pos_rf_level = validPacket[9] || 0;
+                } else if (validPacket.length >= 44) {
+                    parsedResult.csb_forward_power = validPacket.readUInt16LE(8) / 10.0;
+                    parsedResult.csb_reverse_power = validPacket.readUInt16LE(10) / 10.0;
+                    parsedResult.crs_pos_rf_level = parsedResult.csb_forward_power;
+                }
                 parsedResult.crs_pos_ddm = null;
                 parsedResult.crs_pos_sdm = null;
                 parsedResult.crs_width_rf_level = null;
