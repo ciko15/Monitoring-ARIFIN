@@ -1574,7 +1574,7 @@ class NetworkListenerService {
         // 1. Create Parser (or reuse existing one to preserve _lastData across TCP drops)
         let parser = this.parsers.get(id);
         if (!parser && parsing_id) {
-            let pConfig = { equipt_id };
+            let pConfig = { equipt_id, name: source.name || '' };
             if (source.extra_config) {
                 pConfig.parser_config = typeof source.extra_config === 'string' ? JSON.parse(source.extra_config) : source.extra_config;
             }
