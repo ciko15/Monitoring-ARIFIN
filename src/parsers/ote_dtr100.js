@@ -2,15 +2,33 @@
 
 const BaseParser = require('./base');
 
-// Known poll frames derived from PCAP
 const KNOWN_POLLS = {
     4:  Buffer.from('02020a3019061e0100010000043f4a', 'hex'),
     7:  Buffer.from('02020a3019061e0100010000075c7a', 'hex'),
+    8:  Buffer.from('02020a3019061e010001000008b38b', 'hex'),
+    12: Buffer.from('02020a3019061e01000100000c37cb', 'hex'),
+    16: Buffer.from('02020a3019061e0100010000108a18', 'hex'),
+    17: Buffer.from('02020a3019061e010001000011ab08', 'hex'),
+    18: Buffer.from('02020a3019061e010001000012c838', 'hex'),
+    20: Buffer.from('02020a3019061e0100010000140e58', 'hex'),
+    25: Buffer.from('02020a3019061e010001000019a389', 'hex'),
+    26: Buffer.from('02020a3019061e01000100001ac0b9', 'hex'),
     29: Buffer.from('02020a3019061e01000100001d27c9', 'hex'),
+    39: Buffer.from('02020a3019061e0100010000273e5e', 'hex'),
     45: Buffer.from('02020a3019061e01000100002d74ff', 'hex'),
+    46: Buffer.from('02020a3019061e01000100002e17cf', 'hex'),
     48: Buffer.from('02020a3019061e010001000030e83c', 'hex'),
+    54: Buffer.from('02020a3019061e010001000036815e', 'hex'),
+    55: Buffer.from('02020c3019081e010003000037fa02d958', 'hex'),
     56: Buffer.from('02020a3019061e010001000038e0bd', 'hex'),
-    104: Buffer.from('02020a3019061e01000100006815e7', 'hex')
+    57: Buffer.from('02020c3019081e010003000039fa02d843', 'hex'),
+    58: Buffer.from('02020c3019081e01000300003afa02881a', 'hex'),
+    72: Buffer.from('02020c3019081e010003000048fa02e0ac', 'hex'),
+    91: Buffer.from('02020a3019061e01000100005b25e1', 'hex'),
+    96: Buffer.from('02020a3019061e0100010000601d66', 'hex'),
+    100: Buffer.from('02020a3019061e0100010000649926', 'hex'),
+    104: Buffer.from('02020a3019061e01000100006815e7', 'hex'),
+    253: Buffer.from('02020a3019061e0100010000fd0934', 'hex')
 };
 const POLL_IDS = Object.keys(KNOWN_POLLS).map(Number);
 
@@ -162,9 +180,8 @@ class OteDtr100Parser extends BaseParser {
                 this.latestData.rssi_dbm = valueLE;
                 break;
             default:
-                // Hide unknown parameters from the UI by prefixing with underscore
-                this.latestData[`_raw_id_${id}`] = valueLE;
-                this.latestData[`_hex_id_${id}`] = hexStr;
+                // Tampilkan raw data di UI untuk identifikasi lebih lanjut
+                this.latestData[`Raw_Data_ID_${id}`] = hexStr;
                 break;
         }
         this.latestData._status = 'Normal';

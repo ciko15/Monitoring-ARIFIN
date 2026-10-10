@@ -16,6 +16,7 @@ const IlsGpThales421Parser = require('./ils_gp_thales421');
 const IlsLlzThales421Parser = require('./ils_llz_thales421');
 const IlsGpNormacParser = require('./ils_gp_normac');
 const IlsLlzNormacParser = require('./ils_llz_normac');
+const IlsMmNormacParser = require('./ils_mm_normac');
 const DvorMaruBinaryParser = require('./dvor_maru_binary');
 const DmeMopahBinaryParser = require('./dme_mopah_binary');
 const DatakomD700Parser = require('./datakom_d700_modbus');
@@ -149,6 +150,10 @@ class ParserFactory {
             case 'ils_llz_normac7030':
                 return new IlsLlzNormacParser(config);
 
+            case 'ils_mm_normac':
+            case 'ils_mm_normac7030':
+                return new IlsMmNormacParser(config);
+
             case 'json':
                 return new JsonParser(config);
 
@@ -191,6 +196,8 @@ class ParserFactory {
             'ils_gp_normac7030',
             'ils_llz_normac',
             'ils_llz_normac7030',
+            'ils_mm_normac',
+            'ils_mm_normac7030',
             'custom_1783483057654',
             'vhf_t6tv',
             'vhf_marc_rse',

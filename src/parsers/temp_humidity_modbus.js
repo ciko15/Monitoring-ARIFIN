@@ -8,8 +8,8 @@ const { executeModbus } = require("../utils/modbus_wrapper");
  * Menggunakan modbus-serial wrapper untuk perlindungan unhandled rejection.
  */
 
-const WARN_TEMP  = 30.0;
-const ALARM_TEMP = 35.0;
+// const WARN_TEMP = 30.0;
+// const ALARM_TEMP = 35.0;
 
 // Mutex lock global per IP agar 2 sensor tidak pernah di-poll bersamaan (menghentikan collision 100%)
 const ipLocks = new Map();
