@@ -60,9 +60,8 @@ class IlsLlzNormacParser extends BaseParser {
             rf_level: null
         };
 
-        // Cari index Frame yang umum
-        // Header NM7000 LLZ/GP status frame biasanya diawali 7E 7E 7E 89 26 00 (44 bytes)
-        const header = Buffer.from([0x7E, 0x7E, 0x7E, 0x89, 0x26, 0x00]);
+        // Header NM7000 LLZ/GP status frame diawali 7E 7E 7E. Byte ke-4 adalah address yang bisa berbeda (89, 81, 8A dll).
+        const header = Buffer.from([0x7E, 0x7E, 0x7E]);
         const hdlcIndex = this.buffer.indexOf(header);
         
         let validPacket = null;
