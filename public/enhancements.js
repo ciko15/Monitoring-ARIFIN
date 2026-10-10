@@ -1642,7 +1642,7 @@
             //     ]
             // });
         } else if (parserId === 'ote_dtr100') {
-            const isTx = data.forward_power_w !== undefined || String(srcName).toUpperCase().includes('TX');
+            const isTx = data.forward_power_w !== undefined;
             if (isTx) {
                 sections.push({
                     title: 'Transmitter Parameters',
@@ -1664,6 +1664,8 @@
                         ['FREQUENCY', data.frequency_mhz !== undefined ? `${data.frequency_mhz.toFixed(3)} MHz` : '—', '#5a8aaa'],
                         ['RF INPUT PWR', data.rf_input_power_dbm !== undefined ? `${data.rf_input_power_dbm} dBm` : '—', '#3a6a8a'],
                         ['SQUELCH', data.squelch_dbm !== undefined ? `${data.squelch_dbm} dBm` : '—', '#a0c8e8'],
+                        ['SENSITIVITY', data.sensitivity_dbm !== undefined ? `${data.sensitivity_dbm} dBm` : '—', '#a0c8e8'],
+                        ['RSSI', data.rssi_dbm !== undefined ? `${data.rssi_dbm} dBm` : '—', '#a0c8e8'],
                         ['SUPPLY VOLTAGE', data.supply_voltage_v !== undefined ? `${data.supply_voltage_v.toFixed(2)} V` : '—', '#a0c8e8']
                     ]
                 });
