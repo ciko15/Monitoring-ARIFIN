@@ -52,12 +52,20 @@ class IlsGpNormacParser extends BaseParser {
             raw_hex: '',
             status: 'Normal',
             frame_type: 'Unknown',
-            // Default parameters (akan di-mapping manual nanti)
-            crs_ddm: null,
-            crs_sdm: null,
-            clr_ddm: null,
-            clr_sdm: null,
-            rf_level: null
+            // Parameter lengkap sesuai tampilan enhancement (default null sementara)
+            crs_pos_rf_level: null,
+            crs_pos_ddm: null,
+            crs_pos_sdm: null,
+            crs_width_rf_level: null,
+            crs_width_ddm: null,
+            crs_width_sdm: null,
+            clr_width_rf_level: null,
+            clr_width_ddm: null,
+            clr_width_sdm: null,
+            nearfield_pos_rf: null,
+            nearfield_pos_ddm: null,
+            monitor_power: null,
+            gp_angle: null
         };
 
         // Header NM7000 LLZ/GP status frame diawali 7E 7E 7E. Byte ke-4 adalah address yang bisa berbeda (89, 81, 8A dll).
@@ -83,12 +91,19 @@ class IlsGpNormacParser extends BaseParser {
                 parsedResult.csb_forward_power = validPacket.readUInt16LE(8) / 10.0;
                 parsedResult.csb_reverse_power = validPacket.readUInt16LE(10) / 10.0;
                 
-                // Fallback / legacy fields untuk template jika masih dibutuhkan
-                parsedResult.DDM_COURSE = null;
-                parsedResult.SDM_COURSE = null;
-                parsedResult.DDM_CLR = null;
-                parsedResult.CLR_SDM = null;
-                parsedResult.RF_POWER = parsedResult.csb_forward_power;
+                parsedResult.crs_pos_rf_level = parsedResult.csb_forward_power;
+                parsedResult.crs_pos_ddm = null;
+                parsedResult.crs_pos_sdm = null;
+                parsedResult.crs_width_rf_level = null;
+                parsedResult.crs_width_ddm = null;
+                parsedResult.crs_width_sdm = null;
+                parsedResult.clr_width_rf_level = null;
+                parsedResult.clr_width_ddm = null;
+                parsedResult.clr_width_sdm = null;
+                parsedResult.nearfield_pos_rf = null;
+                parsedResult.nearfield_pos_ddm = null;
+                parsedResult.monitor_power = null;
+                parsedResult.gp_angle = null;
                 
                 // TX Status
                 const txStatusByte = validPacket[4]; // 0x26 atau lainnya
