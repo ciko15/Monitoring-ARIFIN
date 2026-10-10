@@ -1,34 +1,31 @@
 const BaseParser = require('./base');
 
 /**
- * ILS Glide Path (GP) Parser — Normarc / Indra ILS-200
- * 
- * Hasil analisa PCAP GP.pcap (192.168.127.20 port 950):
- * - PMDT mengirim request: 7E 7E 7E 1E 05 00 [seq byte] [crc]
- * - GP membalas: 7E 7E 7E 16 A9 02 ... (104 bytes per response)
- * - Format data: Big Endian UInt16, satuan /10
+ * ILS Glide Path (GP) Parser — Normarc
  *
- * Struktur frame 104 bytes:
- * [0-2]   = 7E 7E 7E (header)
- * [3]     = address byte (0x16, 0x22, 0x24, dll)
- * [4-5]   = length field
- * [6]     = status flags (TX status, remote/local)
- * [7]     = flags byte 2
- * [8-9]   = Mon 1 RF Level (UInt16 BE, /10 = %)
- * [10-11] = Mon 1 DDM (UInt16 BE, /10)
- * [12-13] = Mon 2 RF Level (UInt16 BE, /10 = %)
- * [14-15] = Mon 2 DDM (UInt16 BE, /10)
- * [26-27] = GP Angle (UInt16 BE, /100 = degrees)
+ * Hasil analisa live log dan PCAP GP.pcap:
+ * - GP device mengirim stream data berisi 7E 7E 7E markers sebagai frame boundaries
+ * - Address byte bervariasi: 0x08, 0x16, 0x22, dll tergantung segment query
+ * - Data frame di-embed di antara dua 7E 7E 7E headers
+ *
+ * Format frame (dari LLZ raw frame yang menangkap GP): 7E7E7E 08 C1 00 03F4 01A6 0083...
+ * [0-2] = 7E 7E 7E (header)
+ * [3]   = address byte
+ * [4-5] = C1 00 (status/length)
+ * [6-7] = Mon1 RF Level (UInt16 BE, /10 = %)  -> 0x03F4 = 1012/10 = 101.2%
+ * [8-9] = Mon1 DDM (UInt16 BE, /10)           -> 0x01A6 = 422/10 = 42.2
+ * [10-11] = Mon2 RF Level                     -> 0x0083 = 131/10 = 13.1%
+ * [12-13] = Mon2 DDM                          -> 0x0020 = 32/10 = 3.2
+ * [14-15] = SDM                               -> 0x0326 = 806/10 = 80.6
  */
 
-// Trigger polling ke GP — dari PCAP PMDT ke 192.168.127.20 port 950
+// Trigger polling ke GP — dari PCAP: 7E 7E 7E 22 04 00 (address 0x22)
 const TRIGGER_SEND = Buffer.from([0x7E, 0x7E, 0x7E, 0x22, 0x04, 0x00, 0x98, 0x8E, 0xE4, 0xA0]);
 
 class IlsGpNormacParser extends BaseParser {
     constructor(config) {
         super(config);
         this.buffer = Buffer.alloc(0);
-        this._lastValidData = null;
     }
 
     getPollRequests() {
@@ -57,83 +54,101 @@ class IlsGpNormacParser extends BaseParser {
         };
 
         const header = Buffer.from([0x7E, 0x7E, 0x7E]);
+
+        // Cari header 7E 7E 7E pertama
         let hdlcIndex = this.buffer.indexOf(header);
 
-        while (hdlcIndex !== -1) {
-            if (this.buffer.length < hdlcIndex + 4) break;
-
-            const nextHdlcIndex = this.buffer.indexOf(header, hdlcIndex + 3);
-
-            if (nextHdlcIndex === -1) break; // Tunggu data lebih banyak
-
-            const frameSize = nextHdlcIndex - hdlcIndex;
-
-            if (frameSize < 4 || frameSize > 250) {
-                // Skip frame tidak valid, loncat ke header berikutnya
-                this.buffer = this.buffer.subarray(nextHdlcIndex);
-                hdlcIndex = 0;
-                continue;
+        if (hdlcIndex === -1) {
+            // Tidak ada header sama sekali, buang data garbage
+            if (this.buffer.length > 512) {
+                console.log(`[Normarc GP] Tidak ada header 7E7E7E dalam ${this.buffer.length} bytes, membuang garbage...`);
+                this.buffer = Buffer.alloc(0);
             }
-
-            const validPacket = this.buffer.subarray(hdlcIndex, nextHdlcIndex);
-            this.buffer = this.buffer.subarray(nextHdlcIndex);
-
-            parsedResult.frame_type = `GP_${frameSize}`;
-            parsedResult.raw_hex = validPacket.toString('hex').toUpperCase();
-
-            try {
-                const statusByte = validPacket.length > 6 ? validPacket[6] : 0;
-                const isTx2Main = (statusByte & 0x01) !== 0;
-                parsedResult.tx_main_label = isTx2Main ? '2 MAIN' : '1 MAIN';
-                parsedResult.tx_stby_label = isTx2Main ? '1 STBY' : '2 STBY';
-
-                if (validPacket.length >= 16) {
-                    const mon1_rf  = validPacket.readUInt16BE(8);
-                    const mon1_ddm = validPacket.readUInt16BE(10);
-                    const mon2_rf  = validPacket.readUInt16BE(12);
-                    const mon2_ddm = validPacket.readUInt16BE(14);
-
-                    if (mon1_rf > 0 && mon1_rf < 32000)
-                        parsedResult.crs_pos_rf_level = parseFloat((mon1_rf / 10.0).toFixed(1));
-                    if (mon1_ddm < 10000)
-                        parsedResult.crs_pos_ddm = parseFloat((mon1_ddm / 10.0).toFixed(1));
-                    if (mon2_rf > 0 && mon2_rf < 32000)
-                        parsedResult.crs_width_rf_level = parseFloat((mon2_rf / 10.0).toFixed(1));
-                    if (mon2_ddm < 10000)
-                        parsedResult.crs_width_ddm = parseFloat((mon2_ddm / 10.0).toFixed(1));
-                }
-
-                // GP Angle: offset 26-27 (BE UInt16 / 100 = degrees)
-                if (validPacket.length >= 28) {
-                    const rawAngle = validPacket.readUInt16BE(26);
-                    if (rawAngle > 100 && rawAngle < 400) {
-                        parsedResult.gp_angle = parseFloat((rawAngle / 100.0).toFixed(2));
-                    }
-                }
-
-                this._lastValidData = { ...parsedResult };
-
-            } catch (e) {
-                console.error(`[Normarc GP] Gagal ekstrak data:`, e.message);
-            }
-
-            console.log(`[Normarc GP] Raw Frame [${frameSize}]: ${parsedResult.raw_hex.substring(0, 60)}...`);
-            const alarmResult = this.checkAlarms(parsedResult);
-            return {
-                success: true,
-                data: parsedResult,
-                status: alarmResult.status,
-                alarms: alarmResult.alarms,
-                warnings: alarmResult.warnings
-            };
+            return { success: false, error: 'Tunggu data lengkap...' };
         }
 
-        if (this.buffer.length > 4096) {
-            console.warn(`[Normarc GP] Buffer overflow, resetting...`);
-            this.buffer = Buffer.alloc(0);
+        // Buang semua data sebelum header pertama (ini adalah sisa frame lama / garbage)
+        if (hdlcIndex > 0) {
+            console.log(`[Normarc GP] Membuang ${hdlcIndex} bytes garbage sebelum header 7E7E7E`);
+            this.buffer = this.buffer.subarray(hdlcIndex);
         }
 
-        return { success: false, error: 'Tunggu data lengkap...' };
+        // Cari header BERIKUTNYA (menandai akhir frame saat ini)
+        const nextHdlcIndex = this.buffer.indexOf(header, 3);
+
+        if (nextHdlcIndex === -1) {
+            // Hanya ada satu header, tunggu lebih banyak data
+            // Batasi buffer agar tidak terlalu besar
+            if (this.buffer.length > 4096) {
+                console.warn(`[Normarc GP] Buffer ${this.buffer.length} bytes tanpa frame lengkap, reset...`);
+                this.buffer = Buffer.alloc(0);
+            }
+            return { success: false, error: 'Tunggu data lengkap...' };
+        }
+
+        // Ekstrak frame yang lengkap (dari 7E7E7E pertama sampai sebelum 7E7E7E berikutnya)
+        const frameSize = nextHdlcIndex;
+        const validPacket = this.buffer.subarray(0, frameSize);
+
+        // Konsumsi frame ini dari buffer, sisakan mulai dari header berikutnya
+        this.buffer = this.buffer.subarray(nextHdlcIndex);
+
+        if (validPacket.length < 6) {
+            return { success: false, error: 'Frame terlalu pendek...' };
+        }
+
+        parsedResult.frame_type = `GP_${frameSize}`;
+        parsedResult.raw_hex = validPacket.toString('hex').toUpperCase();
+
+        try {
+            // Byte [4] = C1 (status flags)
+            const statusByte = validPacket[4] || 0;
+            const isTx2Main = (statusByte & 0x80) !== 0; // bit7 = TX2 main
+            parsedResult.tx_main_label = isTx2Main ? '2 MAIN' : '1 MAIN';
+            parsedResult.tx_stby_label = isTx2Main ? '1 STBY' : '2 STBY';
+
+            // Data monitoring mulai dari offset 6 (setelah 7E7E7E + addr + 2 status bytes)
+            if (validPacket.length >= 14) {
+                const mon1_rf  = validPacket.readUInt16BE(6);
+                const mon1_ddm = validPacket.readUInt16BE(8);
+                const mon2_rf  = validPacket.readUInt16BE(10);
+                const mon2_ddm = validPacket.readUInt16BE(12);
+
+                if (mon1_rf > 0 && mon1_rf < 30000)
+                    parsedResult.crs_pos_rf_level = parseFloat((mon1_rf / 10.0).toFixed(1));
+                if (mon1_ddm < 10000)
+                    parsedResult.crs_pos_ddm = parseFloat((mon1_ddm / 10.0).toFixed(1));
+                if (mon2_rf > 0 && mon2_rf < 30000)
+                    parsedResult.crs_width_rf_level = parseFloat((mon2_rf / 10.0).toFixed(1));
+                if (mon2_ddm < 10000)
+                    parsedResult.crs_width_ddm = parseFloat((mon2_ddm / 10.0).toFixed(1));
+            }
+
+            // SDM / GP Angle jika frame cukup panjang
+            if (validPacket.length >= 16) {
+                const sdm = validPacket.readUInt16BE(14);
+                if (sdm > 0 && sdm < 10000)
+                    parsedResult.crs_pos_sdm = parseFloat((sdm / 10.0).toFixed(1));
+            }
+            if (validPacket.length >= 20) {
+                const rawAngle = validPacket.readUInt16BE(18);
+                if (rawAngle > 100 && rawAngle < 500)
+                    parsedResult.gp_angle = parseFloat((rawAngle / 100.0).toFixed(2));
+            }
+
+        } catch (e) {
+            console.error(`[Normarc GP] Gagal ekstrak data:`, e.message);
+        }
+
+        console.log(`[Normarc GP] Raw Frame [${frameSize}]: ${parsedResult.raw_hex.substring(0, 80)}...`);
+        const alarmResult = this.checkAlarms(parsedResult);
+        return {
+            success: true,
+            data: parsedResult,
+            status: alarmResult.status,
+            alarms: alarmResult.alarms,
+            warnings: alarmResult.warnings
+        };
     }
 }
 
