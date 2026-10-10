@@ -6,8 +6,8 @@ const BaseParser = require('./base');
  * Supports parsing of HDLC-framed (7E 7E 7E...) packets and binary stream.
  */
 
-// Hex trigger from sniffing
-const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // Adjust if Normarc needs a different trigger
+// Hex trigger from sniffing PCAP (sama dengan MM)
+const TRIGGER_SEND = Buffer.from([0x7E, 0x7E, 0x7E, 0x01, 0x04, 0x00, 0x21, 0x76, 0xEF, 0x9A]);
 
 class IlsLlzNormacParser extends BaseParser {
     constructor(config) {
@@ -61,19 +61,16 @@ class IlsLlzNormacParser extends BaseParser {
         };
 
         // Cari index Frame yang umum
-        const hdlcIndex = this.buffer.indexOf(Buffer.from([0x7E, 0x7E, 0x7E]));
-        const start01Index = this.buffer.indexOf(Buffer.from([0x01]));
+        // Header NM7000 LLZ/GP status frame biasanya diawali 7E 7E 7E 89 26 00 (44 bytes)
+        const header = Buffer.from([0x7E, 0x7E, 0x7E, 0x89, 0x26, 0x00]);
+        const hdlcIndex = this.buffer.indexOf(header);
         
         let validPacket = null;
         let startIndex = -1;
-        let frameSize = 204; // Untuk LLZ Normarc, paket HDLC utamanya berukuran 204 bytes
+        let frameSize = 44; 
 
         if (hdlcIndex !== -1 && this.buffer.length >= hdlcIndex + frameSize) {
             startIndex = hdlcIndex;
-            validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
-        } else if (start01Index !== -1 && this.buffer.length >= start01Index + 95) {
-            startIndex = start01Index;
-            frameSize = 95;
             validPacket = this.buffer.subarray(startIndex, startIndex + frameSize);
         }
 
@@ -83,19 +80,24 @@ class IlsLlzNormacParser extends BaseParser {
 
             // Ekstrak parameter penting
             try {
-                // Posisi offset disesuaikan dengan struktur payload 204 byte
-                let offset = frameSize === 204 ? 40 : 24; 
+                // Sesuai gambar dan koneksi MM (Little Endian)
+                parsedResult.csb_forward_power = validPacket.readUInt16LE(8) / 10.0;
+                parsedResult.csb_reverse_power = validPacket.readUInt16LE(10) / 10.0;
+                parsedResult.csb_i_phase = validPacket.readUInt16LE(16) / 10.0;
+                parsedResult.csb_q_phase = validPacket.readUInt16LE(20) / 100.0;
                 
+                // Fallback / legacy fields untuk template jika masih dibutuhkan
                 parsedResult.DDM_COURSE = null;
                 parsedResult.SDM_COURSE = null;
                 parsedResult.DDM_CLR = null;
                 parsedResult.CLR_SDM = null;
+                parsedResult.RF_POWER = parsedResult.csb_forward_power;
                 
-                // RF Power
-                parsedResult.RF_POWER = null;
-                
-                parsedResult.tx_main_label = '1 MAIN';
-                parsedResult.tx_stby_label = '2 STBY';
+                // TX Status
+                const txStatusByte = validPacket[4]; // 0x26 atau lainnya
+                const isTx2Main = (txStatusByte & 0x01) !== 0; 
+                parsedResult.tx_main_label = isTx2Main ? '2 MAIN' : '1 MAIN';
+                parsedResult.tx_stby_label = isTx2Main ? '1 STBY' : '2 STBY';
                 parsedResult.status_label = 'Normal';
                 parsedResult.tx_data = 'Local';
 
@@ -106,7 +108,7 @@ class IlsLlzNormacParser extends BaseParser {
             // Hapus paket yang sudah diproses dari buffer
             this.buffer = this.buffer.subarray(startIndex + frameSize);
             
-            console.log(`[Normarc] Raw Frame [${frameSize}]: ${parsedResult.raw_hex}`);
+            console.log(`[Normarc LLZ] Raw Frame [${frameSize}]: ${parsedResult.raw_hex}`);
             const alarmResult = this.checkAlarms(parsedResult);
             return {
                 success: true,
