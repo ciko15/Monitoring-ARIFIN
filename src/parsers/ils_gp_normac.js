@@ -117,19 +117,19 @@ class IlsGpNormacParser extends BaseParser {
                     const mon2_ddm = validPacket.readUInt16BE(12);
 
                     if (mon1_rf > 0 && mon1_rf < 30000)
-                        parsedResult.crs_pos_rf_level = parseFloat((mon1_rf / 10.0).toFixed(1));
+                        parsedResult.rf_level = parseFloat((mon1_rf / 10.0).toFixed(1));
                     if (mon1_ddm < 10000)
-                        parsedResult.crs_pos_ddm = parseFloat((mon1_ddm / 10.0).toFixed(1));
+                        parsedResult.crs_ddm = parseFloat((mon1_ddm / 10.0).toFixed(1));
                     if (mon2_rf > 0 && mon2_rf < 30000)
-                        parsedResult.crs_width_rf_level = parseFloat((mon2_rf / 10.0).toFixed(1));
+                        parsedResult.crs_width_rf = parseFloat((mon2_rf / 10.0).toFixed(1));
                     if (mon2_ddm < 10000)
-                        parsedResult.crs_width_ddm = parseFloat((mon2_ddm / 10.0).toFixed(1));
+                        parsedResult.clr_ddm = parseFloat((mon2_ddm / 10.0).toFixed(1));
                 }
 
                 if (validPacket.length >= 18) {
                     const sdm = validPacket.readUInt16BE(14);
                     if (sdm > 0 && sdm < 10000)
-                        parsedResult.crs_pos_sdm = parseFloat((sdm / 10.0).toFixed(1));
+                        parsedResult.crs_sdm = parseFloat((sdm / 10.0).toFixed(1));
 
                     const rawAngle = validPacket.readUInt16BE(16);
                     if (rawAngle > 100 && rawAngle < 500)
