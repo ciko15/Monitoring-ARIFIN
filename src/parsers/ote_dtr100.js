@@ -163,6 +163,18 @@ class OteDtr100Parser extends BaseParser {
                     // Lower 16-bit = Forward Power, Upper 16-bit = Reverse Power
                     this.latestData.forward_power_w = valueLE & 0xFFFF; 
                     this.latestData.reverse_power_w = (valueLE >>> 16) & 0xFFFF;
+                    
+                    // Hitung VSWR
+                    if (this.latestData.forward_power_w > 0) {
+                        const pf = this.latestData.forward_power_w;
+                        const pr = this.latestData.reverse_power_w;
+                        const rho = Math.sqrt(pr / pf);
+                        let vswr = (1 + rho) / (1 - rho);
+                        if (vswr > 99) vswr = 99; // Cap at 99
+                        this.latestData.vswr = Number(vswr.toFixed(2));
+                    } else {
+                        this.latestData.vswr = 1.0;
+                    }
                 } else {
                     this.latestData.rf_input_power_dbm = (valueLE & 0xFFFF) - 111; 
                 }

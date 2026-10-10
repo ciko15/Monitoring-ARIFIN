@@ -73,8 +73,22 @@ class IlsMmNormacParser extends BaseParser {
 
             // Ekstrak parameter penting berdasarkan struktur paket (Little Endian)
             try {
-                // Contoh dummy parsing (bisa di-mapping ke offset yang sebenarnya nanti)
-                // parsedResult.RF_POWER = validPacket.readUInt16LE(12);
+                // Berdasarkan analisa hex NM7050:
+                // MON 1
+                parsedResult.mon1_mod_depth = validPacket.readUInt16LE(5) / 10.0;
+                parsedResult.mon1_keying = validPacket.readUInt16LE(7) === 1 ? 'On' : 'Off';
+                parsedResult.mon1_rf_level = validPacket.readUInt16LE(12) / 1000.0;
+                
+                // MON 2
+                parsedResult.mon2_mod_depth = validPacket.readUInt16LE(22) / 10.0;
+                parsedResult.mon2_keying = validPacket.readUInt16LE(24) === 1 ? 'On' : 'Off';
+                parsedResult.mon2_rf_level = validPacket.readUInt16LE(29) / 1000.0;
+
+                // TX Status (asumsi sementara bit 1 pada byte 1)
+                const txStatusByte = validPacket[1]; // 0x26
+                const isTx2Main = (txStatusByte & 0x02) !== 0; 
+                parsedResult.tx_main_label = isTx2Main ? '2 MAIN' : '1 MAIN';
+                parsedResult.tx_stby_label = isTx2Main ? '1 STBY' : '2 STBY';
             } catch (e) {
                 console.error(`[Normarc MM Parser] Gagal mengekstrak offset:`, e.message);
             }

@@ -1641,6 +1641,44 @@
             //         ['Alarm threshold', '≥ 35.0 °C', '#ff3355'],
             //     ]
             // });
+        } else if (parserId === 'ote_dtr100') {
+            const isTx = data._mode && data.forward_power_w !== undefined;
+            sections.push({
+                title: 'Transmitter Parameters',
+                params: [
+                    ['MODE', data._mode || 'ACTIVE', '#00ffcc'],
+                    ['STATUS', data._status || 'Normal', data._status === 'FAULT' ? '#ff3355' : '#00d4ff'],
+                    ['FREQUENCY', data.frequency_mhz !== undefined ? `${data.frequency_mhz.toFixed(3)} MHz` : '—', '#5a8aaa'],
+                    ['OUTPUT POWER', data.forward_power_w !== undefined ? `${data.forward_power_w} W` : '—', '#3a6a8a'],
+                    ['VSWR', data.vswr !== undefined ? data.vswr : '—', data.vswr > 1.5 ? '#ff3355' : '#a0c8e8'],
+                    ['SQUELCH', data.squelch_dbm !== undefined ? `${data.squelch_dbm} dBm` : '—', '#3a6a8a'],
+                    ['SUPPLY VOLTAGE', data.supply_voltage_v !== undefined ? `${data.supply_voltage_v.toFixed(2)} V` : '—', '#a0c8e8']
+                ]
+            });
+        } else if (parserId === 'ils_mm_normac') {
+            const sup = 'ILS-MM';
+            sections.push({
+                title: 'SYSTEM STATUS', params: [
+                    ['TX MAIN', data.tx_main_label || '—', '#00ffcc'],
+                    ['TX STANDBY', data.tx_stby_label || '—', '#5a8aaa'],
+                    ['STATUS', data.status_label || 'Normal', '#00d4ff'],
+                    ['DATA SOURCE', data.tx_data || 'Local', '#3a6a8a'],
+                ]
+            });
+            sections.push({
+                title: 'MONITOR 1 (MAIN)', params: [
+                    ['RF Level', data.mon1_rf_level !== undefined ? `${data.mon1_rf_level.toFixed(1)} V` : '—', '#00ffcc'],
+                    ['Mod. Depth', data.mon1_mod_depth !== undefined ? `${data.mon1_mod_depth.toFixed(1)} %` : '—', '#5a8aaa'],
+                    ['Keying', data.mon1_keying || '—', '#3a6a8a']
+                ]
+            });
+            sections.push({
+                title: 'MONITOR 2 (STANDBY)', params: [
+                    ['RF Level', data.mon2_rf_level !== undefined ? `${data.mon2_rf_level.toFixed(1)} V` : '—', '#00ffcc'],
+                    ['Mod. Depth', data.mon2_mod_depth !== undefined ? `${data.mon2_mod_depth.toFixed(1)} %` : '—', '#5a8aaa'],
+                    ['Keying', data.mon2_keying || '—', '#3a6a8a']
+                ]
+            });
         } else if (parserId === 'ils_gp_thales421' || parserId === 'ils_gp_normac') {
             const sup = 'ILS-GP';
             sections.push({
@@ -1704,6 +1742,8 @@
                     tmpl = window.templatesCache?.find(t => t.id === 'ils_gp_normac');
                 } else if (nameLower.includes('localizer') || nameLower.includes('llz')) {
                     tmpl = window.templatesCache?.find(t => t.id === 'ils_llz_normac');
+                } else if (nameLower.includes('middle') || nameLower.includes('mm')) {
+                    tmpl = window.templatesCache?.find(t => t.id === 'ils_mm_normac');
                 } else if (nameLower.includes('vhf')) {
                     tmpl = window.templatesCache?.find(t => t.id === 'vhf_t6tv');
                 }

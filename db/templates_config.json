@@ -197,5 +197,36 @@
         "grid_area": "span 12 / span 6"
       }
     ]
+  },
+  {
+    "id": "ils_mm_normac",
+    "name": "ILS MM Normarc",
+    "protocol": "tcp",
+    "category": "Navigation",
+    "description": "Standard ILS MM Normarc template",
+    "parameters": [
+      {
+        "name": "tx_main_label",
+        "label": "TX MAIN",
+        "unit": ""
+      },
+      {
+        "name": "tx_stby_label",
+        "label": "TX STANDBY",
+        "unit": ""
+      },
+      {
+        "name": "tx_data",
+        "label": "DATA SOURCE",
+        "unit": ""
+      },
+      {
+        "name": "RF_POWER",
+        "label": "RF POWER",
+        "unit": "W"
+      }
+    ],
+    "isDefault": true,
+    "isSystem": true
   }
 ]
