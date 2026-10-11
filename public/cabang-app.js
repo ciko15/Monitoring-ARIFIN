@@ -295,6 +295,11 @@ const cabangModule = (function () {
     const normalizeSourceStatus = window.normalizeSourceStatus;
 
     function deriveEquipmentStatus(item) {
+      const rawStatus = String(item?.status || '').trim().toLowerCase();
+      if (rawStatus === 'disconnect' || rawStatus === 'offline') {
+        return rawStatus;
+      }
+
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
         const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status).toLowerCase());
         if (sourceStatuses.some(st => st === 'warning')) return 'warning';
@@ -311,7 +316,7 @@ const cabangModule = (function () {
         return 'normal';
       }
 
-      const fallback = String(item?.status || 'disconnect').toLowerCase();
+      const fallback = rawStatus || 'disconnect';
       return ['normal', 'offline', 'warning', 'disconnect'].includes(fallback)
         ? fallback
         : (['alarm', 'alert', 'fail', 'critical'].includes(fallback) ? 'offline' : 'disconnect');
@@ -339,15 +344,26 @@ const cabangModule = (function () {
 
     // Apply Status Filter
     if (currentStatusFilter) {
-      let filterVal = String(currentStatusFilter).toLowerCase();
-      if (filterVal === 'alert') filterVal = 'alarm';
-      if (filterVal === 'disconnect') filterVal = 'offline';
+      const filterVal = String(currentStatusFilter).trim().toLowerCase();
 
       filtered = filtered.filter(e => {
-        const normalized = window.normalizeStatus
-          ? String(window.normalizeStatus(deriveEquipmentStatus(e))).toLowerCase()
-          : String(deriveEquipmentStatus(e)).toLowerCase();
-        return normalized === filterVal;
+        const status = String(deriveEquipmentStatus(e)).trim().toLowerCase();
+        if (filterVal === 'disconnect') {
+          return status === 'disconnect' || status === 'offline';
+        }
+        if (filterVal === 'offline') {
+          return status === 'offline' || status === 'disconnect';
+        }
+        if (filterVal === 'alert' || filterVal === 'alarm') {
+          return status === 'alert' || status === 'alarm';
+        }
+        if (filterVal === 'warning') {
+          return status === 'warning';
+        }
+        if (filterVal === 'normal') {
+          return status === 'normal';
+        }
+        return status === filterVal;
       });
     }
 

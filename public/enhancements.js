@@ -196,51 +196,87 @@
             console.warn('[Enhancements] Failed to load limitations:', e);
         }
     }
+    window.loadLimitations = loadLimitations;
 
     // Centralized color/threshold logic using limitation_config.json
-    function getLimitColor(supCategory, label, value) {
-        if (value === null || value === undefined || value === '—' || value === '-') return '#4a7a9a';
-        if (!window.limitationsCache || window.limitationsCache.length === 0) return '#e8f4ff';
+    let currentActiveParserId = null;
 
+    function getLimitColor(supCategory, label, value, parserId = null) {
+        if (value === null || value === undefined || value === '—' || value === '-') return '#ffffff';
+        if (!window.limitationsCache || window.limitationsCache.length === 0) return '#ffffff';
+
+        const effectiveParserId = parserId || currentActiveParserId || window.currentDetailParserId || null;
         const cleanLabel = normalizeLimitLabel(label);
-        const numVal = parseFloat(value);
-        if (isNaN(numVal)) return '#e8f4ff';
+        if (!cleanLabel) return '#ffffff';
 
-        const matchesLabel = (limitNameRaw) => {
-            const limitName = normalizeLimitLabel(limitNameRaw);
-            return limitName === cleanLabel ||
-                cleanLabel.includes(limitName) ||
-                limitName.includes(cleanLabel);
+        const matchesLabel = (limitItem) => {
+            const limitName = normalizeLimitLabel(limitItem.name || limitItem.label || '');
+            const limitSource = normalizeLimitLabel(limitItem.source || '');
+            if (!limitName && !limitSource) return false;
+
+            if (limitItem.match_mode === 'exact') {
+                return limitName === cleanLabel || limitSource === cleanLabel;
+            }
+            // Contains match: sama persis ATAU salah satunya mengandung yang lain
+            if (limitName === cleanLabel || limitSource === cleanLabel) return true;
+            if (limitName && (cleanLabel.includes(limitName) || limitName.includes(cleanLabel))) return true;
+            if (limitSource && (cleanLabel.includes(limitSource) || limitSource.includes(cleanLabel))) return true;
+            return false;
+        };
+
+        const matchesParser = (limitItem, targetParserId) => {
+            if (!limitItem.target_parsers || limitItem.target_parsers.length === 0) return true; // Global / Semua parser
+            if (!targetParserId) return true;
+            const parsers = Array.isArray(limitItem.target_parsers) ? limitItem.target_parsers : String(limitItem.target_parsers).split(',');
+            return parsers.some(p => p.trim().toLowerCase() === String(targetParserId).trim().toLowerCase());
         };
 
         const findLimit = (mode) => window.limitationsCache.find(l => {
+            if (!matchesParser(l, effectiveParserId)) return false;
+
             const limitSup = String(l.sup_category || '').toLowerCase();
             const targetSup = String(supCategory || '').toLowerCase();
-            const isGenericSup = limitSup === 'generic' || limitSup === 'all' || limitSup === '*';
+            const isGenericSup = limitSup === 'generic' || limitSup === 'all' || limitSup === '*' || !limitSup;
 
             if (mode === 'exact') {
-                return !!targetSup && limitSup === targetSup && matchesLabel(l.name);
+                return !!targetSup && limitSup === targetSup && matchesLabel(l);
             }
 
             if (mode === 'generic') {
-                return isGenericSup && matchesLabel(l.name);
+                return isGenericSup && matchesLabel(l);
             }
 
-            return matchesLabel(l.name);
+            return matchesLabel(l);
         });
 
         const limit = findLimit('exact') || findLimit('generic') || findLimit('any');
 
-        if (!limit) return '#e8f4ff';
+        // JIKA TIDAK ADA ATURAN LIMITASI: SEMUANYA PUTIH!
+        if (!limit) return '#ffffff';
 
-        const minAlarm = limit.min_alarm_limit ? parseFloat(limit.min_alarm_limit) : -Infinity;
-        const maxAlarm = limit.max_alarm_limit ? parseFloat(limit.max_alarm_limit) : Infinity;
-        const minWarn = limit.min_warning_limit ? parseFloat(limit.min_warning_limit) : minAlarm;
-        const maxWarn = limit.max_warning_limit ? parseFloat(limit.max_warning_limit) : maxAlarm;
+        // JIKA ADA LIMITASI TIPE STRING (e.g. status "ok", "normal", "up"):
+        if (limit.value_type === 'string' || limit.expected_value) {
+            const exp = String(limit.expected_value || 'ok').trim().toLowerCase();
+            const act = String(value).trim().toLowerCase();
+            if (act === exp || act.includes(exp)) {
+                return '#00ff88'; // Normal (Hijau)
+            } else {
+                return '#ff3355'; // Alarm (Merah)
+            }
+        }
 
-        if (numVal < minAlarm || numVal > maxAlarm) return '#ff3355'; // Alarm
-        if (numVal < minWarn || numVal > maxWarn) return '#ffcc00';   // Warning
-        return '#00ff88'; // Normal
+        const cleanValStr = String(value).replace(',', '.');
+        const numVal = parseFloat(cleanValStr);
+        if (isNaN(numVal)) return '#ffffff';
+
+        const minAlarm = (limit.min_alarm_limit != null && limit.min_alarm_limit !== '') ? parseFloat(limit.min_alarm_limit) : ((limit.alv != null && limit.alv !== '') ? parseFloat(limit.alv) : -Infinity);
+        const maxAlarm = (limit.max_alarm_limit != null && limit.max_alarm_limit !== '') ? parseFloat(limit.max_alarm_limit) : ((limit.ahv != null && limit.ahv !== '') ? parseFloat(limit.ahv) : Infinity);
+        const minWarn = (limit.min_warning_limit != null && limit.min_warning_limit !== '') ? parseFloat(limit.min_warning_limit) : ((limit.wlv != null && limit.wlv !== '') ? parseFloat(limit.wlv) : minAlarm);
+        const maxWarn = (limit.max_warning_limit != null && limit.max_warning_limit !== '') ? parseFloat(limit.max_warning_limit) : ((limit.whv != null && limit.whv !== '') ? parseFloat(limit.whv) : maxAlarm);
+
+        if (numVal < minAlarm || numVal > maxAlarm) return '#ff3355'; // Alarm (Merah)
+        if (numVal < minWarn || numVal > maxWarn) return '#ffcc00';   // Warning / Pre-Alarm (Kuning)
+        return '#00ff88'; // Normal / Dalam batas aman pre-alarm (Hijau)
     }   // equipmentId → [{...source}]
 
     // ── Wait until cabang-app renders ────────────────────────────────────────
@@ -708,10 +744,17 @@
                             ? formatSnmpMetricValue(k, rawVal)
                             : rawVal;
                         const eqSup = eq ? eq.sup_category : '';
-                        const valColor = getLimitColor(eqSup, label, rawVal);
+                        const valColor = getLimitColor(eqSup, label, rawVal, effParserId);
+                        const isAlarm = valColor === '#ff3355';
+                        const isWarning = valColor === '#ffcc00';
+                        const isNormalLimit = valColor === '#00ff88';
+                        const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : 'inherit';
+                        const badgeStyle = (isAlarm || isWarning || isNormalLimit)
+                            ? `background: ${isAlarm ? 'rgba(255,51,85,0.12)' : isWarning ? 'rgba(255,204,0,0.12)' : 'rgba(0,255,136,0.08)'}; border: 1px solid ${isAlarm ? 'rgba(255,51,85,0.4)' : isWarning ? 'rgba(255,204,0,0.4)' : 'rgba(0,255,136,0.3)'}; border-radius: 4px; padding: 2px 5px;`
+                            : '';
 
-                        return `<div class="sp-card-preview-point">
-                                <span class="sp-preview-label" title="${label}">${label}</span>
+                        return `<div class="sp-card-preview-point" style="${badgeStyle}">
+                                <span class="sp-preview-label" style="color:${labelColor};font-weight:${(isAlarm || isWarning || isNormalLimit) ? 'bold' : 'normal'}" title="${label}">${label}</span>
                                 <span class="sp-preview-value" style="color:${valColor}">${val}${unit}</span>
                             </div>`;
                     }).join('')}
@@ -958,11 +1001,42 @@
                     ${params.map(([label, key]) => {
                 const val = rd[key];
                 const display = (val === null || val === undefined || val === '-' || val === '—') ? '—' : val;
-                const isStale = status === 'Disconnect';
-                const valColor = isStale ? '#3a5a7a' : getLimitColor(supCategory || 'VHF A/G', label, val);
-                return `<div style="background:#0f1e35;border:1px solid #0d2a45;border-radius:5px;padding:8px 10px;">
-                            <div style="font-size:9px;color:#4a7a9a;letter-spacing:1px;margin-bottom:3px;">${label}</div>
-                            <div style="font-size:13px;font-weight:bold;color:${valColor};">${display}</div>
+                const limColor = getLimitColor(supCategory || 'VHF', label, val, 'vhf_t6tv');
+                let finalColor = '#ffffff';
+                let isAlarm = false;
+                let isWarning = false;
+                let isNormalLimit = false;
+
+                if (limColor === '#ff3355') {
+                    finalColor = '#ff3355';
+                    isAlarm = true;
+                } else if (limColor === '#ffcc00') {
+                    finalColor = '#ffcc00';
+                    isWarning = true;
+                } else if (limColor === '#00ff88') {
+                    finalColor = '#00ff88';
+                    isNormalLimit = true;
+                }
+
+                const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
+                const cardBorder = isAlarm 
+                    ? '1px solid rgba(255, 51, 85, 0.5)' 
+                    : isWarning 
+                    ? '1px solid rgba(255, 204, 0, 0.5)' 
+                    : isNormalLimit 
+                    ? '1px solid rgba(0, 255, 136, 0.35)' 
+                    : '1px solid #0d2a45';
+                const cardBg = isAlarm 
+                    ? 'rgba(255, 51, 85, 0.1)' 
+                    : isWarning 
+                    ? 'rgba(255, 204, 0, 0.1)' 
+                    : isNormalLimit 
+                    ? 'rgba(0, 255, 136, 0.06)' 
+                    : '#0f1e35';
+
+                return `<div style="background:${cardBg};border:${cardBorder};border-radius:5px;padding:8px 10px;transition:all 0.2s ease;">
+                            <div style="font-size:9px;color:${labelColor};letter-spacing:1px;margin-bottom:3px;font-weight:${(isAlarm || isWarning || isNormalLimit) ? 'bold' : 'normal'};">${label}</div>
+                            <div style="font-size:13px;font-weight:bold;color:${finalColor};">${display}</div>
                         </div>`;
             }).join('')}
                 </div>
@@ -971,22 +1045,73 @@
     }
 
     function renderDetailData(parserId, data, supCategory) {
+        currentActiveParserId = parserId;
+        window.currentDetailParserId = parserId;
         // Group by section based on parser
         const sections = getDetailSections(parserId, data, supCategory);
         return sections.map(sec => `
             <div style="margin-bottom:16px">
                 <div style="font-size:10px;color:#007a9e;letter-spacing:2px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #0d2a45">${sec.title}</div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
-                    ${sec.params.map(([label, val, cls]) => `
-                        <div style="background:#0f1e35;border:1px solid #0d2a45;border-radius:5px;padding:8px 10px">
-                            <div style="font-size:9px;color:#4a7a9a;letter-spacing:1px;margin-bottom:3px">${label}</div>
-                            <div style="font-size:13px;font-weight:bold;color:${cls || '#e8f4ff'}">${val !== null && val !== undefined ? val : '—'}</div>
-                        </div>`).join('')}
+                    ${sec.params.map(([label, val, cls]) => {
+                        // Evaluasi warna limitasi secara dinamis untuk setiap item/kolom:
+                        const limColor = getLimitColor(supCategory, label, val, parserId);
+
+                        // Aturan pewarnaan:
+                        // 1. Jika TIDAK ada trigger/aturan alarm limit -> SEMUANYA PUTIH (#ffffff)
+                        // 2. Jika ADA alarm limit:
+                        //    - Hijau (#00ff88) jika nilai tidak keluar dari pre-alarm (aman/normal)
+                        //    - Kuning (#ffcc00) jika pre-alarm / warning
+                        //    - Merah (#ff3355) jika alarm
+                        let finalColor = '#ffffff';
+                        let isAlarm = false;
+                        let isWarning = false;
+                        let isNormalLimit = false;
+
+                        if (limColor === '#ff3355') {
+                            finalColor = '#ff3355';
+                            isAlarm = true;
+                        } else if (limColor === '#ffcc00') {
+                            finalColor = '#ffcc00';
+                            isWarning = true;
+                        } else if (limColor === '#00ff88') {
+                            finalColor = '#00ff88';
+                            isNormalLimit = true;
+                        } else if (sec.title === 'Connection Error') {
+                            finalColor = cls || '#ff3355';
+                            if (finalColor === '#ff3355') isAlarm = true;
+                            if (finalColor === '#ffcc00') isWarning = true;
+                        }
+
+                        const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
+                        const cardBorder = isAlarm 
+                            ? '1px solid rgba(255, 51, 85, 0.5)' 
+                            : isWarning 
+                            ? '1px solid rgba(255, 204, 0, 0.5)' 
+                            : isNormalLimit 
+                            ? '1px solid rgba(0, 255, 136, 0.35)' 
+                            : '1px solid #0d2a45';
+                        const cardBg = isAlarm 
+                            ? 'rgba(255, 51, 85, 0.1)' 
+                            : isWarning 
+                            ? 'rgba(255, 204, 0, 0.1)' 
+                            : isNormalLimit 
+                            ? 'rgba(0, 255, 136, 0.06)' 
+                            : '#0f1e35';
+
+                        return `
+                        <div style="background:${cardBg};border:${cardBorder};border-radius:5px;padding:8px 10px;transition:all 0.2s ease;">
+                            <div style="font-size:9px;color:${labelColor};letter-spacing:1px;margin-bottom:3px;font-weight:${(isAlarm || isWarning || isNormalLimit) ? 'bold' : 'normal'}">${label}</div>
+                            <div style="font-size:13px;font-weight:bold;color:${finalColor}">${val !== null && val !== undefined ? val : '—'}</div>
+                        </div>`;
+                    }).join('')}
                 </div>
             </div>`).join('');
     }
 
     function getDetailSections(parserId, data, supCategory) {
+        currentActiveParserId = parserId;
+        window.currentDetailParserId = parserId;
         const sections = [];
 
         // Global Error Handling: if data has error (e.g. disconnected)
@@ -1190,6 +1315,12 @@
 
         } else if (parserId === 'dme_maru_310_320') {
             const sup = 'DME';
+            const isTxp1Active = data.txp_active === 'TXP1' || data.txp1_active === true;
+            const isTxp2Active = data.txp_active === 'TXP2' || data.txp2_active === true;
+
+            const txp1Color = (label, val) => isTxp1Active ? getLimitColor(sup, label, val) : '#e8f4ff';
+            const txp2Color = (label, val) => isTxp2Active ? getLimitColor(sup, label, val) : '#e8f4ff';
+
             sections.push({
                 title: 'STATUS', params: [
                     ['TXP Active', data.txp_active || '—', '#00ffcc'],
@@ -1198,62 +1329,62 @@
             });
             sections.push({
                 title: 'TXP1 — MON1', params: [
-                    ['Sys Delay', data.txp1_m1_sys_delay, getLimitColor(sup, 'System Delay', data.txp1_m1_sys_delay)],
-                    ['Reply Eff (%)', data.txp1_m1_reply_eff, getLimitColor(sup, 'Reply Efficiency', data.txp1_m1_reply_eff)],
+                    ['Sys Delay', data.txp1_m1_sys_delay, txp1Color('System Delay', data.txp1_m1_sys_delay)],
+                    ['Reply Eff (%)', data.txp1_m1_reply_eff, txp1Color('Reply Efficiency', data.txp1_m1_reply_eff)],
                     ['Pair Rate', data.txp1_m1_pair_rate, '#e8f4ff'],
-                    ['Fwd Power (W)', data.txp1_m1_fwd_power, getLimitColor(sup, 'Forward Power', data.txp1_m1_fwd_power)],
+                    ['Fwd Power (W)', data.txp1_m1_fwd_power, txp1Color('Forward Power', data.txp1_m1_fwd_power)],
                     ['Dur A', data.txp1_m1_dur_a, '#e8f4ff'],
                     ['Dur B', data.txp1_m1_dur_b, '#e8f4ff'],
                     ['Rise A', data.txp1_m1_rise_a, '#e8f4ff'],
                     ['Rise B', data.txp1_m1_rise_b, '#e8f4ff'],
                     ['Decay A', data.txp1_m1_decay_a, '#e8f4ff'],
                     ['Decay B', data.txp1_m1_decay_b, '#e8f4ff'],
-                    ['Spacing', data.txp1_m1_spacing, getLimitColor(sup, 'Pulse Spacing', data.txp1_m1_spacing)],
+                    ['Spacing', data.txp1_m1_spacing, txp1Color('Pulse Spacing', data.txp1_m1_spacing)],
                 ]
             });
             sections.push({
                 title: 'TXP1 — MON2', params: [
-                    ['Sys Delay', data.txp1_m2_sys_delay, vc(data.txp1_m2_sys_delay, 49.5, 50.5)],
-                    ['Reply Eff (%)', data.txp1_m2_reply_eff, vc(data.txp1_m2_reply_eff, 70, 100)],
+                    ['Sys Delay', data.txp1_m2_sys_delay, txp1Color('System Delay', data.txp1_m2_sys_delay)],
+                    ['Reply Eff (%)', data.txp1_m2_reply_eff, txp1Color('Reply Efficiency', data.txp1_m2_reply_eff)],
                     ['Pair Rate', data.txp1_m2_pair_rate, '#e8f4ff'],
-                    ['Fwd Power (W)', data.txp1_m2_fwd_power, vc(data.txp1_m2_fwd_power, 800, 1200)],
-                    ['Dur A', data.txp1_m2_dur_a, vc(data.txp1_m2_dur_a, 3.0, 3.8)],
-                    ['Dur B', data.txp1_m2_dur_b, vc(data.txp1_m2_dur_b, 3.0, 3.8)],
-                    ['Rise A', data.txp1_m2_rise_a, vc(data.txp1_m2_rise_a, 1.5, 2.5)],
-                    ['Rise B', data.txp1_m2_rise_b, vc(data.txp1_m2_rise_b, 1.5, 2.5)],
-                    ['Decay A', data.txp1_m2_decay_a, vc(data.txp1_m2_decay_a, 1.5, 2.5)],
-                    ['Decay B', data.txp1_m2_decay_b, vc(data.txp1_m2_decay_b, 1.5, 2.5)],
-                    ['Spacing', data.txp1_m2_spacing, vc(data.txp1_m2_spacing, 11.5, 12.5)],
+                    ['Fwd Power (W)', data.txp1_m2_fwd_power, txp1Color('Forward Power', data.txp1_m2_fwd_power)],
+                    ['Dur A', data.txp1_m2_dur_a, '#e8f4ff'],
+                    ['Dur B', data.txp1_m2_dur_b, '#e8f4ff'],
+                    ['Rise A', data.txp1_m2_rise_a, '#e8f4ff'],
+                    ['Rise B', data.txp1_m2_rise_b, '#e8f4ff'],
+                    ['Decay A', data.txp1_m2_decay_a, '#e8f4ff'],
+                    ['Decay B', data.txp1_m2_decay_b, '#e8f4ff'],
+                    ['Spacing', data.txp1_m2_spacing, txp1Color('Pulse Spacing', data.txp1_m2_spacing)],
                 ]
             });
             sections.push({
                 title: 'TXP2 — MON1', params: [
-                    ['Sys Delay', data.txp2_m1_sys_delay, vc(data.txp2_m1_sys_delay, 49.5, 50.5)],
-                    ['Reply Eff (%)', data.txp2_m1_reply_eff, vc(data.txp2_m1_reply_eff, 70, 100)],
+                    ['Sys Delay', data.txp2_m1_sys_delay, txp2Color('System Delay', data.txp2_m1_sys_delay)],
+                    ['Reply Eff (%)', data.txp2_m1_reply_eff, txp2Color('Reply Efficiency', data.txp2_m1_reply_eff)],
                     ['Pair Rate', data.txp2_m1_pair_rate, '#e8f4ff'],
-                    ['Fwd Power (W)', data.txp2_m1_fwd_power, vc(data.txp2_m1_fwd_power, 800, 1200)],
-                    ['Dur A', data.txp2_m1_dur_a, vc(data.txp2_m1_dur_a, 3.0, 3.8)],
-                    ['Dur B', data.txp2_m1_dur_b, vc(data.txp2_m1_dur_b, 3.0, 3.8)],
-                    ['Rise A', data.txp2_m1_rise_a, vc(data.txp2_m1_rise_a, 1.5, 2.5)],
-                    ['Rise B', data.txp2_m1_rise_b, vc(data.txp2_m1_rise_b, 1.5, 2.5)],
-                    ['Decay A', data.txp2_m1_decay_a, vc(data.txp2_m1_decay_a, 1.5, 2.5)],
-                    ['Decay B', data.txp2_m1_decay_b, vc(data.txp2_m1_decay_b, 1.5, 2.5)],
-                    ['Spacing', data.txp2_m1_spacing, vc(data.txp2_m1_spacing, 11.5, 12.5)],
+                    ['Fwd Power (W)', data.txp2_m1_fwd_power, txp2Color('Forward Power', data.txp2_m1_fwd_power)],
+                    ['Dur A', data.txp2_m1_dur_a, '#e8f4ff'],
+                    ['Dur B', data.txp2_m1_dur_b, '#e8f4ff'],
+                    ['Rise A', data.txp2_m1_rise_a, '#e8f4ff'],
+                    ['Rise B', data.txp2_m1_rise_b, '#e8f4ff'],
+                    ['Decay A', data.txp2_m1_decay_a, '#e8f4ff'],
+                    ['Decay B', data.txp2_m1_decay_b, '#e8f4ff'],
+                    ['Spacing', data.txp2_m1_spacing, txp2Color('Pulse Spacing', data.txp2_m1_spacing)],
                 ]
             });
             sections.push({
                 title: 'TXP2 — MON2', params: [
-                    ['Sys Delay', data.txp2_m2_sys_delay, vc(data.txp2_m2_sys_delay, 49.5, 50.5)],
-                    ['Reply Eff (%)', data.txp2_m2_reply_eff, vc(data.txp2_m2_reply_eff, 70, 100)],
+                    ['Sys Delay', data.txp2_m2_sys_delay, txp2Color('System Delay', data.txp2_m2_sys_delay)],
+                    ['Reply Eff (%)', data.txp2_m2_reply_eff, txp2Color('Reply Efficiency', data.txp2_m2_reply_eff)],
                     ['Pair Rate', data.txp2_m2_pair_rate, '#e8f4ff'],
-                    ['Fwd Power (W)', data.txp2_m2_fwd_power, vc(data.txp2_m2_fwd_power, 800, 1200)],
-                    ['Dur A', data.txp2_m2_dur_a, vc(data.txp2_m2_dur_a, 3.0, 3.8)],
-                    ['Dur B', data.txp2_m2_dur_b, vc(data.txp2_m2_dur_b, 3.0, 3.8)],
-                    ['Rise A', data.txp2_m2_rise_a, vc(data.txp2_m2_rise_a, 1.5, 2.5)],
-                    ['Rise B', data.txp2_m2_rise_b, vc(data.txp2_m2_rise_b, 1.5, 2.5)],
-                    ['Decay A', data.txp2_m2_decay_a, vc(data.txp2_m2_decay_a, 1.5, 2.5)],
-                    ['Decay B', data.txp2_m2_decay_b, vc(data.txp2_m2_decay_b, 1.5, 2.5)],
-                    ['Spacing', data.txp2_m2_spacing, vc(data.txp2_m2_spacing, 11.5, 12.5)],
+                    ['Fwd Power (W)', data.txp2_m2_fwd_power, txp2Color('Forward Power', data.txp2_m2_fwd_power)],
+                    ['Dur A', data.txp2_m2_dur_a, '#e8f4ff'],
+                    ['Dur B', data.txp2_m2_dur_b, '#e8f4ff'],
+                    ['Rise A', data.txp2_m2_rise_a, '#e8f4ff'],
+                    ['Rise B', data.txp2_m2_rise_b, '#e8f4ff'],
+                    ['Decay A', data.txp2_m2_decay_a, '#e8f4ff'],
+                    ['Decay B', data.txp2_m2_decay_b, '#e8f4ff'],
+                    ['Spacing', data.txp2_m2_spacing, txp2Color('Pulse Spacing', data.txp2_m2_spacing)],
                 ]
             });
         } else if (parserId === 'dme_mopah_binary') {
@@ -1550,32 +1681,30 @@
                 });
             }
         } else if (parserId === 'snmp_network_basic') {
-            const isConn = data.connectivity === 'Connected';
-            const cc = isConn ? '#00ff88' : '#ff3355';
             sections.push({
                 title: 'SISTEM JARINGAN', params: [
-                    ['Konektivitas', data.connectivity || '—', cc],
-                    ['Hostname', data.sys_name || '—', '#00d4ff'],
-                    ['IP', data.resolved_ip || '—', '#e8f4ff'],
-                    ['Hardware', data.hardware || '—', '#e8f4ff'],
-                    ['OS', data.operating_system || '—', '#5a8aaa'],
-                    ['Uptime', data.sys_uptime || '—', '#5a8aaa'],
-                    ['Lokasi', data.sys_location || '—', '#e8f4ff'],
+                    ['Konektivitas', data.connectivity || '—'],
+                    ['Hostname', data.sys_name || '—'],
+                    ['IP', data.resolved_ip || '—'],
+                    ['Hardware', data.hardware || '—'],
+                    ['OS', data.operating_system || '—'],
+                    ['Uptime', data.sys_uptime || '—'],
+                    ['Lokasi', data.sys_location || '—'],
                 ]
             });
             sections.push({
                 title: 'INTERFACE', params: [
-                    ['Total Interface', formatSnmpMetricValue('interface_count', data.interface_count), '#e8f4ff'],
-                    ['Interface Up', formatSnmpMetricValue('active_interface_count', data.active_interface_count), '#00ff88'],
-                    ['Interface Down', formatSnmpMetricValue('down_interface_count', data.down_interface_count), '#ffcc00'],
-                    ['Port Aktif', data.active_interfaces_summary || '—', '#00ff88'],
-                    ['Port Tidak Aktif', data.down_interfaces_summary || '—', '#ffcc00'],
-                    ['Top Interface', data.top_interface_name || '—', '#00d4ff'],
-                    ['Status Top Interface', data.top_interface_status || '—', '#e8f4ff'],
-                    ['In Octets', formatSnmpMetricValue('top_interface_in_octets', data.top_interface_in_octets), '#e8f4ff'],
-                    ['Out Octets', formatSnmpMetricValue('top_interface_out_octets', data.top_interface_out_octets), '#e8f4ff'],
-                    ['Temperature', formatSnmpMetricValue('temperature_c', data.temperature_c), getLimitColor('Switch', 'Temperature', data.temperature_c)],
-                    ['Temp Sensor', data.temperature_sensor_name || '—', '#e8f4ff'],
+                    ['Total Interface', formatSnmpMetricValue('interface_count', data.interface_count)],
+                    ['Interface Up', formatSnmpMetricValue('active_interface_count', data.active_interface_count)],
+                    ['Interface Down', formatSnmpMetricValue('down_interface_count', data.down_interface_count)],
+                    ['Port Aktif', data.active_interfaces_summary || '—'],
+                    ['Port Tidak Aktif', data.down_interfaces_summary || '—'],
+                    ['Top Interface', data.top_interface_name || '—'],
+                    ['Status Top Interface', data.top_interface_status || '—'],
+                    ['In Octets', formatSnmpMetricValue('top_interface_in_octets', data.top_interface_in_octets)],
+                    ['Out Octets', formatSnmpMetricValue('top_interface_out_octets', data.top_interface_out_octets)],
+                    ['Temperature', formatSnmpMetricValue('temperature_c', data.temperature_c)],
+                    ['Temp Sensor', data.temperature_sensor_name || '—'],
                 ]
             });
         } else if (parserId === 'asterix_radar') {

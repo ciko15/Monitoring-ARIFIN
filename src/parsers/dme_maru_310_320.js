@@ -28,19 +28,6 @@ const PASSIVE_TIMEOUT = 30000; // ms
 const POLL_INTERVAL   = 2000;  // ms
 const POLL_REQ_DELAY  = 150;   // ms
 
-const LIMITS = {
-    sys_delay:  [49.5,  50.5],
-    dur_a:      [3.0,   3.8],
-    dur_b:      [3.0,   3.8],
-    rise_a:     [1.5,   2.5],
-    rise_b:     [1.5,   2.5],
-    decay_a:    [1.5,   2.5],
-    decay_b:    [1.5,   2.5],
-    spacing:    [11.5,  12.5],
-    reply_eff:  [70,    100],
-    pair_rate:  [700,   1400],
-    fwd_power:  [800,   1200],
-};
 
 // ── w16: read big-endian uint16 from buffer ──────────────────────────────────
 function w16(data, offset) {
@@ -149,27 +136,6 @@ function hasPartialFrame(buf) {
     return etxPos < 0;
 }
 
-// ── checkAlarms ──────────────────────────────────────────────────────────────
-function checkAlarms(d, isActive) {
-    const alarms = [];
-    const checks = [
-        ['m1_reply_eff', 'reply_eff'],
-        ['m2_reply_eff', 'reply_eff'],
-    ];
-    if (isActive !== false) {
-        checks.push(['m1_fwd_power', 'fwd_power']);
-        checks.push(['m2_fwd_power', 'fwd_power']);
-    }
-    for (const [field, limitKey] of checks) {
-        const v = d[field];
-        const lim = LIMITS[limitKey];
-        if (v !== null && v !== undefined && lim && (v < lim[0] || v > lim[1])) {
-            alarms.push(`${field}=${v} out of range [${lim[0]}-${lim[1]}]`);
-        }
-    }
-    return alarms;
-}
-
 // ── Parser class ─────────────────────────────────────────────────────────────
 class DmeMaru310320Parser extends BaseParser {
     constructor(opts = {}) {
@@ -234,10 +200,6 @@ class DmeMaru310320Parser extends BaseParser {
             if (d2.txp_active === true) txpActive = 'TXP1';
             else if (d3.txp_active === true) txpActive = 'TXP2';
 
-            const alarms2 = checkAlarms(d2, d2.txp_active);
-            const alarms3 = checkAlarms(d3, d3.txp_active);
-            const allAlarms = [...alarms2.map(a => `TXP1 ${a}`), ...alarms3.map(a => `TXP2 ${a}`)];
-
             // Flatten for dashboard
             const flat = {
                 _mode: this._mode,
@@ -279,20 +241,20 @@ class DmeMaru310320Parser extends BaseParser {
                 txp2_active:        d3.txp_active,
             };
 
-            let currentStatus = 'Normal';
-            if (!d2.ident && !d3.ident) {
+            // Gunakan alarmRules dari BaseParser jika ada rule konfigurasi
+            const alarmResult = this.checkAlarms(flat);
+            let currentStatus = alarmResult.status || 'Normal';
+            if (!d2.ident && !d3.ident && Object.keys(d2).length === 0 && Object.keys(d3).length === 0) {
                 currentStatus = 'Disconnect';
-            } else if (allAlarms.length > 0) {
-                currentStatus = 'Alarm';
             }
 
             return {
                 success: true,
                 data: flat,
                 status: currentStatus,
-                alarms: allAlarms,
-                warnings: [],
-                triggeredParams: allAlarms,
+                alarms: alarmResult.alarms || [],
+                warnings: alarmResult.warnings || [],
+                triggeredParams: alarmResult.triggeredParams ? Object.keys(alarmResult.triggeredParams) : [],
                 timestamp: new Date().toISOString()
             };
 

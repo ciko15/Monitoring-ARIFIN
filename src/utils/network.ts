@@ -325,12 +325,45 @@ export async function determineStatus(data: any, templateId: string, equipmentId
                     const cleanKey = key.split('_').pop()?.toLowerCase() || key.toLowerCase();
                     
                     // Find matching limitation for this parameter key
+                    const aliasMap: Record<string, string[]> = {
+                        'totalinterface': ['interfacecount', 'totalinterfaces'],
+                        'interfaceup': ['activeinterfacecount', 'activeinterfaces'],
+                        'interfacedown': ['downinterfacecount', 'downinterfaces'],
+                        'temperature': ['temperaturec', 'temp', 'hottesttemp'],
+                        'cpuusage': ['cpu', 'processorload'],
+                        'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct'],
+                        'diskusage': ['diskusagepct', 'storageusage'],
+                        'systemdelay': ['sysdelay'],
+                        'pulserefficiency': ['replyeff', 'replyefficiency'],
+                        'pulsespacing': ['spacing'],
+                        'forwardpower': ['fwdpower'],
+                        'reflectedpower': ['reflpower']
+                    };
+
                     const limit = limitations.find((l: any) => {
-                        const limitName = l.name.toLowerCase();
-                        return limitName === cleanKey || 
-                               limitName.includes(cleanKey) || 
-                               cleanKey.includes(limitName) ||
-                               key.toLowerCase().includes(limitName);
+                        const limitName = String(l.name || l.label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const limitSource = String(l.source || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const targetKey = cleanKey.replace(/[^a-z0-9]/g, '');
+                        const fullKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        
+                        let isMatch = (limitName === targetKey || limitName === fullKey || limitSource === targetKey || limitSource === fullKey);
+                        if (!isMatch) {
+                            for (const [canon, aliases] of Object.entries(aliasMap)) {
+                                if ((limitName.includes(canon) || canon.includes(limitName)) && aliases.some(a => fullKey.includes(a) || a.includes(fullKey))) {
+                                    isMatch = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (l.match_mode === 'exact') {
+                            return isMatch;
+                        }
+                        // Default: Contains
+                        return isMatch || 
+                               targetKey.includes(limitName) || 
+                               limitName.includes(targetKey) ||
+                               fullKey.includes(limitName);
                     });
 
                     if (limit) {

@@ -1142,22 +1142,48 @@ async function getAllLimitations() {
   return await readJson(LIMITATION_CONFIG_PATH);
 }
 
-async function getLimitationsByEquipment(equipmentId) {
+async function getLimitationsByEquipment(equipmentId, specificParsingId = null) {
   const equipment = await getEquipmentById(equipmentId);
   if (!equipment) return [];
 
   const data = await getAllLimitations();
   const targetSup = String(equipment.sup_category || '').toLowerCase();
+  
+  // Ambil parsing_id yang terhubung ke equipment ini
+  const allSources = await readJson(AUTH_CONFIG_PATH);
+  const equipmentSources = allSources.filter(s => String(s.equipt_id) === String(equipmentId));
+  let activeParsingIds = equipmentSources.map(s => String(s.parsing_id || '').toLowerCase()).filter(Boolean);
+  if (specificParsingId) {
+    activeParsingIds = [String(specificParsingId).toLowerCase()];
+  }
+
   return data.filter(l => {
+    // 1. Cek filter parser jika diatur di rule limitasi
+    if (l.target_parsers && l.target_parsers.length > 0) {
+      const targetParsers = (Array.isArray(l.target_parsers) ? l.target_parsers : String(l.target_parsers).split(',')).map(p => p.trim().toLowerCase()).filter(Boolean);
+      if (targetParsers.length > 0) {
+        const hasMatchingParser = activeParsingIds.some(pid => targetParsers.includes(pid));
+        if (!hasMatchingParser && activeParsingIds.length > 0) {
+          return false;
+        }
+      }
+    }
+
+    // 2. Cek filter sub-kategori
     const limitSup = String(l.sup_category || '').toLowerCase();
-    return (!targetSup || limitSup === targetSup || limitSup === 'generic' || limitSup === 'all' || limitSup === '*');
+    return (!targetSup || limitSup === targetSup || limitSup === 'generic' || limitSup === 'all' || limitSup === '*' || !limitSup);
   });
 }
 
 async function createLimitation(data) {
   let all = await readJson(LIMITATION_CONFIG_PATH);
-  const id = Date.now();
+  const id = Number(data.id) || Date.now();
   const unit = data.value_type === 'percent' ? '%' : (data.unit || '');
+  const minWarn = data.min_warning_limit !== undefined && data.min_warning_limit !== '' ? data.min_warning_limit : (data.wlv || null);
+  const minAlarm = data.min_alarm_limit !== undefined && data.min_alarm_limit !== '' ? data.min_alarm_limit : (data.alv || null);
+  const maxWarn = data.max_warning_limit !== undefined && data.max_warning_limit !== '' ? data.max_warning_limit : (data.whv || null);
+  const maxAlarm = data.max_alarm_limit !== undefined && data.max_alarm_limit !== '' ? data.max_alarm_limit : (data.ahv || null);
+
   const newItem = {
     id: id,
     template_id: data.template_id || null,
@@ -1165,13 +1191,19 @@ async function createLimitation(data) {
     label: data.name,
     source: data.source || data.name.toLowerCase().replace(/\s+/g, '_'),
     unit: unit,
-    value_type: data.value_type,
-    min_warning_limit: data.min_warning_limit || data.wlv || null,
-    min_alarm_limit: data.min_alarm_limit || data.alv || null,
-    max_warning_limit: data.max_warning_limit || data.whv || null,
-    max_alarm_limit: data.max_alarm_limit || data.ahv || null,
-    sup_category: data.sup_category || null,
-    category: data.category || 'Support'
+    value_type: data.value_type || 'numeric',
+    match_mode: data.match_mode || 'contains',
+    target_parsers: data.target_parsers ? (Array.isArray(data.target_parsers) ? data.target_parsers : String(data.target_parsers).split(',').map(s => s.trim()).filter(Boolean)) : [],
+    min_warning_limit: minWarn,
+    min_alarm_limit: minAlarm,
+    max_warning_limit: maxWarn,
+    max_alarm_limit: maxAlarm,
+    wlv: minWarn,
+    alv: minAlarm,
+    whv: maxWarn,
+    ahv: maxAlarm,
+    sup_category: data.sup_category || 'All',
+    category: data.category || 'All'
   };
   all.push(newItem);
   await writeJson(LIMITATION_CONFIG_PATH, all);
@@ -1187,20 +1219,32 @@ async function updateLimitation(id, data) {
     
     if (cleanData.name !== undefined) { all[index].name = cleanData.name; all[index].label = cleanData.name; }
     if (cleanData.source !== undefined) all[index].source = cleanData.source;
+    if (cleanData.category !== undefined) all[index].category = cleanData.category;
+    if (cleanData.sup_category !== undefined) all[index].sup_category = cleanData.sup_category;
+    if (cleanData.match_mode !== undefined) all[index].match_mode = cleanData.match_mode;
+    if (cleanData.target_parsers !== undefined) {
+      all[index].target_parsers = Array.isArray(cleanData.target_parsers) 
+        ? cleanData.target_parsers 
+        : String(cleanData.target_parsers).split(',').map(s => s.trim()).filter(Boolean);
+    }
     if (cleanData.value_type !== undefined || cleanData.unit !== undefined) { 
       all[index].unit = cleanData.value_type === 'percent' ? '%' : (cleanData.unit || '');
       all[index].value_type = cleanData.value_type;
     }
   
-    const alv = cleanData.min_alarm_limit !== undefined ? cleanData.min_alarm_limit : cleanData.alv;
-    const ahv = cleanData.max_alarm_limit !== undefined ? cleanData.max_alarm_limit : cleanData.ahv;
-    const wlv = cleanData.min_warning_limit !== undefined ? cleanData.min_warning_limit : cleanData.wlv;
-    const whv = cleanData.max_warning_limit !== undefined ? cleanData.max_warning_limit : cleanData.whv;
+    const alv = cleanData.min_alarm_limit !== undefined && cleanData.min_alarm_limit !== '' ? cleanData.min_alarm_limit : (cleanData.alv || null);
+    const ahv = cleanData.max_alarm_limit !== undefined && cleanData.max_alarm_limit !== '' ? cleanData.max_alarm_limit : (cleanData.ahv || null);
+    const wlv = cleanData.min_warning_limit !== undefined && cleanData.min_warning_limit !== '' ? cleanData.min_warning_limit : (cleanData.wlv || null);
+    const whv = cleanData.max_warning_limit !== undefined && cleanData.max_warning_limit !== '' ? cleanData.max_warning_limit : (cleanData.whv || null);
   
-    if (alv !== undefined) all[index].min_alarm_limit = alv;
-    if (ahv !== undefined) all[index].max_alarm_limit = ahv;
-    if (wlv !== undefined) all[index].min_warning_limit = wlv;
-    if (whv !== undefined) all[index].max_warning_limit = whv;
+    all[index].min_alarm_limit = alv;
+    all[index].max_alarm_limit = ahv;
+    all[index].min_warning_limit = wlv;
+    all[index].max_warning_limit = whv;
+    all[index].alv = alv;
+    all[index].ahv = ahv;
+    all[index].wlv = wlv;
+    all[index].whv = whv;
     
     await writeJson(LIMITATION_CONFIG_PATH, all);
     return all[index];

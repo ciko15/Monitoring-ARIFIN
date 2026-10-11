@@ -2840,9 +2840,20 @@ window.renderConfigTable = function (tab, data, tbody) {
       const minLimits = `min: ${item.min_alarm_limit || item.alv || '-'} / ${item.min_warning_limit || item.wlv || '-'}`;
       const maxLimits = `max: ${item.max_warning_limit || item.whv || '-'} / ${item.max_alarm_limit || item.ahv || '-'}`;
 
+      const parsersBadge = item.target_parsers && String(item.target_parsers).trim()
+        ? `<div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px;">${String(item.target_parsers).split(',').map(p => `<span class="badge" style="background: rgba(0, 212, 255, 0.15); color: #00d4ff; font-size: 0.7rem; padding: 1px 5px;">${p.trim()}</span>`).join('')}</div>`
+        : `<div style="margin-top: 3px;"><small class="text-muted" style="font-size: 0.72rem;">Semua Parser (Global)</small></div>`;
+
+      const matchBadge = item.match_mode === 'exact' 
+        ? `<span class="badge" style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; font-size: 0.68rem; margin-left: 5px;">Exact</span>`
+        : `<span class="badge" style="background: rgba(0, 255, 136, 0.15); color: #00ff88; font-size: 0.68rem; margin-left: 5px;">Contains</span>`;
+
       tr.innerHTML = `
-        <td><strong>${item.name}</strong></td>
-        <td><span class="badge badge-info">${item.sup_category}</span></td>
+        <td>
+          <strong>${item.name}</strong>${matchBadge}
+          ${parsersBadge}
+        </td>
+        <td><span class="badge badge-info">${item.sup_category || 'All'}</span></td>
         <td>${item.value_type || 'numeric'}</td>
         <td style="font-size: 0.85rem;">
           <div><small class="text-muted">Expected:</small> ${item.expected_value || '-'}</div>
@@ -2974,67 +2985,160 @@ window.renderConfigFields = function (type, item, container) {
       .map(c => `<option value="${c}" ${item?.category === c ? 'selected' : ''}>${c}</option>`).join('');
 
     container.innerHTML = `
-      <div class="form-group-ux">
-        <label>Parameter Name</label>
-        <input type="text" name="name" value="${item?.name || ''}" required placeholder="e.g. Temperature, Status">
-      </div>
-      <div class="form-row-ux">
-        <div class="form-group-ux">
-          <label>Category</label>
-          <select name="category" required onchange="updateSubCategoryDropdown(this.value, 'modalSubCat')">
-            ${categoriesHtml}
-          </select>
+      <div class="limitation-form-grid">
+        <!-- Kolom Kiri: Konfigurasi Parameter & Kategori -->
+        <div class="limitation-card-panel">
+          <h4 style="margin: 0 0 14px 0; color: #00d4ff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-sliders-h"></i> Parameter & Scope
+          </h4>
+
+          <div class="form-group-ux" style="margin-bottom: 12px;">
+            <label style="font-size: 0.82rem; font-weight: 600;">Parameter / Label Name <span style="color:#ff3355">*</span></label>
+            <input type="text" name="name" value="${item?.name || ''}" required placeholder="e.g. Total Interface, Temperature, RF Level" style="width: 100%;">
+            <small class="text-muted" style="font-size: 0.72rem; margin-top: 4px; display: block; opacity: 0.8;">
+              Label yang tampil di popup detail atau nama variabel parser.
+            </small>
+          </div>
+
+          <div class="form-row-ux" style="margin-bottom: 12px;">
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.82rem; font-weight: 600;">Matching Rule</label>
+              <select name="match_mode">
+                <option value="contains" ${item?.match_mode !== 'exact' ? 'selected' : ''}>Mengandung Kata (Contains)</option>
+                <option value="exact" ${item?.match_mode === 'exact' ? 'selected' : ''}>Sama Persis (Exact Match)</option>
+              </select>
+              <small class="text-muted" style="font-size: 0.72rem; margin-top: 4px; display: block; opacity: 0.8;">
+                Contains: 'Total Interface' cocok jika kata terkandung di label.
+              </small>
+            </div>
+          </div>
+
+          <div class="form-row-ux" style="margin-bottom: 12px;">
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.82rem; font-weight: 600;">Category</label>
+              <select name="category" required onchange="updateSubCategoryDropdown(this.value, 'modalSubCat')">
+                <option value="All" ${!item || item?.category === 'All' ? 'selected' : ''}>Semua Kategori (Global / All)</option>
+                ${categoriesHtml}
+              </select>
+            </div>
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.82rem; font-weight: 600;">Sub-Category Scope</label>
+              <select name="sup_category" id="modalSubCat" required>
+                <option value="All" ${!item || item?.sup_category === 'All' || item?.sup_category === 'Generic' ? 'selected' : ''}>Semua Sub-Kategori (All / Generic)</option>
+                ${item && item?.sup_category && item?.sup_category !== 'All' && item?.sup_category !== 'Generic' ? `<option value="${item.sup_category}" selected>${item.sup_category}</option>` : ''}
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-ux">
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.82rem; font-weight: 600;">Value Type</label>
+              <select name="value_type" required>
+                <option value="numeric" ${!item || item?.value_type === 'numeric' ? 'selected' : ''}>Numeric Range</option>
+                <option value="percent" ${item?.value_type === 'percent' ? 'selected' : ''}>Percentage (%)</option>
+                <option value="string" ${item?.value_type === 'string' ? 'selected' : ''}>String Match (ok/normal)</option>
+              </select>
+            </div>
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.82rem; font-weight: 600;">Normal / Expected Value</label>
+              <input type="text" name="expected_value" value="${item?.expected_value || ''}" placeholder="e.g. ok, 100, up">
+            </div>
+          </div>
         </div>
-        <div class="form-group-ux">
-          <label>Sub-Category</label>
-          <select name="sup_category" id="modalSubCat" required>
-            ${item ? `<option value="${item.sup_category}">${item.sup_category}</option>` : '<option value="">Select Category First</option>'}
-          </select>
-        </div>
-      </div>
-      <div class="form-row-ux">
-        <div class="form-group-ux">
-          <label>Value Type</label>
-          <select name="value_type" required>
-            <option value="numeric" ${item?.value_type === 'numeric' ? 'selected' : ''}>Numeric Range</option>
-            <option value="string" ${item?.value_type === 'string' ? 'selected' : ''}>String Match (ok/normal)</option>
-            <option value="percent" ${item?.value_type === 'percent' ? 'selected' : ''}>Percentage (%)</option>
-          </select>
-        </div>
-        <div class="form-group-ux">
-          <label>Normal/Expected Value</label>
-          <input type="text" name="expected_value" value="${item?.expected_value || ''}" placeholder="e.g. ok or 100">
-        </div>
-      </div>
-      <div class="form-row-ux">
-        <div class="form-group-ux">
-          <label>Min. Alarm Limit</label>
-          <input type="number" step="any" name="min_alarm_limit" value="${item?.min_alarm_limit || item?.alv || ''}" placeholder="Min Alarm">
-        </div>
-        <div class="form-group-ux">
-          <label>Min. Warning Limit</label>
-          <input type="number" step="any" name="min_warning_limit" value="${item?.min_warning_limit || item?.wlv || ''}" placeholder="Min Warning">
-        </div>
-      </div>
-      <div class="form-row-ux">
-        <div class="form-group-ux">
-          <label>Max. Warning Limit</label>
-          <input type="number" step="any" name="max_warning_limit" value="${item?.max_warning_limit || item?.whv || ''}" placeholder="Max Warning">
-        </div>
-        <div class="form-group-ux">
-          <label>Max. Alarm Limit</label>
-          <input type="number" step="any" name="max_alarm_limit" value="${item?.max_alarm_limit || item?.ahv || ''}" placeholder="Max Alarm">
+
+        <!-- Kolom Kanan: Target Parsers Checklist & Ambang Batas Limits -->
+        <div class="limitation-card-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h4 style="margin: 0; color: #00d4ff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-microchip"></i> Target Parsers
+            </h4>
+            <span id="parserSelectionSummary" style="font-size: 0.75rem; color: #00ff88; font-weight: 500;">
+              Berlaku untuk SEMUA Parser
+            </span>
+          </div>
+
+          <!-- Search & Bulk Selection Bar -->
+          <div class="parser-search-bar">
+            <i class="fas fa-search" style="color: var(--text-secondary); font-size: 0.8rem;"></i>
+            <input type="text" id="searchTargetParsers" placeholder="Cari parser (contoh: switch, network, radar, dme...)" class="parser-search-input" oninput="window.filterTargetParsers(this.value)">
+            <button type="button" class="btn btn-secondary btn-xs" style="padding: 4px 8px; font-size: 0.72rem; white-space: nowrap;" onclick="window.toggleAllParsers(true)">Pilih Semua</button>
+            <button type="button" class="btn btn-secondary btn-xs" style="padding: 4px 8px; font-size: 0.72rem; white-space: nowrap;" onclick="window.toggleAllParsers(false)">Bersihkan</button>
+          </div>
+
+          <!-- Target Parsers Checklist Container -->
+          <div id="targetParsersContainer" class="target-parsers-list" style="margin-bottom: 14px;">
+            <small class="text-muted" style="padding: 6px;">Memuat daftar parser...</small>
+          </div>
+          <input type="hidden" name="target_parsers" id="targetParsersHidden" value="${item?.target_parsers ? (Array.isArray(item.target_parsers) ? item.target_parsers.join(',') : item.target_parsers) : ''}">
+
+          <!-- Ambang Batas (Threshold Limits) -->
+          <h4 style="margin: 0 0 10px 0; color: #00d4ff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-exclamation-triangle"></i> Ambang Batas (Thresholds)
+          </h4>
+
+          <div class="form-row-ux" style="margin-bottom: 8px;">
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.8rem; color: #ff3355;"><i class="fas fa-bell"></i> Min. Alarm Limit</label>
+              <input type="number" step="any" name="min_alarm_limit" value="${item?.min_alarm_limit || item?.alv || ''}" placeholder="Min Alarm">
+            </div>
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.8rem; color: #ffcc00;"><i class="fas fa-exclamation-circle"></i> Min. Warning Limit</label>
+              <input type="number" step="any" name="min_warning_limit" value="${item?.min_warning_limit || item?.wlv || ''}" placeholder="Min Warning">
+            </div>
+          </div>
+
+          <div class="form-row-ux">
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.8rem; color: #ffcc00;"><i class="fas fa-exclamation-circle"></i> Max. Warning Limit</label>
+              <input type="number" step="any" name="max_warning_limit" value="${item?.max_warning_limit || item?.whv || ''}" placeholder="Max Warning">
+            </div>
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.8rem; color: #ff3355;"><i class="fas fa-bell"></i> Max. Alarm Limit</label>
+              <input type="number" step="any" name="max_alarm_limit" value="${item?.max_alarm_limit || item?.ahv || ''}" placeholder="Max Alarm">
+            </div>
+          </div>
         </div>
       </div>
     `;
-    const initialCategory = item?.category || 'Communication';
-    setTimeout(() => {
-      updateSubCategoryDropdown(initialCategory, 'modalSubCat');
+
+    const initialCategory = item?.category || 'All';
+    setTimeout(async () => {
+      if (initialCategory !== 'All') {
+        updateSubCategoryDropdown(initialCategory, 'modalSubCat');
+      }
       if (item?.sup_category) {
         const select = document.getElementById('modalSubCat');
         if (select) select.value = item.sup_category;
       }
-    }, 100);
+
+      // Populate Target Parsers checkboxes
+      try {
+        const pRes = await fetch('/api/config/parsings', { headers: getAuthHeaders() });
+        const pList = await pRes.json();
+        const pContainer = document.getElementById('targetParsersContainer');
+        if (pContainer && Array.isArray(pList)) {
+          const selectedParsers = (item?.target_parsers ? (Array.isArray(item.target_parsers) ? item.target_parsers : String(item.target_parsers).split(',')) : []).map(s => String(s).trim());
+
+          pContainer.innerHTML = pList.map(p => {
+            const isChecked = selectedParsers.includes(p.id) ? 'checked' : '';
+            const isSelectedClass = isChecked ? 'selected' : '';
+            const searchTerms = `${p.name || ''} ${p.id || ''} ${p.category || ''}`.toLowerCase();
+            return `
+              <label class="target-parser-badge ${isSelectedClass}" data-search="${searchTerms}" onclick="window.handleParserBadgeClick(event, this)">
+                <input type="checkbox" class="target-parser-cb" value="${p.id}" ${isChecked} onchange="window.updateTargetParsersHidden()">
+                <span class="badge-title" style="font-weight: 500;">${p.name || p.id}</span>
+                <span class="badge-cat">(${p.category || 'General'})</span>
+              </label>
+            `;
+          }).join('');
+
+          window.updateTargetParsersHidden();
+        }
+      } catch (err) {
+        console.warn('Failed to load parsers for limitation:', err);
+      }
+    }, 50);
+
   } else if (type === 'authentication') {
     container.innerHTML = `
       <div class="form-row-ux">
@@ -3175,7 +3279,18 @@ window.handleConfigSubmit = async function (e) {
   const data = Object.fromEntries(formData.entries());
 
   if (type === 'sup-category') {
-    data.sub_categories = data.sub_categories_raw.split(',').map(s => s.trim()).filter(s => s);
+    data.sub_categories = (data.sub_categories_raw || '').split(',').map(s => s.trim()).filter(s => s);
+  }
+
+  if (type === 'limitation') {
+    // Explicitly grab all checked parsers directly from DOM
+    const checkedParsers = Array.from(document.querySelectorAll('.target-parser-cb:checked')).map(cb => cb.value);
+    data.target_parsers = checkedParsers;
+
+    // Sanitize numeric inputs (convert empty string to null)
+    ['min_alarm_limit', 'min_warning_limit', 'max_warning_limit', 'max_alarm_limit'].forEach(f => {
+      if (data[f] === '' || data[f] === undefined) data[f] = null;
+    });
   }
 
   try {
@@ -3192,10 +3307,14 @@ window.handleConfigSubmit = async function (e) {
 
     if (res.ok) {
       document.getElementById('configModal').classList.add('hidden');
+      showToast(`Konfigurasi ${type} berhasil disimpan!`, 'success');
       loadConfigData(type);
+      if (typeof window.loadLimitations === 'function') {
+        window.loadLimitations();
+      }
     } else {
-      const err = await res.json();
-      showToast(`Error: ${err.message || 'Operation failed'}`, 'error');
+      const err = await res.json().catch(() => ({}));
+      showToast(`Gagal menyimpan: ${err.message || res.statusText || 'Operation failed'}`, 'error');
     }
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error');
@@ -3228,9 +3347,77 @@ window.deleteConfigData = async function (type, id) {
   }
 }
 
+window.handleParserBadgeClick = function (e, badgeEl) {
+  if (e.target.tagName.toLowerCase() === 'input') return;
+  e.preventDefault();
+  const cb = badgeEl.querySelector('.target-parser-cb');
+  if (cb) {
+    cb.checked = !cb.checked;
+    window.updateTargetParsersHidden();
+  }
+};
+
+window.filterTargetParsers = function (query) {
+  const q = String(query || '').trim().toLowerCase();
+  const badges = document.querySelectorAll('#targetParsersContainer .target-parser-badge');
+  badges.forEach(badge => {
+    const searchTerms = badge.getAttribute('data-search') || '';
+    if (!q || searchTerms.includes(q)) {
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  });
+};
+
+window.toggleAllParsers = function (select) {
+  const visibleBadges = document.querySelectorAll('#targetParsersContainer .target-parser-badge');
+  visibleBadges.forEach(badge => {
+    if (badge.style.display !== 'none') {
+      const cb = badge.querySelector('.target-parser-cb');
+      if (cb) cb.checked = !!select;
+    }
+  });
+  window.updateTargetParsersHidden();
+};
+
+window.updateTargetParsersHidden = function () {
+  const allBadges = document.querySelectorAll('#targetParsersContainer .target-parser-badge');
+  allBadges.forEach(badge => {
+    const cb = badge.querySelector('.target-parser-cb');
+    if (cb && cb.checked) {
+      badge.classList.add('selected');
+    } else {
+      badge.classList.remove('selected');
+    }
+  });
+
+  const cbs = document.querySelectorAll('.target-parser-cb:checked');
+  const vals = Array.from(cbs).map(cb => cb.value);
+  const hiddenInput = document.getElementById('targetParsersHidden');
+  if (hiddenInput) hiddenInput.value = vals.join(',');
+
+  const summaryEl = document.getElementById('parserSelectionSummary');
+  if (summaryEl) {
+    if (vals.length === 0) {
+      summaryEl.textContent = 'Berlaku untuk SEMUA Parser';
+      summaryEl.style.color = '#00ff88';
+    } else {
+      summaryEl.textContent = `${vals.length} Parser Terpilih`;
+      summaryEl.style.color = '#00d4ff';
+    }
+  }
+};
+
+
 window.updateSubCategoryDropdown = async function (category, selectId) {
   const select = document.getElementById(selectId);
   if (!select) return;
+
+  if (category === 'All' || !category) {
+    select.innerHTML = '<option value="All">Semua Sub-Kategori (All / Generic)</option>';
+    return;
+  }
 
   if (!supCategoriesData || supCategoriesData.length === 0) {
     await loadSupCategories();
@@ -3239,11 +3426,11 @@ window.updateSubCategoryDropdown = async function (category, selectId) {
   const group = supCategoriesData.find(c => c.category === category);
   const options = group ? (group.sub_categories || []) : [];
 
-  if (options.length === 0) {
-    select.innerHTML = '<option value="">No sub-categories found</option>';
-  } else {
-    select.innerHTML = options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+  let html = '<option value="All">Semua Sub-Kategori (All / Generic)</option>';
+  if (options.length > 0) {
+    html += options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
   }
+  select.innerHTML = html;
 }
 
 // Global modal closer helper

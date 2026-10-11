@@ -2004,6 +2004,106 @@ tbody tr:hover {
   max-width: 700px;
 }
 
+#configModal .modal-container,
+.modal-container.modal-xlarge {
+  max-width: 980px !important;
+  width: 92vw !important;
+}
+
+/* Landscape Limitation Form Styles */
+.limitation-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .limitation-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.limitation-card-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.parser-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.parser-search-input {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.parser-search-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(0, 168, 255, 0.2);
+}
+
+.target-parsers-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.target-parser-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.target-parser-badge:hover {
+  background: rgba(0, 168, 255, 0.15);
+  border-color: var(--accent-primary);
+}
+
+.target-parser-badge.selected {
+  background: rgba(0, 168, 255, 0.25);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 8px rgba(0, 168, 255, 0.3);
+}
+
+.target-parser-badge input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent-primary);
+  width: 14px;
+  height: 14px;
+}
+
+.target-parser-badge .badge-cat {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
 .modal-header {
   padding: 20px 25px;
   border-bottom: 1px solid var(--border-color);

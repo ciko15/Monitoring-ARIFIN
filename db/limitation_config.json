@@ -353,5 +353,28 @@
     "max_alarm_limit": "75.0",
     "whv": "65.0",
     "ahv": "75.0"
+  },
+  {
+    "id": 1791698838435,
+    "template_id": null,
+    "name": "Total Interface",
+    "label": "Total Interface",
+    "source": "test_total_interface",
+    "unit": "",
+    "value_type": "numeric",
+    "min_warning_limit": "48",
+    "min_alarm_limit": "45",
+    "max_warning_limit": "51",
+    "max_alarm_limit": "52",
+    "sup_category": "All",
+    "category": "Data Processing",
+    "match_mode": "contains",
+    "target_parsers": [
+      "snmp_network_basic"
+    ],
+    "alv": "45",
+    "ahv": "52",
+    "wlv": "48",
+    "whv": "51"
   }
 ]

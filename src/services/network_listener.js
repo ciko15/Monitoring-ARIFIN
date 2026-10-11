@@ -167,6 +167,73 @@ class NetworkListenerService {
             if (isPingable) {
                 statusToEvaluate = 'Offline';
             }
+        } else if (source.equipt_id && parsedData && parsedData.data) {
+            // Dynamic Limitation Threshold Evaluation
+            try {
+                const limits = await this.equipmentService.db.getLimitationsByEquipment(source.equipt_id, source.parsing_id);
+                if (Array.isArray(limits) && limits.length > 0) {
+                    const aliasMap = {
+                        'totalinterface': ['interfacecount', 'totalinterfaces'],
+                        'interfaceup': ['activeinterfacecount', 'activeinterfaces'],
+                        'interfacedown': ['downinterfacecount', 'downinterfaces'],
+                        'temperature': ['temperaturec', 'temp', 'hottesttemp'],
+                        'cpuusage': ['cpu', 'processorload'],
+                        'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct'],
+                        'diskusage': ['diskusagepct', 'storageusage'],
+                        'systemdelay': ['sysdelay'],
+                        'pulserefficiency': ['replyeff', 'replyefficiency'],
+                        'pulsespacing': ['spacing'],
+                        'forwardpower': ['fwdpower'],
+                        'reflectedpower': ['reflpower']
+                    };
+
+                    for (const lim of limits) {
+                        const lName = String(lim.name || lim.label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const lSource = String(lim.source || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                        for (const [key, rawVal] of Object.entries(parsedData.data)) {
+                            const dKey = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                            let isMatch = (lName === dKey || lSource === dKey);
+                            if (!isMatch) {
+                                for (const [canon, aliases] of Object.entries(aliasMap)) {
+                                    if ((lName.includes(canon) || canon.includes(lName)) && aliases.some(a => dKey.includes(a) || a.includes(dKey))) {
+                                        isMatch = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!isMatch && lim.match_mode !== 'exact' && lName.length >= 3) {
+                                isMatch = dKey.includes(lName) || lName.includes(dKey);
+                            }
+
+                            if (isMatch) {
+                                const val = parseFloat(rawVal);
+                                if (!isNaN(val)) {
+                                    const minAlarm = lim.min_alarm_limit != null ? parseFloat(lim.min_alarm_limit) : (lim.alv != null ? parseFloat(lim.alv) : null);
+                                    const maxAlarm = lim.max_alarm_limit != null ? parseFloat(lim.max_alarm_limit) : (lim.ahv != null ? parseFloat(lim.ahv) : null);
+                                    const minWarn = lim.min_warning_limit != null ? parseFloat(lim.min_warning_limit) : (lim.wlv != null ? parseFloat(lim.wlv) : null);
+                                    const maxWarn = lim.max_warning_limit != null ? parseFloat(lim.max_warning_limit) : (lim.whv != null ? parseFloat(lim.whv) : null);
+
+                                    let isAlarm = false;
+                                    let isWarn = false;
+
+                                    if (minAlarm != null && val < minAlarm) isAlarm = true;
+                                    if (maxAlarm != null && val > maxAlarm) isAlarm = true;
+                                    if (minWarn != null && val < minWarn) isWarn = true;
+                                    if (maxWarn != null && val > maxWarn) isWarn = true;
+
+                                    if (isAlarm || isWarn) {
+                                        statusToEvaluate = 'Warning';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (evalErr) {
+                // non-fatal
+            }
         }
 
         const decision = this.statusGate.evaluate(source, statusToEvaluate, {

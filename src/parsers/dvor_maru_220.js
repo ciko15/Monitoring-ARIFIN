@@ -34,15 +34,6 @@ const PASSIVE_TIMEOUT = 30000; // ms — switch ke ACTIVE jika tidak ada data
 const POLL_INTERVAL = 2000;  // ms — interval polling ACTIVE
 const POLL_REQ_DELAY = 150;   // ms — jeda antar request
 
-const LIMITS = {
-    // carrier_power: [80.0, 120.0],
-    // rf_input: [-25.0, 0.0],
-    // fm_index: [15.0, 17.0],
-    // am_30hz: [28.0, 32.0],
-    // am_9960hz: [25.0, 32.5],
-    // am_1020hz: [6.0, 8.0],
-};
-
 function extractSections(buf) {
     const results = {};
     let i = 0;
@@ -169,19 +160,6 @@ function decodeAll(sections) {
     return r;
 }
 
-function checkAlarms(data) {
-    const alarms = [];
-    for (const monKey of ['mon1', 'mon2']) {
-        const mon = data[monKey] || {};
-        for (const [field, [lo, hi]] of Object.entries(LIMITS)) {
-            const v = mon[field];
-            if (v !== null && v !== undefined && (v < lo || v > hi)) {
-                alarms.push(`${monKey.toUpperCase()} ${field}=${v} out of range [${lo}-${hi}]`);
-            }
-        }
-    }
-    return alarms;
-}
 
 class DvorMaru220Parser extends BaseParser {
     constructor(opts = {}) {
@@ -276,13 +254,16 @@ class DvorMaru220Parser extends BaseParser {
             // MERGE dengan data sebelumnya agar tidak ada yang "hilang/blank" saat data datang sepotong-sepotong
             this._lastData = { ...(this._lastData || {}), ...flat };
 
+            // Evaluasi rule alarm jika ada rule khusus di parser config
+            const alarmResult = this.checkAlarms(this._lastData);
+
             return {
                 success: true,
                 data: this._lastData,
-                status: alarms.length > 0 ? 'Alarm' : 'Normal',
-                alarms,
-                warnings: [],
-                triggeredParams: alarms,
+                status: alarmResult.status || 'Normal',
+                alarms: alarmResult.alarms || [],
+                warnings: alarmResult.warnings || [],
+                triggeredParams: alarmResult.triggeredParams ? Object.keys(alarmResult.triggeredParams) : [],
                 timestamp: new Date().toISOString()
             };
 
