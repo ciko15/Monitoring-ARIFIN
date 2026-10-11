@@ -230,7 +230,6 @@ class DvorMaru220Parser extends BaseParser {
             if (lastEtx >= 0) this._passiveBuf = this._passiveBuf.slice(lastEtx + 5);
 
             const decoded = decodeAll(sections);
-            const alarms = checkAlarms(decoded);
 
             // Flatten for dashboard (hanya timpa jika nilai tidak null/undefined)
             const flat = { _mode: this._mode };

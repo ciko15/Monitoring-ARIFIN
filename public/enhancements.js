@@ -209,19 +209,63 @@
         const cleanLabel = normalizeLimitLabel(label);
         if (!cleanLabel) return '#ffffff';
 
+        const aliasMap = {
+            'suhu': ['temperature', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp'],
+            'temperature': ['suhu', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp'],
+            'kelembaban': ['humidity', 'humidity_pct', 'humidity pct', 'humi'],
+            'kelembapan': ['humidity', 'humidity_pct', 'humidity pct', 'humi'],
+            'humidity': ['kelembaban', 'kelembapan', 'humidity_pct', 'humidity pct', 'humi'],
+            'tegangan': ['voltage', 'volt', 'vln', 'vll', 'van voltage', 'vab', 'vbc', 'vca'],
+            'voltage': ['tegangan', 'volt', 'vln', 'vll', 'van voltage', 'vab', 'vbc', 'vca'],
+            'arus': ['current', 'ampere', 'amp', 'ia', 'ib', 'ic'],
+            'current': ['arus', 'ampere', 'amp', 'ia', 'ib', 'ic'],
+            'daya': ['power', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
+            'power': ['daya', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
+            'frekuensi': ['frequency', 'freq', 'hz'],
+            'frequency': ['frekuensi', 'freq', 'hz'],
+            'totalinterface': ['interfacecount', 'totalinterfaces', 'total interface'],
+            'interfaceup': ['activeinterfacecount', 'activeinterfaces', 'interface up'],
+            'interfacedown': ['downinterfacecount', 'downinterfaces', 'interface down'],
+            'cpuusage': ['cpu', 'processorload', 'cpu usage'],
+            'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct', 'ram usage'],
+            'ramavailable': ['ramavailablepct', 'memoryavailable', 'ram available'],
+            'diskusage': ['diskusagepct', 'storageusage', 'disk usage']
+        };
+
+        const checkNameMatch = (targetStr, candStr, isExact) => {
+            if (!targetStr || !candStr) return false;
+            if (targetStr === candStr) return true;
+            if (!isExact && (targetStr.includes(candStr) || candStr.includes(targetStr))) return true;
+
+            const canonTarget = targetStr.replace(/[^a-z0-9]/g, '');
+            const canonCand = candStr.replace(/[^a-z0-9]/g, '');
+            if (canonTarget && canonCand) {
+                if (canonTarget === canonCand) return true;
+                if (!isExact && (canonTarget.includes(canonCand) || canonCand.includes(canonTarget))) return true;
+
+                // Alias check
+                for (const [key, aliases] of Object.entries(aliasMap)) {
+                    const normKey = key.replace(/[^a-z0-9]/g, '');
+                    if (canonCand === normKey || canonCand.includes(normKey) || normKey.includes(canonCand)) {
+                        for (const alias of aliases) {
+                            const normAlias = alias.replace(/[^a-z0-9]/g, '');
+                            if (canonTarget === normAlias || canonTarget.includes(normAlias) || normAlias.includes(canonTarget)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        };
+
         const matchesLabel = (limitItem) => {
             const limitName = normalizeLimitLabel(limitItem.name || limitItem.label || '');
             const limitSource = normalizeLimitLabel(limitItem.source || '');
             if (!limitName && !limitSource) return false;
+            const isExact = limitItem.match_mode === 'exact';
 
-            if (limitItem.match_mode === 'exact') {
-                return limitName === cleanLabel || limitSource === cleanLabel;
-            }
-            // Contains match: sama persis ATAU salah satunya mengandung yang lain
-            if (limitName === cleanLabel || limitSource === cleanLabel) return true;
-            if (limitName && (cleanLabel.includes(limitName) || limitName.includes(cleanLabel))) return true;
-            if (limitSource && (cleanLabel.includes(limitSource) || limitSource.includes(cleanLabel))) return true;
-            return false;
+            return checkNameMatch(cleanLabel, limitName, isExact) || checkNameMatch(cleanLabel, limitSource, isExact);
         };
 
         const matchesParser = (limitItem, targetParserId) => {
@@ -231,11 +275,15 @@
             return parsers.some(p => p.trim().toLowerCase() === String(targetParserId).trim().toLowerCase());
         };
 
+        let targetSup = String(supCategory || '').toLowerCase();
+        if (effectiveParserId === 'temp_humidity_modbus' && (!targetSup || targetSup === 'support' || targetSup === 'generic')) {
+            targetSup = 'shelter';
+        }
+
         const findLimit = (mode) => window.limitationsCache.find(l => {
             if (!matchesParser(l, effectiveParserId)) return false;
 
             const limitSup = String(l.sup_category || '').toLowerCase();
-            const targetSup = String(supCategory || '').toLowerCase();
             const isGenericSup = limitSup === 'generic' || limitSup === 'all' || limitSup === '*' || !limitSup;
 
             if (mode === 'exact') {
@@ -1055,7 +1103,11 @@
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
                     ${sec.params.map(([label, val, cls]) => {
                         // Evaluasi warna limitasi secara dinamis untuk setiap item/kolom:
-                        const limColor = getLimitColor(supCategory, label, val, parserId);
+                        let limColor = getLimitColor(supCategory, label, val, parserId);
+                        // Fallback ke cls jika cls adalah hasil evaluasi limitasi valid yang telah dipersiapkan parser:
+                        if (limColor === '#ffffff' && (cls === '#ff3355' || cls === '#ffcc00' || cls === '#00ff88')) {
+                            limColor = cls;
+                        }
 
                         // Aturan pewarnaan:
                         // 1. Jika TIDAK ada trigger/aturan alarm limit -> SEMUANYA PUTIH (#ffffff)
@@ -1757,11 +1809,10 @@
             const humi = parseFloat(data.humidity_pct);
             sections.push({
                 title: 'SENSOR SUHU & KELEMBABAN', params: [
-                    ['Suhu (°C)', isNaN(temp) ? '—' : `${temp.toFixed(1)} °C`, getLimitColor(sup, 'Temperature', temp)],
-                    ['Kelembaban (%)', isNaN(humi) ? '—' : `${humi.toFixed(1)} %`, '#00d4ff'],
-                    ['Lokasi', data.location || '—', '#00d4ff'],
-                    ['Status', data.status_text || '—',
-                        data.status_text === 'Alarm' ? '#ff3355' : data.status_text === 'Warning' ? '#ffcc00' : '#00ff88'],
+                    ['Suhu (°C)', isNaN(temp) ? '—' : `${temp.toFixed(1)} °C`, getLimitColor(sup, 'Temperature', temp, parserId)],
+                    ['Kelembaban (%)', isNaN(humi) ? '—' : `${humi.toFixed(1)} %`, getLimitColor(sup, 'Humidity', humi, parserId)],
+                    ['Lokasi', data.location || '—'],
+                    ['Status', data.status_text || '—'],
                 ]
             });
             // sections.push({
