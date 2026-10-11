@@ -8,9 +8,6 @@ const { executeModbus } = require("../utils/modbus_wrapper");
  * Menggunakan modbus-serial wrapper untuk perlindungan unhandled rejection.
  */
 
-// const WARN_TEMP = 30.0;
-// const ALARM_TEMP = 35.0;
-
 // Mutex lock global per IP agar 2 sensor tidak pernah di-poll bersamaan (menghentikan collision 100%)
 const ipLocks = new Map();
 
@@ -53,14 +50,6 @@ async function pollTempHumidity(host, port, slaveId, timeoutMs = 4000) {
         let status = 'Normal';
         const alarms = [];
         const warnings = [];
-
-        if (tempC >= ALARM_TEMP) {
-            status = 'Alarm';
-            alarms.push(`Suhu Ruangan Tinggi (${tempC.toFixed(1)}°C)`);
-        } else if (tempC >= WARN_TEMP) {
-            status = 'Warning';
-            warnings.push(`Suhu Ruangan Hangat (${tempC.toFixed(1)}°C)`);
-        }
 
         return {
             success: true,
