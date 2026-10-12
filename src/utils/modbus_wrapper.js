@@ -55,10 +55,9 @@ async function executeModbus(options, executor) {
 
     const client = new ModbusRTU();
     
-    // Cegah unhandled rejection jika library mengeluarkan error dari background socket
-    client.on('error', (err) => {
-        // Log diabaikan atau disingkat karena akan tertangkap di promise execution
-    });
+    // Cegah unhandled error jika library mengeluarkan error dari background socket
+    const noopErr = (err) => {};
+    client.on('error', noopErr);
 
     try {
         client.setTimeout(timeoutMs);
@@ -80,15 +79,33 @@ async function executeModbus(options, executor) {
         throw error;
     } finally {
         try {
-            // Pembersihan menyeluruh (hapus socket, event listener, timer)
-            client.removeAllListeners('error');
-            client.removeAllListeners('timeout');
+            // Hancurkan underlying socket agar tidak ada event timeout/error liar yang terpanggil belakangan
+            if (client._port) {
+                if (typeof client._port.removeAllListeners === 'function') {
+                    client._port.removeAllListeners('error');
+                    client._port.on('error', noopErr);
+                }
+                if (client._port._client) {
+                    if (typeof client._port._client.removeAllListeners === 'function') {
+                        client._port._client.removeAllListeners('error');
+                        client._port._client.on('error', noopErr);
+                    }
+                    if (typeof client._port._client.destroy === 'function') {
+                        client._port._client.destroy();
+                    }
+                }
+                if (typeof client._port.destroy === 'function') {
+                    client._port.destroy();
+                }
+            }
             if (client.isOpen) {
                 client.close();
             }
         } catch (e) {
             // Ignore close errors
         }
+        // Pastikan error listener noop tetap terpasang
+        client.on('error', noopErr);
         releaseLock(lockKey);
     }
 }
