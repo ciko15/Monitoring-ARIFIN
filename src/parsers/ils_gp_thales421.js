@@ -113,10 +113,6 @@ function decodePktC(pkt) {
     const isRemote = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
 
-    // 0x00 = TX1, 0x10 = TX2
-    // Jika selain itu (misal ACK/status/heartbeat), abaikan agar tidak menimpa parameter telemetri dengan angka 0
-    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
-
     const txData = pkt[4] === 0x10 ? 'TX2' : 'TX1';
 
     const params = {};
@@ -141,10 +137,7 @@ function extractFrames(buf) {
         if (isPktCSync(buf, i)) {
             const dec = decodePktC(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
-                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
-                if (dec.tx_data === dec.tx_main) {
-                    results.push({ pos: i, decoded: dec });
-                }
+                results.push({ pos: i, decoded: dec });
                 i += PKT_C_SIZE - 1;
             }
         }
