@@ -281,6 +281,9 @@
         }
 
         const findLimit = (mode) => window.limitationsCache.find(l => {
+            // Abaikan jika limitasi berstatus nonaktif:
+            if (l.is_active === false || l.is_active === 'false' || l.is_active === 0 || l.is_active === '0') return false;
+
             if (!matchesParser(l, effectiveParserId)) return false;
 
             const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
@@ -305,12 +308,12 @@
 
         // JIKA ADA LIMITASI TIPE BOOLEAN, STATE, ATAU STRING:
         const isStateOrBool = limit.value_type === 'string' ||
-                              limit.value_type === 'boolean' ||
-                              limit.value_type === 'state' ||
-                              (limit.expected_value != null && limit.expected_value !== '') ||
-                              (limit.normal_value != null && limit.normal_value !== '') ||
-                              (limit.alarm_value != null && limit.alarm_value !== '') ||
-                              (limit.warning_value != null && limit.warning_value !== '');
+            limit.value_type === 'boolean' ||
+            limit.value_type === 'state' ||
+            (limit.expected_value != null && limit.expected_value !== '') ||
+            (limit.normal_value != null && limit.normal_value !== '') ||
+            (limit.alarm_value != null && limit.alarm_value !== '') ||
+            (limit.warning_value != null && limit.warning_value !== '');
 
         if (isStateOrBool) {
             const norm = String(limit.normal_value != null && limit.normal_value !== '' ? limit.normal_value : (limit.expected_value || '')).trim().toLowerCase();
@@ -341,6 +344,19 @@
         const cleanValStr = String(value).replace(',', '.');
         const numVal = parseFloat(cleanValStr);
         if (isNaN(numVal)) return '#ffffff';
+
+        const hasAlarm = (limit.min_alarm_limit != null && limit.min_alarm_limit !== '') ||
+                         (limit.max_alarm_limit != null && limit.max_alarm_limit !== '') ||
+                         (limit.alv != null && limit.alv !== '') ||
+                         (limit.ahv != null && limit.ahv !== '');
+
+        const hasWarn = (limit.min_warning_limit != null && limit.min_warning_limit !== '') ||
+                        (limit.max_warning_limit != null && limit.max_warning_limit !== '') ||
+                        (limit.wlv != null && limit.wlv !== '') ||
+                        (limit.whv != null && limit.whv !== '');
+
+        // JIKA TIDAK ADA BATAS ALARM ATAU WARNING YANG DIATUR: TETAP PUTIH!
+        if (!hasAlarm && !hasWarn) return '#ffffff';
 
         const minAlarm = (limit.min_alarm_limit != null && limit.min_alarm_limit !== '') ? parseFloat(limit.min_alarm_limit) : ((limit.alv != null && limit.alv !== '') ? parseFloat(limit.alv) : -Infinity);
         const maxAlarm = (limit.max_alarm_limit != null && limit.max_alarm_limit !== '') ? parseFloat(limit.max_alarm_limit) : ((limit.ahv != null && limit.ahv !== '') ? parseFloat(limit.ahv) : Infinity);
@@ -983,6 +999,9 @@
     }
 
     function showDetailModal(src, data, eqSup) {
+        if (typeof loadLimitations === 'function') {
+            loadLimitations().catch(() => {});
+        }
         let modal = document.getElementById('dataSourceDetailModal');
         if (!modal) { createDetailModal(); modal = document.getElementById('dataSourceDetailModal'); }
 
@@ -1092,20 +1111,20 @@
                 }
 
                 const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
-                const cardBorder = isAlarm 
-                    ? '1px solid rgba(255, 51, 85, 0.5)' 
-                    : isWarning 
-                    ? '1px solid rgba(255, 204, 0, 0.5)' 
-                    : isNormalLimit 
-                    ? '1px solid rgba(0, 255, 136, 0.35)' 
-                    : '1px solid #0d2a45';
-                const cardBg = isAlarm 
-                    ? 'rgba(255, 51, 85, 0.1)' 
-                    : isWarning 
-                    ? 'rgba(255, 204, 0, 0.1)' 
-                    : isNormalLimit 
-                    ? 'rgba(0, 255, 136, 0.06)' 
-                    : '#0f1e35';
+                const cardBorder = isAlarm
+                    ? '1px solid rgba(255, 51, 85, 0.5)'
+                    : isWarning
+                        ? '1px solid rgba(255, 204, 0, 0.5)'
+                        : isNormalLimit
+                            ? '1px solid rgba(0, 255, 136, 0.35)'
+                            : '1px solid #0d2a45';
+                const cardBg = isAlarm
+                    ? 'rgba(255, 51, 85, 0.1)'
+                    : isWarning
+                        ? 'rgba(255, 204, 0, 0.1)'
+                        : isNormalLimit
+                            ? 'rgba(0, 255, 136, 0.06)'
+                            : '#0f1e35';
 
                 return `<div style="background:${cardBg};border:${cardBorder};border-radius:5px;padding:8px 10px;transition:all 0.2s ease;">
                             <div style="font-size:9px;color:${labelColor};letter-spacing:1px;margin-bottom:3px;font-weight:${(isAlarm || isWarning || isNormalLimit) ? 'bold' : 'normal'};">${label}</div>
@@ -1127,61 +1146,61 @@
                 <div style="font-size:10px;color:#007a9e;letter-spacing:2px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #0d2a45">${sec.title}</div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
                     ${sec.params.map(([label, val, cls]) => {
-                        // Evaluasi warna limitasi secara dinamis untuk setiap item/kolom:
-                        let limColor = getLimitColor(supCategory, label, val, parserId);
-                        // Fallback ke cls jika cls adalah hasil evaluasi limitasi valid yang telah dipersiapkan parser:
-                        if (limColor === '#ffffff' && (cls === '#ff3355' || cls === '#ffcc00' || cls === '#00ff88')) {
-                            limColor = cls;
-                        }
+            // Evaluasi warna limitasi secara dinamis untuk setiap item/kolom:
+            let limColor = getLimitColor(supCategory, label, val, parserId);
+            // Fallback ke cls jika cls adalah hasil evaluasi limitasi valid yang telah dipersiapkan parser:
+            if (limColor === '#ffffff' && (cls === '#ff3355' || cls === '#ffcc00' || cls === '#00ff88')) {
+                limColor = cls;
+            }
 
-                        // Aturan pewarnaan:
-                        // 1. Jika TIDAK ada trigger/aturan alarm limit -> SEMUANYA PUTIH (#ffffff)
-                        // 2. Jika ADA alarm limit:
-                        //    - Hijau (#00ff88) jika nilai tidak keluar dari pre-alarm (aman/normal)
-                        //    - Kuning (#ffcc00) jika pre-alarm / warning
-                        //    - Merah (#ff3355) jika alarm
-                        let finalColor = '#ffffff';
-                        let isAlarm = false;
-                        let isWarning = false;
-                        let isNormalLimit = false;
+            // Aturan pewarnaan:
+            // 1. Jika TIDAK ada trigger/aturan alarm limit -> SEMUANYA PUTIH (#ffffff)
+            // 2. Jika ADA alarm limit:
+            //    - Hijau (#00ff88) jika nilai tidak keluar dari pre-alarm (aman/normal)
+            //    - Kuning (#ffcc00) jika pre-alarm / warning
+            //    - Merah (#ff3355) jika alarm
+            let finalColor = '#ffffff';
+            let isAlarm = false;
+            let isWarning = false;
+            let isNormalLimit = false;
 
-                        if (limColor === '#ff3355') {
-                            finalColor = '#ff3355';
-                            isAlarm = true;
-                        } else if (limColor === '#ffcc00') {
-                            finalColor = '#ffcc00';
-                            isWarning = true;
-                        } else if (limColor === '#00ff88') {
-                            finalColor = '#00ff88';
-                            isNormalLimit = true;
-                        } else if (sec.title === 'Connection Error') {
-                            finalColor = cls || '#ff3355';
-                            if (finalColor === '#ff3355') isAlarm = true;
-                            if (finalColor === '#ffcc00') isWarning = true;
-                        }
+            if (limColor === '#ff3355') {
+                finalColor = '#ff3355';
+                isAlarm = true;
+            } else if (limColor === '#ffcc00') {
+                finalColor = '#ffcc00';
+                isWarning = true;
+            } else if (limColor === '#00ff88') {
+                finalColor = '#00ff88';
+                isNormalLimit = true;
+            } else if (sec.title === 'Connection Error') {
+                finalColor = cls || '#ff3355';
+                if (finalColor === '#ff3355') isAlarm = true;
+                if (finalColor === '#ffcc00') isWarning = true;
+            }
 
-                        const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
-                        const cardBorder = isAlarm 
-                            ? '1px solid rgba(255, 51, 85, 0.5)' 
-                            : isWarning 
-                            ? '1px solid rgba(255, 204, 0, 0.5)' 
-                            : isNormalLimit 
-                            ? '1px solid rgba(0, 255, 136, 0.35)' 
-                            : '1px solid #0d2a45';
-                        const cardBg = isAlarm 
-                            ? 'rgba(255, 51, 85, 0.1)' 
-                            : isWarning 
-                            ? 'rgba(255, 204, 0, 0.1)' 
-                            : isNormalLimit 
-                            ? 'rgba(0, 255, 136, 0.06)' 
-                            : '#0f1e35';
+            const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
+            const cardBorder = isAlarm
+                ? '1px solid rgba(255, 51, 85, 0.5)'
+                : isWarning
+                    ? '1px solid rgba(255, 204, 0, 0.5)'
+                    : isNormalLimit
+                        ? '1px solid rgba(0, 255, 136, 0.35)'
+                        : '1px solid #0d2a45';
+            const cardBg = isAlarm
+                ? 'rgba(255, 51, 85, 0.1)'
+                : isWarning
+                    ? 'rgba(255, 204, 0, 0.1)'
+                    : isNormalLimit
+                        ? 'rgba(0, 255, 136, 0.06)'
+                        : '#0f1e35';
 
-                        return `
+            return `
                         <div style="background:${cardBg};border:${cardBorder};border-radius:5px;padding:8px 10px;transition:all 0.2s ease;">
                             <div style="font-size:9px;color:${labelColor};letter-spacing:1px;margin-bottom:3px;font-weight:${(isAlarm || isWarning || isNormalLimit) ? 'bold' : 'normal'}">${label}</div>
                             <div style="font-size:13px;font-weight:bold;color:${finalColor}">${val !== null && val !== undefined ? val : '—'}</div>
                         </div>`;
-                    }).join('')}
+        }).join('')}
                 </div>
             </div>`).join('');
     }
@@ -1772,11 +1791,11 @@
             sections.push({
                 title: 'INTERFACE', params: [
                     ['Total Interface', formatSnmpMetricValue('interface_count', data.interface_count)],
+                    ['Top Interface', data.top_interface_name || '—'],
                     ['Interface Up', formatSnmpMetricValue('active_interface_count', data.active_interface_count)],
                     ['Interface Down', formatSnmpMetricValue('down_interface_count', data.down_interface_count)],
                     ['Port Aktif', data.active_interfaces_summary || '—'],
                     ['Port Tidak Aktif', data.down_interfaces_summary || '—'],
-                    ['Top Interface', data.top_interface_name || '—'],
                     ['Status Top Interface', data.top_interface_status || '—'],
                     ['In Octets', formatSnmpMetricValue('top_interface_in_octets', data.top_interface_in_octets)],
                     ['Out Octets', formatSnmpMetricValue('top_interface_out_octets', data.top_interface_out_octets)],

@@ -19,6 +19,11 @@ function checkThreshold(value, config = {}) {
     return 'Disconnect';
   }
 
+  // Jika limitasi dinonaktifkan (inactive / disabled), abaikan (status Normal / tidak ada alarm)
+  if (config.is_active === false || config.is_active === 'false' || config.is_active === 0 || config.is_active === '0') {
+    return 'Normal';
+  }
+
   // ── Boolean & State / String Threshold Evaluation ───────────────────────
   const isStateOrBool = config.value_type === 'boolean' ||
                         config.value_type === 'string' ||

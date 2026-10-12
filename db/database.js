@@ -1186,6 +1186,10 @@ async function createLimitation(data) {
   const maxWarn = data.max_warning_limit !== undefined && data.max_warning_limit !== '' ? data.max_warning_limit : (data.whv || null);
   const maxAlarm = data.max_alarm_limit !== undefined && data.max_alarm_limit !== '' ? data.max_alarm_limit : (data.ahv || null);
 
+  const isActive = data.is_active !== undefined 
+    ? (data.is_active === true || data.is_active === 'true' || data.is_active === 1 || data.is_active === '1')
+    : true;
+
   const newItem = {
     id: id,
     template_id: data.template_id || null,
@@ -1195,6 +1199,7 @@ async function createLimitation(data) {
     unit: unit,
     value_type: data.value_type || 'numeric',
     match_mode: data.match_mode || 'contains',
+    is_active: isActive,
     target_parsers: data.target_parsers ? (Array.isArray(data.target_parsers) ? data.target_parsers : String(data.target_parsers).split(',').map(s => s.trim()).filter(Boolean)) : [],
     min_warning_limit: minWarn,
     min_alarm_limit: minAlarm,
@@ -1228,6 +1233,9 @@ async function updateLimitation(id, data) {
     if (cleanData.category !== undefined) all[index].category = cleanData.category;
     if (cleanData.sup_category !== undefined) all[index].sup_category = cleanData.sup_category;
     if (cleanData.match_mode !== undefined) all[index].match_mode = cleanData.match_mode;
+    if (cleanData.is_active !== undefined) {
+      all[index].is_active = (cleanData.is_active === true || cleanData.is_active === 'true' || cleanData.is_active === 1 || cleanData.is_active === '1');
+    }
     if (cleanData.expected_value !== undefined) all[index].expected_value = cleanData.expected_value;
     if (cleanData.normal_value !== undefined) all[index].normal_value = cleanData.normal_value;
     if (cleanData.warning_value !== undefined) all[index].warning_value = cleanData.warning_value;
@@ -1237,24 +1245,34 @@ async function updateLimitation(id, data) {
         ? cleanData.target_parsers 
         : String(cleanData.target_parsers).split(',').map(s => s.trim()).filter(Boolean);
     }
-    if (cleanData.value_type !== undefined || cleanData.unit !== undefined) { 
-      all[index].unit = cleanData.value_type === 'percent' ? '%' : (cleanData.unit || '');
+    if (cleanData.value_type !== undefined) {
       all[index].value_type = cleanData.value_type;
+      if (cleanData.value_type === 'percent') all[index].unit = '%';
+    }
+    if (cleanData.unit !== undefined && cleanData.value_type !== 'percent') {
+      all[index].unit = cleanData.unit || '';
     }
   
-    const alv = cleanData.min_alarm_limit !== undefined && cleanData.min_alarm_limit !== '' ? cleanData.min_alarm_limit : (cleanData.alv || null);
-    const ahv = cleanData.max_alarm_limit !== undefined && cleanData.max_alarm_limit !== '' ? cleanData.max_alarm_limit : (cleanData.ahv || null);
-    const wlv = cleanData.min_warning_limit !== undefined && cleanData.min_warning_limit !== '' ? cleanData.min_warning_limit : (cleanData.wlv || null);
-    const whv = cleanData.max_warning_limit !== undefined && cleanData.max_warning_limit !== '' ? cleanData.max_warning_limit : (cleanData.whv || null);
-  
-    all[index].min_alarm_limit = alv;
-    all[index].max_alarm_limit = ahv;
-    all[index].min_warning_limit = wlv;
-    all[index].max_warning_limit = whv;
-    all[index].alv = alv;
-    all[index].ahv = ahv;
-    all[index].wlv = wlv;
-    all[index].whv = whv;
+    if (cleanData.min_alarm_limit !== undefined || cleanData.alv !== undefined) {
+      const alv = cleanData.min_alarm_limit !== undefined && cleanData.min_alarm_limit !== '' ? cleanData.min_alarm_limit : (cleanData.alv || null);
+      all[index].min_alarm_limit = alv;
+      all[index].alv = alv;
+    }
+    if (cleanData.max_alarm_limit !== undefined || cleanData.ahv !== undefined) {
+      const ahv = cleanData.max_alarm_limit !== undefined && cleanData.max_alarm_limit !== '' ? cleanData.max_alarm_limit : (cleanData.ahv || null);
+      all[index].max_alarm_limit = ahv;
+      all[index].ahv = ahv;
+    }
+    if (cleanData.min_warning_limit !== undefined || cleanData.wlv !== undefined) {
+      const wlv = cleanData.min_warning_limit !== undefined && cleanData.min_warning_limit !== '' ? cleanData.min_warning_limit : (cleanData.wlv || null);
+      all[index].min_warning_limit = wlv;
+      all[index].wlv = wlv;
+    }
+    if (cleanData.max_warning_limit !== undefined || cleanData.whv !== undefined) {
+      const whv = cleanData.max_warning_limit !== undefined && cleanData.max_warning_limit !== '' ? cleanData.max_warning_limit : (cleanData.whv || null);
+      all[index].max_warning_limit = whv;
+      all[index].whv = whv;
+    }
     
     await writeJson(LIMITATION_CONFIG_PATH, all);
     return all[index];

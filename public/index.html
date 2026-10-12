@@ -1884,7 +1884,15 @@
                     <div class="card-header"
                       style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                       <h3><i class="fas fa-exclamation-triangle"></i> Standard Limitations</h3>
-                      <div class="filter-group" style="display: flex; align-items: center; gap: 10px;">
+                      <div class="filter-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div class="search-box" style="position: relative; display: flex; align-items: center;">
+                          <i class="fas fa-search" style="position: absolute; left: 10px; color: var(--text-secondary, #888); font-size: 0.8rem; pointer-events: none;"></i>
+                          <input type="text" id="searchLimitationInput" placeholder="Cari limitasi..." 
+                            style="padding-left: 28px; padding-right: 10px; height: 31px; font-size: 0.82rem; background: var(--bg-secondary, #1e222d); border: 1px solid var(--border-color, #2c3242); border-radius: 6px; color: var(--text-primary, #fff); width: 190px; outline: none; transition: border-color 0.2s;" 
+                            onfocus="this.style.borderColor='var(--accent-primary, #00d4ff)'" 
+                            onblur="this.style.borderColor='var(--border-color, #2c3242)'"
+                            oninput="window.filterLimitationTable()" autocomplete="off">
+                        </div>
                         <select id="filterLimitationSupCategory" class="btn btn-outline btn-sm"
                           style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer;">
                           <option value="">All Sub-Categories</option>
@@ -2148,9 +2156,9 @@
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-  <script src="app.js?v=29"></script>
+  <script src="app.js?v=33"></script>
   <script src="cabang-app.js?v=2"></script>
-  <script src="enhancements.js?v=17"></script>
+  <script src="enhancements.js?v=19"></script>
   <script src="snmp-tools.js"></script>
 
   <script src="template-app.js"></script>

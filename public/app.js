@@ -2711,8 +2711,24 @@ window.initConfigureNav = function () {
 }
 
 // Filter for limitations
+window.filterLimitationTable = function () {
+  const tbody = document.getElementById('configLimitationTableBody');
+  if (tbody && Array.isArray(configLimitationCache)) {
+    renderConfigTable('limitation', configLimitationCache, tbody);
+  }
+};
+
 function updateLimitationFilterOptions() {
   const select = document.getElementById('filterLimitationSupCategory');
+  const searchInput = document.getElementById('searchLimitationInput');
+
+  if (searchInput && !searchInput.dataset.listenerAdded) {
+    searchInput.addEventListener('input', () => {
+      window.filterLimitationTable();
+    });
+    searchInput.dataset.listenerAdded = 'true';
+  }
+
   if (!select) return;
 
   const currentFilter = select.value;
@@ -2732,8 +2748,7 @@ function updateLimitationFilterOptions() {
   // Add event listener if not already added
   if (!select.dataset.listenerAdded) {
     select.addEventListener('change', () => {
-      const tbody = document.getElementById('configLimitationTableBody');
-      if (tbody) renderConfigTable('limitation', configLimitationCache, tbody);
+      window.filterLimitationTable();
     });
     select.dataset.listenerAdded = 'true';
   }
@@ -2817,12 +2832,22 @@ window.renderConfigTable = function (tab, data, tbody) {
   tbody.innerHTML = '';
 
   const filterValue = tab === 'limitation' ? document.getElementById('filterLimitationSupCategory')?.value : null;
+  const searchVal = tab === 'limitation' ? (document.getElementById('searchLimitationInput')?.value || '').trim().toLowerCase() : '';
   const authEquiptFilter = tab === 'authentication' ? document.getElementById('filterAuthenticationLinkedEquipment')?.value : null;
 
   data.forEach(item => {
     // Apply filter for limitations
-    if (tab === 'limitation' && filterValue && item.sup_category !== filterValue) {
-      return;
+    if (tab === 'limitation') {
+      if (filterValue && item.sup_category !== filterValue) {
+        return;
+      }
+      if (searchVal) {
+        const parsersStr = Array.isArray(item.target_parsers) ? item.target_parsers.join(' ') : String(item.target_parsers || '');
+        const haystack = `${item.name || ''} ${item.sup_category || ''} ${item.category || ''} ${parsersStr} ${item.value_type || ''}`.toLowerCase();
+        if (!haystack.includes(searchVal)) {
+          return;
+        }
+      }
     }
 
     // Apply filter for authentication
@@ -2840,6 +2865,8 @@ window.renderConfigTable = function (tab, data, tbody) {
       const minLimits = `min: ${item.min_alarm_limit || item.alv || '-'} / ${item.min_warning_limit || item.wlv || '-'}`;
       const maxLimits = `max: ${item.max_warning_limit || item.whv || '-'} / ${item.max_alarm_limit || item.ahv || '-'}`;
 
+      const isActive = item.is_active !== false && item.is_active !== 'false' && item.is_active !== 0 && item.is_active !== '0';
+
       const parsersBadge = item.target_parsers && String(item.target_parsers).trim()
         ? `<div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px;">${String(item.target_parsers).split(',').map(p => `<span class="badge" style="background: rgba(0, 212, 255, 0.15); color: #00d4ff; font-size: 0.7rem; padding: 1px 5px;">${p.trim()}</span>`).join('')}</div>`
         : `<div style="margin-top: 3px;"><small class="text-muted" style="font-size: 0.72rem;">Semua Parser (Global)</small></div>`;
@@ -2848,20 +2875,28 @@ window.renderConfigTable = function (tab, data, tbody) {
         ? `<span class="badge" style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; font-size: 0.68rem; margin-left: 5px;">Exact</span>`
         : `<span class="badge" style="background: rgba(0, 255, 136, 0.15); color: #00ff88; font-size: 0.68rem; margin-left: 5px;">Contains</span>`;
 
+      tr.id = `limitation-row-${item.id}`;
+
       tr.innerHTML = `
-        <td>
+        <td style="${!isActive ? 'opacity: 0.6;' : ''}">
           <strong>${item.name}</strong>${matchBadge}
+          <span id="limitation-status-badge-${item.id}">
+            ${window.getLimitationStatusBadgeHtml ? window.getLimitationStatusBadgeHtml(isActive) : ''}
+          </span>
           ${parsersBadge}
         </td>
-        <td><span class="badge badge-info">${item.sup_category || 'All'}</span></td>
-        <td>${item.value_type || 'numeric'}</td>
-        <td style="font-size: 0.85rem;">
+        <td style="${!isActive ? 'opacity: 0.6;' : ''}"><span class="badge badge-info">${item.sup_category || 'All'}</span></td>
+        <td style="${!isActive ? 'opacity: 0.6;' : ''}">${item.value_type || 'numeric'}</td>
+        <td style="font-size: 0.85rem; ${!isActive ? 'opacity: 0.6;' : ''}">
           <div><small class="text-muted">Expected:</small> ${item.expected_value || '-'}</div>
           <div class="text-warning">${minLimits}</div>
           <div class="text-danger">${maxLimits}</div>
         </td>
         <td>
-          <div class="action-buttons">
+          <div class="action-buttons" style="display: flex; gap: 6px; align-items: center;">
+            <span id="limitation-toggle-btn-${item.id}">
+              ${window.getLimitationActionBtnHtml ? window.getLimitationActionBtnHtml(item.id, isActive) : ''}
+            </span>
             <button class="btn-edit" onclick="editConfig('limitation', '${item.id}')" title="Edit"><i class="fas fa-edit"></i></button>
             <button class="btn-delete" onclick="deleteConfigData('limitation', '${item.id}')" title="Delete"><i class="fas fa-trash"></i></button>
           </div>
@@ -2916,6 +2951,11 @@ window.renderConfigTable = function (tab, data, tbody) {
 
     tbody.appendChild(tr);
   });
+
+  if (tbody.children.length === 0) {
+    const colSpan = tab === 'limitation' ? 5 : (tab === 'parsing' ? 6 : (tab === 'authentication' ? 4 : 3));
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty-state text-muted" style="text-align: center; padding: 24px; color: var(--text-secondary);"><i class="fas fa-search" style="margin-right: 6px; opacity: 0.6;"></i>Tidak ada data yang sesuai</td></tr>`;
+  }
 }
 
 window.showAddConfigModal = function (type) {
@@ -2998,6 +3038,7 @@ window.renderConfigFields = function (type, item, container) {
     const isBool = item?.value_type === 'boolean';
     const isString = item?.value_type === 'string' || item?.value_type === 'state';
     const isNumeric = !isBool && !isString;
+    const isItemActive = item ? (item.is_active !== false && item.is_active !== 'false' && item.is_active !== 0 && item.is_active !== '0') : true;
 
     container.innerHTML = `
       <div class="limitation-form-grid">
@@ -3051,16 +3092,26 @@ window.renderConfigFields = function (type, item, container) {
             <input type="hidden" name="sup_category" id="modalSubCatHidden" value="${item?.sup_category || 'All'}">
           </div>
 
-          <!-- Row 4: Value Type Selection -->
-          <div class="form-group-ux" style="margin-bottom: 6px;">
-            <label style="font-size: 0.82rem; font-weight: 600;">Value Type</label>
-            <select name="value_type" id="modalValueTypeSelect" required onchange="window.toggleLimitationValueType(this.value)">
-              <option value="numeric" ${item?.value_type === 'numeric' || (!item?.value_type && !isBool && !isString) ? 'selected' : ''}>Numeric Range (Angka)</option>
-              <option value="percent" ${item?.value_type === 'percent' ? 'selected' : ''}>Percentage (%)</option>
-              <option value="boolean" ${isBool ? 'selected' : ''}>Boolean (True / False / 1 / 0)</option>
-              <option value="string" ${isString ? 'selected' : ''}>State / Label Text (e.g. TX 1, TX 2)</option>
-            </select>
-            <small class="text-muted" style="font-size: 0.7rem; margin-top: 4px; display: block;">Aturan nilai akan disesuaikan di kolom sebelah kanan</small>
+          <!-- Row 4: Value Type & Status Action Selection -->
+          <div class="form-row-ux" style="margin-bottom: 6px; gap: 12px;">
+            <div class="form-group-ux" style="flex: 1.2;">
+              <label style="font-size: 0.82rem; font-weight: 600;">Value Type</label>
+              <select name="value_type" id="modalValueTypeSelect" required onchange="window.toggleLimitationValueType(this.value)">
+                <option value="numeric" ${item?.value_type === 'numeric' || (!item?.value_type && !isBool && !isString) ? 'selected' : ''}>Numeric Range (Angka)</option>
+                <option value="percent" ${item?.value_type === 'percent' ? 'selected' : ''}>Percentage (%)</option>
+                <option value="boolean" ${isBool ? 'selected' : ''}>Boolean (True / False / 1 / 0)</option>
+                <option value="string" ${isString ? 'selected' : ''}>State / Label Text (e.g. TX 1, TX 2)</option>
+              </select>
+              <small class="text-muted" style="font-size: 0.7rem; margin-top: 4px; display: block;">Aturan batas di kolom kanan</small>
+            </div>
+            <div class="form-group-ux" style="flex: 1;">
+              <label style="font-size: 0.82rem; font-weight: 600;">Status Action</label>
+              <select name="is_active" id="modalLimitationActiveSelect">
+                <option value="true" ${isItemActive ? 'selected' : ''}>Aktif (Active / Berfungsi)</option>
+                <option value="false" ${!isItemActive ? 'selected' : ''}>Nonaktif (Inactive / Mati)</option>
+              </select>
+              <small class="text-muted" style="font-size: 0.7rem; margin-top: 4px; display: block;">Jika nonaktif, alarm diabaikan</small>
+            </div>
           </div>
         </div>
 
@@ -3401,6 +3452,10 @@ window.handleConfigSubmit = async function (e) {
     delete data.warning_value_str;
     delete data.alarm_value_str;
 
+    if (data.is_active !== undefined) {
+      data.is_active = (data.is_active === 'true' || data.is_active === true || data.is_active === '1' || data.is_active === 1);
+    }
+
     // Sanitize numeric inputs (convert empty string to null)
     ['min_alarm_limit', 'min_warning_limit', 'max_warning_limit', 'max_alarm_limit'].forEach(f => {
       if (data[f] === '' || data[f] === undefined) data[f] = null;
@@ -3460,6 +3515,91 @@ window.deleteConfigData = async function (type, id) {
     showToast('Delete failed', 'error');
   }
 }
+
+window.getLimitationActionBtnHtml = function (id, isActive) {
+  if (isActive) {
+    return `<button type="button" class="btn btn-xs btn-limitation-toggle" style="background: rgba(0, 255, 136, 0.15); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.4); border-radius: 4px; padding: 4px 9px; font-size: 0.72rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="window.toggleLimitationActive(event, '${id}', false)" title="Status saat ini AKTIF. Klik untuk menonaktifkan"><i class="fas fa-power-off"></i> Aktif</button>`;
+  } else {
+    return `<button type="button" class="btn btn-xs btn-limitation-toggle" style="background: rgba(255, 51, 85, 0.15); color: #ff3355; border: 1px solid rgba(255, 51, 85, 0.4); border-radius: 4px; padding: 4px 9px; font-size: 0.72rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="window.toggleLimitationActive(event, '${id}', true)" title="Status saat ini NONAKTIF. Klik untuk mengaktifkan"><i class="fas fa-power-off"></i> Nonaktif</button>`;
+  }
+};
+
+window.getLimitationStatusBadgeHtml = function (isActive) {
+  if (isActive) {
+    return `<span class="badge" style="background: rgba(0, 255, 136, 0.15); color: #00ff88; font-size: 0.68rem; margin-left: 5px;"><i class="fas fa-check-circle" style="font-size: 0.65rem;"></i> Active</span>`;
+  } else {
+    return `<span class="badge" style="background: rgba(255, 51, 85, 0.15); color: #ff3355; font-size: 0.68rem; margin-left: 5px;"><i class="fas fa-ban" style="font-size: 0.65rem;"></i> Inactive</span>`;
+  }
+};
+
+window.toggleLimitationActive = async function (e, id, targetState) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  const newState = !!targetState;
+
+  // 1. Instant in-place DOM update (NO scroll jump, NO page reload!)
+  const btnContainer = document.getElementById(`limitation-toggle-btn-${id}`);
+  const badgeContainer = document.getElementById(`limitation-status-badge-${id}`);
+  const rowEl = document.getElementById(`limitation-row-${id}`);
+
+  if (btnContainer) {
+    btnContainer.innerHTML = window.getLimitationActionBtnHtml(id, newState);
+  }
+  if (badgeContainer) {
+    badgeContainer.innerHTML = window.getLimitationStatusBadgeHtml(newState);
+  }
+  if (rowEl) {
+    const tds = rowEl.querySelectorAll('td');
+    tds.forEach((td, idx) => {
+      if (idx < tds.length - 1) {
+        td.style.opacity = newState ? '1' : '0.6';
+      }
+    });
+  }
+
+  // 2. Update memory caches immediately
+  if (Array.isArray(configLimitationCache)) {
+    const item = configLimitationCache.find(x => String(x.id) === String(id));
+    if (item) item.is_active = newState;
+  }
+  if (typeof window.limitationsCache !== 'undefined' && Array.isArray(window.limitationsCache)) {
+    const item = window.limitationsCache.find(x => String(x.id) === String(id));
+    if (item) item.is_active = newState;
+  }
+
+  // 3. Persist to server in background
+  try {
+    const existing = Array.isArray(configLimitationCache) ? configLimitationCache.find(x => String(x.id) === String(id)) : null;
+    const payload = existing ? { ...existing, is_active: newState } : { is_active: newState };
+
+    const res = await fetch(`/api/config/limitations/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      showToast(`Status limitasi berhasil diubah menjadi: ${newState ? 'Aktif' : 'Nonaktif'}`, 'success');
+      // Silently sync global limitation cache without re-rendering the DOM table
+      if (typeof window.loadLimitations === 'function') {
+        window.loadLimitations();
+      }
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(`Gagal mengubah status: ${err.message || 'Error'}`, 'error');
+      // Revert if error
+      if (btnContainer) btnContainer.innerHTML = window.getLimitationActionBtnHtml(id, !newState);
+      if (badgeContainer) badgeContainer.innerHTML = window.getLimitationStatusBadgeHtml(!newState);
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+    if (btnContainer) btnContainer.innerHTML = window.getLimitationActionBtnHtml(id, !newState);
+    if (badgeContainer) badgeContainer.innerHTML = window.getLimitationStatusBadgeHtml(!newState);
+  }
+};
 
 window.handleParserBadgeClick = function (e, badgeEl) {
   if (e.target.tagName.toLowerCase() === 'input') return;

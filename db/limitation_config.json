@@ -8,7 +8,8 @@
     "min_alarm_limit": "80.0",
     "max_alarm_limit": "120.0",
     "alv": "80.0",
-    "ahv": "120.0"
+    "ahv": "120.0",
+    "is_active": true
   },
   {
     "id": 1002,
@@ -81,7 +82,9 @@
     "min_alarm_limit": "49.5",
     "max_alarm_limit": "50.5",
     "alv": "49.5",
-    "ahv": "50.5"
+    "ahv": "50.5",
+    "label": "System Delay",
+    "is_active": false
   },
   {
     "id": 2002,
@@ -92,7 +95,9 @@
     "min_alarm_limit": "11.5",
     "max_alarm_limit": "12.5",
     "alv": "11.5",
-    "ahv": "12.5"
+    "ahv": "12.5",
+    "label": "Pulse Spacing",
+    "is_active": false
   },
   {
     "id": 2003,
@@ -101,7 +106,10 @@
     "sup_category": "DME",
     "value_type": "percent",
     "min_alarm_limit": "70.0",
-    "alv": "70.0"
+    "alv": "70.0",
+    "label": "Reply Efficiency",
+    "is_active": false,
+    "unit": "%"
   },
   {
     "id": 2004,
@@ -112,7 +120,9 @@
     "min_alarm_limit": "800.0",
     "max_alarm_limit": "1200.0",
     "alv": "800.0",
-    "ahv": "1200.0"
+    "ahv": "1200.0",
+    "label": "Forward Power",
+    "is_active": false
   },
   {
     "id": 3001,
@@ -123,7 +133,9 @@
     "min_alarm_limit": "2.75",
     "max_alarm_limit": "3.25",
     "alv": "2.75",
-    "ahv": "3.25"
+    "ahv": "3.25",
+    "label": "GP Angle",
+    "is_active": false
   },
   {
     "id": 3002,
@@ -134,7 +146,10 @@
     "min_alarm_limit": "90.0",
     "max_alarm_limit": "110.0",
     "alv": "90.0",
-    "ahv": "110.0"
+    "ahv": "110.0",
+    "label": "RF Power",
+    "is_active": false,
+    "unit": "%"
   },
   {
     "id": 3003,
@@ -211,7 +226,9 @@
     "min_alarm_limit": "200.0",
     "max_alarm_limit": "240.0",
     "alv": "200.0",
-    "ahv": "240.0"
+    "ahv": "240.0",
+    "label": "Van Voltage",
+    "is_active": false
   },
   {
     "id": 5002,
@@ -308,7 +325,10 @@
     "max_warning_limit": "80.0",
     "max_alarm_limit": "95.0",
     "whv": "80.0",
-    "ahv": "95.0"
+    "ahv": "95.0",
+    "label": "CPU Usage",
+    "is_active": false,
+    "unit": "%"
   },
   {
     "id": 9003,
@@ -319,7 +339,10 @@
     "max_warning_limit": "80.0",
     "max_alarm_limit": "95.0",
     "whv": "80.0",
-    "ahv": "95.0"
+    "ahv": "95.0",
+    "label": "RAM Usage",
+    "is_active": false,
+    "unit": "%"
   },
   {
     "id": 9004,
@@ -330,7 +353,10 @@
     "min_warning_limit": "20.0",
     "min_alarm_limit": "5.0",
     "wlv": "20.0",
-    "alv": "5.0"
+    "alv": "5.0",
+    "label": "RAM Available",
+    "is_active": false,
+    "unit": "%"
   },
   {
     "id": 9005,
@@ -341,7 +367,10 @@
     "max_warning_limit": "80.0",
     "max_alarm_limit": "95.0",
     "whv": "80.0",
-    "ahv": "95.0"
+    "ahv": "95.0",
+    "label": "Disk Usage",
+    "is_active": false,
+    "unit": "%"
   },
   {
     "id": 9006,
@@ -352,7 +381,9 @@
     "max_warning_limit": "65.0",
     "max_alarm_limit": "75.0",
     "whv": "65.0",
-    "ahv": "75.0"
+    "ahv": "75.0",
+    "label": "Temperature",
+    "is_active": false
   },
   {
     "id": 1791698838435,
@@ -375,7 +406,8 @@
     "alv": "45",
     "ahv": "52",
     "wlv": "48",
-    "whv": "51"
+    "whv": "51",
+    "is_active": false
   },
   {
     "id": 1791698838500,
@@ -393,7 +425,8 @@
     "category": "Navigation",
     "target_parsers": [
       "iologik_modbus"
-    ]
+    ],
+    "is_active": false
   },
   {
     "id": 1791698838501,
@@ -410,6 +443,7 @@
     "category": "Navigation",
     "target_parsers": [
       "iologik_modbus"
-    ]
+    ],
+    "is_active": false
   }
 ]
