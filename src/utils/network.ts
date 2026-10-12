@@ -29,22 +29,43 @@ export const isValidOID = (oid: string): boolean => {
  * Standard ping function using node-ping
  */
 export async function pingHost(ip: string, timeout: number = 3): Promise<any> {
-    const ping = require('ping');
-    try {
-        const result = await ping.promise.probe(ip, { timeout });
-        return {
-            alive: result.alive,
-            time: result.time,
-            min: result.min,
-            max: result.max,
-            avg: result.avg,
-            packetLoss: result.packetLoss,
-            timestamp: new Date().toISOString()
-        };
-    } catch (error: any) {
-        console.error(`[PING-ERROR] ${ip}:`, error.message);
-        return { alive: false, error: error.message, timestamp: new Date().toISOString() };
-    }
+    const isWin = process.platform === 'win32';
+    return new Promise(resolve => {
+        const cmd = isWin ? `ping -n 1 -w ${timeout * 1000} ${ip}` : `ping -c 1 -W ${timeout} ${ip}`;
+        const child = exec(cmd, { windowsHide: true }, (err, stdout) => {
+            const out = (stdout || '').toLowerCase();
+            let isAlive = false;
+            let timeVal: any = null;
+            if (isWin) {
+                isAlive = (out.includes('ttl=') || out.includes('reply from') || out.includes('balasan dari')) &&
+                          !out.includes('destination host unreachable') &&
+                          !out.includes('tujuan host tidak dapat dijangkau') &&
+                          !out.includes('request timed out') &&
+                          !out.includes('waktu habis') &&
+                          !out.includes('100% loss');
+                const m = out.match(/time[=<]([0-9]+)ms/i) || out.match(/waktu[=<]([0-9]+)ms/i);
+                if (m) timeVal = parseFloat(m[1]);
+            } else {
+                isAlive = !err && (out.includes('ttl=') || out.includes('bytes from') || out.includes('1 packets received') || out.includes('1 received'));
+                const m = out.match(/time=([0-9.]+)\s*ms/i);
+                if (m) timeVal = parseFloat(m[1]);
+            }
+            resolve({
+                alive: isAlive,
+                time: timeVal,
+                min: timeVal,
+                max: timeVal,
+                avg: timeVal,
+                packetLoss: isAlive ? '0.000' : '100.000',
+                timestamp: new Date().toISOString()
+            });
+        });
+
+        setTimeout(() => {
+            try { child.kill(); } catch (e) { }
+            resolve({ alive: false, packetLoss: '100.000', timestamp: new Date().toISOString() });
+        }, (timeout + 1) * 1000);
+    });
 }
 
 

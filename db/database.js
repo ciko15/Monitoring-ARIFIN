@@ -106,8 +106,15 @@ const PARSER_TEMPLATES = {
     'processor_count',
     'top_interface_name',
     'top_interface_status',
-    'temperature_c',
     'temperature_sensor_name'
+  ],
+  'ils_mophien_llz': [
+    'station_ident', 'active_channel',
+    'cl_ddm', 'cl_sdm', 'cl_rf_level', 'cl_ident_am',
+    'clr_ddm', 'clr_sdm', 'clr_rf_level',
+    'ds_ddm', 'ds_sdm',
+    'rf_disp_course', 'rf_disp_clr', 'rf_disp_sep',
+    'heartbeat'
   ],
   'default': ['Status']
 };

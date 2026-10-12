@@ -21,35 +21,38 @@ async function checkIcmpPing(ip) {
     const now = Date.now();
     if (_pingCache.has(ip)) {
         const cached = _pingCache.get(ip);
-        if (now - cached.time < 30000) return cached.result; // Cache 30 detik
+        if (now - cached.time < 15000) return cached.result; // Cache 15 detik
     }
 
-    try {
-        const ping = require('ping');
-        const probeRes = await ping.promise.probe(ip, { timeout: 2 });
-        const isAlive = !!probeRes.alive;
-        _pingCache.set(ip, { time: now, result: isAlive });
-        return isAlive;
-    } catch (e) {
-        // Fallback ke exec native
-        return new Promise(resolve => {
-            const { exec } = require('child_process');
-            const isWin = process.platform === 'win32';
-            const cmd = isWin ? `ping -n 1 -w 1000 ${ip}` : `ping -c 1 -W 1 ${ip}`;
+    return new Promise(resolve => {
+        const { exec } = require('child_process');
+        const isWin = process.platform === 'win32';
+        const cmd = isWin ? `ping -n 1 -w 1500 ${ip}` : `ping -c 1 -W 2 ${ip}`;
 
-            const child = exec(cmd, { windowsHide: true }, (err, stdout) => {
-                const result = !err && (isWin ? (stdout && !stdout.includes('Destination host unreachable') && !stdout.includes('100% loss')) : true);
-                _pingCache.set(ip, { time: now, result: !!result });
-                resolve(!!result);
-            });
+        const child = exec(cmd, { windowsHide: true }, (err, stdout) => {
+            const out = (stdout || '').toLowerCase();
+            let isAlive = false;
+            if (isWin) {
+                isAlive = (out.includes('ttl=') || out.includes('reply from') || out.includes('balasan dari')) &&
+                          !out.includes('destination host unreachable') &&
+                          !out.includes('tujuan host tidak dapat dijangkau') &&
+                          !out.includes('request timed out') &&
+                          !out.includes('waktu habis') &&
+                          !out.includes('100% loss');
+            } else {
+                isAlive = !err && (out.includes('ttl=') || out.includes('bytes from') || out.includes('1 packets received') || out.includes('1 received'));
+            }
 
-            setTimeout(() => {
-                try { child.kill(); } catch (e) { }
-                _pingCache.set(ip, { time: now, result: false });
-                resolve(false);
-            }, 2500);
+            _pingCache.set(ip, { time: now, result: isAlive });
+            resolve(isAlive);
         });
-    }
+
+        setTimeout(() => {
+            try { child.kill(); } catch (e) { }
+            _pingCache.set(ip, { time: now, result: false });
+            resolve(false);
+        }, 2500);
+    });
 }
 
 class NetworkListenerService {

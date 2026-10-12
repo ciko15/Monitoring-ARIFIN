@@ -2134,6 +2134,15 @@
                     return [`${label}${unit}`, val, getLimitColor(supCategory, label, val)];
                 });
                 sections.push({ title: tmpl.name || 'DATA', params });
+
+                // Tampilkan telemetry table rows jika tersedia (seperti PMDT Juanda / DME / DVOR)
+                const extraRows = data._amv_txs_rows || [];
+                if (extraRows.length > 0) {
+                    sections.push({
+                        title: 'TELEMETRY VALUES',
+                        params: extraRows.map(r => [r[0], r[1], '#e8f4ff'])
+                    });
+                }
             } else {
                 // Fallback to existing logic: show keys present in data, with support for nested groups
                 if (sections.length === 0) {
