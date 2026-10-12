@@ -87,18 +87,27 @@ function checkThreshold(value, config = {}) {
     return 'Disconnect';
   }
 
-  const { warning_min, warning_max, alarm_min, alarm_max } = config;
+  const parseLimit = (v) => {
+    if (v === undefined || v === null || v === '') return undefined;
+    const n = Number(v);
+    return isNaN(n) ? undefined : n;
+  };
+
+  const alarm_min = parseLimit(config.alarm_min !== undefined ? config.alarm_min : (config.min_alarm_limit !== undefined ? config.min_alarm_limit : config.alv));
+  const alarm_max = parseLimit(config.alarm_max !== undefined ? config.alarm_max : (config.max_alarm_limit !== undefined ? config.max_alarm_limit : config.ahv));
+  const warning_min = parseLimit(config.warning_min !== undefined ? config.warning_min : (config.min_warning_limit !== undefined ? config.min_warning_limit : config.wlv));
+  const warning_max = parseLimit(config.warning_max !== undefined ? config.warning_max : (config.max_warning_limit !== undefined ? config.max_warning_limit : config.whv));
 
   // Priority: Alarm > Warning > Normal
   // Check alarm conditions first (highest priority)
-  if ((alarm_min !== undefined && numericValue <= alarm_min) ||
-      (alarm_max !== undefined && numericValue >= alarm_max)) {
+  if ((alarm_min !== undefined && numericValue < alarm_min) ||
+      (alarm_max !== undefined && numericValue > alarm_max)) {
     return 'Alert';
   }
 
   // Check warning conditions
-  if ((warning_min !== undefined && numericValue <= warning_min) ||
-      (warning_max !== undefined && numericValue >= warning_max)) {
+  if ((warning_min !== undefined && numericValue < warning_min) ||
+      (warning_max !== undefined && numericValue > warning_max)) {
     return 'Warning';
   }
 

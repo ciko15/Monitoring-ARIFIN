@@ -173,18 +173,53 @@ class NetworkListenerService {
                 const limits = await this.equipmentService.db.getLimitationsByEquipment(source.equipt_id, source.parsing_id);
                 if (Array.isArray(limits) && limits.length > 0) {
                     const aliasMap = {
-                        'totalinterface': ['interfacecount', 'totalinterfaces'],
-                        'interfaceup': ['activeinterfacecount', 'activeinterfaces'],
-                        'interfacedown': ['downinterfacecount', 'downinterfaces'],
-                        'temperature': ['temperaturec', 'temp', 'hottesttemp'],
-                        'cpuusage': ['cpu', 'processorload'],
-                        'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct'],
-                        'diskusage': ['diskusagepct', 'storageusage'],
-                        'systemdelay': ['sysdelay'],
-                        'pulserefficiency': ['replyeff', 'replyefficiency'],
-                        'pulsespacing': ['spacing'],
-                        'forwardpower': ['fwdpower'],
-                        'reflectedpower': ['reflpower']
+                        'suhu': ['temperature', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp'],
+                        'temperature': ['suhu', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp', 'cpatemp', 'msgtemp'],
+                        'kelembaban': ['humidity', 'humidity_pct', 'humidity pct', 'humi'],
+                        'kelembapan': ['humidity', 'humidity_pct', 'humidity pct', 'humi'],
+                        'humidity': ['kelembaban', 'kelembapan', 'humidity_pct', 'humidity pct', 'humi'],
+                        'tegangan': ['voltage', 'volt', 'vln', 'vll', 'van voltage', 'vab', 'vbc', 'vca'],
+                        'voltage': ['tegangan', 'volt', 'vln', 'vll', 'van voltage', 'vab', 'vbc', 'vca'],
+                        'arus': ['current', 'ampere', 'amp', 'ia', 'ib', 'ic'],
+                        'current': ['arus', 'ampere', 'amp', 'ia', 'ib', 'ic'],
+                        'daya': ['power', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
+                        'power': ['daya', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
+                        'frekuensi': ['frequency', 'freq'],
+                        'frequency': ['frekuensi', 'freq'],
+                        'totalinterface': ['interfacecount', 'totalinterfaces', 'total interface'],
+                        'interfaceup': ['activeinterfacecount', 'activeinterfaces', 'interface up'],
+                        'interfacedown': ['downinterfacecount', 'downinterfaces', 'interface down'],
+                        'cpuusage': ['cpu', 'processorload', 'cpu usage'],
+                        'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct', 'ram usage'],
+                        'ramavailable': ['ramavailablepct', 'memoryavailable', 'ram available'],
+                        'diskusage': ['diskusagepct', 'storageusage', 'disk usage'],
+                        'crsrf': ['crsrf', 'crsrflevel', 'crsposrf', 'crsposrflevel', 'crs_rf', 'rf_power', 'rfpower', 'rf power'],
+                        'crsddm': ['crsddm', 'crsposddm', 'crs_ddm', 'ddm_course', 'ddmcourse', 'ddm course'],
+                        'crssdm': ['crssdm', 'crspossdm', 'crs_sdm', 'carrier_pwr', 'carrierpower', 'carrierpwr', 'carrier power'],
+                        'identam': ['identam', 'ident', 'ident_am', 'ident am'],
+                        'widthrf': ['widthrf', 'crswidthrf', 'crswidthrflevel', 'width_rf', 'csb_power', 'csbpower', 'csb power', 'widthrflevel'],
+                        'widthddm': ['widthddm', 'crswidthddm', 'width_ddm', 'ddm_clr', 'ddmclr', 'ddm clr'],
+                        'widthsdm': ['widthsdm', 'crswidthsdm', 'width_sdm', 'sbo_power', 'sbopower', 'sbo power'],
+                        'clrrf': ['clrrf', 'clrwidthrf', 'clrwidthrflevel', 'clr_rf', 'clr_power', 'clrpower', 'clr power'],
+                        'clrddm': ['clrddm', 'clrwidthddm', 'clr_ddm'],
+                        'clrsdm': ['clrsdm', 'clrwidthsdm', 'clr_sdm'],
+                        'nfrf': ['nfrf', 'nearfieldrf', 'nearfieldposrf', 'nearfieldposrflevel', 'nf_rf', 'rf_out', 'rfout', 'rf out', 'nearfieldposrflevel'],
+                        'nfddm': ['nfddm', 'nearfieldddm', 'nearfieldposddm', 'nf_ddm', 'ddm_mon', 'ddmmon', 'ddm mon'],
+                        'nfsdm': ['nfsdm', 'nearfieldsdm', 'nearfieldpossdm', 'nf_sdm', 'mon_power', 'monpower', 'mon power'],
+                        'freqdev': ['freqdev', 'freqdeviation', 'frequencydeviation', 'freq_dev', 'frequency deviation', 'freq deviation'],
+                        'gpangle': ['gpangle', 'glidepathangle', 'gp_angle', 'gp angle'],
+                        'am1020hz': ['am1020hz', '1020hzam', 'am1020', '1020hz'],
+                        'am30hz': ['am30hz', '30hzam', 'am30', '30hz'],
+                        'am9960hz': ['am9960hz', '9960hzam', 'am9960', '9960hz'],
+                        'fmindex': ['fmindex', 'fm index'],
+                        'carrierpower': ['carrierpower', 'carrierpwr', 'carrier power'],
+                        'rfinput': ['rfinput', 'rf input'],
+                        'azimuth': ['azimuth', 'azimuth deg'],
+                        'systemdelay': ['sysdelay', 'systemdelay', 'system delay'],
+                        'pulserefficiency': ['replyeff', 'replyefficiency', 'reply efficiency'],
+                        'pulsespacing': ['spacing', 'pulsespacing', 'pulse spacing'],
+                        'forwardpower': ['fwdpower', 'forwardpower', 'forward power'],
+                        'reflectedpower': ['reflpower', 'reflectedpower', 'reflected power']
                     };
 
                     const thresholdEvaluator = require('../utils/thresholdEvaluator');
@@ -214,18 +249,23 @@ class NetworkListenerService {
                         for (const [key, rawVal] of Object.entries(flatParams)) {
                             if (rawVal === undefined || rawVal === null) continue;
                             const dKey = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                            // Hapus prefix umum seperti mon1_, mon2_, tx1_, tx2_, lcu_ untuk pencocokan generik
+                            const strippedKey = dKey.replace(/^(mon1|mon2|tx1|tx2|lcu)/, '');
 
-                            let isMatch = (lName === dKey || lSource === dKey);
+                            let isMatch = (lName === dKey || lSource === dKey || lName === strippedKey || lSource === strippedKey);
                             if (!isMatch) {
                                 for (const [canon, aliases] of Object.entries(aliasMap)) {
-                                    if ((lName.includes(canon) || canon.includes(lName)) && aliases.some(a => dKey.includes(a) || a.includes(dKey))) {
+                                    const allVariants = [canon, ...aliases];
+                                    const candMatches = allVariants.some(a => lName.includes(a) || a.includes(lName));
+                                    const keyMatches = allVariants.some(a => dKey.includes(a) || a.includes(dKey) || strippedKey.includes(a) || a.includes(strippedKey));
+                                    if (candMatches && keyMatches) {
                                         isMatch = true;
                                         break;
                                     }
                                 }
                             }
                             if (!isMatch && lim.match_mode !== 'exact' && lName.length >= 3) {
-                                isMatch = dKey.includes(lName) || lName.includes(dKey);
+                                isMatch = dKey.includes(lName) || lName.includes(dKey) || strippedKey.includes(lName) || lName.includes(strippedKey);
                             }
 
                             if (isMatch) {
