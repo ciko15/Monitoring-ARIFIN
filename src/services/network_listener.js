@@ -23,27 +23,33 @@ async function checkIcmpPing(ip) {
         const cached = _pingCache.get(ip);
         if (now - cached.time < 30000) return cached.result; // Cache 30 detik
     }
-    return new Promise(resolve => {
-        const { exec } = require('child_process');
-        const isWin = process.platform === 'win32';
 
-        // Windows: -n 1 (1 packet). Linux/Mac: -n (no DNS lookup, mencegah hang 20+ detik) -c 1 (1 packet)
-        const cmd = isWin ? `ping -n 1 ${ip}` : `ping -n -c 1 ${ip}`;
+    try {
+        const ping = require('ping');
+        const probeRes = await ping.promise.probe(ip, { timeout: 2 });
+        const isAlive = !!probeRes.alive;
+        _pingCache.set(ip, { time: now, result: isAlive });
+        return isAlive;
+    } catch (e) {
+        // Fallback ke exec native
+        return new Promise(resolve => {
+            const { exec } = require('child_process');
+            const isWin = process.platform === 'win32';
+            const cmd = isWin ? `ping -n 1 -w 1000 ${ip}` : `ping -c 1 -W 1 ${ip}`;
 
-        // Tambahkan windowsHide: true agar tidak muncul popup CMD hitam di Windows
-        const child = exec(cmd, { windowsHide: true }, (err, stdout, stderr) => {
-            const result = !err;
-            _pingCache.set(ip, { time: now, result });
-            resolve(result);
+            const child = exec(cmd, { windowsHide: true }, (err, stdout) => {
+                const result = !err && (isWin ? (stdout && !stdout.includes('Destination host unreachable') && !stdout.includes('100% loss')) : true);
+                _pingCache.set(ip, { time: now, result: !!result });
+                resolve(!!result);
+            });
+
+            setTimeout(() => {
+                try { child.kill(); } catch (e) { }
+                _pingCache.set(ip, { time: now, result: false });
+                resolve(false);
+            }, 2500);
         });
-
-        // Timeout di level Node.js jika ping menggantung
-        setTimeout(() => {
-            try { child.kill(); } catch (e) { }
-            _pingCache.set(ip, { time: now, result: false });
-            resolve(false);
-        }, 3000);
-    });
+    }
 }
 
 class NetworkListenerService {

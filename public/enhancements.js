@@ -1057,10 +1057,35 @@
         const statusColors = { Normal: '#00ff88', Alarm: '#ff3355', Offline: '#ff3355', Warning: '#ffcc00', Disconnect: '#3a5a7a' };
 
         let pingBadge = '';
-        if (data && data.ping_status) {
-            const pc = data.ping_status === 'Normal' ? '#00ff88' : '#ff3355';
-            const icon = data.ping_status === 'Normal' ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
-            pingBadge = `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${pc}22;color:${pc};border:1px solid ${pc};margin-right:8px;" title="Status Ping dari Server ke IP Perangkat">${icon} Ping: ${data.ping_status}</span>`;
+        const pStatus = data ? data.ping_status : null;
+        if (pStatus) {
+            const pc = pStatus === 'Normal' ? '#00ff88' : '#ff3355';
+            const icon = pStatus === 'Normal' ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
+            pingBadge = `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${pc}22;color:${pc};border:1px solid ${pc};margin-right:8px;" title="Status Ping dari Server ke IP Perangkat">${icon} Ping: ${pStatus}</span>`;
+        } else if (src && src.ip_address) {
+            // Placeholder saat baru dibuka, lalu test langsung via backend ping API jika belum ada status
+            const badgeId = `ping_badge_${src.id}`;
+            pingBadge = `<span id="${badgeId}" style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid #4a5a7a;margin-right:8px;"><i class="fas fa-spinner fa-spin"></i> Ping...</span>`;
+            
+            // Lakukan ping real-time ke API /api/equipment/ping
+            fetch('/api/equipment/ping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(window.getAuthHeaders ? window.getAuthHeaders() : {}) },
+                body: JSON.stringify({ ip: src.ip_address })
+            })
+            .then(res => res.json())
+            .then(res => {
+                const badgeEl = document.getElementById(badgeId);
+                if (!badgeEl) return;
+                const isAlive = res.success || res.status === 'online';
+                const pc = isAlive ? '#00ff88' : '#ff3355';
+                const icon = isAlive ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
+                badgeEl.style.background = `${pc}22`;
+                badgeEl.style.color = pc;
+                badgeEl.style.borderColor = pc;
+                badgeEl.innerHTML = `${icon} Ping: ${isAlive ? 'Normal' : 'Gagal'}`;
+            })
+            .catch(() => {});
         }
 
         document.getElementById('srcDetailStatus').innerHTML =
