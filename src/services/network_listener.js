@@ -663,6 +663,18 @@ class NetworkListenerService {
 
         let socket = null;
         let stopped = false;
+        let reconnectTimer = null;
+
+        const scheduleReconnect = () => {
+            if (stopped || reconnectTimer) return;
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                if (!stopped) {
+                    console.log(`[NetworkListener] Attempting to reconnect ILS binary TCP for ${name} (${ip_address}:${port})...`);
+                    connect();
+                }
+            }, 5000);
+        };
 
         const connect = () => {
             if (stopped) return;
@@ -673,6 +685,10 @@ class NetworkListenerService {
 
             socket.connect(port, ip_address, () => {
                 console.log(`[NetworkListener] ILS binary TCP connected: ${name} (${ip_address}:${port})`);
+                if (reconnectTimer) {
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = null;
+                }
                 this.activeListeners.add(id);
                 this._binaryTcpSockets = this._binaryTcpSockets || new Map();
                 this._binaryTcpSockets.set(id, socket);
@@ -681,11 +697,11 @@ class NetworkListenerService {
                 if (hasTriggerProtocol || hasPollRequests) {
                     const doPoll = () => {
                         let triggerReqs = [];
-                        if (hasTriggerProtocol && typeof parser.getHeartbeatReply === 'function') {
-                            triggerReqs = [parser.getHeartbeatReply()]; // fallback
-                        }
                         if (hasPollRequests) {
                             triggerReqs = parser.getPollRequests();
+                        }
+                        if ((!triggerReqs || triggerReqs.length === 0) && hasTriggerProtocol && typeof parser.getHeartbeatReply === 'function') {
+                            triggerReqs = [parser.getHeartbeatReply()];
                         }
 
                         for (const req of triggerReqs) {
@@ -727,20 +743,23 @@ class NetworkListenerService {
             socket.on('error', (err) => {
                 this._logThrottled('error', `ils:error:${id}:${err.message}`, `[NetworkListener] ILS binary TCP error ${name}: ${err.message}`);
                 reportDisconnect(err.message);
+                scheduleReconnect();
             });
 
             socket.on('timeout', () => {
                 this._logThrottled('warn', `ils:timeout:${id}`, `[NetworkListener] ILS binary TCP timeout ${name}, reconnecting...`);
                 reportDisconnect('timeout');
                 socket.destroy();
+                scheduleReconnect();
             });
 
             socket.on('close', () => {
-                this._logThrottled('log', `ils:close:${id}`, `[NetworkListener] ILS binary TCP disconnected ${name}, watchdog will restart listener`);
+                this._logThrottled('log', `ils:close:${id}`, `[NetworkListener] ILS binary TCP disconnected ${name}, will reconnect in 5s...`);
                 reportDisconnect('close');
                 if (pollTimer) clearInterval(pollTimer);
                 this.activeListeners.delete(id);
                 if (typeof parser.reset === 'function') parser.reset();
+                scheduleReconnect();
             });
         };
 
@@ -749,6 +768,7 @@ class NetworkListenerService {
         this._binaryTcpCleanup = this._binaryTcpCleanup || new Map();
         this._binaryTcpCleanup.set(id, () => {
             stopped = true;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
             if (socket) socket.destroy();
         });
 
