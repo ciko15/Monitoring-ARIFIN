@@ -762,6 +762,9 @@ class NetworkListenerService {
             if (!this._lastHeartbeatReply) this._lastHeartbeatReply = new Map();
 
             socket.on('data', async (chunk) => {
+                if (moduleName === 'ils_mophien_llz') {
+                    console.log(`[ILS Mophien LLZ] Received ${chunk.length} bytes from ${name}: ${chunk.slice(0, 32).toString('hex')}...`);
+                }
                 // Balas heartbeat dari device agar stream tetap hidup tanpa RCMS (max 1x per 5 detik untuk mencegah ping-pong storm)
                 if (hasTriggerProtocol && parser.isHeartbeat(chunk)) {
                     const lastReply = this._lastHeartbeatReply.get(id) || 0;

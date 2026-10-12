@@ -250,6 +250,13 @@ class IlsMophienLlzParser extends BaseParser {
                 }
             }
 
+            if (framesProcessed === 0) {
+                return {
+                    success: false,
+                    error: 'Menunggu data frame ILS Mophien lengkap (buffer ' + this._buf.length + ' bytes)'
+                };
+            }
+
             return this._buildOutput();
         } catch (err) {
             console.error('[ILS Mophien LLZ] Parse error:', err.message);
