@@ -2008,6 +2008,12 @@ tbody tr:hover {
 .modal-container.modal-xlarge {
   max-width: 980px !important;
   width: 92vw !important;
+  box-sizing: border-box;
+}
+
+#configModal .modal-body {
+  max-height: calc(90vh - 120px);
+  overflow-y: auto;
 }
 
 /* Landscape Limitation Form Styles */
@@ -2016,6 +2022,8 @@ tbody tr:hover {
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   align-items: start;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
@@ -2028,7 +2036,52 @@ tbody tr:hover {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   border-radius: 10px;
-  padding: 14px;
+  padding: 16px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Ensure form groups inside limitation cards stack vertically: label on top, input below! */
+.limitation-card-panel .form-group-ux {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  margin-bottom: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.limitation-card-panel .form-group-ux label {
+  width: auto !important;
+  margin-right: 0 !important;
+  margin-bottom: 6px !important;
+  font-size: 0.82rem !important;
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  display: block !important;
+}
+
+.limitation-card-panel .form-group-ux input,
+.limitation-card-panel .form-group-ux select,
+.limitation-card-panel .form-group-ux textarea {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 9px 12px !important;
+  font-size: 0.88rem !important;
+  border-radius: 6px !important;
+}
+
+.limitation-card-panel .form-row-ux {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.limitation-card-panel .form-row-ux > .form-group-ux {
+  flex: 1 !important;
+  min-width: 0 !important;
 }
 
 .parser-search-bar {

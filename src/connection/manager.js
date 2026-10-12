@@ -28,7 +28,7 @@ class ConnectionManager {
             this.disconnect(equipmentId);
 
             const socket = new net.Socket();
-            socket.setTimeout(10000); // 10 second timeout
+            socket.setTimeout(60000); // 60 second timeout for equipment stream
 
             let isConnected = false;
             let hasResolved = false;
@@ -45,18 +45,18 @@ class ConnectionManager {
 
             // Universal TCP stream buffer
             // Supports both:
-            //   DVOR Maru 220: SOH+STX+TAG+data+ETX (wait for all 5 sections)
+            //   DVOR Maru 220: SOH+STX+TAG+data+ETX (emit when sections with ETX are received)
             //   DME Maru 310/320: SOH+ASCII_HEX+STX+ASCII_HEX+ETX (emit per complete frame)
             let tcpBuffer = Buffer.alloc(0);
             const DVOR_TAGS = ['N1', 'N2', 'G1', 'G2', 'LC'];
 
             socket.on('data', (chunk) => {
+                socket.setTimeout(60000); // Reset timeout on activity
                 tcpBuffer = Buffer.concat([tcpBuffer, chunk]);
 
                 const ETX = 0x03;
                 const SOH = 0x01;
                 const STX = 0x02;
-
 
                 // Detect protocol type from buffer content
                 // DVOR: SOH immediately followed by STX then 2-char ASCII tag (N1,N2,G1,G2,LC)
@@ -65,20 +65,15 @@ class ConnectionManager {
                 const isDVOR = DVOR_TAGS.some(tag => bufStr.includes('\x01\x02' + tag));
 
                 if (isDVOR) {
-                    // DVOR mode: wait for all 5 sections
-                    const hasAll = DVOR_TAGS.every(tag => bufStr.includes('\x01\x02' + tag));
-                    if (hasAll) {
-                        let lastEtx = -1;
-                        for (let j = tcpBuffer.length - 1; j >= 0; j--) {
-                            if (tcpBuffer[j] === ETX) { lastEtx = j; break; }
-                        }
-                        if (lastEtx >= 0) {
-                            const complete = tcpBuffer.slice(0, lastEtx + 1);
-                            tcpBuffer = tcpBuffer.slice(lastEtx + 1);
-                            if (onData) onData(complete);
-                        }
+                    // DVOR mode: emit when section ending in ETX (+ optional 4-char CRC) is received
+                    let lastEtx = tcpBuffer.lastIndexOf(ETX);
+                    if (lastEtx >= 0) {
+                        const endPos = (tcpBuffer.length >= lastEtx + 5) ? lastEtx + 5 : lastEtx + 1;
+                        const complete = tcpBuffer.slice(0, endPos);
+                        tcpBuffer = tcpBuffer.slice(endPos);
+                        if (onData) onData(complete);
                     }
-                } else {
+                } else if (tcpBuffer.indexOf(SOH) >= 0 && tcpBuffer.indexOf(STX) > tcpBuffer.indexOf(SOH)) {
                     // DME Maru 310/320 mode
                     // Frame format: SOH + ASCII_HEX(header) + STX + ASCII_HEX(payload) + ETX
                     let startPos = tcpBuffer.indexOf(SOH);
@@ -100,8 +95,6 @@ class ConnectionManager {
 
                     // Trim buffer: buang semua yang sudah diproses
                     if (lastProcessedEnd > 0) {
-                        // Ada frame yang sudah diproses — buang sampai sini
-                        // Cari SOH berikutnya sebagai awal frame yang belum lengkap
                         const nextSoh = startPos >= 0 ? startPos : tcpBuffer.lastIndexOf(SOH, tcpBuffer.length - 1);
                         tcpBuffer = nextSoh > lastProcessedEnd ? tcpBuffer.slice(nextSoh)
                                   : nextSoh === lastProcessedEnd ? tcpBuffer.slice(nextSoh)
@@ -113,7 +106,10 @@ class ConnectionManager {
                         // Ada SOH tapi frame belum lengkap — simpan dari SOH
                         tcpBuffer = tcpBuffer.slice(startPos);
                     }
-                    // startPos === 0 dan belum ada frame lengkap: biarkan buffer utuh, tunggu data berikutnya
+                } else {
+                    // Generic TCP stream (pass through chunk)
+                    if (onData) onData(chunk);
+                    tcpBuffer = Buffer.alloc(0);
                 }
 
                 // Safety: prevent buffer overflow

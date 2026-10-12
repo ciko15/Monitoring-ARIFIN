@@ -283,11 +283,12 @@
         const findLimit = (mode) => window.limitationsCache.find(l => {
             if (!matchesParser(l, effectiveParserId)) return false;
 
-            const limitSup = String(l.sup_category || '').toLowerCase();
-            const isGenericSup = limitSup === 'generic' || limitSup === 'all' || limitSup === '*' || !limitSup;
+            const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
+                .map(s => s.trim().toLowerCase()).filter(Boolean);
+            const isGenericSup = limitSups.length === 0 || limitSups.some(s => s === 'generic' || s === 'all' || s === '*');
 
             if (mode === 'exact') {
-                return !!targetSup && limitSup === targetSup && matchesLabel(l);
+                return !!targetSup && limitSups.includes(targetSup) && matchesLabel(l);
             }
 
             if (mode === 'generic') {
@@ -302,15 +303,39 @@
         // JIKA TIDAK ADA ATURAN LIMITASI: SEMUANYA PUTIH!
         if (!limit) return '#ffffff';
 
-        // JIKA ADA LIMITASI TIPE STRING (e.g. status "ok", "normal", "up"):
-        if (limit.value_type === 'string' || limit.expected_value) {
-            const exp = String(limit.expected_value || 'ok').trim().toLowerCase();
-            const act = String(value).trim().toLowerCase();
-            if (act === exp || act.includes(exp)) {
-                return '#00ff88'; // Normal (Hijau)
-            } else {
-                return '#ff3355'; // Alarm (Merah)
-            }
+        // JIKA ADA LIMITASI TIPE BOOLEAN, STATE, ATAU STRING:
+        const isStateOrBool = limit.value_type === 'string' ||
+                              limit.value_type === 'boolean' ||
+                              limit.value_type === 'state' ||
+                              (limit.expected_value != null && limit.expected_value !== '') ||
+                              (limit.normal_value != null && limit.normal_value !== '') ||
+                              (limit.alarm_value != null && limit.alarm_value !== '') ||
+                              (limit.warning_value != null && limit.warning_value !== '');
+
+        if (isStateOrBool) {
+            const norm = String(limit.normal_value != null && limit.normal_value !== '' ? limit.normal_value : (limit.expected_value || '')).trim().toLowerCase();
+            const warn = String(limit.warning_value || '').trim().toLowerCase();
+            const alarm = String(limit.alarm_value || '').trim().toLowerCase();
+
+            const actStr = String(value).trim().toLowerCase();
+            const actBool = (value === true || actStr === 'true' || actStr === '1' || actStr === 'aktif' || actStr === 'on' || actStr === 'up');
+            const actBoolFalse = (value === false || actStr === 'false' || actStr === '0' || actStr === 'tidak aktif' || actStr === 'off' || actStr === 'down');
+
+            const matchesList = (patternStr) => {
+                if (!patternStr) return false;
+                const candidates = patternStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                return candidates.some(cand => {
+                    if (cand === 'true' && actBool) return true;
+                    if (cand === 'false' && actBoolFalse) return true;
+                    if (cand === actStr) return true;
+                    return actStr.includes(cand);
+                });
+            };
+
+            if (alarm && matchesList(alarm)) return '#ff3355'; // Alarm (Merah)
+            if (warn && matchesList(warn)) return '#ffcc00';   // Warning (Kuning)
+            if (norm && matchesList(norm)) return '#00ff88';   // Normal (Hijau)
+            return '#ffffff'; // Netral jika alarm / warning tidak diatur
         }
 
         const cleanValStr = String(value).replace(',', '.');

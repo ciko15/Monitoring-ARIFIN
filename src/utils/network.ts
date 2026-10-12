@@ -368,6 +368,11 @@ export async function determineStatus(data: any, templateId: string, equipmentId
 
                     if (limit) {
                         const config = {
+                            value_type: limit.value_type,
+                            expected_value: limit.expected_value,
+                            normal_value: limit.normal_value,
+                            warning_value: limit.warning_value,
+                            alarm_value: limit.alarm_value,
                             warning_min: limit.min_warning_limit || limit.wlv,
                             warning_max: limit.max_warning_limit || limit.whv,
                             alarm_min: limit.min_alarm_limit || limit.alv,

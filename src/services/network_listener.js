@@ -187,11 +187,32 @@ class NetworkListenerService {
                         'reflectedpower': ['reflpower']
                     };
 
+                    const thresholdEvaluator = require('../utils/thresholdEvaluator');
+
+                    // Flatten nested data (seperti ioLogik devices: { DME: { TX: 'TX 1' } })
+                    const flatParams = {};
+                    const flatten = (obj, prefix = '') => {
+                        for (const [k, v] of Object.entries(obj || {})) {
+                            if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+                                flatten(v, prefix ? `${prefix}_${k}` : k);
+                            } else {
+                                if (prefix) {
+                                    flatParams[`${prefix}_${k}`] = v;
+                                    flatParams[`${prefix} ${k}`] = v;
+                                    flatParams[`iologik_pin_${prefix}_${k}`] = v;
+                                }
+                                flatParams[k] = v; // Direct key access
+                            }
+                        }
+                    };
+                    flatten(parsedData.data);
+
                     for (const lim of limits) {
                         const lName = String(lim.name || lim.label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                         const lSource = String(lim.source || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-                        for (const [key, rawVal] of Object.entries(parsedData.data)) {
+                        for (const [key, rawVal] of Object.entries(flatParams)) {
+                            if (rawVal === undefined || rawVal === null) continue;
                             const dKey = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
                             let isMatch = (lName === dKey || lSource === dKey);
@@ -208,24 +229,12 @@ class NetworkListenerService {
                             }
 
                             if (isMatch) {
-                                const val = parseFloat(rawVal);
-                                if (!isNaN(val)) {
-                                    const minAlarm = lim.min_alarm_limit != null ? parseFloat(lim.min_alarm_limit) : (lim.alv != null ? parseFloat(lim.alv) : null);
-                                    const maxAlarm = lim.max_alarm_limit != null ? parseFloat(lim.max_alarm_limit) : (lim.ahv != null ? parseFloat(lim.ahv) : null);
-                                    const minWarn = lim.min_warning_limit != null ? parseFloat(lim.min_warning_limit) : (lim.wlv != null ? parseFloat(lim.wlv) : null);
-                                    const maxWarn = lim.max_warning_limit != null ? parseFloat(lim.max_warning_limit) : (lim.whv != null ? parseFloat(lim.whv) : null);
-
-                                    let isAlarm = false;
-                                    let isWarn = false;
-
-                                    if (minAlarm != null && val < minAlarm) isAlarm = true;
-                                    if (maxAlarm != null && val > maxAlarm) isAlarm = true;
-                                    if (minWarn != null && val < minWarn) isWarn = true;
-                                    if (maxWarn != null && val > maxWarn) isWarn = true;
-
-                                    if (isAlarm || isWarn) {
-                                        statusToEvaluate = 'Warning';
-                                    }
+                                const evalStatus = thresholdEvaluator.checkThreshold(rawVal, lim);
+                                if (evalStatus === 'Alert' || evalStatus === 'Alarm') {
+                                    statusToEvaluate = 'Alarm';
+                                    break;
+                                } else if (evalStatus === 'Warning' && statusToEvaluate !== 'Alarm') {
+                                    statusToEvaluate = 'Warning';
                                 }
                             }
                         }
@@ -1673,32 +1682,70 @@ class NetworkListenerService {
             await this.handleIncomingData(source, rawData, parser);
         };
 
-        if (this._datakomTimers) {
-            for (const [id, timer] of this._datakomTimers) {
-                clearInterval(timer);
-            }
-            this._datakomTimers.clear();
-        }
-
         // Generasi token — increment tiap reconnect agar loop lama berhenti
         this._pollGen = this._pollGen || {};
         this._pollGen[id] = (this._pollGen[id] || 0) + 1;
         const myGen = this._pollGen[id];
 
-        const onError = (error) => {
-            console.error(`[NetworkListener] Error for source ${source.name} (${id}):`, error.message);
+        if (!this._reconnectTimers) this._reconnectTimers = new Map();
 
-            // _pollDevices (watchdog) will auto-restart listeners missing from activeListeners
-            // Do NOT use setTimeout here to prevent exponential blowup!
+        const scheduleReconnect = () => {
+            if (protocol !== 'tcp') return;
+            // Cegah duplikasi timer reconnect untuk sumber yang sama
+            if (this._reconnectTimers.has(id)) return;
+
+            // Pastikan listener dikeluarkan dari activeListeners agar polling loop lama berhenti
+            this.activeListeners.delete(id);
+            if (parser && typeof parser.reset === 'function') parser.reset();
+
+            // Laporkan status Disconnect ke dashboard / database logs
+            this._handleLogOutput(
+                source,
+                { data: {}, source: source.name, _ip: ip_address },
+                parsing_id,
+                'Disconnect'
+            ).catch(() => {});
+
+            // Jittered backoff (8 - 12 detik) agar tidak membebani CPU, network, maupun switch/Moxa
+            const retryDelayMs = 8000 + Math.floor(Math.random() * 4000);
+            this._logThrottled(
+                'warn',
+                `tcp:reconnect:${id}`,
+                `[NetworkListener] TCP disconnected for ${source.name} (${id}), auto-reconnect scheduled in ${Math.round(retryDelayMs / 1000)}s...`,
+                30000
+            );
+
+            const timer = setTimeout(async () => {
+                this._reconnectTimers.delete(id);
+                // Batalkan jika service sedang dihentikan / inisialisasi ulang atau sudah aktif
+                if (this._isInitializing || this.activeListeners.has(id)) return;
+                console.log(`[NetworkListener] Attempting auto-reconnect for ${source.name} (${ip_address}:${port})...`);
+                try {
+                    await this.startListener(source);
+                } catch (e) {
+                    console.error(`[NetworkListener] Reconnect error for ${source.name}:`, e.message);
+                }
+            }, retryDelayMs);
+
+            this._reconnectTimers.set(id, timer);
+        };
+
+        const onError = (error) => {
+            this._logThrottled(
+                'error',
+                `tcp:error:${id}:${error.message}`,
+                `[NetworkListener] Error for source ${source.name} (${id}): ${error.message}`,
+                15000
+            );
+
             if (protocol === 'tcp') {
-                this.activeListeners.delete(id);
-                if (parser && typeof parser.reset === 'function') parser.reset();
+                scheduleReconnect();
             }
         };
 
         let success = false;
 
-        // Mode TCP langsung untuk DME
+        // Mode TCP langsung untuk DME / DVOR
         if (protocol === 'udp') {
             success = connectionManager.connectUDP(id, ip_address || '0.0.0.0', port, onData, onError);
         } else {
@@ -1706,6 +1753,12 @@ class NetworkListenerService {
         }
 
         if (success) {
+            // Berhasil tersambung — bersihkan pending reconnect timer jika ada
+            if (this._reconnectTimers.has(id)) {
+                clearTimeout(this._reconnectTimers.get(id));
+                this._reconnectTimers.delete(id);
+            }
+
             this.activeListeners.add(id);
             console.log(`[NetworkListener] Listener active for ${source.name} on port ${port}`);
 
@@ -1769,6 +1822,9 @@ class NetworkListenerService {
             }
         } else {
             console.error(`[NetworkListener] Failed to start listener for ${source.name} on port ${port}`);
+            if (protocol === 'tcp') {
+                scheduleReconnect();
+            }
         }
     }
 
@@ -1864,7 +1920,8 @@ class NetworkListenerService {
         const timerMaps = [
             '_datakomTimers', '_dseTimers', '_iologikTimers', '_pm5350Timers',
             '_upsNetagentTimers', '_snmpSystemTimers', '_tempHumidityTimers',
-            '_asterixTimers', '_marcRseTimers', '_vhfT6tvConnections', '_httpTimers'
+            '_asterixTimers', '_marcRseTimers', '_vhfT6tvConnections', '_httpTimers',
+            '_reconnectTimers'
         ];
 
         for (const mapName of timerMaps) {

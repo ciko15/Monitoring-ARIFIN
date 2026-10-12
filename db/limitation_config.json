@@ -376,5 +376,40 @@
     "ahv": "52",
     "wlv": "48",
     "whv": "51"
+  },
+  {
+    "id": 1791698838500,
+    "template_id": null,
+    "name": "TX",
+    "label": "TX",
+    "source": "tx",
+    "unit": "",
+    "value_type": "string",
+    "match_mode": "exact",
+    "normal_value": "TX 1",
+    "warning_value": "TX 2",
+    "alarm_value": "-",
+    "sup_category": "All",
+    "category": "Navigation",
+    "target_parsers": [
+      "iologik_modbus"
+    ]
+  },
+  {
+    "id": 1791698838501,
+    "template_id": null,
+    "name": "TX 1",
+    "label": "TX 1",
+    "source": "tx_1",
+    "unit": "",
+    "value_type": "boolean",
+    "match_mode": "contains",
+    "normal_value": "true, 1, Aktif",
+    "alarm_value": "false, 0, Tidak Aktif",
+    "sup_category": "All",
+    "category": "Navigation",
+    "target_parsers": [
+      "iologik_modbus"
+    ]
   }
 ]

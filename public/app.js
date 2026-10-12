@@ -2984,117 +2984,215 @@ window.renderConfigFields = function (type, item, container) {
     const categoriesHtml = ['Communication', 'Navigation', 'Surveillance', 'Data Processing', 'Support']
       .map(c => `<option value="${c}" ${item?.category === c ? 'selected' : ''}>${c}</option>`).join('');
 
+    const curNorm = String(item?.normal_value != null && item?.normal_value !== '' ? item?.normal_value : (item?.expected_value || '')).trim().toLowerCase();
+    const curWarn = String(item?.warning_value || '').trim().toLowerCase();
+    const curAlarm = String(item?.alarm_value || '').trim().toLowerCase();
+
+    const isNormTrue = (curNorm === 'true' || curNorm === '1' || curNorm === 'aktif');
+    const isNormFalse = (curNorm === 'false' || curNorm === '0' || curNorm === 'mati' || curNorm === 'tidak aktif');
+    const isWarnTrue = (curWarn === 'true' || curWarn === '1' || curWarn === 'aktif');
+    const isWarnFalse = (curWarn === 'false' || curWarn === '0' || curWarn === 'mati' || curWarn === 'tidak aktif');
+    const isAlarmTrue = (curAlarm === 'true' || curAlarm === '1' || curAlarm === 'aktif');
+    const isAlarmFalse = (curAlarm === 'false' || curAlarm === '0' || curAlarm === 'mati' || curAlarm === 'tidak aktif');
+
+    const isBool = item?.value_type === 'boolean';
+    const isString = item?.value_type === 'string' || item?.value_type === 'state';
+    const isNumeric = !isBool && !isString;
+
     container.innerHTML = `
       <div class="limitation-form-grid">
-        <!-- Kolom Kiri: Konfigurasi Parameter & Kategori -->
+        <!-- Kolom Kiri: Konfigurasi Parameter & Scope -->
         <div class="limitation-card-panel">
           <h4 style="margin: 0 0 14px 0; color: #00d4ff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-sliders-h"></i> Parameter & Scope
           </h4>
 
-          <div class="form-group-ux" style="margin-bottom: 12px;">
-            <label style="font-size: 0.82rem; font-weight: 600;">Parameter / Label Name <span style="color:#ff3355">*</span></label>
-            <input type="text" name="name" value="${item?.name || ''}" required placeholder="e.g. Total Interface, Temperature, RF Level" style="width: 100%;">
-            <small class="text-muted" style="font-size: 0.72rem; margin-top: 4px; display: block; opacity: 0.8;">
-              Label yang tampil di popup detail atau nama variabel parser.
-            </small>
-          </div>
-
-          <div class="form-row-ux" style="margin-bottom: 12px;">
+          <!-- Row 1: Parameter Name & Matching Rule -->
+          <div class="form-row-ux" style="margin-bottom: 12px; gap: 12px;">
+            <div class="form-group-ux" style="flex: 1.2;">
+              <label style="font-size: 0.82rem; font-weight: 600;">Parameter / Label Name <span style="color:#ff3355">*</span></label>
+              <input type="text" name="name" value="${item?.name || ''}" required placeholder="Cth: TX, Temperature, Status">
+              <small class="text-muted" style="font-size: 0.7rem; margin-top: 3px; display: block;">Label yang tampil di popup/dashboard</small>
+            </div>
             <div class="form-group-ux" style="flex: 1;">
               <label style="font-size: 0.82rem; font-weight: 600;">Matching Rule</label>
               <select name="match_mode">
                 <option value="contains" ${item?.match_mode !== 'exact' ? 'selected' : ''}>Mengandung Kata (Contains)</option>
                 <option value="exact" ${item?.match_mode === 'exact' ? 'selected' : ''}>Sama Persis (Exact Match)</option>
               </select>
-              <small class="text-muted" style="font-size: 0.72rem; margin-top: 4px; display: block; opacity: 0.8;">
-                Contains: 'Total Interface' cocok jika kata terkandung di label.
-              </small>
+              <small class="text-muted" style="font-size: 0.7rem; margin-top: 3px; display: block;">Aturan pencocokan nama</small>
             </div>
           </div>
 
-          <div class="form-row-ux" style="margin-bottom: 12px;">
-            <div class="form-group-ux" style="flex: 1;">
-              <label style="font-size: 0.82rem; font-weight: 600;">Category</label>
-              <select name="category" required onchange="updateSubCategoryDropdown(this.value, 'modalSubCat')">
-                <option value="All" ${!item || item?.category === 'All' ? 'selected' : ''}>Semua Kategori (Global / All)</option>
-                ${categoriesHtml}
-              </select>
-            </div>
-            <div class="form-group-ux" style="flex: 1;">
-              <label style="font-size: 0.82rem; font-weight: 600;">Sub-Category Scope</label>
-              <select name="sup_category" id="modalSubCat" required>
-                <option value="All" ${!item || item?.sup_category === 'All' || item?.sup_category === 'Generic' ? 'selected' : ''}>Semua Sub-Kategori (All / Generic)</option>
-                ${item && item?.sup_category && item?.sup_category !== 'All' && item?.sup_category !== 'Generic' ? `<option value="${item.sup_category}" selected>${item.sup_category}</option>` : ''}
-              </select>
-            </div>
+          <!-- Row 2: Category Scope (Baris Penuh) -->
+          <div class="form-group-ux" style="margin-bottom: 12px;">
+            <label style="font-size: 0.82rem; font-weight: 600;">Category (Grouping)</label>
+            <select name="category" required onchange="window.updateSubCategoryBadges(this.value)">
+              <option value="All" ${!item || item?.category === 'All' ? 'selected' : ''}>Semua Kategori (Global / All)</option>
+              ${categoriesHtml}
+            </select>
           </div>
 
-          <div class="form-row-ux">
-            <div class="form-group-ux" style="flex: 1;">
-              <label style="font-size: 0.82rem; font-weight: 600;">Value Type</label>
-              <select name="value_type" required>
-                <option value="numeric" ${!item || item?.value_type === 'numeric' ? 'selected' : ''}>Numeric Range</option>
-                <option value="percent" ${item?.value_type === 'percent' ? 'selected' : ''}>Percentage (%)</option>
-                <option value="string" ${item?.value_type === 'string' ? 'selected' : ''}>String Match (ok/normal)</option>
-              </select>
+          <!-- Row 3: Sub-Category Scope (Baris Penuh Terpisah Rapi) -->
+          <div style="margin-bottom: 14px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; width: 100%; box-sizing: border-box;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 0.82rem; font-weight: 600; color: #cbd5e1;">Sub-Category Scope</span>
+              <span id="subCatSelectionSummary" style="font-size: 0.72rem; color: #00ff88; font-weight: 600;">
+                Semua Sub-Kategori
+              </span>
             </div>
-            <div class="form-group-ux" style="flex: 1;">
-              <label style="font-size: 0.82rem; font-weight: 600;">Normal / Expected Value</label>
-              <input type="text" name="expected_value" value="${item?.expected_value || ''}" placeholder="e.g. ok, 100, up">
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+              <button type="button" class="btn btn-secondary btn-xs" style="padding: 2px 8px; font-size: 0.72rem;" onclick="window.toggleAllSubCats(true)">Pilih Semua</button>
+              <button type="button" class="btn btn-secondary btn-xs" style="padding: 2px 8px; font-size: 0.72rem;" onclick="window.toggleAllSubCats(false)">Bersihkan</button>
             </div>
+            <div id="modalSubCatContainer" class="target-parsers-list" style="max-height: 90px; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); display: flex; flex-wrap: wrap; gap: 6px;">
+              <small class="text-muted" style="padding: 4px;">Memuat sub-kategori...</small>
+            </div>
+            <input type="hidden" name="sup_category" id="modalSubCatHidden" value="${item?.sup_category || 'All'}">
+          </div>
+
+          <!-- Row 4: Value Type Selection -->
+          <div class="form-group-ux" style="margin-bottom: 6px;">
+            <label style="font-size: 0.82rem; font-weight: 600;">Value Type</label>
+            <select name="value_type" id="modalValueTypeSelect" required onchange="window.toggleLimitationValueType(this.value)">
+              <option value="numeric" ${item?.value_type === 'numeric' || (!item?.value_type && !isBool && !isString) ? 'selected' : ''}>Numeric Range (Angka)</option>
+              <option value="percent" ${item?.value_type === 'percent' ? 'selected' : ''}>Percentage (%)</option>
+              <option value="boolean" ${isBool ? 'selected' : ''}>Boolean (True / False / 1 / 0)</option>
+              <option value="string" ${isString ? 'selected' : ''}>State / Label Text (e.g. TX 1, TX 2)</option>
+            </select>
+            <small class="text-muted" style="font-size: 0.7rem; margin-top: 4px; display: block;">Aturan nilai akan disesuaikan di kolom sebelah kanan</small>
           </div>
         </div>
 
-        <!-- Kolom Kanan: Target Parsers Checklist & Ambang Batas Limits -->
+        <!-- Kolom Kanan: Target Parsers Checklist & Aturan Kondisi Nilai -->
         <div class="limitation-card-panel">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <h4 style="margin: 0; color: #00d4ff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
               <i class="fas fa-microchip"></i> Target Parsers
             </h4>
-            <span id="parserSelectionSummary" style="font-size: 0.75rem; color: #00ff88; font-weight: 500;">
+            <span id="parserSelectionSummary" style="font-size: 0.75rem; color: #00ff88; font-weight: 600;">
               Berlaku untuk SEMUA Parser
             </span>
           </div>
 
           <!-- Search & Bulk Selection Bar -->
-          <div class="parser-search-bar">
+          <div class="parser-search-bar" style="margin-bottom: 8px;">
             <i class="fas fa-search" style="color: var(--text-secondary); font-size: 0.8rem;"></i>
-            <input type="text" id="searchTargetParsers" placeholder="Cari parser (contoh: switch, network, radar, dme...)" class="parser-search-input" oninput="window.filterTargetParsers(this.value)">
+            <input type="text" id="searchTargetParsers" placeholder="Cari parser..." class="parser-search-input" oninput="window.filterTargetParsers(this.value)">
             <button type="button" class="btn btn-secondary btn-xs" style="padding: 4px 8px; font-size: 0.72rem; white-space: nowrap;" onclick="window.toggleAllParsers(true)">Pilih Semua</button>
             <button type="button" class="btn btn-secondary btn-xs" style="padding: 4px 8px; font-size: 0.72rem; white-space: nowrap;" onclick="window.toggleAllParsers(false)">Bersihkan</button>
           </div>
 
           <!-- Target Parsers Checklist Container -->
-          <div id="targetParsersContainer" class="target-parsers-list" style="margin-bottom: 14px;">
+          <div id="targetParsersContainer" class="target-parsers-list" style="margin-bottom: 12px; max-height: 120px; overflow-y: auto;">
             <small class="text-muted" style="padding: 6px;">Memuat daftar parser...</small>
           </div>
           <input type="hidden" name="target_parsers" id="targetParsersHidden" value="${item?.target_parsers ? (Array.isArray(item.target_parsers) ? item.target_parsers.join(',') : item.target_parsers) : ''}">
 
-          <!-- Ambang Batas (Threshold Limits) -->
-          <h4 style="margin: 0 0 10px 0; color: #00d4ff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-exclamation-triangle"></i> Ambang Batas (Thresholds)
-          </h4>
-
-          <div class="form-row-ux" style="margin-bottom: 8px;">
-            <div class="form-group-ux" style="flex: 1;">
-              <label style="font-size: 0.8rem; color: #ff3355;"><i class="fas fa-bell"></i> Min. Alarm Limit</label>
-              <input type="number" step="any" name="min_alarm_limit" value="${item?.min_alarm_limit || item?.alv || ''}" placeholder="Min Alarm">
+          <!-- OPSI A: Aturan Kondisi Boolean (di sebelah kanan) -->
+          <div id="booleanLimitationPanel" style="display: ${isBool ? 'block' : 'none'}; background: rgba(0,212,255,0.04); border: 1px solid rgba(0,212,255,0.15); border-radius: 8px; padding: 12px; margin-top: 4px;">
+            <h5 style="margin: 0 0 10px 0; font-size: 0.82rem; color: #00d4ff; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-toggle-on"></i> Aturan Kondisi Boolean
+            </h5>
+            
+            <div class="form-group-ux" style="margin-bottom: 10px;">
+              <label style="font-size: 0.8rem; font-weight: 600; color: #00ff88;">
+                <i class="fas fa-check-circle"></i> Normal Value (Kondisi Aman - Hijau)
+              </label>
+              <select name="normal_value_bool" style="background: #0a1628; color: #00ff88; border: 1px solid rgba(0,255,136,0.4); border-radius: 6px; padding: 7px 10px; font-weight: 500; width: 100%;">
+                <option value="">-- Tidak Diatur --</option>
+                <option value="true" ${isNormTrue ? 'selected' : ''}>True / 1 / Aktif (Hijau)</option>
+                <option value="false" ${isNormFalse ? 'selected' : ''}>False / 0 / Mati (Hijau)</option>
+              </select>
+              <small class="text-muted" style="font-size: 0.7rem; margin-top: 3px; display: block;">Pilih kondisi yang dianggap aman/normal</small>
             </div>
-            <div class="form-group-ux" style="flex: 1;">
-              <label style="font-size: 0.8rem; color: #ffcc00;"><i class="fas fa-exclamation-circle"></i> Min. Warning Limit</label>
-              <input type="number" step="any" name="min_warning_limit" value="${item?.min_warning_limit || item?.wlv || ''}" placeholder="Min Warning">
+
+            <div class="form-row-ux" style="gap: 10px;">
+              <div class="form-group-ux" style="flex: 1;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #ffcc00;">
+                  <i class="fas fa-exclamation-triangle"></i> Warning Value (Kuning)
+                </label>
+                <select name="warning_value_bool" style="background: #0a1628; color: #ffcc00; border: 1px solid rgba(255,204,0,0.4); border-radius: 6px; padding: 7px 10px; font-weight: 500; width: 100%;">
+                  <option value="">-- Tanpa Warning --</option>
+                  <option value="true" ${isWarnTrue ? 'selected' : ''}>True / 1 / Aktif (Kuning)</option>
+                  <option value="false" ${isWarnFalse ? 'selected' : ''}>False / 0 / Mati (Kuning)</option>
+                </select>
+                <small class="text-muted" style="font-size: 0.7rem; margin-top: 3px; display: block;">Opsional</small>
+              </div>
+
+              <div class="form-group-ux" style="flex: 1;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #ff3355;">
+                  <i class="fas fa-bell"></i> Alarm Value (Merah)
+                </label>
+                <select name="alarm_value_bool" style="background: #0a1628; color: #ff3355; border: 1px solid rgba(255,51,85,0.4); border-radius: 6px; padding: 7px 10px; font-weight: 500; width: 100%;">
+                  <option value="">-- Tanpa Alarm --</option>
+                  <option value="true" ${isAlarmTrue ? 'selected' : ''}>True / 1 / Aktif (Merah)</option>
+                  <option value="false" ${isAlarmFalse ? 'selected' : ''}>False / 0 / Mati (Merah)</option>
+                </select>
+                <small class="text-muted" style="font-size: 0.7rem; margin-top: 3px; display: block;">Opsional</small>
+              </div>
             </div>
           </div>
 
-          <div class="form-row-ux">
-            <div class="form-group-ux" style="flex: 1;">
-              <label style="font-size: 0.8rem; color: #ffcc00;"><i class="fas fa-exclamation-circle"></i> Max. Warning Limit</label>
-              <input type="number" step="any" name="max_warning_limit" value="${item?.max_warning_limit || item?.whv || ''}" placeholder="Max Warning">
+          <!-- OPSI B: State / Label Text Input (di sebelah kanan) -->
+          <div id="stringLimitationPanel" style="display: ${isString ? 'block' : 'none'}; background: rgba(0,212,255,0.04); border: 1px solid rgba(0,212,255,0.15); border-radius: 8px; padding: 12px; margin-top: 4px;">
+            <h5 style="margin: 0 0 10px 0; font-size: 0.82rem; color: #00d4ff; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-tag"></i> Aturan Nilai Teks / State
+            </h5>
+
+            <div class="form-group-ux" style="margin-bottom: 10px;">
+              <label style="font-size: 0.8rem; font-weight: 600; color: #00ff88;">
+                <i class="fas fa-check-circle"></i> Normal Value (Kondisi Aman - Hijau)
+              </label>
+              <input type="text" name="normal_value_str" value="${item?.normal_value || item?.expected_value || ''}" placeholder="Cth: TX 1, Normal, Active">
+              <small class="text-muted" style="font-size: 0.7rem; margin-top: 3px; display: block;">Nilai teks saat alat beroperasi normal</small>
             </div>
-            <div class="form-group-ux" style="flex: 1;">
-              <label style="font-size: 0.8rem; color: #ff3355;"><i class="fas fa-bell"></i> Max. Alarm Limit</label>
-              <input type="number" step="any" name="max_alarm_limit" value="${item?.max_alarm_limit || item?.ahv || ''}" placeholder="Max Alarm">
+
+            <div class="form-row-ux" style="gap: 10px;">
+              <div class="form-group-ux" style="flex: 1;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #ffcc00;">
+                  <i class="fas fa-exclamation-triangle"></i> Warning Value (Kuning)
+                </label>
+                <input type="text" name="warning_value_str" value="${item?.warning_value || ''}" placeholder="Cth: TX 2, Transfer">
+                <small class="text-muted" style="font-size: 0.7rem; margin-top: 3px; display: block;">Opsional</small>
+              </div>
+
+              <div class="form-group-ux" style="flex: 1;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #ff3355;">
+                  <i class="fas fa-bell"></i> Alarm Value (Merah)
+                </label>
+                <input type="text" name="alarm_value_str" value="${item?.alarm_value || ''}" placeholder="Cth: -, Shutdown, Error">
+                <small class="text-muted" style="font-size: 0.7rem; margin-top: 3px; display: block;">Opsional</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- OPSI C: Ambang Batas (Numeric Threshold Limits di sebelah kanan) -->
+          <div id="numericThresholdsPanel" style="display: ${isNumeric ? 'block' : 'none'}; margin-top: 4px;">
+            <h4 style="margin: 0 0 10px 0; color: #00d4ff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-exclamation-triangle"></i> Ambang Batas (Numeric Thresholds)
+            </h4>
+
+            <div class="form-row-ux" style="margin-bottom: 8px; gap: 10px;">
+              <div class="form-group-ux" style="flex: 1;">
+                <label style="font-size: 0.8rem; color: #ff3355;"><i class="fas fa-bell"></i> Min. Alarm Limit</label>
+                <input type="number" step="any" name="min_alarm_limit" value="${item?.min_alarm_limit || item?.alv || ''}" placeholder="Min Alarm">
+              </div>
+              <div class="form-group-ux" style="flex: 1;">
+                <label style="font-size: 0.8rem; color: #ffcc00;"><i class="fas fa-exclamation-circle"></i> Min. Warning Limit</label>
+                <input type="number" step="any" name="min_warning_limit" value="${item?.min_warning_limit || item?.wlv || ''}" placeholder="Min Warning">
+              </div>
+            </div>
+
+            <div class="form-row-ux" style="gap: 10px;">
+              <div class="form-group-ux" style="flex: 1;">
+                <label style="font-size: 0.8rem; color: #ffcc00;"><i class="fas fa-exclamation-circle"></i> Max. Warning Limit</label>
+                <input type="number" step="any" name="max_warning_limit" value="${item?.max_warning_limit || item?.whv || ''}" placeholder="Max Warning">
+              </div>
+              <div class="form-group-ux" style="flex: 1;">
+                <label style="font-size: 0.8rem; color: #ff3355;"><i class="fas fa-bell"></i> Max. Alarm Limit</label>
+                <input type="number" step="any" name="max_alarm_limit" value="${item?.max_alarm_limit || item?.ahv || ''}" placeholder="Max Alarm">
+              </div>
             </div>
           </div>
         </div>
@@ -3103,13 +3201,7 @@ window.renderConfigFields = function (type, item, container) {
 
     const initialCategory = item?.category || 'All';
     setTimeout(async () => {
-      if (initialCategory !== 'All') {
-        updateSubCategoryDropdown(initialCategory, 'modalSubCat');
-      }
-      if (item?.sup_category) {
-        const select = document.getElementById('modalSubCat');
-        if (select) select.value = item.sup_category;
-      }
+      await window.updateSubCategoryBadges(initialCategory, item?.sup_category || 'All');
 
       // Populate Target Parsers checkboxes
       try {
@@ -3287,6 +3379,28 @@ window.handleConfigSubmit = async function (e) {
     const checkedParsers = Array.from(document.querySelectorAll('.target-parser-cb:checked')).map(cb => cb.value);
     data.target_parsers = checkedParsers;
 
+    // Map boolean or string inputs to normal_value, warning_value, alarm_value
+    const valType = data.value_type;
+    if (valType === 'boolean') {
+      data.normal_value = data.normal_value_bool || '';
+      data.warning_value = data.warning_value_bool || '';
+      data.alarm_value = data.alarm_value_bool || '';
+      data.expected_value = data.normal_value_bool || '';
+    } else if (valType === 'string' || valType === 'state') {
+      data.normal_value = (data.normal_value_str || '').trim();
+      data.warning_value = (data.warning_value_str || '').trim();
+      data.alarm_value = (data.alarm_value_str || '').trim();
+      data.expected_value = data.normal_value;
+    }
+
+    // Clean up temporary form fields
+    delete data.normal_value_bool;
+    delete data.warning_value_bool;
+    delete data.alarm_value_bool;
+    delete data.normal_value_str;
+    delete data.warning_value_str;
+    delete data.alarm_value_str;
+
     // Sanitize numeric inputs (convert empty string to null)
     ['min_alarm_limit', 'min_warning_limit', 'max_warning_limit', 'max_alarm_limit'].forEach(f => {
       if (data[f] === '' || data[f] === undefined) data[f] = null;
@@ -3381,7 +3495,30 @@ window.toggleAllParsers = function (select) {
   window.updateTargetParsersHidden();
 };
 
+window.sortBadgesToTop = function (containerEl) {
+  if (!containerEl) return;
+  const badges = Array.from(containerEl.children);
+  if (badges.length <= 1) return;
+
+  badges.sort((a, b) => {
+    const aCb = a.querySelector('input[type="checkbox"]');
+    const bCb = b.querySelector('input[type="checkbox"]');
+    const aChecked = aCb && aCb.checked ? 1 : 0;
+    const bChecked = bCb && bCb.checked ? 1 : 0;
+    if (bChecked !== aChecked) {
+      return bChecked - aChecked; // Checked (1) floats before Unchecked (0)
+    }
+    // Keep original relative alphabetical order
+    const aText = (a.innerText || '').trim().toLowerCase();
+    const bText = (b.innerText || '').trim().toLowerCase();
+    return aText.localeCompare(bText);
+  });
+
+  badges.forEach(badge => containerEl.appendChild(badge));
+};
+
 window.updateTargetParsersHidden = function () {
+  const container = document.getElementById('targetParsersContainer');
   const allBadges = document.querySelectorAll('#targetParsersContainer .target-parser-badge');
   allBadges.forEach(badge => {
     const cb = badge.querySelector('.target-parser-cb');
@@ -3391,6 +3528,9 @@ window.updateTargetParsersHidden = function () {
       badge.classList.remove('selected');
     }
   });
+
+  // Urutkan parser yang diceklis ke posisi paling atas
+  if (container) window.sortBadgesToTop(container);
 
   const cbs = document.querySelectorAll('.target-parser-cb:checked');
   const vals = Array.from(cbs).map(cb => cb.value);
@@ -3409,29 +3549,118 @@ window.updateTargetParsersHidden = function () {
   }
 };
 
-
-window.updateSubCategoryDropdown = async function (category, selectId) {
-  const select = document.getElementById(selectId);
-  if (!select) return;
-
-  if (category === 'All' || !category) {
-    select.innerHTML = '<option value="All">Semua Sub-Kategori (All / Generic)</option>';
-    return;
+window.handleSubCatBadgeClick = function (e, badgeEl) {
+  if (e.target.tagName.toLowerCase() === 'input') return;
+  e.preventDefault();
+  const cb = badgeEl.querySelector('.subcat-cb');
+  if (cb) {
+    cb.checked = !cb.checked;
+    window.updateSubCatHidden();
   }
+};
+
+window.updateSubCatHidden = function () {
+  const container = document.getElementById('modalSubCatContainer');
+  const allBadges = document.querySelectorAll('#modalSubCatContainer .target-parser-badge');
+  allBadges.forEach(badge => {
+    const cb = badge.querySelector('.subcat-cb');
+    if (cb && cb.checked) {
+      badge.classList.add('selected');
+    } else {
+      badge.classList.remove('selected');
+    }
+  });
+
+  // Urutkan sub-kategori yang diceklis ke posisi paling atas
+  if (container) window.sortBadgesToTop(container);
+
+  const cbs = document.querySelectorAll('#modalSubCatContainer .subcat-cb:checked');
+  const vals = Array.from(cbs).map(cb => cb.value);
+  const hiddenInput = document.getElementById('modalSubCatHidden');
+  if (hiddenInput) hiddenInput.value = vals.length === 0 ? 'All' : vals.join(', ');
+
+  const summaryEl = document.getElementById('subCatSelectionSummary');
+  if (summaryEl) {
+    if (vals.length === 0) {
+      summaryEl.textContent = 'Semua Sub-Kategori';
+      summaryEl.style.color = '#00ff88';
+    } else {
+      summaryEl.textContent = `${vals.length} Sub-Kategori Terpilih`;
+      summaryEl.style.color = '#00d4ff';
+    }
+  }
+};
+
+window.toggleAllSubCats = function (select) {
+  const badges = document.querySelectorAll('#modalSubCatContainer .target-parser-badge');
+  badges.forEach(badge => {
+    const cb = badge.querySelector('.subcat-cb');
+    if (cb) cb.checked = !!select;
+  });
+  window.updateSubCatHidden();
+};
+
+window.updateSubCategoryBadges = async function (category, selectedSups = null) {
+  const container = document.getElementById('modalSubCatContainer');
+  if (!container) return;
 
   if (!supCategoriesData || supCategoriesData.length === 0) {
     await loadSupCategories();
   }
 
-  const group = supCategoriesData.find(c => c.category === category);
-  const options = group ? (group.sub_categories || []) : [];
-
-  let html = '<option value="All">Semua Sub-Kategori (All / Generic)</option>';
-  if (options.length > 0) {
-    html += options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+  let subCats = [];
+  if (category === 'All' || !category) {
+    (supCategoriesData || []).forEach(g => {
+      (g.sub_categories || []).forEach(sc => {
+        if (!subCats.includes(sc)) subCats.push(sc);
+      });
+    });
+  } else {
+    const group = (supCategoriesData || []).find(c => c.category === category);
+    subCats = group ? (group.sub_categories || []) : [];
   }
-  select.innerHTML = html;
-}
+
+  const hiddenInput = document.getElementById('modalSubCatHidden');
+  let currentVals = selectedSups !== null ? selectedSups : (hiddenInput ? hiddenInput.value : '');
+  const activeList = (Array.isArray(currentVals) ? currentVals : String(currentVals || '').split(','))
+    .map(s => s.trim().toLowerCase()).filter(Boolean);
+
+  if (subCats.length === 0) {
+    container.innerHTML = '<small class="text-muted" style="padding: 4px;">Tidak ada sub-kategori untuk kategori ini</small>';
+    return;
+  }
+
+  container.innerHTML = subCats.map(sc => {
+    const isChecked = activeList.includes(sc.toLowerCase()) ? 'checked' : '';
+    const isSelectedClass = isChecked ? 'selected' : '';
+    return `
+      <label class="target-parser-badge ${isSelectedClass}" onclick="window.handleSubCatBadgeClick(event, this)">
+        <input type="checkbox" class="subcat-cb" value="${sc}" ${isChecked} onchange="window.updateSubCatHidden()">
+        <span class="badge-title" style="font-weight: 500;">${sc}</span>
+      </label>
+    `;
+  }).join('');
+
+  window.updateSubCatHidden();
+};
+
+window.toggleLimitationValueType = function (val) {
+  const isBool = val === 'boolean';
+  const isStr = val === 'string' || val === 'state';
+  const isNum = !isBool && !isStr;
+
+  const boolPanel = document.getElementById('booleanLimitationPanel');
+  const strPanel = document.getElementById('stringLimitationPanel');
+  const numPanel = document.getElementById('numericThresholdsPanel');
+
+  if (boolPanel) boolPanel.style.display = isBool ? 'block' : 'none';
+  if (strPanel) strPanel.style.display = isStr ? 'block' : 'none';
+  if (numPanel) numPanel.style.display = isNum ? 'block' : 'none';
+};
+
+window.updateSubCategoryDropdown = async function (category, selectId) {
+  return window.updateSubCategoryBadges(category);
+};
 
 // Global modal closer helper
 window.closeModal = function (id) {

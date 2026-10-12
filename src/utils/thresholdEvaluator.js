@@ -19,7 +19,52 @@ function checkThreshold(value, config = {}) {
     return 'Disconnect';
   }
 
-  // Parse value to number if it's a string
+  // ── Boolean & State / String Threshold Evaluation ───────────────────────
+  const isStateOrBool = config.value_type === 'boolean' ||
+                        config.value_type === 'string' ||
+                        config.value_type === 'state' ||
+                        (config.expected_value != null && config.expected_value !== '') ||
+                        (config.normal_value != null && config.normal_value !== '') ||
+                        (config.alarm_value != null && config.alarm_value !== '') ||
+                        (config.warning_value != null && config.warning_value !== '');
+
+  if (isStateOrBool) {
+    const normStr = String(config.normal_value != null && config.normal_value !== '' ? config.normal_value : (config.expected_value || '')).trim().toLowerCase();
+    const warnStr = String(config.warning_value || '').trim().toLowerCase();
+    const alarmStr = String(config.alarm_value || '').trim().toLowerCase();
+
+    const actStr = String(value).trim().toLowerCase();
+    // Normalize boolean-like values
+    const actBool = (value === true || actStr === 'true' || actStr === '1' || actStr === 'aktif' || actStr === 'on' || actStr === 'up');
+    const actBoolFalse = (value === false || actStr === 'false' || actStr === '0' || actStr === 'tidak aktif' || actStr === 'off' || actStr === 'down');
+
+    const matchesList = (patternStr) => {
+      if (!patternStr) return false;
+      const candidates = patternStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      return candidates.some(cand => {
+        if (cand === 'true' && actBool) return true;
+        if (cand === 'false' && actBoolFalse) return true;
+        if (cand === actStr) return true;
+        return actStr.includes(cand);
+      });
+    };
+
+    // Priority: Alarm > Warning > Normal
+    if (alarmStr && matchesList(alarmStr)) {
+      return 'Alert';
+    }
+    if (warnStr && matchesList(warnStr)) {
+      return 'Warning';
+    }
+    if (normStr && matchesList(normStr)) {
+      return 'Normal';
+    }
+
+    // Jika alarm/warning tidak ditentukan, jangan paksa Alarm agar kondisi non-kritis tetap aman
+    return 'Normal';
+  }
+
+  // ── Numeric Threshold Evaluation ─────────────────────────────────────────
   let numericValue;
   if (typeof value === 'string') {
     // Handle percentage strings like "80%"

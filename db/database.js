@@ -1169,9 +1169,11 @@ async function getLimitationsByEquipment(equipmentId, specificParsingId = null) 
       }
     }
 
-    // 2. Cek filter sub-kategori
-    const limitSup = String(l.sup_category || '').toLowerCase();
-    return (!targetSup || limitSup === targetSup || limitSup === 'generic' || limitSup === 'all' || limitSup === '*' || !limitSup);
+    // 2. Cek filter sub-kategori (mendukung multi sub-kategori dipisah koma)
+    const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
+      .map(s => s.trim().toLowerCase()).filter(Boolean);
+    const hasMatch = limitSups.length === 0 || limitSups.some(s => s === 'all' || s === 'generic' || s === '*' || s === targetSup);
+    return (!targetSup || hasMatch);
   });
 }
 
@@ -1203,7 +1205,11 @@ async function createLimitation(data) {
     whv: maxWarn,
     ahv: maxAlarm,
     sup_category: data.sup_category || 'All',
-    category: data.category || 'All'
+    category: data.category || 'All',
+    expected_value: data.expected_value !== undefined ? data.expected_value : (data.normal_value !== undefined ? data.normal_value : null),
+    normal_value: data.normal_value !== undefined ? data.normal_value : (data.expected_value !== undefined ? data.expected_value : null),
+    warning_value: data.warning_value !== undefined ? data.warning_value : null,
+    alarm_value: data.alarm_value !== undefined ? data.alarm_value : null
   };
   all.push(newItem);
   await writeJson(LIMITATION_CONFIG_PATH, all);
@@ -1222,6 +1228,10 @@ async function updateLimitation(id, data) {
     if (cleanData.category !== undefined) all[index].category = cleanData.category;
     if (cleanData.sup_category !== undefined) all[index].sup_category = cleanData.sup_category;
     if (cleanData.match_mode !== undefined) all[index].match_mode = cleanData.match_mode;
+    if (cleanData.expected_value !== undefined) all[index].expected_value = cleanData.expected_value;
+    if (cleanData.normal_value !== undefined) all[index].normal_value = cleanData.normal_value;
+    if (cleanData.warning_value !== undefined) all[index].warning_value = cleanData.warning_value;
+    if (cleanData.alarm_value !== undefined) all[index].alarm_value = cleanData.alarm_value;
     if (cleanData.target_parsers !== undefined) {
       all[index].target_parsers = Array.isArray(cleanData.target_parsers) 
         ? cleanData.target_parsers 
