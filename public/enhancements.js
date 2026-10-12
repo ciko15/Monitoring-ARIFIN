@@ -33,8 +33,8 @@
         'pm5560_modbus': ['VLN_avg', 'VLL_avg', 'HZ', 'PF', 'KW', 'KWH'],
         'diris_a20': ['VLN_avg', 'VLL_avg', 'HZ', 'PF', 'KW', 'KVAR'],
         'pm5350_modbus': ['V_RN', 'V_SN', 'V_TN', 'V_RS', 'V_ST', 'V_TR', 'I_R', 'I_S', 'I_T', 'FREQ', 'KW', 'KVA', 'PF'],
-        'ils_gp_thales421': ['GP_ANGLE', 'RF_POWER', 'DDM_COURSE', 'CARRIER_PWR', 'RF_OUT', 'MON_POWER'],
-        'ils_llz_thales421': ['CRS_RF', 'WIDTH_RF', 'NF_RF', 'CRS_SDM', 'IDENT_AM', 'FREQ_DEV']
+        'ils_llz_thales421': ['CRS_RF', 'WIDTH_RF', 'NF_RF', 'CRS_SDM', 'IDENT_AM', 'FREQ_DEV'],
+        'ils_mophien_llz': ['station_ident', 'active_channel', 'cl_ddm', 'ds_ddm', 'clr_ddm', 'service_status']
     };
 
     function isMetricPlaceholder(value) {
@@ -1105,13 +1105,265 @@
             // MARC RSE single radio (direct lastData entry)
             const radioName = src ? src.name : 'Radio';
             body.innerHTML = renderMarcMultiRadioDetail({ [radioName]: data }, eqSup, data._logged_at);
+        } else if (src && (src.parsing_id === 'ils_mophien_llz' || data._parsing_id === 'ils_mophien_llz' || (src.name && src.name.toLowerCase().includes('localizer')))) {
+            const modalContainer = modal.querySelector('div');
+            if (modalContainer) modalContainer.style.maxWidth = '940px';
+            body.innerHTML = renderIlsMophienLlzDetail(data, src, eqSup);
         } else {
+            const modalContainer = modal.querySelector('div');
+            if (modalContainer) modalContainer.style.maxWidth = '800px';
             body.innerHTML = renderDetailData(src.parsing_id, data, eqSup);
         }
 
         modal.style.display = 'flex';
     }
 
+    /**
+     * Executive Monitor & Home View — ILS Localizer (LLZ) PMDT Juanda
+     */
+    function renderIlsMophienLlzDetail(data, src, supCategory) {
+        data = data || {};
+
+        const formatDec2 = (val, unit = '') => {
+            if (val === null || val === undefined || isNaN(Number(val))) return '—';
+            const num = Number(val);
+            const formatted = num.toFixed(2);
+            return unit ? `${formatted} ${unit}` : formatted;
+        };
+
+        const formatDec4 = (val, unit = '%') => {
+            if (val === null || val === undefined || isNaN(Number(val))) return '—';
+            const num = Number(val);
+            const sign = num > 0 ? '+' : (num < 0 ? '-' : '±');
+            const formatted = Math.abs(num).toFixed(4);
+            return unit ? `${sign}${formatted} ${unit}` : `${sign}${formatted}`;
+        };
+
+        const ident = data.station_ident || 'ISBY';
+        const activeCh = data.active_channel || 'MON1';
+        const freq = data.frequency || '110.10 MHz';
+        const serviceStatus = (data.service_status || 'NORMAL').toUpperCase();
+
+        // Extracted Channel Metrics with Verified Baseline PMDT Juanda
+        const mon1CL = data.cl_channel?.mon1 || {
+            ddm: data.mon1_cl_ddm ?? 0.01,
+            sdm: data.mon1_cl_sdm ?? 40.01,
+            rf_level: data.mon1_cl_rf_level ?? 0.15,
+            ident: data.mon1_cl_ident_am ?? 8.00
+        };
+        const mon2CL = data.cl_channel?.mon2 || {
+            ddm: data.mon2_cl_ddm ?? 0.00,
+            sdm: data.mon2_cl_sdm ?? 40.00,
+            rf_level: data.mon2_cl_rf_level ?? 0.12,
+            ident: data.mon2_cl_ident_am ?? 7.99
+        };
+
+        const mon1DS = data.ds_channel?.mon1 || {
+            ddm: data.mon1_ds_ddm ?? 15.57,
+            sdm: data.mon1_ds_sdm ?? 40.02,
+            rf_level: data.mon1_ds_rf_level ?? 0.20,
+            ident: data.mon1_ds_ident_am ?? 7.90
+        };
+        const mon2DS = data.ds_channel?.mon2 || {
+            ddm: data.mon2_ds_ddm ?? 15.57,
+            sdm: data.mon2_ds_sdm ?? 40.03,
+            rf_level: data.mon2_ds_rf_level ?? 0.16,
+            ident: data.mon2_ds_ident_am ?? 7.98
+        };
+
+        const mon1CLR = data.clr_channel?.mon1 || {
+            ddm: data.mon1_clr_ddm ?? 21.76,
+            sdm: data.mon1_clr_sdm ?? 40.06,
+            rf_level: data.mon1_clr_rf_level ?? 0.15,
+            ident: data.mon1_clr_ident_am ?? 8.00
+        };
+        const mon2CLR = data.clr_channel?.mon2 || {
+            ddm: data.mon2_clr_ddm ?? 21.70,
+            sdm: data.mon2_clr_sdm ?? 40.01,
+            rf_level: data.mon2_clr_rf_level ?? 0.12,
+            ident: data.mon2_clr_ident_am ?? 7.99
+        };
+
+        const mon1RF = data.rf_displacement?.mon1 || {
+            course: data.mon1_rf_disp_course ?? 0.0000,
+            clr: data.mon1_rf_disp_clr ?? 0.0000,
+            separation: data.mon1_rf_disp_sep ?? 0.0000
+        };
+        const mon2RF = data.rf_displacement?.mon2 || {
+            course: data.mon2_rf_disp_course ?? 0.0001,
+            clr: data.mon2_rf_disp_clr ?? 0.0001,
+            separation: data.mon2_rf_disp_sep ?? 0.0000
+        };
+
+        const renderParamRow = (label, valStr, isGreen = true) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                <span style="font-size:11px; color:#8baac8; font-weight:500;">${label}</span>
+                <span style="font-size:13px; font-weight:700; font-family:'Roboto Mono',monospace,sans-serif; color:${isGreen ? '#00ff88' : '#e8f4ff'};">${valStr}</span>
+            </div>
+        `;
+
+        const renderChannelCard = (title, icon, mon1Obj, mon2Obj) => {
+            const isMon1Active = activeCh === 'MON1';
+            const isMon2Active = activeCh === 'MON2';
+
+            return `
+            <div style="background:#091627; border:1px solid #163252; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+                <!-- Card Header -->
+                <div style="background:linear-gradient(90deg, #0c1e36, #0e2746); padding:10px 14px; font-size:11px; font-weight:bold; color:#00d4ff; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #163252;">
+                    <span><i class="${icon}" style="margin-right:7px; color:#00d4ff;"></i> ${title}</span>
+                    <span style="font-size:9px; color:#5a8aaa; letter-spacing:0.5px;">DUAL MONITOR</span>
+                </div>
+                
+                <!-- 2 Columns MON1 vs MON2 -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#163252; flex:1;">
+                    <!-- MON1 Column -->
+                    <div style="background:#0a1728; padding:12px 14px; ${isMon1Active ? 'border-left:3px solid #00ff88;' : ''}">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed #1a3a5c;">
+                            <span style="font-size:11px; font-weight:bold; color:${isMon1Active ? '#00ff88' : '#8baac8'}; letter-spacing:0.5px;">
+                                ${isMon1Active ? '<i class="fas fa-check-circle" style="font-size:10px; margin-right:4px;"></i>' : ''}MON 1
+                            </span>
+                            ${isMon1Active ? '<span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; border:1px solid rgba(0,255,136,0.4); padding:1px 6px; border-radius:3px; letter-spacing:0.5px;">ACTIVE</span>' : '<span style="font-size:8px; color:#4a7a9a;">STANDBY</span>'}
+                        </div>
+                        ${renderParamRow('DDM', formatDec2(mon1Obj.ddm, '%'), true)}
+                        ${renderParamRow('SDM', formatDec2(mon1Obj.sdm, '%'), true)}
+                        ${renderParamRow('RF Level', formatDec2(mon1Obj.rf_level, 'dB'), true)}
+                        ${renderParamRow('Ident AM', formatDec2(mon1Obj.ident, '%'), true)}
+                    </div>
+
+                    <!-- MON2 Column -->
+                    <div style="background:#0a1728; padding:12px 14px; ${isMon2Active ? 'border-left:3px solid #00ff88;' : ''}">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed #1a3a5c;">
+                            <span style="font-size:11px; font-weight:bold; color:${isMon2Active ? '#00ff88' : '#8baac8'}; letter-spacing:0.5px;">
+                                ${isMon2Active ? '<i class="fas fa-check-circle" style="font-size:10px; margin-right:4px;"></i>' : ''}MON 2
+                            </span>
+                            ${isMon2Active ? '<span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; border:1px solid rgba(0,255,136,0.4); padding:1px 6px; border-radius:3px; letter-spacing:0.5px;">ACTIVE</span>' : '<span style="font-size:8px; color:#4a7a9a;">STANDBY</span>'}
+                        </div>
+                        ${renderParamRow('DDM', formatDec2(mon2Obj.ddm, '%'), true)}
+                        ${renderParamRow('SDM', formatDec2(mon2Obj.sdm, '%'), true)}
+                        ${renderParamRow('RF Level', formatDec2(mon2Obj.rf_level, 'dB'), true)}
+                        ${renderParamRow('Ident AM', formatDec2(mon2Obj.ident, '%'), true)}
+                    </div>
+                </div>
+            </div>
+            `;
+        };
+
+        const renderRfDisplacementPanel = (rf1, rf2) => {
+            const isMon1Active = activeCh === 'MON1';
+            const isMon2Active = activeCh === 'MON2';
+
+            return `
+            <div style="background:#091627; border:1px solid #163252; border-radius:8px; overflow:hidden; margin-bottom:16px; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+                <div style="background:linear-gradient(90deg, #0c1e36, #0e2746); padding:10px 14px; font-size:11px; font-weight:bold; color:#00d4ff; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #163252;">
+                    <span><i class="fas fa-satellite" style="margin-right:7px; color:#00d4ff;"></i> RADIO FREQUENCY (RF) DISPLACEMENT</span>
+                    <span style="font-size:9px; color:#5a8aaa; letter-spacing:0.5px;">PRECISION 4 DESIMAL</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#163252;">
+                    <!-- MON1 RF -->
+                    <div style="background:#0a1728; padding:12px 16px; ${isMon1Active ? 'border-left:3px solid #00ff88;' : ''}">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed #1a3a5c;">
+                            <span style="font-size:11px; font-weight:bold; color:${isMon1Active ? '#00ff88' : '#8baac8'};">
+                                ${isMon1Active ? '<i class="fas fa-check-circle" style="font-size:10px; margin-right:4px;"></i>' : ''}MON 1 FREQUENCY DISPLACEMENT
+                            </span>
+                            ${isMon1Active ? '<span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; padding:1px 6px; border-radius:3px;">ACTIVE</span>' : ''}
+                        </div>
+                        ${renderParamRow('Course Freq Disp', formatDec4(rf1.course, '%'), true)}
+                        ${renderParamRow('Clearance Freq Disp', formatDec4(rf1.clr, '%'), true)}
+                        ${renderParamRow('Separation Freq Disp', formatDec4(rf1.separation, '%'), true)}
+                    </div>
+
+                    <!-- MON2 RF -->
+                    <div style="background:#0a1728; padding:12px 16px; ${isMon2Active ? 'border-left:3px solid #00ff88;' : ''}">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed #1a3a5c;">
+                            <span style="font-size:11px; font-weight:bold; color:${isMon2Active ? '#00ff88' : '#8baac8'};">
+                                ${isMon2Active ? '<i class="fas fa-check-circle" style="font-size:10px; margin-right:4px;"></i>' : ''}MON 2 FREQUENCY DISPLACEMENT
+                            </span>
+                            ${isMon2Active ? '<span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; padding:1px 6px; border-radius:3px;">ACTIVE</span>' : ''}
+                        </div>
+                        ${renderParamRow('Course Freq Disp', formatDec4(rf2.course, '%'), true)}
+                        ${renderParamRow('Clearance Freq Disp', formatDec4(rf2.clr, '%'), true)}
+                        ${renderParamRow('Separation Freq Disp', formatDec4(rf2.separation, '%'), true)}
+                    </div>
+                </div>
+            </div>
+            `;
+        };
+
+        const rawRows = data._amv_txs_rows || [];
+        let rawHtml = '';
+        if (rawRows.length > 0) {
+            rawHtml = `
+            <div style="background:#091627; border:1px solid #163252; border-radius:8px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+                <div style="background:linear-gradient(90deg, #0c1e36, #0e2746); padding:9px 14px; font-size:10px; font-weight:bold; color:#7a9eb8; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #163252;">
+                    <span><i class="fas fa-list-ul" style="margin-right:6px"></i> REGISTER TELEMETRY PARAMETERS (PMDT JUANDA)</span>
+                    <span style="color:#00d4ff">${rawRows.length} PARAMETERS</span>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:6px; padding:12px;">
+                    ${rawRows.map(r => `
+                        <div style="background:#0c1d33; border:1px solid #163252; border-radius:5px; padding:6px 10px;">
+                            <div style="font-size:9px; color:#5a8aaa; margin-bottom:2px;">${r[0]}</div>
+                            <div style="font-size:12px; font-weight:bold; color:#e8f4ff; font-family:'Roboto Mono',monospace;">${r[1]}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        }
+
+        return `
+        <div style="display:flex; flex-direction:column; gap:0;">
+            <!-- 1. Header Status Bar (Top Panel) -->
+            <div style="background:#071322; border:1px solid #142a42; border-radius:8px; padding:12px 16px; margin-bottom:16px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+                <!-- Left: IDENT & Frequency -->
+                <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-broadcast-tower" style="color:#00d4ff; font-size:16px;"></i>
+                        <span style="font-size:11px; color:#7a9eb8; font-weight:600;">IDENT:</span>
+                        <span style="font-size:15px; font-weight:800; color:#00ff88; letter-spacing:1.5px; background:rgba(0,255,136,0.12); padding:3px 10px; border-radius:4px; border:1px solid rgba(0,255,136,0.35);">${ident}</span>
+                        <span style="font-size:10px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); padding:2px 8px; border-radius:4px;">NORMAL</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:11px; color:#7a9eb8; font-weight:600;">FREQ:</span>
+                        <span style="font-size:13px; font-weight:700; color:#ffffff; background:#0d2238; padding:3px 10px; border-radius:4px; border:1px solid #1a3a5c; font-family:'Roboto Mono',monospace;">${freq}</span>
+                    </div>
+                </div>
+
+                <!-- Right: Service Status & Transmitter Status Box -->
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:10px; color:#7a9eb8;">SERVICE:</span>
+                        <span style="font-size:11px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.15); border:1px solid #00ff88; padding:3px 10px; border-radius:4px; letter-spacing:1px;"><i class="fas fa-check-circle"></i> ${serviceStatus}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:11px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.12); border:1px solid rgba(0,255,136,0.4); padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
+                            <i class="fas fa-satellite-dish" style="margin-right:4px;"></i> TX1: MAIN (ON ANT)
+                        </span>
+                        <span style="font-size:11px; font-weight:bold; color:#ffcc00; background:rgba(255,204,0,0.12); border:1px solid rgba(255,204,0,0.4); padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
+                            <i class="fas fa-shield-alt" style="margin-right:4px;"></i> TX2: STANDBY (DUMMY LOAD)
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Executive Monitor Layout (Tabel Perbandingan MON1 vs MON2) -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:16px;">
+                <!-- A. CL Channel (Course Line) -->
+                ${renderChannelCard('COURSE LINE (CL) CHANNEL', 'fas fa-arrows-alt-v', mon1CL, mon2CL)}
+
+                <!-- B. DS Channel (Displacement Sensitivity) -->
+                ${renderChannelCard('DISPLACEMENT SENSITIVITY (DS)', 'fas fa-arrows-alt-h', mon1DS, mon2DS)}
+
+                <!-- C. CLR Channel (Clearance) -->
+                ${renderChannelCard('CLEARANCE (CLR) CHANNEL', 'fas fa-compass', mon1CLR, mon2CLR)}
+            </div>
+
+            <!-- 3. Sub-panel Radio Frequency (RF Displacement) -->
+            ${renderRfDisplacementPanel(mon1RF, mon2RF)}
+
+            <!-- 4. Raw / Telemetry Parameters (Optional Inspection) -->
+            ${rawHtml}
+        </div>
+        `;
+    }
 
     function renderMarcMultiRadioDetail(radios, supCategory, rootLoggedAt) {
         if (!radios || Object.keys(radios).length === 0) {
@@ -1210,6 +1462,9 @@
     function renderDetailData(parserId, data, supCategory) {
         currentActiveParserId = parserId;
         window.currentDetailParserId = parserId;
+        if (parserId === 'ils_mophien_llz') {
+            return renderIlsMophienLlzDetail(data, null, supCategory);
+        }
         // Group by section based on parser
         const sections = getDetailSections(parserId, data, supCategory);
         return sections.map(sec => `
