@@ -330,30 +330,39 @@ async function checkEquipmentWatchdog() {
                         return src._status || 'Normal';
                     }));
 
-                    // Rule-based consolidation
+                    // Rule-based consolidation sesuai spesifikasi:
+                    // 1. Jika semua data source statusnya sama persis -> ikuti status tersebut
+                    // 2. Jika semua normal -> Normal
+                    // 3. Jika semua offline -> Offline
+                    // 4. Jika kombinasi offline dan disconnect (misal 1 offline, 4 disconnect) -> Offline
+                    // 5. Jika ada 1 dari N alat warning/alarm/disconnect tapi lainnya normal -> Warning
+                    // 6. Jika 4 warning dan 1 alarm/disconnect -> Warning
                     if (sourceStatuses.length > 0) {
-                        const lowerStatuses = sourceStatuses.map(s => {
-                            const str = String(s).toLowerCase();
-                            if (str === 'alarm' || str === 'alert' || str === 'fail' || str === 'critical' || str === 'offline') return 'offline';
-                            if (str === 'warning') return 'warning';
-                            if (str === 'disconnect') return 'disconnect';
-                            return 'normal';
+                        const normStatuses = sourceStatuses.map(s => {
+                            const str = String(s || '').trim().toLowerCase();
+                            if (str === 'offline' || str === 'mati') return 'Offline';
+                            if (str === 'disconnect' || str === 'terputus') return 'Disconnect';
+                            if (str === 'warning' || str === 'alert' || str === 'alarm' || str === 'fail' || str === 'critical') return 'Warning';
+                            return 'Normal';
                         });
 
-                        if (lowerStatuses.every(s => s === 'offline' || s === 'disconnect')) {
-                            if (lowerStatuses.some(s => s === 'offline')) {
-                                finalStatus = 'Alarm';
-                            } else {
-                                finalStatus = 'Disconnect';
-                            }
-                        } else if (lowerStatuses.some(s => s === 'offline')) {
-                            finalStatus = 'Alarm';
-                        } else if (lowerStatuses.some(s => s === 'warning')) {
-                            finalStatus = 'Warning';
-                        } else if (lowerStatuses.some(s => s === 'disconnect')) {
-                            finalStatus = 'Warning';
+                        const uniqueStatuses = Array.from(new Set(normStatuses));
+                        if (uniqueStatuses.length === 1) {
+                            // Semua data source sama persis
+                            finalStatus = uniqueStatuses[0];
                         } else {
-                            finalStatus = 'Normal';
+                            const hasOffline = normStatuses.includes('Offline');
+                            const hasDisconnect = normStatuses.includes('Disconnect');
+                            const hasWarning = normStatuses.includes('Warning');
+                            const hasNormal = normStatuses.includes('Normal');
+
+                            // Jika semua data source hanya kombinasi Offline & Disconnect (tanpa Normal & tanpa Warning)
+                            if ((hasOffline || hasDisconnect) && !hasNormal && !hasWarning) {
+                                finalStatus = hasOffline ? 'Offline' : 'Disconnect';
+                            } else {
+                                // Jika ada Warning, atau ada sebagian Disconnect/Offline bercampur Normal/Warning
+                                finalStatus = 'Warning';
+                            }
                         }
                     }
                 } else if (item.lastUpdate) {

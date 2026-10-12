@@ -270,11 +270,10 @@ class NetworkListenerService {
 
                             if (isMatch) {
                                 const evalStatus = thresholdEvaluator.checkThreshold(rawVal, lim);
-                                if (evalStatus === 'Alert' || evalStatus === 'Alarm') {
-                                    statusToEvaluate = 'Alarm';
-                                    break;
-                                } else if (evalStatus === 'Warning' && statusToEvaluate !== 'Alarm') {
+                                if (evalStatus === 'Alert' || evalStatus === 'Alarm' || evalStatus === 'Warning') {
+                                    // Aturan 1: Berapapun pembacaan nilainya (warning maupun alarm), status data source tetap Warning
                                     statusToEvaluate = 'Warning';
+                                    break;
                                 }
                             }
                         }
