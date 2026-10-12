@@ -157,6 +157,11 @@ class NetworkListenerService {
         const isInitialDisconnect = initialLower === 'disconnect' || initialLower === 'error' || initialLower === 'offline';
         let isPingable = false;
 
+        // Aturan 1: Untuk data source, berapapun pembacaan nilainya (warning maupun alarm), status data source tetap Warning
+        if (initialLower === 'alarm' || initialLower === 'alert' || initialLower === 'fail' || initialLower === 'critical') {
+            statusToEvaluate = 'Warning';
+        }
+
         if (isInitialDisconnect) {
             // Cek status Ping (ICMP) lebih awal
             // Sesuai aturan: jika ping normal tapi data kosong (SNMP gagal), maka status menjadi Offline (mati)

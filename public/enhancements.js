@@ -972,7 +972,13 @@
                 }
             }
         }
-        return window.normalizeSourceStatus ? window.normalizeSourceStatus(rawStatus) : rawStatus;
+        // Aturan 1: Untuk data source, berapapun pembacaan nilainya (warning maupun alarm), status data source tetap Warning
+        const norm = window.normalizeSourceStatus ? window.normalizeSourceStatus(rawStatus) : rawStatus;
+        const normLower = String(norm || '').toLowerCase();
+        if (normLower === 'alarm' || normLower === 'alert' || normLower === 'fail' || normLower === 'critical') {
+            return 'Warning';
+        }
+        return norm;
     }
 
     // ── Source Detail Modal ───────────────────────────────────────────────────
@@ -1042,7 +1048,12 @@
 
         document.getElementById('srcDetailTitle').textContent = src.name + ' — ' + (src.ip_address || '');
 
-        const status = data ? (data._status || 'Normal') : 'Disconnect';
+        let status = data ? (data._status || 'Normal') : 'Disconnect';
+        // Aturan 1: Untuk data source, berapapun pembacaan nilainya (warning maupun alarm), status data source tetap Warning
+        const statusLower = String(status).toLowerCase();
+        if (statusLower === 'alarm' || statusLower === 'alert' || statusLower === 'fail' || statusLower === 'critical') {
+            status = 'Warning';
+        }
         const statusColors = { Normal: '#00ff88', Alarm: '#ff3355', Offline: '#ff3355', Warning: '#ffcc00', Disconnect: '#3a5a7a' };
 
         let pingBadge = '';

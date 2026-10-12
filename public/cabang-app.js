@@ -282,44 +282,37 @@ const cabangModule = (function () {
   function renderCabangGrid() {
     if (!cabangGrid) return;
 
-    if (!window.normalizeSourceStatus) {
-      window.normalizeSourceStatus = function (rawStatus) {
-        const s = String(rawStatus || '').toLowerCase();
-        if (s === 'offline' || s === 'fail' || s === 'critical') return 'Offline';
-        if (s === 'alarm' || s === 'alert') return 'Alarm';
-        if (s === 'warning') return 'Warning';
-        if (s === 'disconnect') return 'Disconnect';
-        return 'Normal';
-      };
-    }
+    window.normalizeSourceStatus = function (rawStatus) {
+      const s = String(rawStatus || '').toLowerCase();
+      if (s === 'offline' || s === 'fail' || s === 'critical') return 'Offline';
+      if (s === 'alarm' || s === 'alert' || s === 'warning') return 'Warning';
+      if (s === 'disconnect') return 'Disconnect';
+      return 'Normal';
+    };
     const normalizeSourceStatus = window.normalizeSourceStatus;
 
     function deriveEquipmentStatus(item) {
-      const rawStatus = String(item?.status || '').trim().toLowerCase();
-      if (rawStatus === 'disconnect' || rawStatus === 'offline') {
-        return rawStatus;
-      }
-
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
-        const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status).toLowerCase());
-        if (sourceStatuses.some(st => st === 'warning')) return 'warning';
-        
-        const allOfflineOrDisconnect = sourceStatuses.every(st => st === 'offline' || st === 'disconnect');
-        if (allOfflineOrDisconnect) {
-          if (sourceStatuses.some(st => st === 'offline')) return 'offline';
-          return 'disconnect';
+        const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status));
+        const uniqueStatuses = Array.from(new Set(sourceStatuses));
+        if (uniqueStatuses.length === 1) {
+          return uniqueStatuses[0].toLowerCase();
         }
-        
-        const hasOfflineOrDisconnect = sourceStatuses.some(st => st === 'offline' || st === 'disconnect');
-        if (hasOfflineOrDisconnect) return 'warning';
-        
-        return 'normal';
+        const hasOffline = sourceStatuses.includes('Offline');
+        const hasDisconnect = sourceStatuses.includes('Disconnect');
+        const hasNormal = sourceStatuses.includes('Normal');
+        const hasWarning = sourceStatuses.includes('Warning');
+
+        if ((hasOffline || hasDisconnect) && !hasNormal && !hasWarning) {
+          return hasOffline ? 'offline' : 'disconnect';
+        }
+        return 'warning';
       }
 
-      const fallback = rawStatus || 'disconnect';
-      return ['normal', 'offline', 'warning', 'disconnect'].includes(fallback)
-        ? fallback
-        : (['alarm', 'alert', 'fail', 'critical'].includes(fallback) ? 'offline' : 'disconnect');
+      const rawStatus = String(item?.status || '').trim().toLowerCase();
+      if (['alarm', 'alert', 'fail', 'critical'].includes(rawStatus)) return 'warning';
+      if (['normal', 'offline', 'warning', 'disconnect'].includes(rawStatus)) return rawStatus;
+      return 'disconnect';
     }
 
     let filtered = equipmentData;
@@ -408,7 +401,7 @@ const cabangModule = (function () {
         if (sources.length > 0) {
           const cardsHtml = sources.map(sourceName => {
             const sourceData = item.lastData[sourceName] || {};
-            const srcStatus = sourceData._status || 'Normal';
+            const srcStatus = normalizeSourceStatus(sourceData._status || 'Normal');
             const logDate = sourceData._logged_at ? new Date(sourceData._logged_at) : null;
             const isToday = logDate && logDate.toDateString() === new Date().toDateString();
             const srcTime = logDate
