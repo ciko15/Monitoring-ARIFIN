@@ -229,7 +229,22 @@
             'cpuusage': ['cpu', 'processorload', 'cpu usage'],
             'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct', 'ram usage'],
             'ramavailable': ['ramavailablepct', 'memoryavailable', 'ram available'],
-            'diskusage': ['diskusagepct', 'storageusage', 'disk usage']
+            'diskusage': ['diskusagepct', 'storageusage', 'disk usage'],
+            'crsrf': ['crsrf', 'crsrflevel', 'crsposrf', 'crsposrflevel', 'crs_rf', 'rf_power', 'rfpower', 'rf power'],
+            'crsddm': ['crsddm', 'crsposddm', 'crs_ddm', 'ddm_course', 'ddmcourse', 'ddm course'],
+            'crssdm': ['crssdm', 'crspossdm', 'crs_sdm', 'carrier_pwr', 'carrierpower', 'carrierpwr', 'carrier power'],
+            'identam': ['identam', 'ident', 'ident_am', 'ident am'],
+            'widthrf': ['widthrf', 'crswidthrf', 'crswidthrflevel', 'width_rf', 'csb_power', 'csbpower', 'csb power', 'widthrflevel'],
+            'widthddm': ['widthddm', 'crswidthddm', 'width_ddm', 'ddm_clr', 'ddmclr', 'ddm clr'],
+            'widthsdm': ['widthsdm', 'crswidthsdm', 'width_sdm', 'sbo_power', 'sbopower', 'sbo power'],
+            'clrrf': ['clrrf', 'clrwidthrf', 'clrwidthrflevel', 'clr_rf', 'clr_power', 'clrpower', 'clr power'],
+            'clrddm': ['clrddm', 'clrwidthddm', 'clr_ddm'],
+            'clrsdm': ['clrsdm', 'clrwidthsdm', 'clr_sdm'],
+            'nfrf': ['nfrf', 'nearfieldrf', 'nearfieldposrf', 'nearfieldposrflevel', 'nf_rf', 'rf_out', 'rfout', 'rf out', 'nearfieldposrflevel'],
+            'nfddm': ['nfddm', 'nearfieldddm', 'nearfieldposddm', 'nf_ddm', 'ddm_mon', 'ddmmon', 'ddm mon'],
+            'nfsdm': ['nfsdm', 'nearfieldsdm', 'nearfieldpossdm', 'nf_sdm', 'mon_power', 'monpower', 'mon power'],
+            'freqdev': ['freqdev', 'freqdeviation', 'frequencydeviation', 'freq_dev', 'frequency deviation', 'freq deviation'],
+            'gpangle': ['gpangle', 'glidepathangle', 'gp_angle', 'gp angle']
         };
 
         const checkNameMatch = (targetStr, candStr, isExact) => {
@@ -248,16 +263,14 @@
                 const candTokens = candStr.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).sort().join(' ');
                 if (targetTokens && candTokens && targetTokens === candTokens) return true;
 
-                // Alias check
+                // Alias check (bidirectional)
                 for (const [key, aliases] of Object.entries(aliasMap)) {
                     const normKey = key.replace(/[^a-z0-9]/g, '');
-                    if (canonCand === normKey) {
-                        for (const alias of aliases) {
-                            const normAlias = alias.replace(/[^a-z0-9]/g, '');
-                            if (canonTarget === normAlias || (!isExact && (canonTarget.includes(normAlias) || normAlias.includes(canonTarget)))) {
-                                return true;
-                            }
-                        }
+                    const allVariants = [normKey, ...aliases.map(a => a.replace(/[^a-z0-9]/g, ''))];
+                    const candMatches = allVariants.some(v => canonCand === v || (!isExact && (canonCand.includes(v) || v.includes(canonCand))));
+                    const targetMatches = allVariants.some(v => canonTarget === v || (!isExact && (canonTarget.includes(v) || v.includes(canonTarget))));
+                    if (candMatches && targetMatches) {
+                        return true;
                     }
                 }
             }
@@ -1964,11 +1977,19 @@
             });
 
             const paramLabels = {
-                RF_POWER: 'CRS Pos. RF Level', DDM_COURSE: 'CRS Pos. DDM', CARRIER_PWR: 'CRS Pos. SDM',
-                CSB_POWER: 'CRS Width RF Level', DDM_CLR: 'CRS Width DDM', SBO_POWER: 'CRS Width SDM',
-                CLR_POWER: 'CLR Width RF Level', CLR_DDM: 'CLR Width DDM', CLR_SDM: 'CLR Width SDM',
-                RF_OUT: 'Nearfield Pos. RF', DDM_MON: 'Nearfield Pos. DDM', MON_POWER: 'Monitor Power',
-                GP_ANGLE: 'GP Angle'
+                GP_ANGLE: 'GP ANGLE',
+                RF_POWER: 'RF POWER',
+                DDM_COURSE: 'DDM COURSE',
+                CARRIER_PWR: 'CARRIER PWR',
+                CSB_POWER: 'CSB POWER',
+                DDM_CLR: 'DDM CLR',
+                SBO_POWER: 'SBO POWER',
+                CLR_POWER: 'CLR POWER',
+                CLR_DDM: 'CLR DDM',
+                CLR_SDM: 'CLR SDM',
+                RF_OUT: 'RF OUT',
+                DDM_MON: 'DDM MON',
+                MON_POWER: 'MON POWER'
             };
 
             sections.push({
@@ -1989,11 +2010,20 @@
             });
 
             const paramLabels = {
-                CRS_RF: 'CRS Pos. RF Level', CRS_DDM: 'CRS Pos. DDM', CRS_SDM: 'CRS Pos. SDM',
-                IDENT_AM: 'Ident AM', WIDTH_RF: 'CRS Width RF Level', WIDTH_DDM: 'CRS Width DDM',
-                WIDTH_SDM: 'CRS Width SDM', CLR_RF: 'CLR Width RF Level', CLR_DDM: 'CLR Width DDM',
-                CLR_SDM: 'CLR Width SDM', NF_RF: 'Nearfield Pos. RF Level', NF_DDM: 'Nearfield Pos. DDM',
-                NF_SDM: 'Nearfield Pos. SDM', FREQ_DEV: 'Freq Deviation'
+                CRS_RF: 'CRS RF',
+                CRS_DDM: 'CRS DDM',
+                CRS_SDM: 'CRS SDM',
+                IDENT_AM: 'IDENT AM',
+                WIDTH_RF: 'WIDTH RF',
+                WIDTH_DDM: 'WIDTH DDM',
+                WIDTH_SDM: 'WIDTH SDM',
+                CLR_RF: 'CLR RF',
+                CLR_DDM: 'CLR DDM',
+                CLR_SDM: 'CLR SDM',
+                NF_RF: 'NF RF',
+                NF_DDM: 'NF DDM',
+                NF_SDM: 'NF SDM',
+                FREQ_DEV: 'FREQ DEV'
             };
 
             sections.push({
