@@ -99,14 +99,11 @@ function decodeCat034(data, radarName, radarLat, radarLon) {
                     let b = data[offset];
                     statusVal.push(b.toString(16).padStart(2,'0'));
                     
-                    // Decode System Status (berdasarkan ASTERIX Eurocontrol)
-                    if (byteIdx === 0) {
-                        if (b & 0x80) malfunctions.push('COM Fail');
-                        if (b & 0x40) malfunctions.push('STAT Fail');
-                        if (b & 0x02) malfunctions.push('OVERLOAD'); // OVL bit
-                    } else if (byteIdx === 1) {
-                        if (b & 0x02) malfunctions.push('JAMMING'); // JMM bit
-                        if (b & 0x08) malfunctions.push('Time Sync Fail');
+                    // Decode System Status (ASTERIX Eurocontrol)
+                    // Byte 0 adalah Primary Subfield: 0x80 = COM present, 0x40 = PSR, 0x20 = SSR.
+                    // Bit 0x80 BUKAN COM Fail melainkan indikator bahwa Common Part disertakan.
+                    if (byteIdx > 0) {
+                        if (b & 0x02) malfunctions.push('OVERLOAD');
                     }
                     
                     ext = (b & 0x01) !== 0;
@@ -164,8 +161,10 @@ class AsterixRadarParser extends BaseParser {
         this._lastSeen  = null;
         this._connected = false;
         
-        // Simpan jumlah pesawat dari CAT048
+        // Simpan pesawat & target list dari CAT048
         this._lastTargetCount = 0;
+        this._lastTargetsList = '';
+        this._recentTargets = new Map();
         this._lastCat048Time = null;
     }
 
@@ -186,13 +185,32 @@ class AsterixRadarParser extends BaseParser {
         if (rawData[0] === 48) {
             this._lastCat048Time = new Date().toISOString();
             
-            // Estimasi heuristik jumlah pesawat berdasarkan ukuran paket
-            // (Karena struktur CAT048 sangat dinamis, 1 target rata-rata = ~22-30 bytes)
             const totalLength = (rawData[1] << 8) | rawData[2];
-            const estimatedTargets = Math.max(1, Math.floor((totalLength - 3) / 25));
-            this._lastTargetCount = estimatedTargets;
+            const newTargets = new Set();
+            for (let i = 3; i < Math.min(rawData.length, totalLength) - 2; i++) {
+                if (rawData[i] === 0x8A) {
+                    const hex = (rawData[i].toString(16) + 
+                                 rawData[i+1].toString(16).padStart(2, '0') + 
+                                 rawData[i+2].toString(16).padStart(2, '0')).toUpperCase();
+                    newTargets.add(hex);
+                }
+            }
+
+            const now = Date.now();
+            if (!this._recentTargets) this._recentTargets = new Map();
+            for (const t of newTargets) {
+                this._recentTargets.set(t, now);
+            }
+            // Bersihkan target yang lebih lama dari 30 detik (sliding window putaran antena)
+            for (const [t, ts] of this._recentTargets.entries()) {
+                if (now - ts > 30000) this._recentTargets.delete(t);
+            }
+
+            const activeTargetList = Array.from(this._recentTargets.keys());
+            this._lastTargetCount = activeTargetList.length > 0 ? activeTargetList.length : Math.max(1, Math.floor((totalLength - 3) / 25));
+            this._lastTargetsList = activeTargetList.join(', ');
             
-            // Return last state (CAT034) dengan update target_count terbaru
+            // Return last state (CAT034) dengan update target_count & targets_list terbaru
             return this._buildResult();
         }
 
@@ -212,8 +230,10 @@ class AsterixRadarParser extends BaseParser {
             if (decoded.msg_type === '—') decoded.msg_type = this._lastData.msg_type;
             if (decoded.time_of_day === '—') decoded.time_of_day = this._lastData.time_of_day;
             if (decoded.sector_number === '—') decoded.sector_number = this._lastData.sector_number;
-            if (decoded.system_config === '—') decoded.system_config = this._lastData.system_config;
-            if (decoded.system_status === 'Normal') decoded.system_status = this._lastData.system_status;
+            if (decoded.system_config === '—') {
+                decoded.system_config = this._lastData.system_config;
+                decoded.system_status = this._lastData.system_status;
+            }
         }
 
         this._lastData  = decoded;
@@ -249,6 +269,7 @@ class AsterixRadarParser extends BaseParser {
                 lon:           String(this._lon),
                 last_cat034:   this._lastData ? this._lastData.last_cat034 : '—',
                 target_count:  String(this._lastTargetCount || 0), // Jumlah pesawat dari CAT 048
+                targets_list:  this._lastTargetsList || '—',
                 last_cat048:   this._lastCat048Time || '—',
                 data_source:   this._lastData ? this._lastData.data_source : '—'
             },

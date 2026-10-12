@@ -698,9 +698,8 @@ class NetworkListenerService {
                     const doPoll = () => {
                         let triggerReqs = [];
                         if (hasPollRequests) {
-                            triggerReqs = parser.getPollRequests();
-                        }
-                        if ((!triggerReqs || triggerReqs.length === 0) && hasTriggerProtocol && typeof parser.getHeartbeatReply === 'function') {
+                            triggerReqs = parser.getPollRequests() || [];
+                        } else if (hasTriggerProtocol && typeof parser.getHeartbeatReply === 'function') {
                             triggerReqs = [parser.getHeartbeatReply()];
                         }
 
