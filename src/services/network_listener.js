@@ -152,15 +152,10 @@ class NetworkListenerService {
     }
 
     async _handleLogOutput(source, parsedData, connectionType, initialStatus) {
-        let statusToEvaluate = initialStatus;
         const initialLower = String(initialStatus || '').toLowerCase();
         const isInitialDisconnect = initialLower === 'disconnect' || initialLower === 'error' || initialLower === 'offline';
+        let statusToEvaluate = 'Normal';
         let isPingable = false;
-
-        // Aturan 1: Untuk data source, berapapun pembacaan nilainya (warning maupun alarm), status data source tetap Warning
-        if (initialLower === 'alarm' || initialLower === 'alert' || initialLower === 'fail' || initialLower === 'critical') {
-            statusToEvaluate = 'Warning';
-        }
 
         if (isInitialDisconnect) {
             // Cek status Ping (ICMP) lebih awal
@@ -171,6 +166,8 @@ class NetworkListenerService {
 
             if (isPingable) {
                 statusToEvaluate = 'Offline';
+            } else {
+                statusToEvaluate = 'Disconnect';
             }
         } else if (source.equipt_id && parsedData && parsedData.data) {
             // Dynamic Limitation Threshold Evaluation
@@ -248,6 +245,7 @@ class NetworkListenerService {
                     flatten(parsedData.data);
 
                     for (const lim of limits) {
+                        if (lim.is_active === false || lim.is_active === 'false' || lim.is_active === 0 || lim.is_active === '0') continue;
                         const lName = String(lim.name || lim.label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                         const lSource = String(lim.source || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 

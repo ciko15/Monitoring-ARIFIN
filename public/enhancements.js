@@ -1192,22 +1192,10 @@
                 <div style="font-size:10px;color:#007a9e;letter-spacing:2px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #0d2a45">${sec.title}</div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
                     ${sec.params.map(([label, val, cls]) => {
-            // Evaluasi warna limitasi secara dinamis untuk setiap item/kolom:
+            // Evaluasi warna limitasi secara dinamis murni dari menu Alarm Limit (limitation_config.json):
             let limColor = getLimitColor(supCategory, label, val, parserId);
-            // Fallback ke cls jika cls adalah hasil evaluasi khusus parser (kecuali jika parameter ini memang nonaktif):
-            if (limColor === '#ffffff' && (cls === '#ff3355' || cls === '#ffcc00' || cls === '#00ff88')) {
-                const checkInactive = () => {
-                    if (!window.limitationsCache) return false;
-                    const clean = normalizeLimitLabel(label);
-                    return window.limitationsCache.some(l => {
-                        if (l.is_active !== false && l.is_active !== 'false' && l.is_active !== 0 && l.is_active !== '0') return false;
-                        const lName = normalizeLimitLabel(l.name || l.label || '');
-                        return lName && (clean.includes(lName) || lName.includes(clean));
-                    });
-                };
-                if (!checkInactive()) {
-                    limColor = cls;
-                }
+            if (sec.title === 'Connection Error') {
+                limColor = cls || '#ff3355';
             }
 
             // Aturan pewarnaan:
@@ -1660,92 +1648,86 @@
 
             sections.push({
                 title: 'STATUS', params: [
-                    ['Tegangan VLN Avg (V)', fn(data.VLN_avg, 1), getLimitColor(sup, 'Van Voltage', data.VLN_avg)],
-                    ['Tegangan VLL Avg (V)', fn(data.VLL_avg, 1), '#e8f4ff'],
-                    ['Frekuensi (Hz)', fn(data.HZ, 2), getLimitColor(sup, 'Frequency', data.HZ)],
-                    ['Power Factor', fn(data.PF, 3), getLimitColor(sup, 'Power Factor', Math.abs(data.PF || 0))],
-                    ['Alarm', (data.alarmDetail && data.alarmDetail.length > 0) ? data.alarmDetail.join(' | ') : 'Tidak Ada', data.alarmDetail && data.alarmDetail.length > 0 ? '#ff3355' : '#00ff88'],
+                    ['Tegangan VLN Avg (V)', fn(data.VLN_avg, 1)],
+                    ['Tegangan VLL Avg (V)', fn(data.VLL_avg, 1)],
+                    ['Frekuensi (Hz)', fn(data.HZ, 2)],
+                    ['Power Factor', fn(data.PF, 3)],
+                    ['Alarm', (data.alarmDetail && data.alarmDetail.length > 0) ? data.alarmDetail.join(' | ') : 'Tidak Ada'],
                 ]
             });
 
             sections.push({
                 title: 'TEGANGAN LINE-TO-NEUTRAL (V)', params: [
-                    ['Van (L1-N)', fn(data.VL1N, 1), vc(data.VL1N, 200, 240)],
-                    ['Vbn (L2-N)', fn(data.VL2N, 1), vc(data.VL2N, 200, 240)],
-                    ['Vcn (L3-N)', fn(data.VL3N, 1), vc(data.VL3N, 200, 240)],
+                    ['Van (L1-N)', fn(data.VL1N, 1)],
+                    ['Vbn (L2-N)', fn(data.VL2N, 1)],
+                    ['Vcn (L3-N)', fn(data.VL3N, 1)],
                 ]
             });
 
             sections.push({
                 title: 'TEGANGAN LINE-TO-LINE (V)', params: [
-                    ['Vab (L1-L2)', fn(data.VL12, 1), vc(data.VL12, 340, 430)],
-                    ['Vbc (L2-L3)', fn(data.VL23, 1), vc(data.VL23, 340, 430)],
-                    ['Vca (L3-L1)', fn(data.VL31, 1), vc(data.VL31, 340, 430)],
+                    ['Vab (L1-L2)', fn(data.VL12, 1)],
+                    ['Vbc (L2-L3)', fn(data.VL23, 1)],
+                    ['Vca (L3-L1)', fn(data.VL31, 1)],
                 ]
             });
 
             sections.push({
                 title: 'ARUS (A)', params: [
-                    ['Ia (L1)', fn(data.IL1, 2), vn(data.IL1)],
-                    ['Ib (L2)', fn(data.IL2, 2), vn(data.IL2)],
-                    ['Ic (L3)', fn(data.IL3, 2), vn(data.IL3)],
+                    ['Ia (L1)', fn(data.IL1, 2)],
+                    ['Ib (L2)', fn(data.IL2, 2)],
+                    ['Ic (L3)', fn(data.IL3, 2)],
                 ]
             });
 
             sections.push({
                 title: 'DAYA', params: [
-                    ['Real (kW)', fn(data.KW, 3), vn(data.KW)],
-                    ['Reaktif (kVAR)', fn(data.KVAR, 3), vn(data.KVAR)],
-                    ['Semu (kVA)', fn(data.KVA, 3), vn(data.KVA)],
-                    ['Power Factor', fn(data.PF, 3), vc(Math.abs(data.PF || 0), 0.8, 1.05)],
-                    ['Frekuensi (Hz)', fn(data.HZ, 2), vc(data.HZ, 49.5, 50.5)],
-                    ['Energi (kWh)', data.KWH != null ? (+data.KWH).toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '—', '#00d4ff'],
+                    ['Real (kW)', fn(data.KW, 3)],
+                    ['Reaktif (kVAR)', fn(data.KVAR, 3)],
+                    ['Semu (kVA)', fn(data.KVA, 3)],
+                    ['Power Factor', fn(data.PF, 3)],
+                    ['Frekuensi (Hz)', fn(data.HZ, 2)],
+                    ['Energi (kWh)', data.KWH != null ? (+data.KWH).toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '—'],
                 ]
             });
         } else if (parserId === 'pm5350_modbus') {
             const fn = (v, d) => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(d) : '—';
-            const vn = (v) => (v != null && !isNaN(parseFloat(v))) ? '#e8f4ff' : '#4a7a9a';
-            const vc = (v, min, max) => {
-                const num = parseFloat(v);
-                if (isNaN(num)) return '#4a7a9a';
-                return (num >= min && num <= max) ? '#00ff88' : '#ff3355';
-            };
 
             sections.push({
                 title: 'STATUS', params: [
-                    ['Frekuensi (Hz)', fn(data.FREQ, 2), vc(data.FREQ, 49, 51)],
-                    ['Power Factor', fn(data.PF, 3), '#e8f4ff'],
+                    ['Frekuensi (Hz)', fn(data.FREQ, 2)],
+                    ['Power Factor', fn(data.PF, 3)],
                 ]
             });
 
             sections.push({
                 title: 'TEGANGAN LINE-TO-NEUTRAL (V)', params: [
-                    ['V_RN (L1-N)', fn(data.V_RN, 1), vc(data.V_RN, 200, 240)],
-                    ['V_SN (L2-N)', fn(data.V_SN, 1), vc(data.V_SN, 200, 240)],
-                    ['V_TN (L3-N)', fn(data.V_TN, 1), vc(data.V_TN, 200, 240)],
+                    ['V_RN (L1-N)', fn(data.V_RN, 1)],
+                    ['V_SN (L2-N)', fn(data.V_SN, 1)],
+                    ['V_TN (L3-N)', fn(data.V_TN, 1)],
                 ]
             });
 
             sections.push({
                 title: 'TEGANGAN LINE-TO-LINE (V)', params: [
-                    ['V_RS (L1-L2)', fn(data.V_RS, 1), vc(data.V_RS, 340, 430)],
-                    ['V_ST (L2-L3)', fn(data.V_ST, 1), vc(data.V_ST, 340, 430)],
-                    ['V_TR (L3-L1)', fn(data.V_TR, 1), vc(data.V_TR, 340, 430)],
+                    ['V_RS (L1-L2)', fn(data.V_RS, 1)],
+                    ['V_ST (L2-L3)', fn(data.V_ST, 1)],
+                    ['V_TR (L3-L1)', fn(data.V_TR, 1)],
                 ]
             });
 
             sections.push({
                 title: 'ARUS (A)', params: [
-                    ['I_R (L1)', fn(data.I_R, 2), vn(data.I_R)],
-                    ['I_S (L2)', fn(data.I_S, 2), vn(data.I_S)],
-                    ['I_T (L3)', fn(data.I_T, 2), vn(data.I_T)],
+                    ['I_R (L1)', fn(data.I_R, 2)],
+                    ['I_S (L2)', fn(data.I_S, 2)],
+                    ['I_T (L3)', fn(data.I_T, 2)],
                 ]
             });
 
             sections.push({
                 title: 'DAYA', params: [
-                    ['Aktif (kW)', fn(data.KW, 3), vn(data.KW)],
-                    ['Semu (kVA)', fn(data.KVA, 3), vn(data.KVA)],
+                    ['Aktif (kW)', fn(data.KW, 3)],
+                    ['Semu (kVA)', fn(data.KVA, 3)],
                 ]
             });
         } else if (parserId === 'snmp_system') {
