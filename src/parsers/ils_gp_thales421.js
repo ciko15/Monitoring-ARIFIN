@@ -40,7 +40,7 @@ const HBEAT_REPLY = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat 
 
 function isPktCSync(buf, i) {
     return i + 3 < buf.length &&
-        buf[i] === 0x11 && buf[i + 1] === 0x8D && buf[i + 3] === 0x0C;
+        buf[i] === 0x11 && buf[i + 1] === 0x8D && (buf[i + 3] === 0x0C || buf[i + 3] === 0x0E);
 }
 
 const OFFSETS = {
@@ -229,8 +229,8 @@ class IlsGpThales421Parser extends BaseParser {
         const mode = this.getMode();
         console.log(`[GP-DEBUG] getPollRequests called. Mode is: ${mode}`);
         if (mode === 'ACTIVE') {
-            console.log(`[GP-DEBUG] Sending POLL_TRIGGER 00 00 F9 06 because ADRACS is offline`);
-            const TRIGGER_POLL = Buffer.from([0x00, 0x00, 0xF9, 0x06]);
+            console.log(`[GP-DEBUG] Sending POLL_TRIGGER 0B 00 F9 06 because ADRACS is offline`);
+            const TRIGGER_POLL = Buffer.from([0x0B, 0x00, 0xF9, 0x06]);
             return [{ bytes: TRIGGER_POLL, label: 'POLL_TRIGGER' }];
         }
         return [];
