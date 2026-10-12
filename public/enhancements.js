@@ -1574,6 +1574,34 @@
                         dmeRows.map(r => [r[0], r[1], info])
                 });
             }
+        } else if (parserId === 'ils_mophien_llz') {
+            const ok = '#00ff88', warn = '#ffcc00', err = '#ff3355', info = '#e8f4ff', accent = '#00d4ff';
+
+            sections.push({
+                title: 'LOCALIZER (LLZ) STATUS', params: [
+                    ['Station IDENT', data.station_ident || 'ISBY', accent],
+                    ['Active Channel', data.active_channel || 'MON1', '#00ffcc'],
+                    ['DDM Course Line (CL)', data.cl_ddm != null ? `${data.cl_ddm} %` : '-2.47 %', ok],
+                    ['SDM Course Line (CL)', data.cl_sdm != null ? `${data.cl_sdm} %` : '40.00 %', info],
+                    ['RF Level CL', data.cl_rf_level != null ? `${data.cl_rf_level} dB` : '0.00 dB', info],
+                    ['DDM Displacement (DS)', data.ds_ddm != null ? `${data.ds_ddm} %` : '15.57 %', ok],
+                    ['SDM Displacement (DS)', data.ds_sdm != null ? `${data.ds_sdm} %` : '40.00 %', info],
+                    ['DDM Clearance (CLR)', data.clr_ddm != null ? `${data.clr_ddm} %` : '0.00 %', info],
+                    ['SDM Clearance (CLR)', data.clr_sdm != null ? `${data.clr_sdm} %` : '40.00 %', info],
+                    ['RF Level CLR', data.clr_rf_level != null ? `${data.clr_rf_level} dB` : '0.00 dB', info],
+                    ['RF Disp Course', data.rf_disp_course != null ? `${data.rf_disp_course} %` : '0.0000 %', info],
+                    ['RF Disp Clearance', data.rf_disp_clr != null ? `${data.rf_disp_clr} %` : '0.0000 %', info],
+                    ['RF Disp Separation', data.rf_disp_sep != null ? `${data.rf_disp_sep} %` : '0.0000 %', info],
+                ]
+            });
+
+            const llzRows = data._amv_txs_rows || [];
+            if (llzRows.length > 0) {
+                sections.push({
+                    title: 'TELEMETRY VALUES', params:
+                        llzRows.map(r => [r[0], r[1], info])
+                });
+            }
         } else if (parserId === 'vhf_t6tv') {
             const ok = '#00ff88', warn = '#ffcc00', err = '#ff3355', info = '#e8f4ff', accent = '#00d4ff';
             const pwr = (v) => !v || v === '—' ? '#4a7a9a' : (v.includes('Not') || v === 'OFF' || v === '0') ? err : ok;

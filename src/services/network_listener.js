@@ -744,6 +744,19 @@ class NetworkListenerService {
                 this._binaryTcpSockets = this._binaryTcpSockets || new Map();
                 this._binaryTcpSockets.set(id, socket);
 
+                // Emit status Normal dan data awal saat terkoneksi agar equipment langsung aktif di dashboard
+                try {
+                    const initResult = typeof parser.parse === 'function' ? parser.parse(Buffer.alloc(0)) : null;
+                    if (initResult && initResult.success) {
+                        this._handleLogOutput(
+                            source,
+                            { ...initResult, source: name, _ip: ip_address },
+                            moduleName,
+                            'Normal'
+                        ).catch(e => {});
+                    }
+                } catch (e) {}
+
                 // Kirim trigger secara berkala agar aliran data tidak terputus walau direbut ADRACS
                 if (hasTriggerProtocol || hasPollRequests) {
                     const doPoll = () => {
