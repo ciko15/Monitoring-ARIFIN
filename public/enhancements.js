@@ -250,13 +250,13 @@
         const checkNameMatch = (targetStr, candStr, isExact) => {
             if (!targetStr || !candStr) return false;
             if (targetStr === candStr) return true;
-            if (!isExact && (targetStr.includes(candStr) || candStr.includes(targetStr))) return true;
+            if (!isExact && targetStr.length >= 4 && candStr.length >= 4 && (targetStr.includes(candStr) || candStr.includes(targetStr))) return true;
 
             const canonTarget = targetStr.replace(/[^a-z0-9]/g, '');
             const canonCand = candStr.replace(/[^a-z0-9]/g, '');
             if (canonTarget && canonCand) {
                 if (canonTarget === canonCand) return true;
-                if (!isExact && (canonTarget.includes(canonCand) || canonCand.includes(canonTarget))) return true;
+                if (!isExact && canonTarget.length >= 4 && canonCand.length >= 4 && (canonTarget.includes(canonCand) || canonCand.includes(canonTarget))) return true;
 
                 // Token match: '30hz am' <=> 'am 30hz'
                 const targetTokens = targetStr.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).sort().join(' ');
@@ -267,8 +267,8 @@
                 for (const [key, aliases] of Object.entries(aliasMap)) {
                     const normKey = key.replace(/[^a-z0-9]/g, '');
                     const allVariants = [normKey, ...aliases.map(a => a.replace(/[^a-z0-9]/g, ''))];
-                    const candMatches = allVariants.some(v => canonCand === v || (!isExact && (canonCand.includes(v) || v.includes(canonCand))));
-                    const targetMatches = allVariants.some(v => canonTarget === v || (!isExact && (canonTarget.includes(v) || v.includes(canonTarget))));
+                    const candMatches = allVariants.some(v => canonCand === v || (!isExact && v.length >= 4 && canonCand.length >= 4 && (canonCand.includes(v) || v.includes(canonCand))));
+                    const targetMatches = allVariants.some(v => canonTarget === v || (!isExact && v.length >= 4 && canonTarget.length >= 4 && (canonTarget.includes(v) || v.includes(canonTarget))));
                     if (candMatches && targetMatches) {
                         return true;
                     }

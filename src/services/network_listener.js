@@ -261,16 +261,16 @@ class NetworkListenerService {
                             if (!isMatch) {
                                 for (const [canon, aliases] of Object.entries(aliasMap)) {
                                     const allVariants = [canon, ...aliases];
-                                    const candMatches = allVariants.some(a => lName.includes(a) || a.includes(lName));
-                                    const keyMatches = allVariants.some(a => dKey.includes(a) || a.includes(dKey) || strippedKey.includes(a) || a.includes(strippedKey));
+                                    const candMatches = allVariants.some(a => a === lName || (a.length >= 4 && lName.length >= 4 && (lName.includes(a) || a.includes(lName))));
+                                    const keyMatches = allVariants.some(a => a === dKey || a === strippedKey || (a.length >= 4 && dKey.length >= 4 && (dKey.includes(a) || a.includes(dKey))) || (a.length >= 4 && strippedKey.length >= 4 && (strippedKey.includes(a) || a.includes(strippedKey))));
                                     if (candMatches && keyMatches) {
                                         isMatch = true;
                                         break;
                                     }
                                 }
                             }
-                            if (!isMatch && lim.match_mode !== 'exact' && lName.length >= 3) {
-                                isMatch = dKey.includes(lName) || lName.includes(dKey) || strippedKey.includes(lName) || lName.includes(strippedKey);
+                            if (!isMatch && lim.match_mode !== 'exact' && lName.length >= 4) {
+                                isMatch = (dKey.length >= 4 && (dKey.includes(lName) || lName.includes(dKey))) || (strippedKey.length >= 4 && (strippedKey.includes(lName) || lName.includes(strippedKey)));
                             }
 
                             if (isMatch) {
