@@ -221,8 +221,8 @@
             'current': ['arus', 'ampere', 'amp', 'ia', 'ib', 'ic'],
             'daya': ['power', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
             'power': ['daya', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
-            'frekuensi': ['frequency', 'freq', 'hz'],
-            'frequency': ['frekuensi', 'freq', 'hz'],
+            'frekuensi': ['frequency', 'freq'],
+            'frequency': ['frekuensi', 'freq'],
             'totalinterface': ['interfacecount', 'totalinterfaces', 'total interface'],
             'interfaceup': ['activeinterfacecount', 'activeinterfaces', 'interface up'],
             'interfacedown': ['downinterfacecount', 'downinterfaces', 'interface down'],
@@ -243,13 +243,18 @@
                 if (canonTarget === canonCand) return true;
                 if (!isExact && (canonTarget.includes(canonCand) || canonCand.includes(canonTarget))) return true;
 
+                // Token match: '30hz am' <=> 'am 30hz'
+                const targetTokens = targetStr.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).sort().join(' ');
+                const candTokens = candStr.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).sort().join(' ');
+                if (targetTokens && candTokens && targetTokens === candTokens) return true;
+
                 // Alias check
                 for (const [key, aliases] of Object.entries(aliasMap)) {
                     const normKey = key.replace(/[^a-z0-9]/g, '');
-                    if (canonCand === normKey || canonCand.includes(normKey) || normKey.includes(canonCand)) {
+                    if (canonCand === normKey) {
                         for (const alias of aliases) {
                             const normAlias = alias.replace(/[^a-z0-9]/g, '');
-                            if (canonTarget === normAlias || canonTarget.includes(normAlias) || normAlias.includes(canonTarget)) {
+                            if (canonTarget === normAlias || (!isExact && (canonTarget.includes(normAlias) || normAlias.includes(canonTarget)))) {
                                 return true;
                             }
                         }
@@ -280,6 +285,22 @@
             targetSup = 'shelter';
         }
 
+        // Cek jika ada aturan limitasi yang cocok namun berstatus NONAKTIF:
+        // Jika nonaktif -> Langsung kembalikan putih (#ffffff)!
+        const isExplicitlyInactive = window.limitationsCache.some(l => {
+            if (l.is_active !== false && l.is_active !== 'false' && l.is_active !== 0 && l.is_active !== '0') return false;
+            if (!matchesParser(l, effectiveParserId)) return false;
+            const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
+                .map(s => s.trim().toLowerCase()).filter(Boolean);
+            const isGenericSup = limitSups.length === 0 || limitSups.some(s => s === 'generic' || s === 'all' || s === '*');
+            const matchesCategory = (!!targetSup && limitSups.includes(targetSup)) || isGenericSup;
+            return matchesCategory && matchesLabel(l);
+        });
+
+        if (isExplicitlyInactive) {
+            return '#ffffff';
+        }
+
         const findLimit = (mode) => window.limitationsCache.find(l => {
             // Abaikan jika limitasi berstatus nonaktif:
             if (l.is_active === false || l.is_active === 'false' || l.is_active === 0 || l.is_active === '0') return false;
@@ -298,10 +319,11 @@
                 return isGenericSup && matchesLabel(l);
             }
 
-            return matchesLabel(l);
+            return false;
         });
 
-        const limit = findLimit('exact') || findLimit('generic') || findLimit('any');
+        // HANYA cocokkan dengan sub-kategori yang sesuai atau rule generic. JANGAN bocor antar sub-kategori!
+        const limit = findLimit('exact') || findLimit('generic');
 
         // JIKA TIDAK ADA ATURAN LIMITASI: SEMUANYA PUTIH!
         if (!limit) return '#ffffff';
@@ -1148,9 +1170,20 @@
                     ${sec.params.map(([label, val, cls]) => {
             // Evaluasi warna limitasi secara dinamis untuk setiap item/kolom:
             let limColor = getLimitColor(supCategory, label, val, parserId);
-            // Fallback ke cls jika cls adalah hasil evaluasi limitasi valid yang telah dipersiapkan parser:
+            // Fallback ke cls jika cls adalah hasil evaluasi khusus parser (kecuali jika parameter ini memang nonaktif):
             if (limColor === '#ffffff' && (cls === '#ff3355' || cls === '#ffcc00' || cls === '#00ff88')) {
-                limColor = cls;
+                const checkInactive = () => {
+                    if (!window.limitationsCache) return false;
+                    const clean = normalizeLimitLabel(label);
+                    return window.limitationsCache.some(l => {
+                        if (l.is_active !== false && l.is_active !== 'false' && l.is_active !== 0 && l.is_active !== '0') return false;
+                        const lName = normalizeLimitLabel(l.name || l.label || '');
+                        return lName && (clean.includes(lName) || lName.includes(clean));
+                    });
+                };
+                if (!checkInactive()) {
+                    limColor = cls;
+                }
             }
 
             // Aturan pewarnaan:
