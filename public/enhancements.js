@@ -2034,7 +2034,9 @@
             // Map custom IDs to known templates based on equipment name
             if (!tmpl && parserId && parserId.startsWith('custom_')) {
                 const nameLower = (data.equipment || supCategory || '').toLowerCase();
-                if (nameLower.includes('glide') || nameLower.includes('gp')) {
+                if (nameLower.includes('mophien')) {
+                    tmpl = window.templatesCache?.find(t => t.id === 'ils_mophien_llz');
+                } else if (nameLower.includes('glide') || nameLower.includes('gp')) {
                     tmpl = window.templatesCache?.find(t => t.id === 'ils_gp_normac');
                 } else if (nameLower.includes('localizer') || nameLower.includes('llz')) {
                     tmpl = window.templatesCache?.find(t => t.id === 'ils_llz_normac');

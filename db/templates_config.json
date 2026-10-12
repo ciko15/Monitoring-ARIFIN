@@ -228,5 +228,31 @@
     ],
     "isDefault": true,
     "isSystem": true
+  },
+  {
+    "id": "ils_mophien_llz",
+    "name": "ILS Mophien LLZ (PMDT Juanda)",
+    "protocol": "tcp",
+    "category": "Navigation",
+    "description": "Standard ILS Mophien Localizer (PMDT Juanda) template",
+    "parameters": [
+      { "name": "active_channel", "label": "Active Channel", "unit": "" },
+      { "name": "station_ident", "label": "Station IDENT", "unit": "" },
+      { "name": "cl_ddm", "label": "DDM Course Line (CL)", "unit": "%" },
+      { "name": "cl_sdm", "label": "SDM Course Line (CL)", "unit": "%" },
+      { "name": "cl_rf_level", "label": "RF Level CL", "unit": "dB" },
+      { "name": "cl_ident_am", "label": "Ident-AM Depth CL", "unit": "%" },
+      { "name": "clr_ddm", "label": "DDM Clearance (CLR)", "unit": "%" },
+      { "name": "clr_sdm", "label": "SDM Clearance (CLR)", "unit": "%" },
+      { "name": "clr_rf_level", "label": "RF Level CLR", "unit": "dB" },
+      { "name": "ds_ddm", "label": "DDM Displacement (DS)", "unit": "%" },
+      { "name": "ds_sdm", "label": "SDM Displacement (DS)", "unit": "%" },
+      { "name": "rf_disp_course", "label": "RF Disp Course", "unit": "%" },
+      { "name": "rf_disp_clr", "label": "RF Disp Clearance", "unit": "%" },
+      { "name": "rf_disp_sep", "label": "RF Disp Separation", "unit": "%" },
+      { "name": "heartbeat", "label": "Heartbeat", "unit": "" }
+    ],
+    "isDefault": true,
+    "isSystem": true
   }
 ]

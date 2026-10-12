@@ -243,5 +243,13 @@
         "category": "Navigation",
         "files": "/src/parsers/ils_mm_normac.js",
         "createdAt": "2026-10-10T06:15:05.036Z"
+    },
+    {
+        "id": "ils_mophien_llz",
+        "name": "ILS Mophien LLZ (PMDT Juanda)",
+        "description": "Parser TCP streaming untuk ILS Localizer Mophien / PMDT Juanda",
+        "category": "Navigation",
+        "files": "/src/parsers/ils_mophien_llz.js",
+        "createdAt": "2026-10-12T09:00:00.000Z"
     }
 ]
