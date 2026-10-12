@@ -308,17 +308,6 @@
     "ahv": "30.0"
   },
   {
-    "id": 9001,
-    "name": "Temperature",
-    "category": "Support",
-    "sup_category": "Generic",
-    "value_type": "numeric",
-    "max_warning_limit": "65.0",
-    "max_alarm_limit": "75.0",
-    "whv": "65.0",
-    "ahv": "75.0"
-  },
-  {
     "id": 9002,
     "name": "CPU Usage",
     "category": "Support",
