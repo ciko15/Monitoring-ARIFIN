@@ -230,16 +230,22 @@
             'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct', 'ram usage'],
             'ramavailable': ['ramavailablepct', 'memoryavailable', 'ram available'],
             'diskusage': ['diskusagepct', 'storageusage', 'disk usage'],
-            'crsrf': ['crsrf', 'crsrflevel', 'crsposrf', 'crsposrflevel', 'crs_rf', 'rf_power', 'rfpower', 'rf power'],
-            'crsddm': ['crsddm', 'crsposddm', 'crs_ddm', 'ddm_course', 'ddmcourse', 'ddm course'],
-            'crssdm': ['crssdm', 'crspossdm', 'crs_sdm', 'carrier_pwr', 'carrierpower', 'carrierpwr', 'carrier power'],
-            'identam': ['identam', 'ident', 'ident_am', 'ident am'],
+            'crsrf': ['crsrf', 'crsrflevel', 'crsposrf', 'crsposrflevel', 'crs_rf', 'rf_power', 'rfpower', 'rf power', 'crs rf level', 'rf level cl', 'cl rf level'],
+            'crsddm': ['crsddm', 'crsposddm', 'crs_ddm', 'ddm_course', 'ddmcourse', 'ddm course', 'ddm course line', 'ddm cl'],
+            'crssdm': ['crssdm', 'crspossdm', 'crs_sdm', 'carrier_pwr', 'carrierpower', 'carrierpwr', 'carrier power', 'sdm course line', 'sdm cl'],
+            'identam': ['identam', 'ident', 'ident_am', 'ident am', 'ident am cl', 'ident am ds', 'ident am clr', 'ident am depth cl'],
+            'dsddm': ['dsddm', 'ds_ddm', 'ddm displacement', 'ddm ds', 'displacement ddm'],
+            'dssdm': ['dssdm', 'ds_sdm', 'sdm displacement', 'sdm ds', 'displacement sdm'],
+            'dsrf': ['dsrf', 'ds_rf', 'rf level ds', 'rf ds'],
             'widthrf': ['widthrf', 'crswidthrf', 'crswidthrflevel', 'width_rf', 'csb_power', 'csbpower', 'csb power', 'widthrflevel'],
             'widthddm': ['widthddm', 'crswidthddm', 'width_ddm', 'ddm_clr', 'ddmclr', 'ddm clr'],
             'widthsdm': ['widthsdm', 'crswidthsdm', 'width_sdm', 'sbo_power', 'sbopower', 'sbo power'],
-            'clrrf': ['clrrf', 'clrwidthrf', 'clrwidthrflevel', 'clr_rf', 'clr_power', 'clrpower', 'clr power'],
-            'clrddm': ['clrddm', 'clrwidthddm', 'clr_ddm'],
-            'clrsdm': ['clrsdm', 'clrwidthsdm', 'clr_sdm'],
+            'clrrf': ['clrrf', 'clrwidthrf', 'clrwidthrflevel', 'clr_rf', 'clr_power', 'clrpower', 'clr power', 'rf level clr', 'rf clr'],
+            'clrddm': ['clrddm', 'clrwidthddm', 'clr_ddm', 'ddm clearance', 'ddm clr'],
+            'clrsdm': ['clrsdm', 'clrwidthsdm', 'clr_sdm', 'sdm clearance', 'sdm clr'],
+            'rfdispcourse': ['rfdispcourse', 'rf_disp_course', 'course freq disp', 'course frequency displacement', 'rf disp course'],
+            'rfdispclr': ['rfdispclr', 'rf_disp_clr', 'clearance freq disp', 'clr freq disp', 'rf disp clr'],
+            'rfdispsep': ['rfdispsep', 'rf_disp_sep', 'separation freq disp', 'sep freq disp', 'rf disp sep'],
             'nfrf': ['nfrf', 'nearfieldrf', 'nearfieldposrf', 'nearfieldposrflevel', 'nf_rf', 'rf_out', 'rfout', 'rf out', 'nearfieldposrflevel'],
             'nfddm': ['nfddm', 'nearfieldddm', 'nearfieldposddm', 'nf_ddm', 'ddm_mon', 'ddmmon', 'ddm mon'],
             'nfsdm': ['nfsdm', 'nearfieldsdm', 'nearfieldpossdm', 'nf_sdm', 'mon_power', 'monpower', 'mon power'],
@@ -1022,16 +1028,23 @@
     function createDetailModal() {
         const div = document.createElement('div');
         div.id = 'dataSourceDetailModal';
-        div.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:5000;align-items:center;justify-content:center;';
+        div.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:5000;align-items:center;justify-content:center;padding:16px;';
         div.innerHTML = `
-            <div style="background:#0a1628;border:1px solid #1a3a5c;border-radius:10px;width:90vw;max-width:800px;max-height:85vh;display:flex;flex-direction:column;">
-                <div style="display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid #1a3a5c;gap:12px">
-                    <span id="srcDetailTitle" style="font-size:14px;font-weight:bold;color:#00d4ff;flex:1"></span>
-                    <span id="srcDetailStatus"></span>
+            <div style="background:#091222;border:1px solid #1e293b;border-radius:14px;width:100%;max-width:920px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);overflow:hidden;">
+                <!-- Header Modal -->
+                <div style="display:flex;align-items:center;padding:14px 20px;border-bottom:1px solid #1e293b;gap:12px;background:rgba(15,23,42,0.75);">
+                    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+                        <i class="fas fa-server" style="color:#00d4ff;font-size:15px;flex-shrink:0;"></i>
+                        <span id="srcDetailTitle" style="font-size:15px;font-weight:700;color:#00d4ff;letter-spacing:0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                    </div>
+                    <div id="srcDetailStatus" style="display:flex;align-items:center;gap:8px;flex-shrink:0;"></div>
                     <button id="srcDetailCloseBtn"
-                        style="background:none;border:none;color:#4a7a9a;font-size:18px;cursor:pointer">✕</button>
+                        style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all 0.15s ease;"
+                        onmouseover="this.style.color='#ffffff';this.style.background='rgba(255,255,255,0.08)'"
+                        onmouseout="this.style.color='#94a3b8';this.style.background='none'">✕</button>
                 </div>
-                <div id="srcDetailBody" style="flex:1;overflow-y:auto;padding:16px"></div>
+                <!-- Dynamic Group Body -->
+                <div id="srcDetailBody" style="flex:1;overflow-y:auto;padding:18px 20px;background:#070d18;"></div>
             </div>`;
         div.addEventListener('click', e => { if (e.target === div) closeDetailModal(); });
         document.body.appendChild(div);
@@ -1046,10 +1059,10 @@
         let modal = document.getElementById('dataSourceDetailModal');
         if (!modal) { createDetailModal(); modal = document.getElementById('dataSourceDetailModal'); }
 
-        document.getElementById('srcDetailTitle').textContent = src.name + ' — ' + (src.ip_address || '');
+        const titleText = (src.name || 'Equipment') + (src.ip_address ? ` — ${src.ip_address}` : '');
+        document.getElementById('srcDetailTitle').textContent = titleText;
 
         let status = data ? (data._status || 'Normal') : 'Disconnect';
-        // Aturan 1: Untuk data source, berapapun pembacaan nilainya (warning maupun alarm), status data source tetap Warning
         const statusLower = String(status).toLowerCase();
         if (statusLower === 'alarm' || statusLower === 'alert' || statusLower === 'fail' || statusLower === 'critical') {
             status = 'Warning';
@@ -1061,13 +1074,11 @@
         if (pStatus) {
             const pc = pStatus === 'Normal' ? '#00ff88' : '#ff3355';
             const icon = pStatus === 'Normal' ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
-            pingBadge = `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${pc}22;color:${pc};border:1px solid ${pc};margin-right:8px;" title="Status Ping dari Server ke IP Perangkat">${icon} Ping: ${pStatus}</span>`;
+            pingBadge = `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;background:rgba(0,255,136,0.1);color:${pc};border:1px solid rgba(0,255,136,0.25);display:inline-flex;align-items:center;gap:5px;" title="Status Ping dari Server ke IP Perangkat">${icon} Ping: ${pStatus}</span>`;
         } else if (src && src.ip_address) {
-            // Placeholder saat baru dibuka, lalu test langsung via backend ping API jika belum ada status
             const badgeId = `ping_badge_${src.id}`;
-            pingBadge = `<span id="${badgeId}" style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid #4a5a7a;margin-right:8px;"><i class="fas fa-spinner fa-spin"></i> Ping...</span>`;
+            pingBadge = `<span id="${badgeId}" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(148,163,184,0.2);display:inline-flex;align-items:center;gap:5px;"><i class="fas fa-spinner fa-spin"></i> Ping...</span>`;
             
-            // Lakukan ping real-time ke API /api/equipment/ping
             fetch('/api/equipment/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(window.getAuthHeaders ? window.getAuthHeaders() : {}) },
@@ -1080,29 +1091,27 @@
                 const isAlive = res.success || res.status === 'online';
                 const pc = isAlive ? '#00ff88' : '#ff3355';
                 const icon = isAlive ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
-                badgeEl.style.background = `${pc}22`;
+                badgeEl.style.background = isAlive ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,85,0.1)';
                 badgeEl.style.color = pc;
-                badgeEl.style.borderColor = pc;
+                badgeEl.style.borderColor = isAlive ? 'rgba(0,255,136,0.25)' : 'rgba(255,51,85,0.25)';
                 badgeEl.innerHTML = `${icon} Ping: ${isAlive ? 'Normal' : 'Gagal'}`;
             })
             .catch(() => {});
         }
 
         document.getElementById('srcDetailStatus').innerHTML =
-            pingBadge + `<span style="font-size:11px;font-weight:bold;padding:3px 10px;border-radius:3px;background:${statusColors[status]}22;color:${statusColors[status]};border:1px solid ${statusColors[status]}">${status}</span>`;
+            pingBadge + `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${statusColors[status]}18;color:${statusColors[status]};border:1px solid ${statusColors[status]}40;letter-spacing:0.5px;">${status.toUpperCase()}</span>`;
 
         const body = document.getElementById('srcDetailBody');
 
         if (!data || Object.keys(data).filter(k => !k.startsWith('_')).length === 0) {
-            body.innerHTML = `<div style="text-align:center;padding:40px;color:#4a7a9a">
-                <i class="fas fa-satellite-dish fa-2x" style="margin-bottom:12px"></i>
-                <p>Belum ada data diterima</p>
+            body.innerHTML = `<div style="text-align:center;padding:48px 20px;color:#475569">
+                <i class="fas fa-satellite-dish fa-3x" style="margin-bottom:14px;color:#334155;"></i>
+                <p style="font-size:13px;font-weight:500;">Belum ada data telemetri yang diterima dari perangkat ini.</p>
             </div>`;
         } else if (data._isMarcMulti) {
-            // MARC RSE: render radio detail (1 radio per source)
             body.innerHTML = renderMarcMultiRadioDetail(data.radios, eqSup, data._logged_at);
         } else if (data._parsing_id === 'vhf_marc_rse' || data._parsing_id === 'marc_pae') {
-            // MARC RSE single radio (direct lastData entry)
             const radioName = src ? src.name : 'Radio';
             body.innerHTML = renderMarcMultiRadioDetail({ [radioName]: data }, eqSup, data._logged_at);
         } else if (src && (src.parsing_id === 'ils_mophien_llz' || data._parsing_id === 'ils_mophien_llz' || (src.name && src.name.toLowerCase().includes('localizer')))) {
@@ -1111,8 +1120,8 @@
             body.innerHTML = renderIlsMophienLlzDetail(data, src, eqSup);
         } else {
             const modalContainer = modal.querySelector('div');
-            if (modalContainer) modalContainer.style.maxWidth = '800px';
-            body.innerHTML = renderDetailData(src.parsing_id, data, eqSup);
+            if (modalContainer) modalContainer.style.maxWidth = '920px';
+            body.innerHTML = renderUniversalEquipmentModal(data, src, eqSup);
         }
 
         modal.style.display = 'flex';
@@ -1143,6 +1152,9 @@
         const activeCh = data.active_channel || 'MON1';
         const freq = data.frequency || '110.10 MHz';
         const serviceStatus = (data.service_status || 'NORMAL').toUpperCase();
+
+        const tx1Text = data.tx1?.status_text || 'TX1: MAIN (ON ANT)';
+        const tx2Text = data.tx2?.status_text || 'TX2: STANDBY (DUMMY LOAD)';
 
         // Extracted Channel Metrics with Verified Baseline PMDT Juanda
         const mon1CL = data.cl_channel?.mon1 || {
@@ -1195,16 +1207,57 @@
             separation: data.mon2_rf_disp_sep ?? 0.0000
         };
 
-        const renderParamRow = (label, valStr, isGreen = true) => `
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
-                <span style="font-size:11px; color:#8baac8; font-weight:500;">${label}</span>
-                <span style="font-size:13px; font-weight:700; font-family:'Roboto Mono',monospace,sans-serif; color:${isGreen ? '#00ff88' : '#e8f4ff'};">${valStr}</span>
-            </div>
-        `;
+        const targetSup = supCategory || 'ILS-LLZ';
+        currentActiveParserId = 'ils_mophien_llz';
+        window.currentDetailParserId = 'ils_mophien_llz';
 
-        const renderChannelCard = (title, icon, mon1Obj, mon2Obj) => {
+        const renderParamRow = (label, rawVal, valStr, lookupKey = null) => {
+            const queryLabel = lookupKey || label;
+            const limColor = getLimitColor(targetSup, queryLabel, rawVal, 'ils_mophien_llz');
+
+            // Aturan Pewarnaan Dinamis:
+            // - Jika parameter TIDAK memiliki konfigurasi limit pada database (unconfigured/null):
+            //   Warna teks angka PUTIH (#ffffff), border kartu netral (border-slate-700 / #163252).
+            // - Jika parameter MEMILIKI konfigurasi limit:
+            //   Normal: Teks HIJAU (#00ff88 / text-emerald-400), border hijau lembut.
+            //   Warning: Teks KUNING (#ffcc00 / text-amber-400), border kuning lembut.
+            //   Alarm: Teks MERAH (#ff3355 / text-rose-400), border merah lembut.
+            let textColor = '#ffffff';
+            let rowBorder = '1px solid rgba(255,255,255,0.05)';
+            let rowBg = 'transparent';
+
+            if (limColor === '#ff3355') {
+                textColor = '#ff3355'; // Alarm
+                rowBorder = '1px solid rgba(255, 51, 85, 0.4)';
+                rowBg = 'rgba(255, 51, 85, 0.08)';
+            } else if (limColor === '#ffcc00') {
+                textColor = '#ffcc00'; // Warning
+                rowBorder = '1px solid rgba(255, 204, 0, 0.4)';
+                rowBg = 'rgba(255, 204, 0, 0.08)';
+            } else if (limColor === '#00ff88') {
+                textColor = '#00ff88'; // Normal
+                rowBorder = '1px solid rgba(0, 255, 136, 0.25)';
+                rowBg = 'rgba(0, 255, 136, 0.04)';
+            }
+
+            return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 8px; margin-bottom:2px; border-radius:4px; border-bottom:${rowBorder}; background:${rowBg}; transition:all 0.2s ease;">
+                <span style="font-size:11px; color:#8baac8; font-weight:500;">${label}</span>
+                <span style="font-size:13px; font-weight:700; font-family:'Roboto Mono',monospace,sans-serif; color:${textColor};">${valStr}</span>
+            </div>
+            `;
+        };
+
+        const renderChannelCard = (title, icon, mon1Obj, mon2Obj, chPrefix = 'cl') => {
             const isMon1Active = activeCh === 'MON1';
             const isMon2Active = activeCh === 'MON2';
+
+            const lookupKeys = {
+                ddm: chPrefix === 'cl' ? 'CRS DDM' : (chPrefix === 'ds' ? 'DS DDM' : 'CLR DDM'),
+                sdm: chPrefix === 'cl' ? 'CRS SDM' : (chPrefix === 'ds' ? 'DS SDM' : 'CLR SDM'),
+                rf_level: chPrefix === 'cl' ? 'CRS RF Level' : (chPrefix === 'ds' ? 'DS RF Level' : 'CLR RF Level'),
+                ident: 'Ident AM'
+            };
 
             return `
             <div style="background:#091627; border:1px solid #163252; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
@@ -1224,10 +1277,10 @@
                             </span>
                             ${isMon1Active ? '<span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; border:1px solid rgba(0,255,136,0.4); padding:1px 6px; border-radius:3px; letter-spacing:0.5px;">ACTIVE</span>' : '<span style="font-size:8px; color:#4a7a9a;">STANDBY</span>'}
                         </div>
-                        ${renderParamRow('DDM', formatDec2(mon1Obj.ddm, '%'), true)}
-                        ${renderParamRow('SDM', formatDec2(mon1Obj.sdm, '%'), true)}
-                        ${renderParamRow('RF Level', formatDec2(mon1Obj.rf_level, 'dB'), true)}
-                        ${renderParamRow('Ident AM', formatDec2(mon1Obj.ident, '%'), true)}
+                        ${renderParamRow('DDM', mon1Obj.ddm, formatDec2(mon1Obj.ddm, '%'), lookupKeys.ddm)}
+                        ${renderParamRow('SDM', mon1Obj.sdm, formatDec2(mon1Obj.sdm, '%'), lookupKeys.sdm)}
+                        ${renderParamRow('RF Level', mon1Obj.rf_level, formatDec2(mon1Obj.rf_level, 'dB'), lookupKeys.rf_level)}
+                        ${renderParamRow('Ident AM', mon1Obj.ident, formatDec2(mon1Obj.ident, '%'), lookupKeys.ident)}
                     </div>
 
                     <!-- MON2 Column -->
@@ -1238,10 +1291,10 @@
                             </span>
                             ${isMon2Active ? '<span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; border:1px solid rgba(0,255,136,0.4); padding:1px 6px; border-radius:3px; letter-spacing:0.5px;">ACTIVE</span>' : '<span style="font-size:8px; color:#4a7a9a;">STANDBY</span>'}
                         </div>
-                        ${renderParamRow('DDM', formatDec2(mon2Obj.ddm, '%'), true)}
-                        ${renderParamRow('SDM', formatDec2(mon2Obj.sdm, '%'), true)}
-                        ${renderParamRow('RF Level', formatDec2(mon2Obj.rf_level, 'dB'), true)}
-                        ${renderParamRow('Ident AM', formatDec2(mon2Obj.ident, '%'), true)}
+                        ${renderParamRow('DDM', mon2Obj.ddm, formatDec2(mon2Obj.ddm, '%'), lookupKeys.ddm)}
+                        ${renderParamRow('SDM', mon2Obj.sdm, formatDec2(mon2Obj.sdm, '%'), lookupKeys.sdm)}
+                        ${renderParamRow('RF Level', mon2Obj.rf_level, formatDec2(mon2Obj.rf_level, 'dB'), lookupKeys.rf_level)}
+                        ${renderParamRow('Ident AM', mon2Obj.ident, formatDec2(mon2Obj.ident, '%'), lookupKeys.ident)}
                     </div>
                 </div>
             </div>
@@ -1267,9 +1320,9 @@
                             </span>
                             ${isMon1Active ? '<span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; padding:1px 6px; border-radius:3px;">ACTIVE</span>' : ''}
                         </div>
-                        ${renderParamRow('Course Freq Disp', formatDec4(rf1.course, '%'), true)}
-                        ${renderParamRow('Clearance Freq Disp', formatDec4(rf1.clr, '%'), true)}
-                        ${renderParamRow('Separation Freq Disp', formatDec4(rf1.separation, '%'), true)}
+                        ${renderParamRow('Course Freq Disp', rf1.course, formatDec4(rf1.course, '%'), 'rf_disp_course')}
+                        ${renderParamRow('Clearance Freq Disp', rf1.clr, formatDec4(rf1.clr, '%'), 'rf_disp_clr')}
+                        ${renderParamRow('Separation Freq Disp', rf1.separation, formatDec4(rf1.separation, '%'), 'rf_disp_sep')}
                     </div>
 
                     <!-- MON2 RF -->
@@ -1280,9 +1333,9 @@
                             </span>
                             ${isMon2Active ? '<span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; padding:1px 6px; border-radius:3px;">ACTIVE</span>' : ''}
                         </div>
-                        ${renderParamRow('Course Freq Disp', formatDec4(rf2.course, '%'), true)}
-                        ${renderParamRow('Clearance Freq Disp', formatDec4(rf2.clr, '%'), true)}
-                        ${renderParamRow('Separation Freq Disp', formatDec4(rf2.separation, '%'), true)}
+                        ${renderParamRow('Course Freq Disp', rf2.course, formatDec4(rf2.course, '%'), 'rf_disp_course')}
+                        ${renderParamRow('Clearance Freq Disp', rf2.clr, formatDec4(rf2.clr, '%'), 'rf_disp_clr')}
+                        ${renderParamRow('Separation Freq Disp', rf2.separation, formatDec4(rf2.separation, '%'), 'rf_disp_sep')}
                     </div>
                 </div>
             </div>
@@ -1322,7 +1375,7 @@
                         <span style="font-size:10px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); padding:2px 8px; border-radius:4px;">NORMAL</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="font-size:11px; color:#7a9eb8; font-weight:600;">FREQ:</span>
+                        <span style="font-size:11px; color:#7a9eb8; font-weight:600;">Frekuensi:</span>
                         <span style="font-size:13px; font-weight:700; color:#ffffff; background:#0d2238; padding:3px 10px; border-radius:4px; border:1px solid #1a3a5c; font-family:'Roboto Mono',monospace;">${freq}</span>
                     </div>
                 </div>
@@ -1330,15 +1383,14 @@
                 <!-- Right: Service Status & Transmitter Status Box -->
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="font-size:10px; color:#7a9eb8;">SERVICE:</span>
-                        <span style="font-size:11px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.15); border:1px solid #00ff88; padding:3px 10px; border-radius:4px; letter-spacing:1px;"><i class="fas fa-check-circle"></i> ${serviceStatus}</span>
+                        <span style="font-size:11px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.15); border:1px solid #00ff88; padding:4px 12px; border-radius:4px; letter-spacing:0.5px;"><i class="fas fa-check-circle" style="margin-right:4px;"></i> Service Status: ${serviceStatus}</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="font-size:11px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.12); border:1px solid rgba(0,255,136,0.4); padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
-                            <i class="fas fa-satellite-dish" style="margin-right:4px;"></i> TX1: MAIN (ON ANT)
+                            <i class="fas fa-satellite-dish" style="margin-right:4px;"></i> ${tx1Text}
                         </span>
                         <span style="font-size:11px; font-weight:bold; color:#ffcc00; background:rgba(255,204,0,0.12); border:1px solid rgba(255,204,0,0.4); padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
-                            <i class="fas fa-shield-alt" style="margin-right:4px;"></i> TX2: STANDBY (DUMMY LOAD)
+                            <i class="fas fa-shield-alt" style="margin-right:4px;"></i> ${tx2Text}
                         </span>
                     </div>
                 </div>
@@ -1347,13 +1399,13 @@
             <!-- 2. Executive Monitor Layout (Tabel Perbandingan MON1 vs MON2) -->
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:16px;">
                 <!-- A. CL Channel (Course Line) -->
-                ${renderChannelCard('COURSE LINE (CL) CHANNEL', 'fas fa-arrows-alt-v', mon1CL, mon2CL)}
+                ${renderChannelCard('COURSE LINE (CL) CHANNEL', 'fas fa-arrows-alt-v', mon1CL, mon2CL, 'cl')}
 
                 <!-- B. DS Channel (Displacement Sensitivity) -->
-                ${renderChannelCard('DISPLACEMENT SENSITIVITY (DS)', 'fas fa-arrows-alt-h', mon1DS, mon2DS)}
+                ${renderChannelCard('DISPLACEMENT SENSITIVITY (DS)', 'fas fa-arrows-alt-h', mon1DS, mon2DS, 'ds')}
 
                 <!-- C. CLR Channel (Clearance) -->
-                ${renderChannelCard('CLEARANCE (CLR) CHANNEL', 'fas fa-compass', mon1CLR, mon2CLR)}
+                ${renderChannelCard('CLEARANCE (CLR) CHANNEL', 'fas fa-compass', mon1CLR, mon2CLR, 'clr')}
             </div>
 
             <!-- 3. Sub-panel Radio Frequency (RF Displacement) -->
@@ -1459,75 +1511,174 @@
         }).join('');
     }
 
+    /**
+     * Universal Equipment Modal: Adaptive Responsive Dynamic Grouped Grid
+     * Mendukung data bertingkat/nested groups (UTAMA, VOLTAGE, CURRENT, dll.)
+     * serta flat telemetry dengan evaluasi limitasi Smart dan penanganan unit otomatis.
+     */
+    function renderUniversalEquipmentModal(data, src, supCategory) {
+        data = data || {};
+        const parserId = src ? src.parsing_id : (data._parsing_id || null);
+        const effectiveParserId = parserId || currentActiveParserId || window.currentDetailParserId || null;
+        const targetSup = supCategory || (src && (src.category || src.sup_category)) || '';
+
+        // 1. Ekstrak grup bertingkat dan flat items secara adaptif
+        const groups = {};
+        const flatItems = {};
+
+        // Cari template (jika ada) untuk urutan/label parameter
+        const tmpl = window.templatesCache?.find(t => t.id === effectiveParserId);
+        const tmplParams = tmpl?.parameters || [];
+
+        // Helper untuk ekstrak unit bawaan
+        const getUnitFor = (key, parentGroupObj = null) => {
+            // Cek unit di grup lokal atau root data
+            if (parentGroupObj && parentGroupObj[`${key}_unit`]) return parentGroupObj[`${key}_unit`];
+            if (data[`${key}_unit`]) return data[`${key}_unit`];
+            // Cek di template config
+            const p = tmplParams.find(tp => (tp.name === key || tp.label === key));
+            return p?.unit || '';
+        };
+
+        // Iterasi properti data
+        Object.entries(data).forEach(([key, val]) => {
+            if (key.startsWith('_') || key.endsWith('_unit') || isMetricPlaceholder(val)) return;
+
+            if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+                // Nested Object -> Grup
+                const subItems = {};
+                Object.entries(val).forEach(([subK, subV]) => {
+                    if (subK.startsWith('_') || subK.endsWith('_unit') || isMetricPlaceholder(subV)) return;
+                    subItems[subK] = subV;
+                });
+                if (Object.keys(subItems).length > 0) {
+                    groups[key] = { items: subItems, rawGroup: val };
+                }
+            } else {
+                flatItems[key] = val;
+            }
+        });
+
+        // Kumpulkan parameter flat tanpa grup ke dalam grup default
+        if (Object.keys(flatItems).length > 0) {
+            groups['TELEMETRY / PARAMETER'] = { items: flatItems, rawGroup: data };
+        }
+
+        // Tampilkan telemetry table rows jika tersedia (seperti PMDT Juanda / DME / DVOR)
+        const extraRows = data._amv_txs_rows || [];
+        if (extraRows.length > 0) {
+            const extraObj = {};
+            extraRows.forEach(r => {
+                if (r && r[0]) extraObj[r[0]] = r[1];
+            });
+            groups['REGISTER TELEMETRY'] = { items: extraObj, rawGroup: extraObj };
+        }
+
+        // Jika tidak ada data yang bisa ditampilkan
+        if (Object.keys(groups).length === 0) {
+            return `
+            <div style="text-align:center;padding:40px 20px;color:#64748b;">
+                <i class="fas fa-inbox fa-3x" style="margin-bottom:12px;color:#334155;"></i>
+                <p style="font-size:13px;font-weight:500;">Tidak ada parameter telemetri yang dapat ditampilkan.</p>
+            </div>`;
+        }
+
+        // 2. Render Kartu Parameter Universal
+        const renderCard = (key, val, parentGroupObj = null) => {
+            const unit = getUnitFor(key, parentGroupObj);
+            const labelText = key.replace(/_/g, ' ').trim();
+
+            // Evaluasi warna limitasi secara dinamis dari database Smart (limitation_config.json)
+            const limColor = getLimitColor(targetSup, labelText, val, effectiveParserId);
+
+            let status = 'unconfigured'; // Default No Limit (#ffffff)
+            if (limColor === '#ff3355') status = 'alarm';
+            else if (limColor === '#ffcc00') status = 'warning';
+            else if (limColor === '#00ff88') status = 'normal';
+
+            // Styling Dark Theme elegan berbasis slate/cyan/emerald/amber/rose
+            let cardBg = 'rgba(15, 23, 42, 0.6)';
+            let cardBorder = '1px solid rgba(30, 41, 59, 0.8)';
+            let valueColor = '#ffffff';
+            let labelColor = '#94a3b8';
+            let badgeHtml = '';
+            let extraClass = '';
+
+            if (status === 'unconfigured') {
+                // UNCONFIGURED / NO LIMIT: Putih murni, border abu-abu gelap netral + badge No Limit
+                valueColor = '#ffffff';
+                cardBorder = '1px solid #1e293b';
+                cardBg = 'rgba(15, 23, 42, 0.65)';
+                badgeHtml = `<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(30, 41, 59, 0.8);color:#64748b;border:1px solid rgba(51, 65, 85, 0.6);letter-spacing:0.3px;flex-shrink:0;">No Limit</span>`;
+            } else if (status === 'normal') {
+                // NORMAL: Hijau Emerald, border hijau lembut
+                valueColor = '#34d399'; // text-emerald-400
+                cardBorder = '1px solid rgba(16, 185, 129, 0.4)';
+                cardBg = 'rgba(6, 78, 59, 0.2)';
+                labelColor = '#6ee7b7';
+                badgeHtml = `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(16, 185, 129, 0.15);color:#34d399;border:1px solid rgba(16, 185, 129, 0.3);letter-spacing:0.3px;flex-shrink:0;">NORMAL</span>`;
+            } else if (status === 'warning') {
+                // WARNING: Kuning Amber, border kuning redup
+                valueColor = '#fbbf24'; // text-amber-400
+                cardBorder = '1px solid rgba(245, 158, 11, 0.5)';
+                cardBg = 'rgba(120, 53, 15, 0.25)';
+                labelColor = '#fcd34d';
+                badgeHtml = `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(245, 158, 11, 0.2);color:#fbbf24;border:1px solid rgba(245, 158, 11, 0.4);letter-spacing:0.3px;flex-shrink:0;">WARNING</span>`;
+            } else if (status === 'alarm') {
+                // ALARM: Merah Rose, border merah tegas dengan subtle glow
+                valueColor = '#fb7185'; // text-rose-400
+                cardBorder = '1px solid rgba(244, 63, 94, 0.6)';
+                cardBg = 'rgba(136, 19, 55, 0.25)';
+                labelColor = '#fda4af';
+                extraClass = 'univ-card-alarm';
+                badgeHtml = `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(244, 63, 94, 0.25);color:#fb7185;border:1px solid rgba(244, 63, 94, 0.5);letter-spacing:0.3px;flex-shrink:0;">ALARM</span>`;
+            }
+
+            // Nilai tampil & satuan
+            let valDisplay = (val !== null && val !== undefined && val !== '') ? String(val) : '—';
+            if (valDisplay !== '—' && unit) {
+                valDisplay = `${valDisplay} <span style="font-size:12px;font-weight:500;color:#94a3b8;margin-left:2px;">${unit}</span>`;
+            }
+
+            return `
+            <div class="${extraClass}" style="background:${cardBg};border:${cardBorder};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;min-height:68px;box-sizing:border-box;transition:all 0.15s ease;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;">
+                    <span style="font-size:10px;text-transform:uppercase;font-weight:600;color:${labelColor};letter-spacing:0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${labelText}">${labelText}</span>
+                    ${badgeHtml}
+                </div>
+                <div style="font-size:15px;font-weight:700;font-family:'Roboto Mono',monospace,sans-serif;color:${valueColor};letter-spacing:-0.3px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    ${valDisplay}
+                </div>
+            </div>`;
+        };
+
+        // 3. Render Setiap Section Group
+        return Object.entries(groups).map(([groupName, groupData]) => {
+            const cleanGroupName = groupName.replace(/_/g, ' ').toUpperCase();
+            const items = groupData.items || {};
+
+            return `
+            <div style="margin-bottom:18px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid rgba(30, 41, 59, 0.8);">
+                    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#06b6d4;display:inline-flex;align-items:center;gap:6px;">
+                        <i class="fas fa-layer-group" style="font-size:10px;color:#0891b2;"></i> ${cleanGroupName}
+                    </span>
+                    <span style="font-size:9px;color:#64748b;font-weight:600;">${Object.keys(items).length} PARAMETER</span>
+                </div>
+                <div class="univ-grid-container">
+                    ${Object.entries(items).map(([k, v]) => renderCard(k, v, groupData.rawGroup)).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
     function renderDetailData(parserId, data, supCategory) {
         currentActiveParserId = parserId;
         window.currentDetailParserId = parserId;
         if (parserId === 'ils_mophien_llz') {
             return renderIlsMophienLlzDetail(data, null, supCategory);
         }
-        // Group by section based on parser
-        const sections = getDetailSections(parserId, data, supCategory);
-        return sections.map(sec => `
-            <div style="margin-bottom:16px">
-                <div style="font-size:10px;color:#007a9e;letter-spacing:2px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #0d2a45">${sec.title}</div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
-                    ${sec.params.map(([label, val, cls]) => {
-            // Evaluasi warna limitasi secara dinamis murni dari menu Alarm Limit (limitation_config.json):
-            let limColor = getLimitColor(supCategory, label, val, parserId);
-            if (sec.title === 'Connection Error') {
-                limColor = cls || '#ff3355';
-            }
-
-            // Aturan pewarnaan:
-            // 1. Jika TIDAK ada trigger/aturan alarm limit -> SEMUANYA PUTIH (#ffffff)
-            // 2. Jika ADA alarm limit:
-            //    - Hijau (#00ff88) jika nilai tidak keluar dari pre-alarm (aman/normal)
-            //    - Kuning (#ffcc00) jika pre-alarm / warning
-            //    - Merah (#ff3355) jika alarm
-            let finalColor = '#ffffff';
-            let isAlarm = false;
-            let isWarning = false;
-            let isNormalLimit = false;
-
-            if (limColor === '#ff3355') {
-                finalColor = '#ff3355';
-                isAlarm = true;
-            } else if (limColor === '#ffcc00') {
-                finalColor = '#ffcc00';
-                isWarning = true;
-            } else if (limColor === '#00ff88') {
-                finalColor = '#00ff88';
-                isNormalLimit = true;
-            } else if (sec.title === 'Connection Error') {
-                finalColor = cls || '#ff3355';
-                if (finalColor === '#ff3355') isAlarm = true;
-                if (finalColor === '#ffcc00') isWarning = true;
-            }
-
-            const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
-            const cardBorder = isAlarm
-                ? '1px solid rgba(255, 51, 85, 0.5)'
-                : isWarning
-                    ? '1px solid rgba(255, 204, 0, 0.5)'
-                    : isNormalLimit
-                        ? '1px solid rgba(0, 255, 136, 0.35)'
-                        : '1px solid #0d2a45';
-            const cardBg = isAlarm
-                ? 'rgba(255, 51, 85, 0.1)'
-                : isWarning
-                    ? 'rgba(255, 204, 0, 0.1)'
-                    : isNormalLimit
-                        ? 'rgba(0, 255, 136, 0.06)'
-                        : '#0f1e35';
-
-            return `
-                        <div style="background:${cardBg};border:${cardBorder};border-radius:5px;padding:8px 10px;transition:all 0.2s ease;">
-                            <div style="font-size:9px;color:${labelColor};letter-spacing:1px;margin-bottom:3px;font-weight:${(isAlarm || isWarning || isNormalLimit) ? 'bold' : 'normal'}">${label}</div>
-                            <div style="font-size:13px;font-weight:bold;color:${finalColor}">${val !== null && val !== undefined ? val : '—'}</div>
-                        </div>`;
-        }).join('')}
-                </div>
-            </div>`).join('');
+        return renderUniversalEquipmentModal(data, { parsing_id: parserId }, supCategory);
     }
 
     function getDetailSections(parserId, data, supCategory) {
@@ -2710,8 +2861,31 @@
                 gap: 4px;
                 border: 1px solid #1a3a5c;
             }
-            .sp-parser-badge { background: #1a3a5c; color: #a0c8e8; }
             .sp-card-no-data { padding: 20px; text-align: center; color: #3a5a7a; font-size: 11px; display: flex; flex-direction: column; gap: 8px; }
+
+            /* ── Universal Adaptive Grouped Grid Modal Styling ──────────── */
+            .univ-grid-container {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+            @media (min-width: 640px) {
+                .univ-grid-container {
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                }
+            }
+            @media (min-width: 900px) {
+                .univ-grid-container {
+                    grid-template-columns: repeat(4, minmax(0, 1fr));
+                }
+            }
+            @keyframes pulse-subtle {
+                0%, 100% { box-shadow: 0 0 10px rgba(244, 63, 94, 0.25); }
+                50% { box-shadow: 0 0 18px rgba(244, 63, 94, 0.45); }
+            }
+            .univ-card-alarm {
+                animation: pulse-subtle 2s infinite ease-in-out;
+            }
         `;
         document.head.appendChild(style);
     }

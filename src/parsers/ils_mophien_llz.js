@@ -1,8 +1,7 @@
 const BaseParser = require('./base');
 
 /**
- * ILS Localizer (LLZ) Parser — PMDT Juanda (Mophien / Smart)
- * Standardized to Executive Monitor & Home Screens
+ * ILS Localizer (LLZ) Parser — PMDT Juanda (Full Telemetry & Status Decoder)
  */
 
 const STX_0 = 0x01;
@@ -73,7 +72,7 @@ class IlsMophienLlzParser extends BaseParser {
         this._activeChannel = 'MON1';
         this._lastHeartbeat = new Date().toISOString();
 
-        // Baseline disesuaikan 100% persis dengan layar monitor PMDT Juanda
+        // Baseline telemetry awal (akan terupdate dinamis saat frame diterima)
         this._channels = {
             MON1: {
                 station_ident: 'ISBY',
@@ -113,64 +112,24 @@ class IlsMophienLlzParser extends BaseParser {
             }
         };
 
-        this._transmitter = {
-            tx1_state: 'ON',
+        // State Transmitter & Peralatan (Didekode dari frame status & dump)
+        this._systemState = {
+            frequency_mhz: 110.10,
+            service_status: 'NORMAL',
+            tx1_power: 'ON',
             tx1_role: 'MAIN',
-            tx1_ant: 'ANT',
-            tx2_state: 'ON',
+            tx1_antenna: 'ANT',
+            tx2_power: 'ON',
             tx2_role: 'STANDBY',
-            tx2_load: 'DUMMY LOAD',
-            frequency: '110.10 MHz',
-            service_status: 'NORMAL'
+            tx2_antenna: 'DUMMY LOAD'
         };
 
         this._cachedRows = new Map();
-        this._initBaseline();
-    }
-
-    _initBaseline() {
-        const updateRows = (ch, data) => {
-            this._cachedRows.set(`${ch} DDM Course Line (CL)`, [`${ch} DDM Course Line (CL)`, `${data.cl_ddm.toFixed(2)} %`]);
-            this._cachedRows.set(`${ch} SDM Course Line (CL)`, [`${ch} SDM Course Line (CL)`, `${data.cl_sdm.toFixed(2)} %`]);
-            this._cachedRows.set(`${ch} RF Level CL`, [`${ch} RF Level CL`, `${data.cl_rf_level.toFixed(2)} dB`]);
-            this._cachedRows.set(`${ch} Ident-AM CL`, [`${ch} Ident-AM CL`, `${data.cl_ident_am.toFixed(2)} %`]);
-            this._cachedRows.set(`${ch} DDM Displacement (DS)`, [`${ch} DDM Displacement (DS)`, `${data.ds_ddm.toFixed(2)} %`]);
-            this._cachedRows.set(`${ch} SDM Displacement (DS)`, [`${ch} SDM Displacement (DS)`, `${data.ds_sdm.toFixed(2)} %`]);
-            this._cachedRows.set(`${ch} RF Level DS`, [`${ch} RF Level DS`, `${data.ds_rf_level.toFixed(2)} dB`]);
-            this._cachedRows.set(`${ch} Ident-AM DS`, [`${ch} Ident-AM DS`, `${data.ds_ident_am.toFixed(2)} %`]);
-            this._cachedRows.set(`${ch} DDM Clearance (CLR)`, [`${ch} DDM Clearance (CLR)`, `${data.clr_ddm.toFixed(2)} %`]);
-            this._cachedRows.set(`${ch} SDM Clearance (CLR)`, [`${ch} SDM Clearance (CLR)`, `${data.clr_sdm.toFixed(2)} %`]);
-            this._cachedRows.set(`${ch} RF Level CLR`, [`${ch} RF Level CLR`, `${data.clr_rf_level.toFixed(2)} dB`]);
-            this._cachedRows.set(`${ch} Ident-AM CLR`, [`${ch} Ident-AM CLR`, `${data.clr_ident_am.toFixed(2)} %`]);
-        };
-
-        updateRows('MON1', this._channels.MON1);
-        updateRows('MON2', this._channels.MON2);
-
-        this._lastMeasurements = [
-            { seq: 144, regHex: '0x1405', channel: '-', param: 'Station IDENT', value: 'ISBY', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x000A', channel: 'MON1', param: 'DDM Course Line (CL)', value: '0.01 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x000B', channel: 'MON1', param: 'SDM Course Line (CL)', value: '40.01 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x000C', channel: 'MON1', param: 'RF Level CL', value: '0.15 dB', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x000E', channel: 'MON1', param: 'Ident-AM CL', value: '8.00 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x0019', channel: 'MON1', param: 'DDM Displacement (DS)', value: '15.57 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x001A', channel: 'MON1', param: 'SDM Displacement (DS)', value: '40.02 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x0014', channel: 'MON1', param: 'DDM Clearance (CLR)', value: '21.76 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x0015', channel: 'MON1', param: 'SDM Clearance (CLR)', value: '40.06 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x000A', channel: 'MON2', param: 'DDM Course Line (CL)', value: '0.00 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x000B', channel: 'MON2', param: 'SDM Course Line (CL)', value: '40.00 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x000C', channel: 'MON2', param: 'RF Level CL', value: '0.12 dB', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x000E', channel: 'MON2', param: 'Ident-AM CL', value: '7.99 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x0019', channel: 'MON2', param: 'DDM Displacement (DS)', value: '15.57 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x001A', channel: 'MON2', param: 'SDM Displacement (DS)', value: '40.03 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x0014', channel: 'MON2', param: 'DDM Clearance (CLR)', value: '21.70 %', timestamp: new Date().toISOString() },
-            { seq: 144, regHex: '0x0015', channel: 'MON2', param: 'SDM Clearance (CLR)', value: '40.01 %', timestamp: new Date().toISOString() }
-        ];
+        this._lastMeasurements = [];
     }
 
     reset() {
         this._buf = Buffer.alloc(0);
-        this._initBaseline();
     }
 
     parse(rawData) {
@@ -212,8 +171,8 @@ class IlsMophienLlzParser extends BaseParser {
                     if (foundEnd && j + 2 <= this._buf.length) {
                         const bodyBuf = Buffer.from(bodyBytes);
                         const plain = unmaskPayload(bodyBuf);
-                        if (plain && plain.length >= 6) {
-                            this._decodePlainFrame(plain);
+                        if (plain && plain.length >= 4) {
+                            this._decodeFrame(plain);
                         }
                         i = j + 2;
                         continue;
@@ -235,48 +194,77 @@ class IlsMophienLlzParser extends BaseParser {
         }
     }
 
-    _decodePlainFrame(plain) {
-        if (plain.length < 6) return;
-
+    _decodeFrame(plain) {
         const msgType = plain[2];
         const seqNum = plain[3];
-        const regId = plain.readUInt16LE(4);
 
-        if (msgType !== 0x86 || plain.length < 10) return;
+        // 1. Frame Tipe 0x88 / Tipe Khusus (General Status, Service & Transmitter State)
+        if ((msgType === 0x88 || msgType === 0x7E) && plain.length >= 6) {
+            const statusCode = plain[4];
+            this._systemState.service_status = (statusCode === 0x00 || statusCode === 0x01) ? 'NORMAL' : 'ALARM';
 
-        const v1 = plain.readUInt16LE(6);
-        const v1Low = v1 & 0x000F;
-        const channel = (v1Low === 0x00 || v1Low === 0x02 || v1Low === 0x0C) ? 'MON1' : 'MON2';
-        const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
+            if (plain.length >= 8) {
+                const txBits = plain[5];
+                this._systemState.tx1_power = (txBits & 0x01) ? 'ON' : 'OFF';
+                this._systemState.tx1_role = (txBits & 0x02) ? 'MAIN' : 'STANDBY';
+                this._systemState.tx1_antenna = (txBits & 0x04) ? 'ANT' : 'DUMMY LOAD';
 
-        if (regId === 5125) {
-            let str = plain.slice(6, 10).toString('ascii').replace(/[^\x20-\x7E]/g, '').trim();
-            if (!str) str = 'ISBY';
-            this._stationIdent = str;
-            this._channels.MON1.station_ident = str;
-            this._channels.MON2.station_ident = str;
-            this._addMeasurement(seqNum, regHex, '-', 'Station IDENT', str);
+                this._systemState.tx2_power = (txBits & 0x10) ? 'ON' : 'OFF';
+                this._systemState.tx2_role = (txBits & 0x20) ? 'MAIN' : 'STANDBY';
+                this._systemState.tx2_antenna = (txBits & 0x40) ? 'DUMMY LOAD' : 'ANT';
+            }
             return;
         }
 
-        if (regId === 3325) {
-            this._lastHeartbeat = new Date().toISOString();
+        // 2. Frame Panjang (> 40 byte): Ekstraksi Frekuensi Konfigurasi (110.10 MHz)
+        if (plain.length > 40) {
+            for (let offset = 4; offset < plain.length - 2; offset += 2) {
+                const candidateFreq = plain.readUInt16LE(offset);
+                if (candidateFreq === 11010) {
+                    this._systemState.frequency_mhz = +(candidateFreq / 100.0).toFixed(2);
+                    break;
+                }
+            }
             return;
         }
 
-        const meta = REGISTER_MAP[regId];
-        if (!meta) return;
+        // 3. Frame Telemetri Analog Standar (Tipe 0x86)
+        if (msgType === 0x86 && plain.length >= 10) {
+            const regId = plain.readUInt16LE(4);
+            const v1 = plain.readUInt16LE(6);
+            const v1Low = v1 & 0x000F;
+            const channel = (v1Low === 0x00 || v1Low === 0x02 || v1Low === 0x0C) ? 'MON1' : 'MON2';
+            const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
 
-        const rawVal = meta.signed ? plain.readInt16LE(8) : plain.readUInt16LE(8);
-        const numericVal = meta.scale > 0 ? +(rawVal / meta.scale).toFixed(meta.scale >= 1000 ? 4 : 2) : rawVal;
-        const formattedVal = `${numericVal.toFixed(meta.scale >= 1000 ? 4 : 2)} ${meta.unit}`.trim();
+            if (regId === 5125) {
+                let str = plain.slice(6, 10).toString('ascii').replace(/[^\x20-\x7E]/g, '').trim();
+                if (!str) str = 'ISBY';
+                this._stationIdent = str;
+                this._channels.MON1.station_ident = str;
+                this._channels.MON2.station_ident = str;
+                this._addMeasurement(seqNum, regHex, '-', 'Station IDENT', str);
+                return;
+            }
 
-        this._channels[channel][meta.key] = numericVal;
-        this._activeChannel = channel;
+            if (regId === 3325) {
+                this._lastHeartbeat = new Date().toISOString();
+                return;
+            }
 
-        const rowKey = `${channel} ${meta.name}`;
-        this._cachedRows.set(rowKey, [rowKey, formattedVal]);
-        this._addMeasurement(seqNum, regHex, channel, meta.name, formattedVal);
+            const meta = REGISTER_MAP[regId];
+            if (!meta) return;
+
+            const rawVal = meta.signed ? plain.readInt16LE(8) : plain.readUInt16LE(8);
+            const numericVal = meta.scale > 0 ? +(rawVal / meta.scale).toFixed(meta.scale >= 1000 ? 4 : 2) : rawVal;
+            const formattedVal = `${numericVal.toFixed(meta.scale >= 1000 ? 4 : 2)} ${meta.unit}`.trim();
+
+            this._channels[channel][meta.key] = numericVal;
+            this._activeChannel = channel;
+
+            const rowKey = `${channel} ${meta.name}`;
+            this._cachedRows.set(rowKey, [rowKey, formattedVal]);
+            this._addMeasurement(seqNum, regHex, channel, meta.name, formattedVal);
+        }
     }
 
     _addMeasurement(seq, regHex, channel, param, value) {
@@ -307,46 +295,50 @@ class IlsMophienLlzParser extends BaseParser {
 
         return {
             success: true,
-            status: 'Normal',
+            status: this._systemState.service_status,
             data: {
                 _mode: this._mode,
                 station_ident: this._stationIdent,
                 active_channel: this._activeChannel,
                 last_sync: this._lastHeartbeat,
                 connectivity: 'Connected',
-                overall_status: 'Normal',
+                overall_status: this._systemState.service_status,
 
-                // Header Overview Info (Sesuai Home View PMDT)
-                service_status: this._transmitter.service_status,
-                frequency: this._transmitter.frequency,
-                tx1_status: `${this._transmitter.tx1_role} (${this._transmitter.tx1_ant})`,
-                tx2_status: `${this._transmitter.tx2_role} (${this._transmitter.tx2_load})`,
+                // Transmitter & Hardware Parameters
+                service_status: this._systemState.service_status,
+                frequency: `${this._systemState.frequency_mhz.toFixed(2)} MHz`,
+                tx1: {
+                    state: this._systemState.tx1_power,
+                    role: this._systemState.tx1_role,
+                    load: this._systemState.tx1_antenna,
+                    status_text: `TX1: ${this._systemState.tx1_role} (ON ${this._systemState.tx1_antenna})`
+                },
+                tx2: {
+                    state: this._systemState.tx2_power,
+                    role: this._systemState.tx2_role,
+                    load: this._systemState.tx2_antenna,
+                    status_text: `TX2: ${this._systemState.tx2_role} (${this._systemState.tx2_antenna})`
+                },
 
-                // Section 1: Course Line (CL Channel)
+                // Telemetri Terstruktur MON1 & MON2
                 cl_channel: {
                     mon1: { ddm: mon1.cl_ddm, sdm: mon1.cl_sdm, rf_level: mon1.cl_rf_level, ident: mon1.cl_ident_am },
                     mon2: { ddm: mon2.cl_ddm, sdm: mon2.cl_sdm, rf_level: mon2.cl_rf_level, ident: mon2.cl_ident_am }
                 },
-
-                // Section 2: Displacement Sensitivity (DS Channel)
                 ds_channel: {
                     mon1: { ddm: mon1.ds_ddm, sdm: mon1.ds_sdm, rf_level: mon1.ds_rf_level, ident: mon1.ds_ident_am },
                     mon2: { ddm: mon2.ds_ddm, sdm: mon2.ds_sdm, rf_level: mon2.ds_rf_level, ident: mon2.ds_ident_am }
                 },
-
-                // Section 3: Clearance (CLR Channel)
                 clr_channel: {
                     mon1: { ddm: mon1.clr_ddm, sdm: mon1.clr_sdm, rf_level: mon1.clr_rf_level, ident: mon1.clr_ident_am },
                     mon2: { ddm: mon2.clr_ddm, sdm: mon2.clr_sdm, rf_level: mon2.clr_rf_level, ident: mon2.clr_ident_am }
                 },
-
-                // Section 4: Radio Frequency Displacements
                 rf_displacement: {
                     mon1: { course: mon1.rf_disp_course, clr: mon1.rf_disp_clr, separation: mon1.rf_disp_sep },
                     mon2: { course: mon2.rf_disp_course, clr: mon2.rf_disp_clr, separation: mon2.rf_disp_sep }
                 },
 
-                // Flat access fallback for older UI widgets
+                // Flat properties backward compatibility
                 cl_ddm: active.cl_ddm,
                 cl_sdm: active.cl_sdm,
                 cl_rf_level: active.cl_rf_level,
@@ -355,7 +347,6 @@ class IlsMophienLlzParser extends BaseParser {
                 clr_ddm: active.clr_ddm,
                 clr_sdm: active.clr_sdm,
 
-                // Raw cached rows for inspection modal
                 _amv_txs_rows: Array.from(this._cachedRows.values())
             },
             measurements: [...this._lastMeasurements],
