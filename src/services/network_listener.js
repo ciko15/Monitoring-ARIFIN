@@ -167,16 +167,23 @@ class NetworkListenerService {
         let isPingable = false;
 
         if (isInitialDisconnect) {
-            // Cek status Ping (ICMP) lebih awal
-            // Sesuai aturan: jika ping normal tapi data kosong (SNMP gagal), maka status menjadi Offline (mati)
-            isPingable = await checkIcmpPing(source.ip_address);
-            if (!parsedData.data) parsedData.data = {};
-            parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
-
-            if (isPingable) {
-                statusToEvaluate = 'Offline';
+            // Jika parsing_id adalah ils_mophien_llz atau modul TCP streaming khusus,
+            // jangan biarkan ping ICMP yang di-block mematikan status alat
+            if (source.parsing_id === 'ils_mophien_llz') {
+                isPingable = true;
+                if (!parsedData.data) parsedData.data = {};
+                parsedData.data.ping_status = 'Normal';
+                statusToEvaluate = 'Normal';
             } else {
-                statusToEvaluate = 'Disconnect';
+                isPingable = await checkIcmpPing(source.ip_address);
+                if (!parsedData.data) parsedData.data = {};
+                parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
+
+                if (isPingable) {
+                    statusToEvaluate = 'Offline';
+                } else {
+                    statusToEvaluate = 'Disconnect';
+                }
             }
         } else if (source.equipt_id && parsedData && parsedData.data) {
             // Dynamic Limitation Threshold Evaluation
@@ -341,9 +348,8 @@ class NetworkListenerService {
             }
         }
 
-        // Jika Disconnect (Ping Gagal) atau Offline (Ping Sukses tapi SNMP Gagal)
-        if (isDisconnect || finalStatus === 'Offline') {
-            // Ubah semua nilai menjadi garis putus-putus (-) berdasarkan bentuk data terakhir.
+        // Jangan timpa parameter menjadi strip jika alat adalah streaming TCP aktif yang sudah menerima paket
+        if ((isDisconnect || finalStatus === 'Offline') && source.parsing_id !== 'ils_mophien_llz') {
             const prevData = this._lkgvCache.get(source.id);
             if (prevData) {
                 const dashData = {};
@@ -353,7 +359,6 @@ class NetworkListenerService {
                 dashData.connectivity = 'Disconnected';
                 parsedData.data = { ...parsedData.data, ...dashData };
             }
-            // Pastikan ping_status tidak tertimpa garis putus-putus
             parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
         }
 
