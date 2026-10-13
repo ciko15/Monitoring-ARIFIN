@@ -759,15 +759,26 @@ class NetworkListenerService {
                 this._binaryTcpSockets = this._binaryTcpSockets || new Map();
                 this._binaryTcpSockets.set(id, socket);
 
-                // Kirim frame inisiasi sesi / trigger jika ada
+                // Kirim frame inisiasi sesi / trigger secara periodik untuk PMDT Juanda
                 if (moduleName === 'ils_mophien_llz') {
-                    try {
-                        const triggerCommand = Buffer.from([0x01, 0x02, 0xc5, 0x35, 0x17, 0x8b, 0x1a, 0x0e, 0x01, 0x03, 0xab, 0x39]);
-                        socket.write(triggerCommand);
-                        console.log(`[LLZ-TCP] Session trigger command sent to ${ip_address}:${port}`);
-                    } catch (err) {
-                        console.warn(`[LLZ-TCP] Trigger write warning: ${err.message}`);
-                    }
+                    const triggerCommand = Buffer.from([0x01, 0x02, 0xc5, 0x35, 0x17, 0x8b, 0x1a, 0x0e, 0x01, 0x03, 0xab, 0x39]);
+                    const sendTrigger = () => {
+                        if (socket && !socket.destroyed) {
+                            try {
+                                socket.write(triggerCommand);
+                            } catch (err) {
+                                console.warn(`[LLZ-TCP] Trigger write warning: ${err.message}`);
+                            }
+                        }
+                    };
+
+                    // Kirim trigger pertama saat konek
+                    sendTrigger();
+                    console.log(`[LLZ-TCP] Session trigger loop started for ${ip_address}:${port}`);
+
+                    // Ulangi kirim trigger setiap 3 detik agar alat terus menyemburkan paket live
+                    if (pollTimer) clearInterval(pollTimer);
+                    pollTimer = setInterval(sendTrigger, 3000);
                 }
 
                 // Emit status Normal dan data awal saat terkoneksi agar equipment langsung aktif di dashboard

@@ -53,7 +53,8 @@
       "SHELTER",
       "UPS",
       "GENSET",
-      "Power Meter"
+      "Power Meter",
+      "Radio Link"
     ]
   }
 ]
