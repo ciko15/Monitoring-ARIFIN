@@ -206,7 +206,7 @@ async function collectEquipmentData() {
                 try {
                     // Cek apakah equipment ini memiliki parsing_id khusus yang dipoll oleh network_listener
                     const auths = await db.getOtenticationByEquipment(item.id);
-                    const isHandledByNetworkListener = auths.some(src => 
+                    const isHandledByNetworkListener = auths.some((src: any) => 
                         src.is_active !== 0 && src.is_active !== false && src.is_active !== '0' &&
                         src.parsing_id && 
                         src.parsing_id !== 'ping_monitor' &&

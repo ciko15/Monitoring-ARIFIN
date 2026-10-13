@@ -872,6 +872,126 @@ class NetworkListenerService {
         console.log(`[NetworkListener] ILS persistent TCP worker active for ${name}`);
     }
 
+    /**
+     * Passive Sniffer untuk ILS Mophien LLZ Juanda.
+     * Menggunakan tshark untuk menyadap paket tanpa menghubunginya langsung (menghindari ECONNREFUSED),
+     * dengan auto-discovery antarmuka / fallback graceful jika tshark belum tersedia.
+     */
+    startIlsMophienSnifferListener(source) {
+        const { spawn } = require('child_process');
+        const fs = require('fs');
+        const { id, equipt_id, ip_address, tcp_port, parsing_id, name } = source;
+        const port = parseInt(tcp_port) || 38317;
+
+        let moduleName = this._getParserModule(parsing_id);
+        const ParserModule = require('../parsers/' + moduleName);
+        const parser = new ParserModule({ equipt_id });
+
+        console.log(`[LLZ-SNIFFER] Initializing passive packet sniffer for ${name} (${ip_address}:${port})...`);
+
+        let snifferProc = null;
+        let isStopped = false;
+        let restartTimer = null;
+
+        // Cari executable tshark di Windows atau Linux/macOS
+        const tsharkPaths = [
+            'C:\\Program Files\\Wireshark\\tshark.exe',
+            'C:\\Program Files (x86)\\Wireshark\\tshark.exe',
+            '/usr/bin/tshark',
+            '/usr/local/bin/tshark',
+            'tshark'
+        ];
+
+        let chosenTshark = 'tshark';
+        for (const p of tsharkPaths) {
+            if (p.includes('\\') || p.includes('/')) {
+                if (fs.existsSync(p)) {
+                    chosenTshark = p;
+                    break;
+                }
+            }
+        }
+
+        const runSniffer = () => {
+            if (isStopped) return;
+
+            // Filter paket: tangkap paket TCP port 38317 baik dari atau ke IP LLZ
+            const captureFilter = `tcp port ${port} and host ${ip_address}`;
+            const args = [
+                '-i', 'any', // dengarkan di semua interface yang aktif
+                '-f', captureFilter,
+                '-T', 'fields',
+                '-e', 'tcp.payload',
+                '-l' // line-buffered output
+            ];
+
+            try {
+                console.log(`[LLZ-SNIFFER] Spawning ${chosenTshark} with filter: "${captureFilter}"`);
+                snifferProc = spawn(chosenTshark, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+                this.activeListeners.add(id);
+
+                snifferProc.stdout.on('data', async (data) => {
+                    const output = data.toString().trim();
+                    if (!output) return;
+
+                    const lines = output.split('\n');
+                    for (let line of lines) {
+                        line = line.trim();
+                        if (!line) continue;
+
+                        const payloads = line.split(',');
+                        for (let hexStr of payloads) {
+                            hexStr = hexStr.replace(/[:\s]/g, '');
+                            if (hexStr.length >= 8 && hexStr.length % 2 === 0) {
+                                const chunk = Buffer.from(hexStr, 'hex');
+                                await this.handleIncomingData(source, chunk, parser);
+                            }
+                        }
+                    }
+                });
+
+                snifferProc.stderr.on('data', (data) => {
+                    const msg = data.toString();
+                    if (msg.includes('Capturing on') || msg.includes('Packets captured')) return;
+                    if (msg.toLowerCase().includes('error') || msg.toLowerCase().includes('invalid')) {
+                        console.warn(`[LLZ-SNIFFER] ${msg.trim()}`);
+                    }
+                });
+
+                snifferProc.on('error', (err) => {
+                    console.warn(`[LLZ-SNIFFER] TShark spawn error (${err.message}). Mencoba direct passive connection...`);
+                    // Jika tshark tidak ada di OS, fallback ke TCP client standar
+                    if (!isStopped) {
+                        this.startBinaryTcpListener(source);
+                    }
+                });
+
+                snifferProc.on('close', (code) => {
+                    if (!isStopped) {
+                        console.log(`[LLZ-SNIFFER] Sniffer process exited with code ${code}. Restarting in 5s...`);
+                        restartTimer = setTimeout(runSniffer, 5000);
+                    }
+                });
+
+            } catch (err) {
+                console.error(`[LLZ-SNIFFER] Execution error: ${err.message}. Fallback to TCP listener.`);
+                this.startBinaryTcpListener(source);
+            }
+        };
+
+        runSniffer();
+
+        this._binaryTcpCleanup = this._binaryTcpCleanup || new Map();
+        this._binaryTcpCleanup.set(id, () => {
+            isStopped = true;
+            if (restartTimer) clearTimeout(restartTimer);
+            if (snifferProc) {
+                try { snifferProc.kill(); } catch (e) {}
+            }
+        });
+    }
+
 
 
     /**
@@ -1705,8 +1825,15 @@ class NetworkListenerService {
             return;
         }
 
-        // ILS GP / LLZ — binary streaming TCP, bypass SOH/STX/ETX buffering
-        if (moduleName === 'ils_gp_thales421' || moduleName === 'ils_llz_thales421' || moduleName === 'ils_gp_normac' || moduleName === 'ils_gp_normac7030' || moduleName === 'ils_llz_normac' || moduleName === 'ils_llz_normac7030' || moduleName === 'ils_mm_normac' || moduleName === 'ils_mm_normac7030' || moduleName === 'ils_mophien_llz') {
+        // ILS Mophien LLZ Juanda — Passive Sniffer (tanpa connect langsung ke port yang sibuk)
+        if (moduleName === 'ils_mophien_llz') {
+            console.log(`[LLZ-TRACE] Routing ${source.name} to startIlsMophienSnifferListener`);
+            this.startIlsMophienSnifferListener(source);
+            return;
+        }
+
+        // ILS GP / LLZ Normac / Thales — binary streaming TCP, bypass SOH/STX/ETX buffering
+        if (moduleName === 'ils_gp_thales421' || moduleName === 'ils_llz_thales421' || moduleName === 'ils_gp_normac' || moduleName === 'ils_gp_normac7030' || moduleName === 'ils_llz_normac' || moduleName === 'ils_llz_normac7030' || moduleName === 'ils_mm_normac' || moduleName === 'ils_mm_normac7030') {
             console.log(`[LLZ-TRACE] Routing ${source.name} to startBinaryTcpListener`);
             this.startBinaryTcpListener(source);
             return;
