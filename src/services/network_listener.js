@@ -428,15 +428,18 @@ class NetworkListenerService {
             const sources = await db.getAllOtentication();
             console.log(`[NetworkListener] Found ${sources.length} total sources`);
 
-            // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal)
-            const PORTLESS_PARSERS = ['snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv_snmp', 'vhf_t6tv'];
+            // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal) atau memiliki default port internal
+            const PORTLESS_PARSERS = [
+                'snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv_snmp', 'vhf_t6tv',
+                'ils_mophien_llz', 'ils_gp_normac', 'ils_llz_normac'
+            ];
             const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 25;
             const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 1000;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             let startedCount = 0;
 
             for (const source of sources) {
-                // Start jika punya port ATAU parsing_id yang tidak butuh port
+                // Start jika punya port ATAU parsing_id yang memiliki default port / tidak butuh port
                 if (source.udp_port || source.tcp_port || PORTLESS_PARSERS.includes(source.parsing_id)) {
                     console.log(`[NetworkListener] Starting listener for ${source.name} (${source.parsing_id})`);
                     this.startListener(source); // Tidak di-await agar berjalan paralel dan tidak memblock loop
@@ -697,7 +700,7 @@ class NetworkListenerService {
     startBinaryTcpListener(source) {
         const net = require('net');
         const { id, equipt_id, ip_address, tcp_port, parsing_id, name } = source;
-        const port = parseInt(tcp_port) || 950;
+        const port = parseInt(tcp_port) || (parsing_id === 'ils_mophien_llz' ? 38317 : 950);
 
         // Petakan custom_id ke file js yang benar
         let moduleName = this._getParserModule(parsing_id);
@@ -710,32 +713,39 @@ class NetworkListenerService {
             typeof parser.getHeartbeatReply === 'function';
         const hasPollRequests = typeof parser.getPollRequests === 'function';
 
-        console.log(`[LLZ-TRACE] startBinaryTcpListener called for ${name} (${ip_address}:${port}), hasTriggerProtocol=${hasTriggerProtocol}, hasPollRequests=${hasPollRequests}`);
+        console.log(`[LLZ-TCP] Persistent worker initialized for ${name} (${ip_address}:${port}), module=${moduleName}`);
 
         let socket = null;
         let stopped = false;
         let reconnectTimer = null;
+        let pollTimer = null;
 
         const scheduleReconnect = () => {
             if (stopped || reconnectTimer) return;
+            // Backoff jeda 3 - 5 detik sesuai requirement
+            const delay = 3000 + Math.floor(Math.random() * 2000);
             reconnectTimer = setTimeout(() => {
                 reconnectTimer = null;
                 if (!stopped) {
-                    console.log(`[NetworkListener] Attempting to reconnect ILS binary TCP for ${name} (${ip_address}:${port})...`);
+                    console.log(`[LLZ-TCP] Attempting auto-reconnect for ${name} (${ip_address}:${port}) in backoff mode...`);
                     connect();
                 }
-            }, 5000);
+            }, delay);
         };
 
         const connect = () => {
             if (stopped) return;
-            socket = new net.Socket();
-            socket.setTimeout(60000); // 60s — heartbeat akan menjaga koneksi tetap hidup
+            if (socket) {
+                try { socket.destroy(); } catch (e) {}
+                socket = null;
+            }
 
-            let pollTimer = null;
+            socket = new net.Socket();
+            // 60s timeout agar stream tetap terjaga
+            socket.setTimeout(60000);
 
             socket.connect(port, ip_address, () => {
-                console.log(`[NetworkListener] ILS binary TCP connected: ${name} (${ip_address}:${port})`);
+                console.log(`[LLZ-TCP] Connected to ${name} (${ip_address}:${port})`);
                 if (reconnectTimer) {
                     clearTimeout(reconnectTimer);
                     reconnectTimer = null;
@@ -743,6 +753,17 @@ class NetworkListenerService {
                 this.activeListeners.add(id);
                 this._binaryTcpSockets = this._binaryTcpSockets || new Map();
                 this._binaryTcpSockets.set(id, socket);
+
+                // Kirim frame inisiasi sesi / trigger jika ada
+                if (moduleName === 'ils_mophien_llz') {
+                    try {
+                        const triggerCommand = Buffer.from([0x01, 0x02, 0xc5, 0x35, 0x17, 0x8b, 0x1a, 0x0e, 0x01, 0x03, 0xab, 0x39]);
+                        socket.write(triggerCommand);
+                        console.log(`[LLZ-TCP] Session trigger command sent to ${ip_address}:${port}`);
+                    } catch (err) {
+                        console.warn(`[LLZ-TCP] Trigger write warning: ${err.message}`);
+                    }
+                }
 
                 // Emit status Normal dan data awal saat terkoneksi agar equipment langsung aktif di dashboard
                 try {
@@ -757,7 +778,7 @@ class NetworkListenerService {
                     }
                 } catch (e) {}
 
-                // Kirim trigger secara berkala agar aliran data tidak terputus walau direbut ADRACS
+                // Kirim trigger secara berkala jika parser mendukung poll requests atau heartbeat
                 if (hasTriggerProtocol || hasPollRequests) {
                     const doPoll = () => {
                         let triggerReqs = [];
@@ -777,7 +798,7 @@ class NetworkListenerService {
                         }
                     };
                     doPoll();
-                    pollTimer = setInterval(doPoll, 5000); // Paksa minta data tiap 5 detik
+                    pollTimer = setInterval(doPoll, 5000);
                 }
             });
 
@@ -785,9 +806,10 @@ class NetworkListenerService {
 
             socket.on('data', async (chunk) => {
                 if (moduleName === 'ils_mophien_llz') {
-                    console.log(`[ILS Mophien LLZ] Received ${chunk.length} bytes from ${name}: ${chunk.slice(0, 32).toString('hex')}...`);
+                    console.log(`[LLZ-TCP] Received ${chunk.length} bytes from ${name}: ${chunk.slice(0, 32).toString('hex')}...`);
                 }
-                // Balas heartbeat dari device agar stream tetap hidup tanpa RCMS (max 1x per 5 detik untuk mencegah ping-pong storm)
+
+                // Balas heartbeat dari device agar stream tetap hidup tanpa RCMS
                 if (hasTriggerProtocol && parser.isHeartbeat(chunk)) {
                     const lastReply = this._lastHeartbeatReply.get(id) || 0;
                     if (Date.now() - lastReply > 5000) {
@@ -799,6 +821,8 @@ class NetworkListenerService {
                         }
                     }
                 }
+
+                // Alirkan chunk mentah langsung ke parser & handler log/WebSocket
                 await this.handleIncomingData(source, chunk, parser);
             });
 
@@ -807,20 +831,26 @@ class NetworkListenerService {
             };
 
             socket.on('error', (err) => {
-                this._logThrottled('error', `ils:error:${id}:${err.message}`, `[NetworkListener] ILS binary TCP error ${name}: ${err.message}`);
+                console.warn(`[LLZ-TCP] Socket error for ${name} (${ip_address}:${port}): ${err.message}`);
+                this._logThrottled('error', `ils:error:${id}:${err.message}`, `[LLZ-TCP] Error ${name}: ${err.message}`);
                 reportDisconnect(err.message);
+                if (socket) {
+                    try { socket.destroy(); } catch (e) {}
+                }
                 scheduleReconnect();
             });
 
             socket.on('timeout', () => {
-                this._logThrottled('warn', `ils:timeout:${id}`, `[NetworkListener] ILS binary TCP timeout ${name}, reconnecting...`);
+                this._logThrottled('warn', `ils:timeout:${id}`, `[LLZ-TCP] Timeout ${name} (${ip_address}:${port}), reconnecting...`);
                 reportDisconnect('timeout');
-                socket.destroy();
+                if (socket) {
+                    try { socket.destroy(); } catch (e) {}
+                }
                 scheduleReconnect();
             });
 
             socket.on('close', () => {
-                this._logThrottled('log', `ils:close:${id}`, `[NetworkListener] ILS binary TCP disconnected ${name}, will reconnect in 5s...`);
+                console.log(`[LLZ-TCP] Connection closed for ${name} (${ip_address}:${port}). Auto-reconnecting...`);
                 reportDisconnect('close');
                 if (pollTimer) clearInterval(pollTimer);
                 this.activeListeners.delete(id);
@@ -834,11 +864,12 @@ class NetworkListenerService {
         this._binaryTcpCleanup = this._binaryTcpCleanup || new Map();
         this._binaryTcpCleanup.set(id, () => {
             stopped = true;
+            if (pollTimer) clearInterval(pollTimer);
             if (reconnectTimer) clearTimeout(reconnectTimer);
             if (socket) socket.destroy();
         });
 
-        console.log(`[NetworkListener] ILS binary TCP listener started for ${name}`);
+        console.log(`[NetworkListener] ILS persistent TCP worker active for ${name}`);
     }
 
 
