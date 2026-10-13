@@ -1521,6 +1521,12 @@
         const parserId = src ? src.parsing_id : (data._parsing_id || null);
         const effectiveParserId = parserId || currentActiveParserId || window.currentDetailParserId || null;
         const targetSup = supCategory || (src && (src.category || src.sup_category)) || '';
+        // Daftar key atau properti internal/array yang TIDAK boleh masuk ke grid kartu utama
+        const IGNORED_ROOT_KEYS = new Set([
+            'raw', 'timestamp', 'triggeredparams', 'alarms', 'warnings', 
+            '_amv_txs_rows', '_amv_rxs_rows', '_bit_esc_rows', '_radio_rows',
+            'temperature_sensors'
+        ]);
 
         // 1. Ekstrak grup bertingkat dan flat items secara adaptif
         const groups = {};
@@ -1532,46 +1538,47 @@
 
         // Helper untuk ekstrak unit bawaan
         const getUnitFor = (key, parentGroupObj = null) => {
-            // Cek unit di grup lokal atau root data
             if (parentGroupObj && parentGroupObj[`${key}_unit`]) return parentGroupObj[`${key}_unit`];
             if (data[`${key}_unit`]) return data[`${key}_unit`];
-            // Cek di template config
             const p = tmplParams.find(tp => (tp.name === key || tp.label === key));
             return p?.unit || '';
         };
 
+        // Kumpulkan keys yang sudah masuk ke dalam salah satu nested group
+        const groupedParamKeys = new Set();
+        Object.entries(data).forEach(([key, val]) => {
+            if (typeof val === 'object' && val !== null && !Array.isArray(val) && !key.startsWith('_')) {
+                Object.keys(val).forEach(k => groupedParamKeys.add(k));
+            }
+        });
+
         // Iterasi properti data
         Object.entries(data).forEach(([key, val]) => {
-            if (key.startsWith('_') || key.endsWith('_unit') || isMetricPlaceholder(val)) return;
+            const lowerK = key.toLowerCase();
+            if (key.startsWith('_') || key.endsWith('_unit') || IGNORED_ROOT_KEYS.has(lowerK) || isMetricPlaceholder(val)) return;
 
             if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
                 // Nested Object -> Grup
                 const subItems = {};
                 Object.entries(val).forEach(([subK, subV]) => {
-                    if (subK.startsWith('_') || subK.endsWith('_unit') || isMetricPlaceholder(subV)) return;
+                    const subLower = subK.toLowerCase();
+                    if (subK.startsWith('_') || subK.endsWith('_unit') || IGNORED_ROOT_KEYS.has(subLower) || Array.isArray(subV) || isMetricPlaceholder(subV)) return;
                     subItems[subK] = subV;
                 });
                 if (Object.keys(subItems).length > 0) {
                     groups[key] = { items: subItems, rawGroup: val };
                 }
             } else {
-                flatItems[key] = val;
+                // Abaikan flat item jika key tersebut sudah dimasukkan ke salah satu nested group
+                if (!groupedParamKeys.has(key)) {
+                    flatItems[key] = val;
+                }
             }
         });
 
-        // Kumpulkan parameter flat tanpa grup ke dalam grup default
+        // Kumpulkan parameter flat tanpa grup ke dalam grup default jika ada
         if (Object.keys(flatItems).length > 0) {
             groups['TELEMETRY / PARAMETER'] = { items: flatItems, rawGroup: data };
-        }
-
-        // Tampilkan telemetry table rows jika tersedia (seperti PMDT Juanda / DME / DVOR)
-        const extraRows = data._amv_txs_rows || [];
-        if (extraRows.length > 0) {
-            const extraObj = {};
-            extraRows.forEach(r => {
-                if (r && r[0]) extraObj[r[0]] = r[1];
-            });
-            groups['REGISTER TELEMETRY'] = { items: extraObj, rawGroup: extraObj };
         }
 
         // Jika tidak ada data yang bisa ditampilkan

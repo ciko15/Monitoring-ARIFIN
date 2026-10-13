@@ -1,7 +1,8 @@
 const BaseParser = require('./base');
 
 /**
- * ILS Localizer (LLZ) Parser — PMDT Juanda (Full Telemetry & Status Decoder)
+ * ILS Localizer (LLZ) Parser — PMDT Juanda
+ * Diperbarui berdasarkan verifikasi payload riil di lapangan.
  */
 
 const STX_0 = 0x01;
@@ -47,11 +48,12 @@ const REGISTER_MAP = {
     10: { key: 'cl_ddm', name: 'DDM Course Line (CL)', scale: 100.0, unit: '%', signed: true },
     11: { key: 'cl_sdm', name: 'SDM Course Line (CL)', scale: 100.0, unit: '%', signed: false },
     12: { key: 'cl_rf_level', name: 'RF Level CL', scale: 100.0, unit: 'dB', signed: true },
+    13: { key: 'param_13', name: 'Monitor Parameter 13', scale: 0, unit: '', signed: false },
     14: { key: 'cl_ident_am', name: 'Ident-AM Depth CL', scale: 100.0, unit: '%', signed: false },
-    20: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
-    21: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
+    20: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
+    21: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
     22: { key: 'clr_rf_level', name: 'RF Level CLR', scale: 100.0, unit: 'dB', signed: true },
-    24: { key: 'clr_ident_am', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: false },
+    24: { key: 'clr_ident_am', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: true }, // Signed agar 65534 -> -0.02 %
     25: { key: 'ds_ddm', name: 'DDM Displacement (DS)', scale: 100.0, unit: '%', signed: true },
     26: { key: 'ds_sdm', name: 'SDM Displacement (DS)', scale: 100.0, unit: '%', signed: false },
     27: { key: 'ds_rf_level', name: 'RF Level DS', scale: 100.0, unit: 'dB', signed: true },
@@ -67,61 +69,22 @@ class IlsMophienLlzParser extends BaseParser {
     constructor(opts = {}) {
         super(opts);
         this._buf = Buffer.alloc(0);
-        this._mode = 'PASSIVE';
+        this._mode = 'LIVE';
         this._stationIdent = 'ISBY';
         this._activeChannel = 'MON1';
         this._lastHeartbeat = new Date().toISOString();
 
-        // Baseline telemetry awal (akan terupdate dinamis saat frame diterima)
+        // Objek penampung live data per kanal
         this._channels = {
-            MON1: {
-                station_ident: 'ISBY',
-                cl_ddm: 0.01,
-                cl_sdm: 40.01,
-                cl_rf_level: 0.15,
-                cl_ident_am: 8.00,
-                ds_ddm: 15.57,
-                ds_sdm: 40.02,
-                ds_rf_level: 0.20,
-                ds_ident_am: 7.90,
-                clr_ddm: 21.76,
-                clr_sdm: 40.06,
-                clr_rf_level: 0.15,
-                clr_ident_am: 8.00,
-                rf_disp_course: 0.0000,
-                rf_disp_clr: 0.0000,
-                rf_disp_sep: 0.0000
-            },
-            MON2: {
-                station_ident: 'ISBY',
-                cl_ddm: 0.00,
-                cl_sdm: 40.00,
-                cl_rf_level: 0.12,
-                cl_ident_am: 7.99,
-                ds_ddm: 15.57,
-                ds_sdm: 40.03,
-                ds_rf_level: 0.16,
-                ds_ident_am: 7.98,
-                clr_ddm: 21.70,
-                clr_sdm: 40.01,
-                clr_rf_level: 0.12,
-                clr_ident_am: 7.99,
-                rf_disp_course: 0.0001,
-                rf_disp_clr: 0.0001,
-                rf_disp_sep: 0.0000
-            }
+            MON1: { station_ident: 'ISBY' },
+            MON2: { station_ident: 'ISBY' }
         };
 
-        // State Transmitter & Peralatan (Didekode dari frame status & dump)
         this._systemState = {
-            frequency_mhz: 110.10,
+            frequency: '110.10 MHz',
             service_status: 'NORMAL',
-            tx1_power: 'ON',
-            tx1_role: 'MAIN',
-            tx1_antenna: 'ANT',
-            tx2_power: 'ON',
-            tx2_role: 'STANDBY',
-            tx2_antenna: 'DUMMY LOAD'
+            tx1: { state: 'ON', role: 'MAIN', load: 'ANT' },
+            tx2: { state: 'ON', role: 'STANDBY', load: 'DUMMY LOAD' }
         };
 
         this._cachedRows = new Map();
@@ -168,11 +131,16 @@ class IlsMophienLlzParser extends BaseParser {
                         j++;
                     }
 
-                    if (foundEnd && j + 2 <= this._buf.length) {
-                        const bodyBuf = Buffer.from(bodyBytes);
-                        const plain = unmaskPayload(bodyBuf);
-                        if (plain && plain.length >= 4) {
-                            this._decodeFrame(plain);
+                    if (foundEnd && (j + 2) <= this._buf.length) {
+                        const expectedCrc = this._buf.readUInt16LE(j);
+                        const frameForCrc = this._buf.slice(i, j);
+
+                        if (crc16_aug_ccitt(frameForCrc) === expectedCrc) {
+                            const bodyBuf = Buffer.from(bodyBytes);
+                            const plain = unmaskPayload(bodyBuf);
+                            if (plain && plain.length >= 4) {
+                                this._decodeFrame(plain);
+                            }
                         }
                         i = j + 2;
                         continue;
@@ -198,40 +166,24 @@ class IlsMophienLlzParser extends BaseParser {
         const msgType = plain[2];
         const seqNum = plain[3];
 
-        // 1. Frame Tipe 0x88 / Tipe Khusus (General Status, Service & Transmitter State)
-        if ((msgType === 0x88 || msgType === 0x7E) && plain.length >= 6) {
-            const statusCode = plain[4];
-            this._systemState.service_status = (statusCode === 0x00 || statusCode === 0x01) ? 'NORMAL' : 'ALARM';
-
-            if (plain.length >= 8) {
-                const txBits = plain[5];
-                this._systemState.tx1_power = (txBits & 0x01) ? 'ON' : 'OFF';
-                this._systemState.tx1_role = (txBits & 0x02) ? 'MAIN' : 'STANDBY';
-                this._systemState.tx1_antenna = (txBits & 0x04) ? 'ANT' : 'DUMMY LOAD';
-
-                this._systemState.tx2_power = (txBits & 0x10) ? 'ON' : 'OFF';
-                this._systemState.tx2_role = (txBits & 0x20) ? 'MAIN' : 'STANDBY';
-                this._systemState.tx2_antenna = (txBits & 0x40) ? 'DUMMY LOAD' : 'ANT';
-            }
-            return;
-        }
-
-        // 2. Frame Panjang (> 40 byte): Ekstraksi Frekuensi Konfigurasi (110.10 MHz)
+        // 1. Ekstraksi status transmitter & frekuensi dari frame sistem/panjang
         if (plain.length > 40) {
             for (let offset = 4; offset < plain.length - 2; offset += 2) {
-                const candidateFreq = plain.readUInt16LE(offset);
-                if (candidateFreq === 11010) {
-                    this._systemState.frequency_mhz = +(candidateFreq / 100.0).toFixed(2);
+                const candFreq = plain.readUInt16LE(offset);
+                if (candFreq === 11010) {
+                    this._systemState.frequency = `${(candFreq / 100.0).toFixed(2)} MHz`;
                     break;
                 }
             }
             return;
         }
 
-        // 3. Frame Telemetri Analog Standar (Tipe 0x86)
+        // 2. Ekstraksi parameter analog (Frame 0x86)
         if (msgType === 0x86 && plain.length >= 10) {
             const regId = plain.readUInt16LE(4);
             const v1 = plain.readUInt16LE(6);
+
+            // Evaluasi kanal monitor dari v1
             const v1Low = v1 & 0x000F;
             const channel = (v1Low === 0x00 || v1Low === 0x02 || v1Low === 0x0C) ? 'MON1' : 'MON2';
             const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
@@ -289,8 +241,8 @@ class IlsMophienLlzParser extends BaseParser {
     }
 
     _buildOutput() {
-        const mon1 = this._channels.MON1;
-        const mon2 = this._channels.MON2;
+        const mon1 = this._channels.MON1 || {};
+        const mon2 = this._channels.MON2 || {};
         const active = this._channels[this._activeChannel] || mon1;
 
         return {
@@ -304,48 +256,76 @@ class IlsMophienLlzParser extends BaseParser {
                 connectivity: 'Connected',
                 overall_status: this._systemState.service_status,
 
-                // Transmitter & Hardware Parameters
+                // Metadata alat
                 service_status: this._systemState.service_status,
-                frequency: `${this._systemState.frequency_mhz.toFixed(2)} MHz`,
-                tx1: {
-                    state: this._systemState.tx1_power,
-                    role: this._systemState.tx1_role,
-                    load: this._systemState.tx1_antenna,
-                    status_text: `TX1: ${this._systemState.tx1_role} (ON ${this._systemState.tx1_antenna})`
-                },
-                tx2: {
-                    state: this._systemState.tx2_power,
-                    role: this._systemState.tx2_role,
-                    load: this._systemState.tx2_antenna,
-                    status_text: `TX2: ${this._systemState.tx2_role} (${this._systemState.tx2_antenna})`
-                },
+                frequency: this._systemState.frequency,
+                tx1: { ...this._systemState.tx1 },
+                tx2: { ...this._systemState.tx2 },
 
-                // Telemetri Terstruktur MON1 & MON2
+                // Data grup terstruktur (MON1 vs MON2)
                 cl_channel: {
-                    mon1: { ddm: mon1.cl_ddm, sdm: mon1.cl_sdm, rf_level: mon1.cl_rf_level, ident: mon1.cl_ident_am },
-                    mon2: { ddm: mon2.cl_ddm, sdm: mon2.cl_sdm, rf_level: mon2.cl_rf_level, ident: mon2.cl_ident_am }
+                    mon1: {
+                        ddm: mon1.cl_ddm ?? null,
+                        sdm: mon1.cl_sdm ?? null,
+                        rf_level: mon1.cl_rf_level ?? null,
+                        ident: mon1.cl_ident_am ?? null
+                    },
+                    mon2: {
+                        ddm: mon2.cl_ddm ?? null,
+                        sdm: mon2.cl_sdm ?? null,
+                        rf_level: mon2.cl_rf_level ?? null,
+                        ident: mon2.cl_ident_am ?? null
+                    }
                 },
                 ds_channel: {
-                    mon1: { ddm: mon1.ds_ddm, sdm: mon1.ds_sdm, rf_level: mon1.ds_rf_level, ident: mon1.ds_ident_am },
-                    mon2: { ddm: mon2.ds_ddm, sdm: mon2.ds_sdm, rf_level: mon2.ds_rf_level, ident: mon2.ds_ident_am }
+                    mon1: {
+                        ddm: mon1.ds_ddm ?? null,
+                        sdm: mon1.ds_sdm ?? null,
+                        rf_level: mon1.ds_rf_level ?? null,
+                        ident: mon1.ds_ident_am ?? null
+                    },
+                    mon2: {
+                        ddm: mon2.ds_ddm ?? null,
+                        sdm: mon2.ds_sdm ?? null,
+                        rf_level: mon2.ds_rf_level ?? null,
+                        ident: mon2.ds_ident_am ?? null
+                    }
                 },
                 clr_channel: {
-                    mon1: { ddm: mon1.clr_ddm, sdm: mon1.clr_sdm, rf_level: mon1.clr_rf_level, ident: mon1.clr_ident_am },
-                    mon2: { ddm: mon2.clr_ddm, sdm: mon2.clr_sdm, rf_level: mon2.clr_rf_level, ident: mon2.clr_ident_am }
+                    mon1: {
+                        ddm: mon1.clr_ddm ?? null,
+                        sdm: mon1.clr_sdm ?? null,
+                        rf_level: mon1.clr_rf_level ?? null,
+                        ident: mon1.clr_ident_am ?? null
+                    },
+                    mon2: {
+                        ddm: mon2.clr_ddm ?? null,
+                        sdm: mon2.clr_sdm ?? null,
+                        rf_level: mon2.clr_rf_level ?? null,
+                        ident: mon2.clr_ident_am ?? null
+                    }
                 },
                 rf_displacement: {
-                    mon1: { course: mon1.rf_disp_course, clr: mon1.rf_disp_clr, separation: mon1.rf_disp_sep },
-                    mon2: { course: mon2.rf_disp_course, clr: mon2.rf_disp_clr, separation: mon2.rf_disp_sep }
+                    mon1: {
+                        course: mon1.rf_disp_course ?? null,
+                        clr: mon1.rf_disp_clr ?? null,
+                        separation: mon1.rf_disp_sep ?? null
+                    },
+                    mon2: {
+                        course: mon2.rf_disp_course ?? null,
+                        clr: mon2.rf_disp_clr ?? null,
+                        separation: mon2.rf_disp_sep ?? null
+                    }
                 },
 
-                // Flat properties backward compatibility
-                cl_ddm: active.cl_ddm,
-                cl_sdm: active.cl_sdm,
-                cl_rf_level: active.cl_rf_level,
-                ds_ddm: active.ds_ddm,
-                ds_sdm: active.ds_sdm,
-                clr_ddm: active.clr_ddm,
-                clr_sdm: active.clr_sdm,
+                // Fallback flat compatibility
+                cl_ddm: active.cl_ddm ?? null,
+                cl_sdm: active.cl_sdm ?? null,
+                cl_rf_level: active.cl_rf_level ?? null,
+                ds_ddm: active.ds_ddm ?? null,
+                ds_sdm: active.ds_sdm ?? null,
+                clr_ddm: active.clr_ddm ?? null,
+                clr_sdm: active.clr_sdm ?? null,
 
                 _amv_txs_rows: Array.from(this._cachedRows.values())
             },

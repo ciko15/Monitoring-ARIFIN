@@ -265,6 +265,34 @@ class VhfT6tvSnmpCollector extends EventEmitter {
             ...amvTxRaw.map(x => [`Raw Field ${x.index}`, x.value !== undefined ? String(x.value) : '—'])
         ];
 
+        const systemAndStatus = {
+            model: byOid[OID.model] || '—',
+            equipment: byOid[OID.equipment] || '—',
+            serial_number: byOid[OID.serialNumber] || '—',
+            software_version: byOid[OID.softwareInstalled] || '—',
+            tx_frequency_mhz: txFrequencyMhz,
+            overall_status: status,
+            elapsed_time: byOid[OID.elapsedTime] || '—'
+        };
+
+        const transmitterMetrics = {
+            tx_enabled: byOid[OID.txEnabled] === 1 ? 'Enabled' : 'Disabled',
+            tx_active: byOid[OID.txActive] === 1 ? 'Active' : 'Standby',
+            pa_status: byOid[OID.paStatus] === 1 ? 'OK' : 'Fault',
+            antenna_status: byOid[OID.antennaStatus] === 0 ? 'OK' : 'Alert',
+            vswr_alarm: byOid[OID.vswrAlarm] === 0 ? 'Normal' : 'Alert',
+            duty_cycle_alarm: byOid[OID.dutyCycleAlarm] === 0 ? 'Normal' : 'Alert',
+            fwd_power: byOid[OID.txPowerLevel] !== undefined ? String(byOid[OID.txPowerLevel]) : '—',
+            mod_level: byOid[OID.modError] !== undefined ? String(byOid[OID.modError]) : '—'
+        };
+
+        const amVoiceParameters = {
+            rf_power_watts: amvTxConfirmed.rf_power_watts !== undefined ? String(amvTxConfirmed.rf_power_watts) : '—',
+            modulation_depth: amvTxConfirmed.modulation_depth !== undefined ? String(amvTxConfirmed.modulation_depth) : '—',
+            ptt_ref_voltage: amvTxConfirmed.ptt_ref_voltage !== undefined ? String(amvTxConfirmed.ptt_ref_voltage) : '—',
+            tone_keying_freq: amvTxConfirmed.tone_keying_freq !== undefined ? String(amvTxConfirmed.tone_keying_freq) : '—'
+        };
+
         const flat = {
             // ── SYSTEM INFO ──
             model: byOid[OID.model] || '—',
@@ -312,12 +340,6 @@ class VhfT6tvSnmpCollector extends EventEmitter {
             rx_freq:      '—',
             squelch_state:'—',
 
-            // ── RAW ROWS (Wajib ada untuk sidebar enhancements.js) ──
-            _amv_txs_rows: amvTxsRows,
-            _amv_rxs_rows: [],
-            _bit_esc_rows: bitEscRows,
-            _radio_rows:   [],
-            
             // ── EXTRA (Khusus SNMP) ──
             tx_frequency_mhz: txFrequencyMhz,
             tx_faults: byOid[OID.txFaults],
@@ -326,7 +348,18 @@ class VhfT6tvSnmpCollector extends EventEmitter {
             pa_status: byOid[OID.paStatus] === 1 ? 'OK' : 'Fault',
             antenna_status: byOid[OID.antennaStatus] === 0 ? 'OK' : 'Alert',
             vswr_alarm: byOid[OID.vswrAlarm] === 0 ? 'Normal' : 'Alert',
-            duty_cycle_alarm: byOid[OID.dutyCycleAlarm] === 0 ? 'Normal' : 'Alert'
+            duty_cycle_alarm: byOid[OID.dutyCycleAlarm] === 0 ? 'Normal' : 'Alert',
+
+            // ── RAW ROWS (Wajib ada untuk sidebar enhancements.js) ──
+            _amv_txs_rows: amvTxsRows,
+            _amv_rxs_rows: [],
+            _bit_esc_rows: bitEscRows,
+            _radio_rows:   [],
+
+            // ── NESTED CATEGORIES FOR UNIVERSAL MODAL ──
+            'SYSTEM & STATUS': systemAndStatus,
+            'TRANSMITTER METRICS': transmitterMetrics,
+            'AM VOICE PARAMETERS': amVoiceParameters
         };
 
         return {

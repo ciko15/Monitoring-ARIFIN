@@ -322,48 +322,101 @@ async function pollSNMP(host, community = 'public', options = {}) {
             : 'Normal';
         const status = worstStatus(s_cpu, s_ram, s_disk, s_temp);
 
+        function buildStructuredSystemData(raw) {
+            return {
+                // Backward-compatibility: Root-level flat properties
+                ...raw,
+
+                // Nested categories per request
+                'SISTEM': {
+                    connectivity: raw.connectivity,
+                    sys_name: raw.sys_name,
+                    sys_descr: raw.sys_descr,
+                    hardware: raw.hardware,
+                    operating_system: raw.operating_system,
+                    sys_uptime: raw.sys_uptime,
+                    sys_contact: raw.sys_contact,
+                    sys_location: raw.sys_location
+                },
+                'CPU': {
+                    cpu_usage: raw.cpu_usage,
+                    processor_count: raw.processor_count
+                },
+                'TEMPERATURE': {
+                    temperature_c: raw.temperature_c,
+                    temperature_sensor_name: raw.temperature_sensor_name,
+                    temperature_sensor_count: raw.temperature_sensor_count
+                },
+                'MEMORY (RAM)': {
+                    ram_total_mb: raw.ram_total_mb,
+                    ram_used_mb: raw.ram_used_mb,
+                    ram_available_mb: raw.ram_available_mb,
+                    ram_usage_pct: raw.ram_usage_pct,
+                    ram_available_pct: raw.ram_available_pct
+                },
+                'MEMORY (PHYSICAL / VIRTUAL / SWAP)': {
+                    physical_memory_total_mb: raw.physical_memory_total_mb,
+                    physical_memory_usage_pct: raw.physical_memory_usage_pct,
+                    virtual_memory_total_mb: raw.virtual_memory_total_mb,
+                    virtual_memory_usage_pct: raw.virtual_memory_usage_pct,
+                    swap_total_mb: raw.swap_total_mb,
+                    swap_used_mb: raw.swap_used_mb,
+                    memory_buffers_mb: raw.memory_buffers_mb,
+                    cached_memory_mb: raw.cached_memory_mb,
+                    shared_memory_mb: raw.shared_memory_mb
+                },
+                'DISK': {
+                    disk_total_gb: raw.disk_total_gb,
+                    disk_used_gb: raw.disk_used_gb,
+                    disk_usage_pct: raw.disk_usage_pct
+                }
+            };
+        }
+
+        const rawData = {
+            connectivity: 'Connected',
+            resolved_ip: host,
+            sys_name: String(sysName || '—'),
+            sys_descr: String(sysDescr || '—').substring(0, 80),
+            hardware: parseHardware(sysDescr),
+            operating_system: parseOperatingSystem(sysDescr),
+            sys_object_id: Array.isArray(sysObjectID) ? sysObjectID.join('.') : String(sysObjectID || '—'),
+            sys_contact: String(sysContact || '—'),
+            sys_location: String(sysLocation || '—'),
+            sys_uptime: sysUpRaw !== null ? formatUptime(sysUpRaw) : '—',
+            processor_count,
+            cpu_usage: cpu_pct !== null ? cpu_pct.toFixed(1) : '—',
+            ram_total_mb: ram_total_final !== null ? ram_total_final.toFixed(0) : '—',
+            ram_used_mb: ram_used_final !== null ? ram_used_final.toFixed(0) : '—',
+            ram_usage_pct: ram_pct !== null ? ram_pct.toFixed(1) : '—',
+            ram_available_mb: ram_available_mb !== null ? ram_available_mb.toFixed(0) : '—',
+            ram_available_pct: ram_available_pct !== null ? ram_available_pct.toFixed(1) : '—',
+            physical_memory_total_mb: memTotalRealMbRaw !== null ? memTotalRealMbRaw.toFixed(0) : '—',
+            physical_memory_used_mb: memUsedRealMbRaw !== null ? memUsedRealMbRaw.toFixed(0) : '—',
+            physical_memory_usage_pct: memRealPctRaw !== null ? memRealPctRaw.toFixed(1) : '—',
+            virtual_memory_total_mb: memTotalSwapMb !== null ? memTotalSwapMb.toFixed(0) : '—',
+            virtual_memory_used_mb: memUsedSwapMb !== null ? memUsedSwapMb.toFixed(0) : '—',
+            virtual_memory_usage_pct: memSwapPct !== null ? memSwapPct.toFixed(1) : '—',
+            memory_buffers_mb: memBufferKb !== null ? (Number(memBufferKb) / 1024).toFixed(1) : '—',
+            cached_memory_mb: memCachedKb !== null ? (Number(memCachedKb) / 1024).toFixed(1) : '—',
+            shared_memory_mb: memSharedKb !== null ? (Number(memSharedKb) / 1024).toFixed(1) : '—',
+            swap_total_mb: memTotalSwapMb !== null ? memTotalSwapMb.toFixed(0) : '—',
+            swap_used_mb: memUsedSwapMb !== null ? memUsedSwapMb.toFixed(0) : '—',
+            swap_usage_pct: memSwapPct !== null ? memSwapPct.toFixed(1) : '—',
+            disk_total_gb: disk_total_gb !== null ? disk_total_gb.toFixed(1) : '—',
+            disk_used_gb: disk_used_gb !== null ? disk_used_gb.toFixed(1) : '—',
+            disk_usage_pct: disk_pct !== null ? disk_pct.toFixed(1) : '—',
+            temperature_c: tempInfo.hottest ? tempInfo.hottest.value_c.toFixed(1) : '—',
+            temperature_sensor_name: tempInfo.hottest ? tempInfo.hottest.name : '—',
+            temperature_sensor_count: String(temperatureSensors.length),
+            temperature_sensors: temperatureSensors,
+        };
+
         session.close();
         return {
             success: true,
             status,
-            data: {
-                connectivity: 'Connected',
-                resolved_ip: host,
-                sys_name: String(sysName || '—'),
-                sys_descr: String(sysDescr || '—').substring(0, 80),
-                hardware: parseHardware(sysDescr),
-                operating_system: parseOperatingSystem(sysDescr),
-                sys_object_id: Array.isArray(sysObjectID) ? sysObjectID.join('.') : String(sysObjectID || '—'),
-                sys_contact: String(sysContact || '—'),
-                sys_location: String(sysLocation || '—'),
-                sys_uptime: sysUpRaw !== null ? formatUptime(sysUpRaw) : '—',
-                processor_count,
-                cpu_usage: cpu_pct !== null ? cpu_pct.toFixed(1) : '—',
-                ram_total_mb: ram_total_final !== null ? ram_total_final.toFixed(0) : '—',
-                ram_used_mb: ram_used_final !== null ? ram_used_final.toFixed(0) : '—',
-                ram_usage_pct: ram_pct !== null ? ram_pct.toFixed(1) : '—',
-                ram_available_mb: ram_available_mb !== null ? ram_available_mb.toFixed(0) : '—',
-                ram_available_pct: ram_available_pct !== null ? ram_available_pct.toFixed(1) : '—',
-                physical_memory_total_mb: memTotalRealMbRaw !== null ? memTotalRealMbRaw.toFixed(0) : '—',
-                physical_memory_used_mb: memUsedRealMbRaw !== null ? memUsedRealMbRaw.toFixed(0) : '—',
-                physical_memory_usage_pct: memRealPctRaw !== null ? memRealPctRaw.toFixed(1) : '—',
-                virtual_memory_total_mb: memTotalSwapMb !== null ? memTotalSwapMb.toFixed(0) : '—',
-                virtual_memory_used_mb: memUsedSwapMb !== null ? memUsedSwapMb.toFixed(0) : '—',
-                virtual_memory_usage_pct: memSwapPct !== null ? memSwapPct.toFixed(1) : '—',
-                memory_buffers_mb: memBufferKb !== null ? (Number(memBufferKb) / 1024).toFixed(1) : '—',
-                cached_memory_mb: memCachedKb !== null ? (Number(memCachedKb) / 1024).toFixed(1) : '—',
-                shared_memory_mb: memSharedKb !== null ? (Number(memSharedKb) / 1024).toFixed(1) : '—',
-                swap_total_mb: memTotalSwapMb !== null ? memTotalSwapMb.toFixed(0) : '—',
-                swap_used_mb: memUsedSwapMb !== null ? memUsedSwapMb.toFixed(0) : '—',
-                swap_usage_pct: memSwapPct !== null ? memSwapPct.toFixed(1) : '—',
-                disk_total_gb: disk_total_gb !== null ? disk_total_gb.toFixed(1) : '—',
-                disk_used_gb: disk_used_gb !== null ? disk_used_gb.toFixed(1) : '—',
-                disk_usage_pct: disk_pct !== null ? disk_pct.toFixed(1) : '—',
-                temperature_c: tempInfo.hottest ? tempInfo.hottest.value_c.toFixed(1) : '—',
-                temperature_sensor_name: tempInfo.hottest ? tempInfo.hottest.name : '—',
-                temperature_sensor_count: String(temperatureSensors.length),
-                temperature_sensors: temperatureSensors,
-            },
+            data: buildStructuredSystemData(rawData),
             alarms: status === 'Alarm' ? ['Resource usage critical or temperature high'] : [],
             warnings: status === 'Warning' ? ['Resource usage high or temperature elevated'] : [],
             triggeredParams: [],
@@ -372,26 +425,61 @@ async function pollSNMP(host, community = 'public', options = {}) {
 
     } catch (err) {
         try { session.close(); } catch (e) { }
+        const fallbackRaw = {
+            connectivity: 'Disconnected',
+            resolved_ip: host,
+            sys_name: '—', sys_descr: '—', sys_uptime: '—',
+            hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
+            processor_count: '—',
+            cpu_usage: '—',
+            ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+            ram_available_mb: '—', ram_available_pct: '—',
+            physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
+            virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
+            memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
+            swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
+            disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
+            temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
+        };
+        const structuredFallback = {
+            ...fallbackRaw,
+            'SISTEM': {
+                connectivity: fallbackRaw.connectivity, sys_name: fallbackRaw.sys_name,
+                sys_descr: fallbackRaw.sys_descr, hardware: fallbackRaw.hardware,
+                operating_system: fallbackRaw.operating_system, sys_uptime: fallbackRaw.sys_uptime,
+                sys_contact: fallbackRaw.sys_contact, sys_location: fallbackRaw.sys_location
+            },
+            'CPU': { cpu_usage: fallbackRaw.cpu_usage, processor_count: fallbackRaw.processor_count },
+            'TEMPERATURE': {
+                temperature_c: fallbackRaw.temperature_c,
+                temperature_sensor_name: fallbackRaw.temperature_sensor_name,
+                temperature_sensor_count: fallbackRaw.temperature_sensor_count
+            },
+            'MEMORY (RAM)': {
+                ram_total_mb: fallbackRaw.ram_total_mb, ram_used_mb: fallbackRaw.ram_used_mb,
+                ram_available_mb: fallbackRaw.ram_available_mb, ram_usage_pct: fallbackRaw.ram_usage_pct,
+                ram_available_pct: fallbackRaw.ram_available_pct
+            },
+            'MEMORY (PHYSICAL / VIRTUAL / SWAP)': {
+                physical_memory_total_mb: fallbackRaw.physical_memory_total_mb,
+                physical_memory_usage_pct: fallbackRaw.physical_memory_usage_pct,
+                virtual_memory_total_mb: fallbackRaw.virtual_memory_total_mb,
+                virtual_memory_usage_pct: fallbackRaw.virtual_memory_usage_pct,
+                swap_total_mb: fallbackRaw.swap_total_mb, swap_used_mb: fallbackRaw.swap_used_mb,
+                memory_buffers_mb: fallbackRaw.memory_buffers_mb, cached_memory_mb: fallbackRaw.cached_memory_mb,
+                shared_memory_mb: fallbackRaw.shared_memory_mb
+            },
+            'DISK': {
+                disk_total_gb: fallbackRaw.disk_total_gb, disk_used_gb: fallbackRaw.disk_used_gb,
+                disk_usage_pct: fallbackRaw.disk_usage_pct
+            }
+        };
+
         return {
             success: false,
             status: 'Disconnect',
             error: err.message,
-            data: {
-                connectivity: 'Disconnected',
-                resolved_ip: host,
-                sys_name: '—', sys_descr: '—', sys_uptime: '—',
-                hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
-                processor_count: '—',
-                cpu_usage: '—',
-                ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
-                ram_available_mb: '—', ram_available_pct: '—',
-                physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
-                virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
-                memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
-                swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
-                disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
-                temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
-            },
+            data: structuredFallback,
             timestamp: new Date().toISOString(),
         };
     }
@@ -414,27 +502,62 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
         const jitterMs = Math.floor(Math.random() * 2500);
 
         setTimeout(() => {
+            const timeoutFallbackRaw = {
+                connectivity: 'Disconnected',
+                resolved_ip: host,
+                sys_name: '—', sys_descr: '—', sys_uptime: '—',
+                hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
+                processor_count: '—',
+                cpu_usage: '—',
+                ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+                ram_available_mb: '—', ram_available_pct: '—',
+                physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
+                virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
+                memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
+                swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
+                disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
+                temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
+            };
+            const timeoutStructuredFallback = {
+                ...timeoutFallbackRaw,
+                'SISTEM': {
+                    connectivity: timeoutFallbackRaw.connectivity, sys_name: timeoutFallbackRaw.sys_name,
+                    sys_descr: timeoutFallbackRaw.sys_descr, hardware: timeoutFallbackRaw.hardware,
+                    operating_system: timeoutFallbackRaw.operating_system, sys_uptime: timeoutFallbackRaw.sys_uptime,
+                    sys_contact: timeoutFallbackRaw.sys_contact, sys_location: timeoutFallbackRaw.sys_location
+                },
+                'CPU': { cpu_usage: timeoutFallbackRaw.cpu_usage, processor_count: timeoutFallbackRaw.processor_count },
+                'TEMPERATURE': {
+                    temperature_c: timeoutFallbackRaw.temperature_c,
+                    temperature_sensor_name: timeoutFallbackRaw.temperature_sensor_name,
+                    temperature_sensor_count: timeoutFallbackRaw.temperature_sensor_count
+                },
+                'MEMORY (RAM)': {
+                    ram_total_mb: timeoutFallbackRaw.ram_total_mb, ram_used_mb: timeoutFallbackRaw.ram_used_mb,
+                    ram_available_mb: timeoutFallbackRaw.ram_available_mb, ram_usage_pct: timeoutFallbackRaw.ram_usage_pct,
+                    ram_available_pct: timeoutFallbackRaw.ram_available_pct
+                },
+                'MEMORY (PHYSICAL / VIRTUAL / SWAP)': {
+                    physical_memory_total_mb: timeoutFallbackRaw.physical_memory_total_mb,
+                    physical_memory_usage_pct: timeoutFallbackRaw.physical_memory_usage_pct,
+                    virtual_memory_total_mb: timeoutFallbackRaw.virtual_memory_total_mb,
+                    virtual_memory_usage_pct: timeoutFallbackRaw.virtual_memory_usage_pct,
+                    swap_total_mb: timeoutFallbackRaw.swap_total_mb, swap_used_mb: timeoutFallbackRaw.swap_used_mb,
+                    memory_buffers_mb: timeoutFallbackRaw.memory_buffers_mb, cached_memory_mb: timeoutFallbackRaw.cached_memory_mb,
+                    shared_memory_mb: timeoutFallbackRaw.shared_memory_mb
+                },
+                'DISK': {
+                    disk_total_gb: timeoutFallbackRaw.disk_total_gb, disk_used_gb: timeoutFallbackRaw.disk_used_gb,
+                    disk_usage_pct: timeoutFallbackRaw.disk_usage_pct
+                }
+            };
+
             const timer = setTimeout(() => {
                 resolve({
                     success: false,
                     status: 'Disconnect',
                     error: `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
-                    data: {
-                        connectivity: 'Disconnected',
-                        resolved_ip: host,
-                        sys_name: '—', sys_descr: '—', sys_uptime: '—',
-                        hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
-                        processor_count: '—',
-                        cpu_usage: '—',
-                        ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
-                        ram_available_mb: '—', ram_available_pct: '—',
-                        physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
-                        virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
-                        memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
-                        swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
-                        disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
-                        temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
-                    },
+                    data: timeoutStructuredFallback,
                     timestamp: new Date().toISOString(),
                 });
             }, effectiveTimeoutMs);
@@ -448,22 +571,7 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
                     success: false,
                     status: 'Disconnect',
                     error: err.message,
-                    data: {
-                        connectivity: 'Disconnected',
-                        resolved_ip: host,
-                        sys_name: '—', sys_descr: '—', sys_uptime: '—',
-                        hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
-                        processor_count: '—',
-                        cpu_usage: '—',
-                        ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
-                        ram_available_mb: '—', ram_available_pct: '—',
-                        physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
-                        virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
-                        memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
-                        swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
-                        disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
-                        temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
-                    },
+                    data: timeoutStructuredFallback,
                     timestamp: new Date().toISOString(),
                 });
             });
