@@ -1,8 +1,8 @@
 const BaseParser = require('./base');
 
 /**
- * ILS Localizer (LLZ) Parser — PMDT Juanda
- * Diperbarui berdasarkan verifikasi payload riil di lapangan.
+ * ILS Localizer (LLZ) Parser — PMDT Juanda (Live Verified Version)
+ * AirNav Indonesia
  */
 
 const STX_0 = 0x01;
@@ -53,14 +53,14 @@ const REGISTER_MAP = {
     20: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
     21: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
     22: { key: 'clr_rf_level', name: 'RF Level CLR', scale: 100.0, unit: 'dB', signed: true },
-    24: { key: 'clr_ident_am', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: true }, // Signed agar 65534 -> -0.02 %
+    24: { key: 'clr_fine_ddm', name: 'DDM Fine Tune CLR', scale: 100.0, unit: '%', signed: true },
     25: { key: 'ds_ddm', name: 'DDM Displacement (DS)', scale: 100.0, unit: '%', signed: true },
     26: { key: 'ds_sdm', name: 'SDM Displacement (DS)', scale: 100.0, unit: '%', signed: false },
     27: { key: 'ds_rf_level', name: 'RF Level DS', scale: 100.0, unit: 'dB', signed: true },
-    28: { key: 'ds_ident_am', name: 'Ident-AM Depth DS', scale: 100.0, unit: '%', signed: false },
     30: { key: 'rf_disp_course', name: 'Freq Displacement CL', scale: 10000.0, unit: '%', signed: true },
     31: { key: 'rf_disp_clr', name: 'Freq Displacement CLR', scale: 10000.0, unit: '%', signed: true },
     32: { key: 'rf_disp_sep', name: 'Freq Displacement Sep', scale: 10000.0, unit: '%', signed: true },
+    2039: { key: 'rf_separation', name: 'RF Course/CLR Separation', scale: 1000.0, unit: 'kHz', signed: false },
     3325: { key: 'heartbeat', name: 'Heartbeat / Sync', scale: 0, unit: 'hex', signed: false },
     5125: { key: 'station_ident', name: 'Station IDENT', scale: 0, unit: 'str', signed: false }
 };
@@ -74,10 +74,10 @@ class IlsMophienLlzParser extends BaseParser {
         this._activeChannel = 'MON1';
         this._lastHeartbeat = new Date().toISOString();
 
-        // Objek penampung live data per kanal
+        // Kosongkan baseline agar tidak ada angka dummy yang tersisa
         this._channels = {
-            MON1: { station_ident: 'ISBY' },
-            MON2: { station_ident: 'ISBY' }
+            MON1: {},
+            MON2: {}
         };
 
         this._systemState = {
@@ -136,8 +136,7 @@ class IlsMophienLlzParser extends BaseParser {
                         const frameForCrc = this._buf.slice(i, j);
 
                         if (crc16_aug_ccitt(frameForCrc) === expectedCrc) {
-                            const bodyBuf = Buffer.from(bodyBytes);
-                            const plain = unmaskPayload(bodyBuf);
+                            const plain = unmaskPayload(Buffer.from(bodyBytes));
                             if (plain && plain.length >= 4) {
                                 this._decodeFrame(plain);
                             }
@@ -166,7 +165,7 @@ class IlsMophienLlzParser extends BaseParser {
         const msgType = plain[2];
         const seqNum = plain[3];
 
-        // 1. Ekstraksi status transmitter & frekuensi dari frame sistem/panjang
+        // 1. Ekstraksi Frekuensi dan Service Status dari Frame Panjang
         if (plain.length > 40) {
             for (let offset = 4; offset < plain.length - 2; offset += 2) {
                 const candFreq = plain.readUInt16LE(offset);
@@ -178,12 +177,10 @@ class IlsMophienLlzParser extends BaseParser {
             return;
         }
 
-        // 2. Ekstraksi parameter analog (Frame 0x86)
+        // 2. Ekstraksi Parameter Telemetri Analog (Frame 0x86)
         if (msgType === 0x86 && plain.length >= 10) {
             const regId = plain.readUInt16LE(4);
             const v1 = plain.readUInt16LE(6);
-
-            // Evaluasi kanal monitor dari v1
             const v1Low = v1 & 0x000F;
             const channel = (v1Low === 0x00 || v1Low === 0x02 || v1Low === 0x0C) ? 'MON1' : 'MON2';
             const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
@@ -194,6 +191,9 @@ class IlsMophienLlzParser extends BaseParser {
                 this._stationIdent = str;
                 this._channels.MON1.station_ident = str;
                 this._channels.MON2.station_ident = str;
+
+                // Log Bukti Live IDENT
+                console.log(`[PMDT LIVE] ${new Date().toLocaleTimeString()} | Seq: ${seqNum} | IDENT: ${str}`);
                 this._addMeasurement(seqNum, regHex, '-', 'Station IDENT', str);
                 return;
             }
@@ -207,8 +207,13 @@ class IlsMophienLlzParser extends BaseParser {
             if (!meta) return;
 
             const rawVal = meta.signed ? plain.readInt16LE(8) : plain.readUInt16LE(8);
-            const numericVal = meta.scale > 0 ? +(rawVal / meta.scale).toFixed(meta.scale >= 1000 ? 4 : 2) : rawVal;
-            const formattedVal = `${numericVal.toFixed(meta.scale >= 1000 ? 4 : 2)} ${meta.unit}`.trim();
+
+            // Format 4 desimal untuk mendeteksi fluktuasi mikro sinyal
+            const numericVal = meta.scale > 0 ? +(rawVal / meta.scale).toFixed(4) : rawVal;
+            const formattedVal = meta.scale > 0 ? `${(rawVal / meta.scale).toFixed(4)} ${meta.unit}`.trim() : `${rawVal}`;
+
+            // LOG BUKTI LIVE: Jika paket riil mengalir, baris ini AKAN terus dicetak di terminal backend
+            console.log(`[PMDT LIVE] ${new Date().toLocaleTimeString()} | Seq: ${seqNum.toString().padStart(3, ' ')} | Ch: ${channel} | ${meta.name.padEnd(25, ' ')} : ${formattedVal}`);
 
             this._channels[channel][meta.key] = numericVal;
             this._activeChannel = channel;
@@ -255,14 +260,12 @@ class IlsMophienLlzParser extends BaseParser {
                 last_sync: this._lastHeartbeat,
                 connectivity: 'Connected',
                 overall_status: this._systemState.service_status,
-
-                // Metadata alat
                 service_status: this._systemState.service_status,
                 frequency: this._systemState.frequency,
                 tx1: { ...this._systemState.tx1 },
                 tx2: { ...this._systemState.tx2 },
 
-                // Data grup terstruktur (MON1 vs MON2)
+                // Data grup kanal (tanpa dummy fallback)
                 cl_channel: {
                     mon1: {
                         ddm: mon1.cl_ddm ?? null,
@@ -318,7 +321,7 @@ class IlsMophienLlzParser extends BaseParser {
                     }
                 },
 
-                // Fallback flat compatibility
+                // Flat properties backward compatibility
                 cl_ddm: active.cl_ddm ?? null,
                 cl_sdm: active.cl_sdm ?? null,
                 cl_rf_level: active.cl_rf_level ?? null,
