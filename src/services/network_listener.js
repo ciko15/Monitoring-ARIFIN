@@ -34,11 +34,11 @@ async function checkIcmpPing(ip) {
             let isAlive = false;
             if (isWin) {
                 isAlive = (out.includes('ttl=') || out.includes('reply from') || out.includes('balasan dari')) &&
-                          !out.includes('destination host unreachable') &&
-                          !out.includes('tujuan host tidak dapat dijangkau') &&
-                          !out.includes('request timed out') &&
-                          !out.includes('waktu habis') &&
-                          !out.includes('100% loss');
+                    !out.includes('destination host unreachable') &&
+                    !out.includes('tujuan host tidak dapat dijangkau') &&
+                    !out.includes('request timed out') &&
+                    !out.includes('waktu habis') &&
+                    !out.includes('100% loss');
             } else {
                 isAlive = !err && (out.includes('ttl=') || out.includes('bytes from') || out.includes('1 packets received') || out.includes('1 received'));
             }
@@ -156,7 +156,7 @@ class NetworkListenerService {
             const timer = setInterval(execute, pollSec * 1000);
             timersMap.set(id, timer);
         }, initialDelay);
-        
+
         timersMap.set(id, startTimer);
     }
 
@@ -736,7 +736,7 @@ class NetworkListenerService {
         const connect = () => {
             if (stopped) return;
             if (socket) {
-                try { socket.destroy(); } catch (e) {}
+                try { socket.destroy(); } catch (e) { }
                 socket = null;
             }
 
@@ -774,9 +774,9 @@ class NetworkListenerService {
                             { ...initResult, source: name, _ip: ip_address },
                             moduleName,
                             'Normal'
-                        ).catch(e => {});
+                        ).catch(e => { });
                     }
-                } catch (e) {}
+                } catch (e) { }
 
                 // Kirim trigger secara berkala jika parser mendukung poll requests atau heartbeat
                 if (hasTriggerProtocol || hasPollRequests) {
@@ -835,7 +835,7 @@ class NetworkListenerService {
                 this._logThrottled('error', `ils:error:${id}:${err.message}`, `[LLZ-TCP] Error ${name}: ${err.message}`);
                 reportDisconnect(err.message);
                 if (socket) {
-                    try { socket.destroy(); } catch (e) {}
+                    try { socket.destroy(); } catch (e) { }
                 }
                 scheduleReconnect();
             });
@@ -844,7 +844,7 @@ class NetworkListenerService {
                 this._logThrottled('warn', `ils:timeout:${id}`, `[LLZ-TCP] Timeout ${name} (${ip_address}:${port}), reconnecting...`);
                 reportDisconnect('timeout');
                 if (socket) {
-                    try { socket.destroy(); } catch (e) {}
+                    try { socket.destroy(); } catch (e) { }
                 }
                 scheduleReconnect();
             });
@@ -987,7 +987,7 @@ class NetworkListenerService {
             isStopped = true;
             if (restartTimer) clearTimeout(restartTimer);
             if (snifferProc) {
-                try { snifferProc.kill(); } catch (e) {}
+                try { snifferProc.kill(); } catch (e) { }
             }
         });
     }
@@ -1825,10 +1825,10 @@ class NetworkListenerService {
             return;
         }
 
-        // ILS Mophien LLZ Juanda — Passive Sniffer (tanpa connect langsung ke port yang sibuk)
+        // ILS Mophien LLZ Juanda — Gunakan dedicated persistent TCP streaming listener
         if (moduleName === 'ils_mophien_llz') {
-            console.log(`[LLZ-TRACE] Routing ${source.name} to startIlsMophienSnifferListener`);
-            this.startIlsMophienSnifferListener(source);
+            console.log(`[LLZ-TRACE] Routing ${source.name} to startBinaryTcpListener`);
+            this.startBinaryTcpListener(source);
             return;
         }
 
@@ -1948,7 +1948,7 @@ class NetworkListenerService {
                 { data: {}, source: source.name, _ip: ip_address },
                 parsing_id,
                 'Disconnect'
-            ).catch(() => {});
+            ).catch(() => { });
 
             // Jittered backoff (8 - 12 detik) agar tidak membebani CPU, network, maupun switch/Moxa
             const retryDelayMs = 8000 + Math.floor(Math.random() * 4000);
