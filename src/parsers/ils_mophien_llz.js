@@ -48,19 +48,20 @@ const REGISTER_MAP = {
     10: { key: 'cl_ddm', name: 'DDM Course Line (CL)', scale: 100.0, unit: '%', signed: true },
     11: { key: 'cl_sdm', name: 'SDM Course Line (CL)', scale: 100.0, unit: '%', signed: false },
     12: { key: 'cl_rf_level', name: 'RF Level CL', scale: 100.0, unit: 'dB', signed: true },
-    13: { key: 'param_13', name: 'Monitor Parameter 13', scale: 0, unit: '', signed: false },
+    13: { key: 'param_13', name: 'Monitor Parameter 13', scale: 0, unit: 'raw', signed: false },
     14: { key: 'cl_ident_am', name: 'Ident-AM Depth CL', scale: 100.0, unit: '%', signed: false },
-    20: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
-    21: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
+    20: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
+    21: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
     22: { key: 'clr_rf_level', name: 'RF Level CLR', scale: 100.0, unit: 'dB', signed: true },
-    24: { key: 'clr_fine_ddm', name: 'DDM Fine Tune CLR', scale: 100.0, unit: '%', signed: true },
+    24: { key: 'clr_ident_am', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: false },
     25: { key: 'ds_ddm', name: 'DDM Displacement (DS)', scale: 100.0, unit: '%', signed: true },
     26: { key: 'ds_sdm', name: 'SDM Displacement (DS)', scale: 100.0, unit: '%', signed: false },
     27: { key: 'ds_rf_level', name: 'RF Level DS', scale: 100.0, unit: 'dB', signed: true },
+    28: { key: 'ds_ident_am', name: 'Ident-AM Depth DS', scale: 100.0, unit: '%', signed: false },
     30: { key: 'rf_disp_course', name: 'Freq Displacement CL', scale: 10000.0, unit: '%', signed: true },
     31: { key: 'rf_disp_clr', name: 'Freq Displacement CLR', scale: 10000.0, unit: '%', signed: true },
     32: { key: 'rf_disp_sep', name: 'Freq Displacement Sep', scale: 10000.0, unit: '%', signed: true },
-    2039: { key: 'rf_separation', name: 'RF Course/CLR Separation', scale: 1000.0, unit: 'kHz', signed: false },
+    2039: { key: 'rf_separation', name: 'Reg_2039', scale: 1.0, unit: '', signed: false },
     3325: { key: 'heartbeat', name: 'Heartbeat / Sync', scale: 0, unit: 'hex', signed: false },
     5125: { key: 'station_ident', name: 'Station IDENT', scale: 0, unit: 'str', signed: false }
 };
@@ -70,19 +71,19 @@ class IlsMophienLlzParser extends BaseParser {
         super(opts);
         this._buf = Buffer.alloc(0);
         this._mode = 'LIVE';
-        this._stationIdent = 'ISBY';
-        this._activeChannel = 'MON1';
-        this._lastHeartbeat = new Date().toISOString();
+        this._stationIdent = null;
+        this._activeChannel = null;
+        this._lastHeartbeat = null;
 
-        // Kosongkan baseline agar tidak ada angka dummy yang tersisa
+        // Kosongkan baseline: data murni berasal dari live stream alat
         this._channels = {
             MON1: {},
             MON2: {}
         };
 
         this._systemState = {
-            frequency: '110.10 MHz',
-            service_status: 'NORMAL',
+            frequency: null,
+            service_status: null,
             tx1: { state: 'ON', role: 'MAIN', load: 'ANT' },
             tx2: { state: 'ON', role: 'STANDBY', load: 'DUMMY LOAD' }
         };

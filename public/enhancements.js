@@ -1134,77 +1134,77 @@
         data = data || {};
 
         const formatDec2 = (val, unit = '') => {
-            if (val === null || val === undefined || isNaN(Number(val))) return '—';
+            if (val === null || val === undefined || isNaN(Number(val))) return '-';
             const num = Number(val);
             const formatted = num.toFixed(2);
             return unit ? `${formatted} ${unit}` : formatted;
         };
 
         const formatDec4 = (val, unit = '%') => {
-            if (val === null || val === undefined || isNaN(Number(val))) return '—';
+            if (val === null || val === undefined || isNaN(Number(val))) return '-';
             const num = Number(val);
             const sign = num > 0 ? '+' : (num < 0 ? '-' : '±');
             const formatted = Math.abs(num).toFixed(4);
             return unit ? `${sign}${formatted} ${unit}` : `${sign}${formatted}`;
         };
 
-        const ident = data.station_ident || 'ISBY';
-        const activeCh = data.active_channel || 'MON1';
-        const freq = data.frequency || '110.10 MHz';
-        const serviceStatus = (data.service_status || 'NORMAL').toUpperCase();
+        const ident = data.station_ident || '-';
+        const activeCh = data.active_channel || '-';
+        const freq = data.frequency || '-';
+        const serviceStatus = (data.service_status || '-').toUpperCase();
 
         const tx1Text = data.tx1?.status_text || 'TX1: MAIN (ON ANT)';
         const tx2Text = data.tx2?.status_text || 'TX2: STANDBY (DUMMY LOAD)';
 
-        // Extracted Channel Metrics with Verified Baseline PMDT Juanda
+        // Extracted Channel Metrics from Parser (Tanpa fallback dummy)
         const mon1CL = data.cl_channel?.mon1 || {
-            ddm: data.mon1_cl_ddm ?? 0.01,
-            sdm: data.mon1_cl_sdm ?? 40.01,
-            rf_level: data.mon1_cl_rf_level ?? 0.15,
-            ident: data.mon1_cl_ident_am ?? 8.00
+            ddm: data.mon1_cl_ddm ?? null,
+            sdm: data.mon1_cl_sdm ?? null,
+            rf_level: data.mon1_cl_rf_level ?? null,
+            ident: data.mon1_cl_ident_am ?? null
         };
         const mon2CL = data.cl_channel?.mon2 || {
-            ddm: data.mon2_cl_ddm ?? 0.00,
-            sdm: data.mon2_cl_sdm ?? 40.00,
-            rf_level: data.mon2_cl_rf_level ?? 0.12,
-            ident: data.mon2_cl_ident_am ?? 7.99
+            ddm: data.mon2_cl_ddm ?? null,
+            sdm: data.mon2_cl_sdm ?? null,
+            rf_level: data.mon2_cl_rf_level ?? null,
+            ident: data.mon2_cl_ident_am ?? null
         };
 
         const mon1DS = data.ds_channel?.mon1 || {
-            ddm: data.mon1_ds_ddm ?? 15.57,
-            sdm: data.mon1_ds_sdm ?? 40.02,
-            rf_level: data.mon1_ds_rf_level ?? 0.20,
-            ident: data.mon1_ds_ident_am ?? 7.90
+            ddm: data.mon1_ds_ddm ?? null,
+            sdm: data.mon1_ds_sdm ?? null,
+            rf_level: data.mon1_ds_rf_level ?? null,
+            ident: data.mon1_ds_ident_am ?? null
         };
         const mon2DS = data.ds_channel?.mon2 || {
-            ddm: data.mon2_ds_ddm ?? 15.57,
-            sdm: data.mon2_ds_sdm ?? 40.03,
-            rf_level: data.mon2_ds_rf_level ?? 0.16,
-            ident: data.mon2_ds_ident_am ?? 7.98
+            ddm: data.mon2_ds_ddm ?? null,
+            sdm: data.mon2_ds_sdm ?? null,
+            rf_level: data.mon2_ds_rf_level ?? null,
+            ident: data.mon2_ds_ident_am ?? null
         };
 
         const mon1CLR = data.clr_channel?.mon1 || {
-            ddm: data.mon1_clr_ddm ?? 21.76,
-            sdm: data.mon1_clr_sdm ?? 40.06,
-            rf_level: data.mon1_clr_rf_level ?? 0.15,
-            ident: data.mon1_clr_ident_am ?? 8.00
+            ddm: data.mon1_clr_ddm ?? null,
+            sdm: data.mon1_clr_sdm ?? null,
+            rf_level: data.mon1_clr_rf_level ?? null,
+            ident: data.mon1_clr_ident_am ?? null
         };
         const mon2CLR = data.clr_channel?.mon2 || {
-            ddm: data.mon2_clr_ddm ?? 21.70,
-            sdm: data.mon2_clr_sdm ?? 40.01,
-            rf_level: data.mon2_clr_rf_level ?? 0.12,
-            ident: data.mon2_clr_ident_am ?? 7.99
+            ddm: data.mon2_clr_ddm ?? null,
+            sdm: data.mon2_clr_sdm ?? null,
+            rf_level: data.mon2_clr_rf_level ?? null,
+            ident: data.mon2_clr_ident_am ?? null
         };
 
         const mon1RF = data.rf_displacement?.mon1 || {
-            course: data.mon1_rf_disp_course ?? 0.0000,
-            clr: data.mon1_rf_disp_clr ?? 0.0000,
-            separation: data.mon1_rf_disp_sep ?? 0.0000
+            course: data.mon1_rf_disp_course ?? null,
+            clr: data.mon1_rf_disp_clr ?? null,
+            separation: data.mon1_rf_disp_sep ?? null
         };
         const mon2RF = data.rf_displacement?.mon2 || {
-            course: data.mon2_rf_disp_course ?? 0.0001,
-            clr: data.mon2_rf_disp_clr ?? 0.0001,
-            separation: data.mon2_rf_disp_sep ?? 0.0000
+            course: data.mon2_rf_disp_course ?? null,
+            clr: data.mon2_rf_disp_clr ?? null,
+            separation: data.mon2_rf_disp_sep ?? null
         };
 
         const targetSup = supCategory || 'ILS-LLZ';
