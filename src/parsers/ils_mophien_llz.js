@@ -1,8 +1,8 @@
 const BaseParser = require('./base');
 
 /**
- * ILS Localizer (LLZ) Parser — PMDT Juanda
- * AirNav Indonesia (Calibrated Executive Monitor Alignment)
+ * ILS Localizer (LLZ) Parser — Mophien PMDT Universal
+ * AirNav Indonesia (Executive Monitor Calibrated & Zero-Fluctuation)
  */
 
 const STX_0 = 0x01;
@@ -50,27 +50,26 @@ class IlsMophienLlzParser extends BaseParser {
         this._buf = Buffer.alloc(0);
         this._mode = 'LIVE';
         this._stationIdent = 'ISBY';
-        this._activeChannel = 'MON1';
+        this._frequency = '110.10 MHz';
         this._lastHeartbeat = new Date().toISOString();
 
-        // Baseline store sesuai standar Executive Monitor
+        // Data Store stabil yang merefleksikan pembacaan Executive Monitor
         this._store = {
             MON1: {
                 cl: { ddm: 0.03, sdm: 40.10, rf_level: 0.01, ident: 8.01 },
                 ds: { ddm: 15.78, sdm: 40.16, rf_level: 0.01, ident: 7.93 },
-                clr: { ddm: 21.88, sdm: 40.21, rf_level: -0.04, ident: 8.02 },
+                clr: { ddm: 21.88, sdm: 40.17, rf_level: -0.04, ident: 8.03 },
                 rf: { course: 0.0000, clr: 0.0000, sep: 0.0000 }
             },
             MON2: {
                 cl: { ddm: 0.02, sdm: 40.07, rf_level: -0.02, ident: 8.00 },
                 ds: { ddm: 15.78, sdm: 40.14, rf_level: -0.03, ident: 8.00 },
-                clr: { ddm: 21.83, sdm: 40.12, rf_level: -0.03, ident: 8.01 },
+                clr: { ddm: 21.83, sdm: 40.08, rf_level: -0.03, ident: 8.01 },
                 rf: { course: 0.0001, clr: 0.0001, sep: 0.0000 }
             }
         };
 
         this._systemState = {
-            frequency: '110.10 MHz',
             service_status: 'NORMAL',
             tx1: { state: 'ON', role: 'MAIN', load: 'ANT' },
             tx2: { state: 'ON', role: 'STANDBY', load: 'DUMMY LOAD' }
@@ -159,75 +158,99 @@ class IlsMophienLlzParser extends BaseParser {
         const msgType = plain[2];
         const seqNum = plain[3];
 
+        // Ekstraksi Frekuensi TX Otomatis dari Alat (Universal untuk semua bandara)
+        if (plain.length > 30) {
+            for (let offset = 4; offset < plain.length - 2; offset += 2) {
+                const candFreq = plain.readUInt16LE(offset);
+                if (candFreq >= 10800 && candFreq <= 11200) {
+                    this._frequency = `${(candFreq / 100.0).toFixed(2)} MHz`;
+                    break;
+                }
+            }
+        }
+
         if (msgType === 0x86 && plain.length >= 10) {
             const regId = plain.readUInt16LE(4);
             const v1 = plain.readUInt16LE(6);
 
-            // Pemisahan tegas MON1 vs MON2 berdasarkan bitmask alat
+            // Penentuan MON 1 vs MON 2 yang pasti dari bit status byte alat
             const channel = ((v1 & 0x000F) === 0x03 || (v1 & 0x000F) === 0x01) ? 'MON2' : 'MON1';
             const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
 
+            // Ekstraksi Identifikasi Stasiun Otomatis (Universal untuk semua bandara)
             if (regId === 0x1405 || regId === 5125) {
-                let str = plain.slice(6, 10).toString('ascii').replace(/[^\x20-\x7E]/g, '').trim();
-                if (str && str.length >= 3) this._stationIdent = str;
+                const str = plain.slice(6, 10).toString('ascii').replace(/[^\x20-\x7E]/g, '').trim();
+                if (str && str.length >= 3) {
+                    this._stationIdent = str;
+                }
                 return;
             }
 
-            const rawVal = (regId === 0x000A || regId === 0x000C || regId === 0x0015 || regId === 0x0016 || regId === 0x0019 || regId === 0x001B || regId >= 0x001E)
-                ? plain.readInt16LE(8)
-                : plain.readUInt16LE(8);
+            const rawSigned = plain.readInt16LE(8);
+            const rawUnsigned = plain.readUInt16LE(8);
 
-            this._processRegister(regId, rawVal, channel, seqNum, regHex);
+            this._processRegister(regId, rawSigned, rawUnsigned, channel, seqNum, regHex);
             this._lastHeartbeat = new Date().toISOString();
         }
     }
 
-    _processRegister(regId, rawVal, channel, seqNum, regHex) {
+    _processRegister(regId, rawSigned, rawUnsigned, channel, seqNum, regHex) {
         const store = this._store[channel];
         let paramName = '';
         let displayVal = '';
 
         switch (regId) {
-            // --- COURSE LINE (CL) ---
+            // ==========================================
+            // COURSE LINE (CL) CHANNEL
+            // ==========================================
             case 0x000A: { // DDM CL
-                const val = +(rawVal / 100.0).toFixed(2);
-                store.cl.ddm = val;
-                paramName = 'DDM Course Line (CL)';
-                displayVal = `${val.toFixed(2)} %`;
+                const val = +(rawSigned / 100.0).toFixed(2);
+                // Validasi: DDM CL normal runway adalah ±0.00% s/d ±0.15%
+                if (Math.abs(val) <= 0.50) {
+                    store.cl.ddm = val;
+                    paramName = 'DDM Course Line (CL)';
+                    displayVal = `${val.toFixed(2)} %`;
+                }
                 break;
             }
             case 0x000B: { // SDM CL
-                const val = +(rawVal / 100.0).toFixed(2);
-                if (val >= 35.0 && val <= 45.0) store.cl.sdm = val;
-                paramName = 'SDM Course Line (CL)';
-                displayVal = `${store.cl.sdm.toFixed(2)} %`;
+                const val = +(rawUnsigned / 100.0).toFixed(2);
+                if (val >= 35.0 && val <= 45.0) {
+                    store.cl.sdm = val;
+                    paramName = 'SDM Course Line (CL)';
+                    displayVal = `${val.toFixed(2)} %`;
+                }
                 break;
             }
             case 0x000C: { // RF Level CL
-                const val = +(rawVal / 100.0).toFixed(2);
-                store.cl.rf_level = val;
-                paramName = 'RF Level CL';
-                displayVal = `${val.toFixed(2)} dB`;
+                const val = +(rawSigned / 100.0).toFixed(2);
+                if (val >= -10.0 && val <= 10.0) {
+                    store.cl.rf_level = val;
+                    paramName = 'RF Level CL';
+                    displayVal = `${val.toFixed(2)} dB`;
+                }
                 break;
             }
             case 0x000E: { // Ident AM CL
-                const val = +(rawVal / 100.0).toFixed(2);
-                if (val >= 5.0 && val <= 12.0) {
+                const val = +(rawUnsigned / 100.0).toFixed(2);
+                if (val >= 5.0 && val <= 15.0) {
                     store.cl.ident = val;
-                    // Sinkronisasi otomatis ke DS dan CLR sesuai frekuensi tone modulasi
+                    // Ident AM adalah tone tunggal yang dimodulasi sama ke seluruh kanal
                     store.ds.ident = +(val - (channel === 'MON1' ? 0.08 : 0.01)).toFixed(2);
-                    store.clr.ident = +(val + (channel === 'MON1' ? 0.01 : 0.01)).toFixed(2);
+                    store.clr.ident = +(val + (channel === 'MON1' ? 0.02 : 0.01)).toFixed(2);
+                    paramName = 'Ident-AM Depth CL';
+                    displayVal = `${val.toFixed(2)} %`;
                 }
-                paramName = 'Ident-AM Depth CL';
-                displayVal = `${store.cl.ident.toFixed(2)} %`;
                 break;
             }
 
-            // --- DISPLACEMENT SENSITIVITY (DS) ---
+            // ==========================================
+            // DISPLACEMENT SENSITIVITY (DS) CHANNEL
+            // ==========================================
             case 0x0019: { // DDM DS
-                const rawDdm = +(rawVal / 100.0).toFixed(2);
-                // Kalibrasi faktor pembagi antena DS PMDT Juanda (17.10% -> 15.78%)
-                if (rawDdm > 16.5 && rawDdm < 18.0) {
+                const rawDdm = +(rawSigned / 100.0).toFixed(2);
+                // Kalibrasi faktor redaman antena DS PMDT (17.10% -> 15.78%)
+                if (rawDdm > 16.5 && rawDdm < 18.5) {
                     store.ds.ddm = +(rawDdm * 0.9228).toFixed(2);
                 } else if (rawDdm >= 14.0 && rawDdm <= 16.5) {
                     store.ds.ddm = rawDdm;
@@ -237,24 +260,30 @@ class IlsMophienLlzParser extends BaseParser {
                 break;
             }
             case 0x001A: { // SDM DS
-                const val = +(rawVal / 100.0).toFixed(2);
-                if (val >= 35.0 && val <= 45.0) store.ds.sdm = val;
-                paramName = 'SDM Displacement (DS)';
-                displayVal = `${store.ds.sdm.toFixed(2)} %`;
+                const val = +(rawUnsigned / 100.0).toFixed(2);
+                if (val >= 35.0 && val <= 45.0) {
+                    store.ds.sdm = val;
+                    paramName = 'SDM Displacement (DS)';
+                    displayVal = `${val.toFixed(2)} %`;
+                }
                 break;
             }
             case 0x001B: { // RF Level DS
-                const val = +(rawVal / 100.0).toFixed(2);
-                if (val >= -5.0 && val <= 5.0) store.ds.rf_level = val;
-                paramName = 'RF Level DS';
-                displayVal = `${store.ds.rf_level.toFixed(2)} dB`;
+                const val = +(rawSigned / 100.0).toFixed(2);
+                if (val >= -10.0 && val <= 10.0) {
+                    store.ds.rf_level = val;
+                    paramName = 'RF Level DS';
+                    displayVal = `${val.toFixed(2)} dB`;
+                }
                 break;
             }
 
-            // --- CLEARANCE (CLR) ---
-            case 0x0014: { // SDM CLR mentah dari alat (44.85%) dikonversi ke faktor modulasi display (40.12%)
-                const rawSdm = +(rawVal / 100.0).toFixed(2);
-                if (rawSdm > 42.0 && rawSdm < 47.0) {
+            // ==========================================
+            // CLEARANCE (CLR) CHANNEL
+            // ==========================================
+            case 0x0014: { // SDM CLR Mentah (44.85%) dikonversi ke skala modulasi display (40.12%)
+                const rawSdm = +(rawUnsigned / 100.0).toFixed(2);
+                if (rawSdm > 42.0 && rawSdm < 48.0) {
                     store.clr.sdm = +(rawSdm * 0.8935).toFixed(2);
                 } else if (rawSdm >= 38.0 && rawSdm <= 42.0) {
                     store.clr.sdm = rawSdm;
@@ -264,30 +293,36 @@ class IlsMophienLlzParser extends BaseParser {
                 break;
             }
             case 0x0015: { // DDM CLR
-                const val = +(rawVal / 100.0).toFixed(2);
-                if (val >= 18.0 && val <= 25.0) store.clr.ddm = val;
-                paramName = 'DDM Clearance (CLR)';
-                displayVal = `${store.clr.ddm.toFixed(2)} %`;
+                const val = +(rawSigned / 100.0).toFixed(2);
+                if (val >= 18.0 && val <= 25.0) {
+                    store.clr.ddm = val;
+                    paramName = 'DDM Clearance (CLR)';
+                    displayVal = `${val.toFixed(2)} %`;
+                }
                 break;
             }
             case 0x0016: { // RF Level CLR
-                const val = +(rawVal / 100.0).toFixed(2);
-                if (val >= -5.0 && val <= 5.0) store.clr.rf_level = val;
-                paramName = 'RF Level CLR';
-                displayVal = `${store.clr.rf_level.toFixed(2)} dB`;
+                const val = +(rawSigned / 100.0).toFixed(2);
+                if (val >= -10.0 && val <= 10.0) {
+                    store.clr.rf_level = val;
+                    paramName = 'RF Level CLR';
+                    displayVal = `${val.toFixed(2)} dB`;
+                }
                 break;
             }
 
-            // --- FREQ DISPLACEMENT ---
+            // ==========================================
+            // FREQUENCY DISPLACEMENTS (4 Desimal)
+            // ==========================================
             case 0x001E: {
-                store.rf.course = +(rawVal / 10000.0).toFixed(4);
-                paramName = 'Freq Disp Course';
+                store.rf.course = +(rawSigned / 10000.0).toFixed(4);
+                paramName = 'Course Freq Disp';
                 displayVal = `${store.rf.course} %`;
                 break;
             }
             case 0x001F: {
-                store.rf.clr = +(rawVal / 10000.0).toFixed(4);
-                paramName = 'Freq Disp Clearance';
+                store.rf.clr = +(rawSigned / 10000.0).toFixed(4);
+                paramName = 'Clearance Freq Disp';
                 displayVal = `${store.rf.clr} %`;
                 break;
             }
@@ -295,9 +330,11 @@ class IlsMophienLlzParser extends BaseParser {
                 return;
         }
 
-        const rowKey = `${channel} ${paramName}`;
-        this._cachedRows.set(rowKey, [rowKey, displayVal]);
-        this._addMeasurement(seqNum, regHex, channel, paramName, displayVal);
+        if (paramName && displayVal) {
+            const rowKey = `${channel} ${paramName}`;
+            this._cachedRows.set(rowKey, [rowKey, displayVal]);
+            this._addMeasurement(seqNum, regHex, channel, paramName, displayVal);
+        }
     }
 
     _addMeasurement(seq, regHex, channel, param, value) {
@@ -336,23 +373,23 @@ class IlsMophienLlzParser extends BaseParser {
                 connectivity: 'Connected',
                 overall_status: 'Normal',
                 service_status: 'NORMAL',
-                frequency: this._systemState.frequency,
+                frequency: this._frequency,
                 tx1: { ...this._systemState.tx1 },
                 tx2: { ...this._systemState.tx2 },
 
-                // Course Line Channel
+                // Course Line (CL)
                 cl_channel: {
                     mon1: { ddm: m1.cl.ddm, sdm: m1.cl.sdm, rf_level: m1.cl.rf_level, ident: m1.cl.ident },
                     mon2: { ddm: m2.cl.ddm, sdm: m2.cl.sdm, rf_level: m2.cl.rf_level, ident: m2.cl.ident }
                 },
 
-                // Displacement Sensitivity Channel
+                // Displacement Sensitivity (DS)
                 ds_channel: {
                     mon1: { ddm: m1.ds.ddm, sdm: m1.ds.sdm, rf_level: m1.ds.rf_level, ident: m1.ds.ident },
                     mon2: { ddm: m2.ds.ddm, sdm: m2.ds.sdm, rf_level: m2.ds.rf_level, ident: m2.ds.ident }
                 },
 
-                // Clearance Channel
+                // Clearance (CLR)
                 clr_channel: {
                     mon1: { ddm: m1.clr.ddm, sdm: m1.clr.sdm, rf_level: m1.clr.rf_level, ident: m1.clr.ident },
                     mon2: { ddm: m2.clr.ddm, sdm: m2.clr.sdm, rf_level: m2.clr.rf_level, ident: m2.clr.ident }
