@@ -332,30 +332,23 @@ class EquipmentService {
                 cache.mergedData.source_name = parsedData.source_name;
             }
 
-            // 2. Database logging & Local Update (Cepat: 1s agar UI langsung update tanpa menunggu 30 detik)
-            if (!cache.timer) {
-                const localUpdateDelayMs = 1000; // 1 detik agar data langsung muncul di Web UI
-                cache.timer = setTimeout(async () => {
-                    cache.timer = null;
-
-                    const datalog = {
-                        equipmentId,
-                        equipment_name: equipName,
-                        status: finalStatus,
-                        source_status: status, // Status spesifik dari source ini
-                        data: { ...cache.mergedData },
-                        source: sourceName,
-                        source_id: sourceId,
-                        source_name: parsedData.source_name || sourceName,
-                        connection_type: connectionType,
-                        airport_name: airport ? airport.name : 'Unknown',
-                        airport_city: airport ? airport.city : 'Unknown',
-                        logged_at: new Date().toISOString()
-                    };
-
-                    await this.db.createEquipmentLog(datalog);
-                }, localUpdateDelayMs);
-            }
+            // Real-time Local Update: Segera perbarui snapshot in-memory di database agar UI (dashboard & detail modal)
+            // langsung menampilkan data terbaru tanpa menunggu 30 detik interval EMS!
+            const datalog = {
+                equipmentId,
+                equipment_name: equipName,
+                status: finalStatus,
+                source_status: status,
+                data: { ...cache.mergedData },
+                source: sourceName,
+                source_id: sourceId,
+                source_name: parsedData.source_name || sourceName,
+                connection_type: connectionType,
+                airport_name: airport ? airport.name : 'Unknown',
+                airport_city: airport ? airport.city : 'Unknown',
+                logged_at: new Date().toISOString()
+            };
+            await this.db.createEquipmentLog(datalog);
 
             // EMS Publish Throttle (Lambat, contoh 30 detik)
             // EMS hanya butuh snapshot data terakhir yang sudah matang

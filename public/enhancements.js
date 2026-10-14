@@ -18,7 +18,7 @@
     window.templatesCache = [];
     window.limitationsCache = [];
     const SOURCE_FETCH_TTL_MS = 15000;
-    const SOURCE_DETAIL_REFRESH_MS = 5000;
+    const SOURCE_DETAIL_REFRESH_MS = 1500;
 
     const PREVIEW_SCHEMAS = {
         'dvor_maru_220': ['mon1_azimuth', 'mon1_carrier_power', 'mon2_azimuth', 'mon2_carrier_power', 'tx_active', 'lcu_dc_28v'],

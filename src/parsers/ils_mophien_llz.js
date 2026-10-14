@@ -54,17 +54,17 @@ const REGISTER_MAP = {
     14: { key: 'cl_ident_am', name: 'Ident-AM Depth CL', scale: 100.0, unit: '%', signed: false },
 
     // 20-24: Clearance (CLR) Channel
-    20: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
-    21: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
+    20: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
+    21: { key: 'clr_ident_am', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: false },
     22: { key: 'clr_rf_level', name: 'RF Level CLR', scale: 100.0, unit: 'dB', signed: true },
-    23: { key: 'clr_ident_am', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: false },
+    23: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
     24: { key: 'clr_fine_ddm', name: 'DDM Fine Offset CLR', scale: 100.0, unit: '%', signed: true },
 
     // 25-28: Displacement Sensitivity (DS) Channel
     25: { key: 'ds_ddm', name: 'DDM Displacement (DS)', scale: 100.0, unit: '%', signed: true },
-    26: { key: 'ds_sdm', name: 'SDM Displacement (DS)', scale: 100.0, unit: '%', signed: false },
+    26: { key: 'ds_ident_am', name: 'Ident-AM Depth DS', scale: 100.0, unit: '%', signed: false },
     27: { key: 'ds_rf_level', name: 'RF Level DS', scale: 100.0, unit: 'dB', signed: true },
-    28: { key: 'ds_ident_am', name: 'Ident-AM Depth DS', scale: 100.0, unit: '%', signed: false },
+    28: { key: 'ds_sdm', name: 'SDM Displacement (DS)', scale: 100.0, unit: '%', signed: false },
 
     // 30-32: Radio Frequency (RF) Displacement (Presisi 4 Desimal: misal 0.0001 %)
     30: { key: 'rf_disp_course', name: 'Freq Displacement CL', scale: 10000.0, unit: '%', signed: true },
@@ -199,22 +199,8 @@ class IlsMophienLlzParser extends BaseParser {
         if (msgType === 0x86 && plain.length >= 10) {
             const regId = plain.readUInt16LE(4);
             const v1 = plain.readUInt16LE(6);
-            const byte3 = plain[3];
-
-            // Deteksi Channel (MON1 vs MON2):
-            // byte3: 0x90/0x91/0x93/0x97 = MON1 (0x90 mask), 0xb0/0xb1/0xb3/0xb7 = MON2 (0xB0 mask)
-            // v1 (word at offset 6): low nibble 0x0, 0x2, 0xC menandakan MON1, 0x1, 0x3, 0xD menandakan MON2
-            let channel = 'MON1';
-            const byte3High = byte3 & 0xF0;
-            if (byte3High === 0x90) {
-                channel = 'MON1';
-            } else if (byte3High === 0xB0) {
-                channel = 'MON2';
-            } else {
-                const v1Low = v1 & 0x000F;
-                channel = (v1Low === 0x00 || v1Low === 0x02 || v1Low === 0x0C) ? 'MON1' : 'MON2';
-            }
-
+            const v1Low = v1 & 0x000F;
+            const channel = (v1Low === 0x00 || v1Low === 0x02 || v1Low === 0x0C) ? 'MON1' : 'MON2';
             const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
 
             if (regId === 5125) {
