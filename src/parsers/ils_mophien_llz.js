@@ -54,8 +54,8 @@ const REGISTER_MAP = {
     14: { key: 'cl_ident_am', name: 'Ident-AM Depth CL', scale: 100.0, unit: '%', signed: false },
 
     // 20-24: Clearance (CLR) Channel
-    20: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
-    21: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
+    20: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
+    21: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
     22: { key: 'clr_rf_level', name: 'RF Level CLR', scale: 100.0, unit: 'dB', signed: true },
     23: { key: 'clr_ident_am', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: false },
     24: { key: 'clr_fine_ddm', name: 'DDM Fine Offset CLR', scale: 100.0, unit: '%', signed: true },
@@ -201,13 +201,14 @@ class IlsMophienLlzParser extends BaseParser {
             const v1 = plain.readUInt16LE(6);
             const byte3 = plain[3];
 
-            // Deteksi Channel:
-            // 1. Berdasarkan flag byte3 (0x90 = MON1, 0xb0 = MON2)
-            // 2. Fallback ke v1 low nibble (0x0, 0x2, 0xC = MON1, lainnya = MON2)
+            // Deteksi Channel (MON1 vs MON2):
+            // byte3: 0x90/0x91/0x93/0x97 = MON1 (0x90 mask), 0xb0/0xb1/0xb3/0xb7 = MON2 (0xB0 mask)
+            // v1 (word at offset 6): low nibble 0x0, 0x2, 0xC menandakan MON1, 0x1, 0x3, 0xD menandakan MON2
             let channel = 'MON1';
-            if (byte3 === 0x90 || (byte3 & 0x20) === 0) {
+            const byte3High = byte3 & 0xF0;
+            if (byte3High === 0x90) {
                 channel = 'MON1';
-            } else if (byte3 === 0xb0 || (byte3 & 0x20) !== 0) {
+            } else if (byte3High === 0xB0) {
                 channel = 'MON2';
             } else {
                 const v1Low = v1 & 0x000F;
