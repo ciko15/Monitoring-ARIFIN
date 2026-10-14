@@ -44,58 +44,51 @@ function unmaskPayload(rawBody) {
     return plain;
 }
 
+// Map Register ILS Localizer (LLZ) Mophien — Sesuai format PMDT Juanda
 const REGISTER_MAP = {
+    // 10-14: Course Line (CL) Channel
     10: { key: 'cl_ddm', name: 'DDM Course Line (CL)', scale: 100.0, unit: '%', signed: true },
     11: { key: 'cl_sdm', name: 'SDM Course Line (CL)', scale: 100.0, unit: '%', signed: false },
     12: { key: 'cl_rf_level', name: 'RF Level CL', scale: 100.0, unit: 'dB', signed: true },
     13: { key: 'param_13', name: 'Monitor Parameter 13', scale: 0, unit: 'raw', signed: false },
     14: { key: 'cl_ident_am', name: 'Ident-AM Depth CL', scale: 100.0, unit: '%', signed: false },
-    20: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
-    21: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
+
+    // 20-24: Clearance (CLR) Channel
+    20: { key: 'clr_ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
+    21: { key: 'clr_sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
     22: { key: 'clr_rf_level', name: 'RF Level CLR', scale: 100.0, unit: 'dB', signed: true },
+    23: { key: 'clr_ident_am', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: false },
     24: { key: 'clr_fine_ddm', name: 'DDM Fine Offset CLR', scale: 100.0, unit: '%', signed: true },
+
+    // 25-28: Displacement Sensitivity (DS) Channel
     25: { key: 'ds_ddm', name: 'DDM Displacement (DS)', scale: 100.0, unit: '%', signed: true },
     26: { key: 'ds_sdm', name: 'SDM Displacement (DS)', scale: 100.0, unit: '%', signed: false },
     27: { key: 'ds_rf_level', name: 'RF Level DS', scale: 100.0, unit: 'dB', signed: true },
+    28: { key: 'ds_ident_am', name: 'Ident-AM Depth DS', scale: 100.0, unit: '%', signed: false },
+
+    // 30-32: Radio Frequency (RF) Displacement (Presisi 4 Desimal: misal 0.0001 %)
     30: { key: 'rf_disp_course', name: 'Freq Displacement CL', scale: 10000.0, unit: '%', signed: true },
     31: { key: 'rf_disp_clr', name: 'Freq Displacement CLR', scale: 10000.0, unit: '%', signed: true },
     32: { key: 'rf_disp_sep', name: 'Freq Displacement Sep', scale: 10000.0, unit: '%', signed: true },
+
     2039: { key: 'rf_separation', name: 'Course/CLR RF Separation', scale: 1000.0, unit: 'kHz', signed: false },
     3325: { key: 'heartbeat', name: 'Heartbeat / Sync', scale: 0, unit: 'hex', signed: false },
     5125: { key: 'station_ident', name: 'Station IDENT', scale: 0, unit: 'str', signed: false }
 };
-
-// Seed frames yang sudah tervalidasi dari capture lapangan
-const VERIFIED_FRAMES = [
-    "AA30008690051449534259", // IDENT: ISBY
-    "053a098e971005a00c0100", // MON1 CL DDM: -0.01 %
-    "053a098e971005a30c0000", // MON2 CL DDM: -0.02 %
-    "053a098e971105a00ca10f", // MON1 CL SDM: 37.43 %
-    "053a098e971105a30ca00f", // MON2 CL SDM: 37.42 %
-    "053a098e971205a00c0f00", // MON1 CL RF: -2.43 dB
-    "053a098e971205a30c0c00", // MON2 CL RF: -2.46 dB
-    "053a098e971405a00c2003", // MON1 Ident AM: 5.42 %
-    "053a098e971405a30c1f03", // MON2 Ident AM: 5.41 %
-    "F03a098e971f05a00c1707", // MON1 DS DDM: 15.57 %
-    "F03a098e971f05a30c1707", // MON2 DS DDM: 15.57 %
-    "3a098e971405a00c8008",   // MON1 CLR SDM: 37.44 %
-    "3a098e971405a30c7a08",   // MON2 CLR SDM: 37.45 %
-    "333a098e9713050d032202", // MON2 Status Code: 288
-    "003a098e97fd0c494d3e57"  // Heartbeat / Sync
-];
 
 class IlsMophienLlzParser extends BaseParser {
     constructor(opts = {}) {
         super(opts);
         this._buf = Buffer.alloc(0);
         this._mode = 'LIVE';
-        this._stationIdent = 'ISBY';
+        this._stationIdent = null;
         this._activeChannel = 'MON1';
-        this._lastHeartbeat = new Date().toISOString();
+        this._lastHeartbeat = null;
 
+        // Kosongkan channels di awal agar 100% murni terisi saat paket fisik masuk
         this._channels = {
-            MON1: { ddm_ds: 15.57, sdm_ds: 40.02, rf_level_ds: 0.20, ident_am_ds: 7.90 },
-            MON2: { ddm_ds: 15.57, sdm_ds: 40.03, rf_level_ds: 0.16, ident_am_ds: 7.98 }
+            MON1: {},
+            MON2: {}
         };
 
         this._systemState = {
@@ -107,23 +100,12 @@ class IlsMophienLlzParser extends BaseParser {
 
         this._cachedRows = new Map();
         this._lastMeasurements = [];
-
-        // Inisialisasi awal menggunakan deretan frame lapangan yang terverifikasi
-        this._seedVerifiedFrames();
-    }
-
-    _seedVerifiedFrames() {
-        for (const hex of VERIFIED_FRAMES) {
-            const rawBody = Buffer.from(hex, 'hex');
-            const plain = unmaskPayload(rawBody);
-            if (plain && plain.length >= 6) {
-                this._decodeFrame(plain);
-            }
-        }
     }
 
     reset() {
         this._buf = Buffer.alloc(0);
+        this._cachedRows.clear();
+        this._lastMeasurements = [];
     }
 
     // Command untuk memicu alat agar menyemburkan data TCP stream
@@ -283,10 +265,10 @@ class IlsMophienLlzParser extends BaseParser {
             status: this._systemState.service_status || 'Normal',
             data: {
                 _mode: this._mode,
-                station_ident: this._stationIdent,
+                station_ident: this._stationIdent || '-',
                 active_channel: this._activeChannel,
                 last_sync: this._lastHeartbeat,
-                connectivity: 'Connected',
+                connectivity: this._lastHeartbeat ? 'Connected' : 'Standby',
                 overall_status: this._systemState.service_status || 'Normal',
                 service_status: this._systemState.service_status || 'NORMAL',
                 frequency: this._systemState.frequency,
@@ -294,29 +276,29 @@ class IlsMophienLlzParser extends BaseParser {
                 tx2: { ...this._systemState.tx2 },
 
                 cl_channel: {
-                    mon1: { ddm: mon1.cl_ddm ?? -0.01, sdm: mon1.cl_sdm ?? 37.43, rf_level: mon1.cl_rf_level ?? -2.43, ident: mon1.cl_ident_am ?? 5.42 },
-                    mon2: { ddm: mon2.cl_ddm ?? -0.02, sdm: mon2.cl_sdm ?? 37.42, rf_level: mon2.cl_rf_level ?? -2.46, ident: mon2.cl_ident_am ?? 5.41 }
+                    mon1: { ddm: mon1.cl_ddm ?? null, sdm: mon1.cl_sdm ?? null, rf_level: mon1.cl_rf_level ?? null, ident: mon1.cl_ident_am ?? null },
+                    mon2: { ddm: mon2.cl_ddm ?? null, sdm: mon2.cl_sdm ?? null, rf_level: mon2.cl_rf_level ?? null, ident: mon2.cl_ident_am ?? null }
                 },
                 ds_channel: {
-                    mon1: { ddm: mon1.ds_ddm ?? 15.57, sdm: mon1.ds_sdm ?? 40.02, rf_level: mon1.ds_rf_level ?? 0.20, ident: mon1.ds_ident_am ?? 7.90 },
-                    mon2: { ddm: mon2.ds_ddm ?? 15.57, sdm: mon2.ds_sdm ?? 40.03, rf_level: mon2.ds_rf_level ?? 0.16, ident: mon2.ds_ident_am ?? 7.98 }
+                    mon1: { ddm: mon1.ds_ddm ?? null, sdm: mon1.ds_sdm ?? null, rf_level: mon1.ds_rf_level ?? null, ident: mon1.ds_ident_am ?? null },
+                    mon2: { ddm: mon2.ds_ddm ?? null, sdm: mon2.ds_sdm ?? null, rf_level: mon2.ds_rf_level ?? null, ident: mon2.ds_ident_am ?? null }
                 },
                 clr_channel: {
-                    mon1: { ddm: mon1.clr_ddm ?? 21.76, sdm: mon1.clr_sdm ?? 37.44, rf_level: mon1.clr_rf_level ?? 0.15, ident: mon1.clr_ident_am ?? 8.00 },
-                    mon2: { ddm: mon2.clr_ddm ?? 21.70, sdm: mon2.clr_sdm ?? 37.45, rf_level: mon2.clr_rf_level ?? 0.12, ident: mon2.clr_ident_am ?? 7.99 }
+                    mon1: { ddm: mon1.clr_ddm ?? null, sdm: mon1.clr_sdm ?? null, rf_level: mon1.clr_rf_level ?? null, ident: mon1.clr_ident_am ?? null },
+                    mon2: { ddm: mon2.clr_ddm ?? null, sdm: mon2.clr_sdm ?? null, rf_level: mon2.clr_rf_level ?? null, ident: mon2.clr_ident_am ?? null }
                 },
                 rf_displacement: {
-                    mon1: { course: mon1.rf_disp_course ?? 0.0, clr: mon1.rf_disp_clr ?? 0.0, separation: mon1.rf_disp_sep ?? 0.0 },
-                    mon2: { course: mon2.rf_disp_course ?? 0.0001, clr: mon2.rf_disp_clr ?? 0.0001, separation: mon2.rf_disp_sep ?? 0.0 }
+                    mon1: { course: mon1.rf_disp_course ?? null, clr: mon1.rf_disp_clr ?? null, separation: mon1.rf_disp_sep ?? null },
+                    mon2: { course: mon2.rf_disp_course ?? null, clr: mon2.rf_disp_clr ?? null, separation: mon2.rf_disp_sep ?? null }
                 },
 
-                cl_ddm: active.cl_ddm ?? -0.01,
-                cl_sdm: active.cl_sdm ?? 37.43,
-                cl_rf_level: active.cl_rf_level ?? -2.43,
-                ds_ddm: active.ds_ddm ?? 15.57,
-                ds_sdm: active.ds_sdm ?? 40.02,
-                clr_ddm: active.clr_ddm ?? 21.76,
-                clr_sdm: active.clr_sdm ?? 37.44,
+                cl_ddm: active.cl_ddm ?? null,
+                cl_sdm: active.cl_sdm ?? null,
+                cl_rf_level: active.cl_rf_level ?? null,
+                ds_ddm: active.ds_ddm ?? null,
+                ds_sdm: active.ds_sdm ?? null,
+                clr_ddm: active.clr_ddm ?? null,
+                clr_sdm: active.clr_sdm ?? null,
 
                 _amv_txs_rows: Array.from(this._cachedRows.values())
             },

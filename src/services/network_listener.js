@@ -1040,6 +1040,10 @@ class NetworkListenerService {
                                 hexStr = hexStr.replace(/[:\s]/g, '');
                                 if (hexStr.length >= 8 && hexStr.length % 2 === 0) {
                                     const chunk = Buffer.from(hexStr, 'hex');
+                                    // Log jika paket data telemetry LLZ tertangkap
+                                    if (chunk.includes(0x01) && chunk.includes(0x02)) {
+                                        console.log(`[LLZ-SNIFFER] Captured live LLZ packet (${chunk.length} bytes) from mirror interface`);
+                                    }
                                     await this.handleIncomingData(source, chunk, parser);
                                 }
                             }
