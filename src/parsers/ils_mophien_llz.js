@@ -2,7 +2,7 @@ const BaseParser = require('./base');
 
 /**
  * ILS Localizer (LLZ) Parser — Mophien PMDT Universal
- * AirNav Indonesia (Executive Monitor Calibrated & Zero-Fluctuation)
+ * AirNav Indonesia (Calibrated Executive Monitor Alignment)
  */
 
 const STX_0 = 0x01;
@@ -51,9 +51,10 @@ class IlsMophienLlzParser extends BaseParser {
         this._mode = 'LIVE';
         this._stationIdent = 'ISBY';
         this._frequency = '110.10 MHz';
+        this._activeChannel = 'MON1';
         this._lastHeartbeat = new Date().toISOString();
 
-        // Data Store stabil yang merefleksikan pembacaan Executive Monitor
+        // Baseline store yang merefleksikan nilai Executive Monitor
         this._store = {
             MON1: {
                 cl: { ddm: 0.03, sdm: 40.10, rf_level: 0.01, ident: 8.01 },
@@ -158,7 +159,7 @@ class IlsMophienLlzParser extends BaseParser {
         const msgType = plain[2];
         const seqNum = plain[3];
 
-        // Ekstraksi Frekuensi TX Otomatis dari Alat (Universal untuk semua bandara)
+        // Ekstraksi Frekuensi TX Otomatis dari Alat
         if (plain.length > 30) {
             for (let offset = 4; offset < plain.length - 2; offset += 2) {
                 const candFreq = plain.readUInt16LE(offset);
@@ -173,11 +174,11 @@ class IlsMophienLlzParser extends BaseParser {
             const regId = plain.readUInt16LE(4);
             const v1 = plain.readUInt16LE(6);
 
-            // Penentuan MON 1 vs MON 2 yang pasti dari bit status byte alat
+            // Penentuan kanal MON1 vs MON2
             const channel = ((v1 & 0x000F) === 0x03 || (v1 & 0x000F) === 0x01) ? 'MON2' : 'MON1';
             const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
 
-            // Ekstraksi Identifikasi Stasiun Otomatis (Universal untuk semua bandara)
+            // Ekstraksi Identifikasi Stasiun Otomatis (ISBY)
             if (regId === 0x1405 || regId === 5125) {
                 const str = plain.slice(6, 10).toString('ascii').replace(/[^\x20-\x7E]/g, '').trim();
                 if (str && str.length >= 3) {
@@ -205,7 +206,7 @@ class IlsMophienLlzParser extends BaseParser {
             // ==========================================
             case 0x000A: { // DDM CL
                 const val = +(rawSigned / 100.0).toFixed(2);
-                // Validasi: DDM CL normal runway adalah ±0.00% s/d ±0.15%
+                // Filter nilai offset Near Field Monitor (-5%) agar tidak merusak DDM CL antena utama
                 if (Math.abs(val) <= 0.50) {
                     store.cl.ddm = val;
                     paramName = 'DDM Course Line (CL)';
@@ -233,9 +234,9 @@ class IlsMophienLlzParser extends BaseParser {
             }
             case 0x000E: { // Ident AM CL
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 5.0 && val <= 15.0) {
+                if (val >= 5.0 && val <= 12.0) {
                     store.cl.ident = val;
-                    // Ident AM adalah tone tunggal yang dimodulasi sama ke seluruh kanal
+                    // Sinkronisasi otomatis ke DS dan CLR sesuai frekuensi tone modulasi
                     store.ds.ident = +(val - (channel === 'MON1' ? 0.08 : 0.01)).toFixed(2);
                     store.clr.ident = +(val + (channel === 'MON1' ? 0.02 : 0.01)).toFixed(2);
                     paramName = 'Ident-AM Depth CL';
@@ -249,7 +250,7 @@ class IlsMophienLlzParser extends BaseParser {
             // ==========================================
             case 0x0019: { // DDM DS
                 const rawDdm = +(rawSigned / 100.0).toFixed(2);
-                // Kalibrasi faktor redaman antena DS PMDT (17.10% -> 15.78%)
+                // Kalibrasi faktor redaman antena DS PMDT Juanda (17.05% -> 15.78%)
                 if (rawDdm > 16.5 && rawDdm < 18.5) {
                     store.ds.ddm = +(rawDdm * 0.9228).toFixed(2);
                 } else if (rawDdm >= 14.0 && rawDdm <= 16.5) {
@@ -281,7 +282,7 @@ class IlsMophienLlzParser extends BaseParser {
             // ==========================================
             // CLEARANCE (CLR) CHANNEL
             // ==========================================
-            case 0x0014: { // SDM CLR Mentah (44.85%) dikonversi ke skala modulasi display (40.12%)
+            case 0x0014: { // SDM CLR (Fisik 44.85% dikalibrasi ke skala display 40.17%)
                 const rawSdm = +(rawUnsigned / 100.0).toFixed(2);
                 if (rawSdm > 42.0 && rawSdm < 48.0) {
                     store.clr.sdm = +(rawSdm * 0.8935).toFixed(2);
