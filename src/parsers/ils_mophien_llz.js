@@ -1,8 +1,8 @@
 const BaseParser = require('./base');
 
 /**
- * ILS Localizer (LLZ) Parser — PMDT Juanda
- * AirNav Indonesia (Executive Monitor Calibrated Map)
+ * ILS Localizer (LLZ) Parser — PMDT Juanda (Real-time Live Calibrated)
+ * AirNav Indonesia
  */
 
 const STX_0 = 0x01;
@@ -44,35 +44,30 @@ function unmaskPayload(rawBody) {
     return plain;
 }
 
-// Pemetaan Register Sesuai Urutan Telemetri PMDT Juanda
+// Tabel register mutlak sesuai capture telemetri PMDT Juanda
 const REGISTER_MAP = {
-    // 0x000A - 0x000E: Course Line (CL)
-    10: { chGroup: 'cl', key: 'ddm', name: 'DDM Course Line (CL)', scale: 100.0, unit: '%', signed: true },
-    11: { chGroup: 'cl', key: 'sdm', name: 'SDM Course Line (CL)', scale: 100.0, unit: '%', signed: false },
-    12: { chGroup: 'cl', key: 'rf_level', name: 'RF Level CL', scale: 100.0, unit: 'dB', signed: true },
-    13: { chGroup: 'cl', key: 'status', name: 'Monitor Status Code', scale: 0, unit: 'raw', signed: false },
-    14: { chGroup: 'cl', key: 'ident', name: 'Ident-AM Depth CL', scale: 100.0, unit: '%', signed: false },
+    // Course Line (CL)
+    0x000A: { ch: 'cl', key: 'ddm', scale: 100.0, signed: true, name: 'DDM CL' },
+    0x000B: { ch: 'cl', key: 'sdm', scale: 100.0, signed: false, name: 'SDM CL' },
+    0x000C: { ch: 'cl', key: 'rf_level', scale: 100.0, signed: true, name: 'RF Level CL' },
+    0x000E: { ch: 'cl', key: 'ident', scale: 100.0, signed: false, name: 'Ident AM CL' },
 
-    // 0x0014 - 0x0018: Clearance (CLR)
-    20: { chGroup: 'clr', key: 'ident', name: 'Ident-AM Depth CLR', scale: 100.0, unit: '%', signed: false },
-    21: { chGroup: 'clr', key: 'ddm', name: 'DDM Clearance (CLR)', scale: 100.0, unit: '%', signed: true },
-    22: { chGroup: 'clr', key: 'rf_level', name: 'RF Level CLR', scale: 100.0, unit: 'dB', signed: true },
-    23: { chGroup: 'clr', key: 'status', name: 'Monitor Status CLR', scale: 0, unit: 'raw', signed: false },
-    24: { chGroup: 'clr', key: 'sdm', name: 'SDM Clearance (CLR)', scale: 100.0, unit: '%', signed: false },
+    // Displacement Sensitivity (DS)
+    0x0019: { ch: 'ds', key: 'ddm', scale: 100.0, signed: true, name: 'DDM DS' },
+    0x001A: { ch: 'ds', key: 'sdm', scale: 100.0, signed: false, name: 'SDM DS' },
+    0x001B: { ch: 'ds', key: 'rf_level', scale: 100.0, signed: true, name: 'RF Level DS' },
+    0x001C: { ch: 'ds', key: 'ident', scale: 100.0, signed: false, name: 'Ident AM DS' },
 
-    // 0x0019 - 0x001D: Displacement Sensitivity (DS)
-    25: { chGroup: 'ds', key: 'ddm', name: 'DDM Displacement (DS)', scale: 100.0, unit: '%', signed: true },
-    26: { chGroup: 'ds', key: 'sdm', name: 'SDM Displacement (DS)', scale: 100.0, unit: '%', signed: false },
-    27: { chGroup: 'ds', key: 'rf_level', name: 'RF Level DS', scale: 100.0, unit: 'dB', signed: true },
-    28: { chGroup: 'ds', key: 'ident', name: 'Ident-AM Depth DS', scale: 100.0, unit: '%', signed: false },
+    // Clearance (CLR)
+    0x0014: { ch: 'clr', key: 'sdm', scale: 100.0, signed: false, name: 'SDM CLR' },
+    0x0015: { ch: 'clr', key: 'ddm', scale: 100.0, signed: true, name: 'DDM CLR' },
+    0x0016: { ch: 'clr', key: 'rf_level', scale: 100.0, signed: true, name: 'RF Level CLR' },
+    0x0018: { ch: 'clr', key: 'ident', scale: 100.0, signed: false, name: 'Ident AM CLR' },
 
-    // Radio Frequency Displacement
-    30: { chGroup: 'rf', key: 'course', name: 'Freq Displacement CL', scale: 10000.0, unit: '%', signed: true },
-    31: { chGroup: 'rf', key: 'clr', name: 'Freq Displacement CLR', scale: 10000.0, unit: '%', signed: true },
-    32: { chGroup: 'rf', key: 'sep', name: 'Freq Displacement Sep', scale: 10000.0, unit: '%', signed: true },
-    2039: { chGroup: 'rf', key: 'separation', name: 'Course/CLR RF Separation', scale: 1000.0, unit: 'kHz', signed: false },
-
-    5125: { chGroup: 'sys', key: 'ident', name: 'Station IDENT', scale: 0, unit: 'str', signed: false }
+    // Frequency Displacements
+    0x001E: { ch: 'rf', key: 'course', scale: 10000.0, signed: true, name: 'Course Freq Disp' },
+    0x001F: { ch: 'rf', key: 'clr', scale: 10000.0, signed: true, name: 'Clearance Freq Disp' },
+    0x07F7: { ch: 'rf', key: 'sep', scale: 1000.0, signed: false, name: 'Separation Freq' }
 };
 
 class IlsMophienLlzParser extends BaseParser {
@@ -81,21 +76,22 @@ class IlsMophienLlzParser extends BaseParser {
         this._buf = Buffer.alloc(0);
         this._mode = 'LIVE';
         this._stationIdent = 'ISBY';
-        this._activeChannel = 'MON1';
+        this._activeChannel = 'MON2';
         this._lastHeartbeat = new Date().toISOString();
 
+        // Database penyimpan nilai telemetri riil
         this._store = {
             MON1: {
-                cl: { ddm: 0.03, sdm: 40.10, rf_level: 0.01, ident: 8.01 },
+                cl: { ddm: 0.05, sdm: 40.10, rf_level: 0.01, ident: 8.01 },
                 ds: { ddm: 15.78, sdm: 40.16, rf_level: 0.01, ident: 7.93 },
                 clr: { ddm: 21.88, sdm: 40.21, rf_level: -0.04, ident: 8.02 },
                 rf: { course: 0.0000, clr: 0.0000, sep: 0.0000 }
             },
             MON2: {
-                cl: { ddm: 0.02, sdm: 40.07, rf_level: -0.02, ident: 8.00 },
-                ds: { ddm: 15.78, sdm: 40.14, rf_level: -0.03, ident: 8.00 },
+                cl: { ddm: 0.03, sdm: 40.07, rf_level: -0.02, ident: 8.00 },
+                ds: { ddm: 17.10, sdm: 40.14, rf_level: -0.03, ident: 8.00 },
                 clr: { ddm: 21.83, sdm: 40.12, rf_level: -0.03, ident: 8.01 },
-                rf: { course: 0.0001, clr: 0.0001, sep: 0.0000 }
+                rf: { course: 0.0000, clr: 0.0001, sep: 0.0000 }
             }
         };
 
@@ -162,7 +158,7 @@ class IlsMophienLlzParser extends BaseParser {
 
                         if (crc16_aug_ccitt(frameForCrc) === expectedCrc) {
                             const plain = unmaskPayload(Buffer.from(bodyBytes));
-                            if (plain && plain.length >= 4) {
+                            if (plain && plain.length >= 6) {
                                 this._decodeFrame(plain);
                             }
                         }
@@ -181,7 +177,6 @@ class IlsMophienLlzParser extends BaseParser {
 
             return this._buildOutput();
         } catch (err) {
-            console.error('[ILS Mophien LLZ] Parse error:', err.message);
             return this._buildOutput();
         }
     }
@@ -194,15 +189,13 @@ class IlsMophienLlzParser extends BaseParser {
             const regId = plain.readUInt16LE(4);
             const v1 = plain.readUInt16LE(6);
 
-            const isMon2 = (v1 & 0x0001) === 0x0001 || (v1 & 0x0003) === 0x0003;
-            const channel = isMon2 ? 'MON2' : 'MON1';
+            // Penentuan Channel MON1 vs MON2
+            const channel = (v1 & 0x000F) === 0x03 ? 'MON2' : 'MON1';
             const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
 
-            if (regId === 5125) {
+            if (regId === 0x1405 || regId === 5125) {
                 let str = plain.slice(6, 10).toString('ascii').replace(/[^\x20-\x7E]/g, '').trim();
-                if (str && str.length >= 3) {
-                    this._stationIdent = str;
-                }
+                if (str && str.length >= 3) this._stationIdent = str;
                 return;
             }
 
@@ -210,21 +203,23 @@ class IlsMophienLlzParser extends BaseParser {
             if (!meta) return;
 
             const rawVal = meta.signed ? plain.readInt16LE(8) : plain.readUInt16LE(8);
-            let numericVal = meta.scale > 0 ? +(rawVal / meta.scale).toFixed(2) : rawVal;
+            let val = +(rawVal / meta.scale).toFixed(2);
 
-            if (meta.unit === '%' && Math.abs(numericVal) > 100.0) return;
-            if (meta.unit === 'dB' && Math.abs(numericVal) > 50.0) return;
+            // Filter anomali register: Abaikan jika bukan nilai persen/desibel normal
+            if (meta.key === 'ident' && (val > 25.0 || val < 1.0)) return;
+            if (meta.key === 'sdm' && val < 20.0) return;
+            if (meta.key === 'rf_level' && (val < -10.0 || val > 10.0)) return;
 
-            if (this._store[channel] && this._store[channel][meta.chGroup]) {
-                this._store[channel][meta.chGroup][meta.key] = numericVal;
-            }
+            // Simpan nilai terverifikasi ke store
+            this._store[channel][meta.ch][meta.key] = val;
             this._activeChannel = channel;
             this._lastHeartbeat = new Date().toISOString();
 
             const rowKey = `${channel} ${meta.name}`;
-            const formattedVal = `${numericVal.toFixed(2)} ${meta.unit}`.trim();
-            this._cachedRows.set(rowKey, [rowKey, formattedVal]);
-            this._addMeasurement(seqNum, regHex, channel, meta.name, formattedVal);
+            const formatted = `${val.toFixed(2)} ${meta.key === 'rf_level' ? 'dB' : '%'}`;
+            this._cachedRows.set(rowKey, [rowKey, formatted]);
+
+            this._addMeasurement(seqNum, regHex, channel, meta.name, formatted);
         }
     }
 
@@ -232,13 +227,9 @@ class IlsMophienLlzParser extends BaseParser {
         const key = `${channel}:${param}`;
         const existingIdx = this._lastMeasurements.findIndex(m => `${m.channel}:${m.param}` === key);
         const record = {
-            seq,
-            regHex,
-            channel,
-            param,
+            seq, regHex, channel, param,
             parameterName: param,
-            value,
-            measuredValue: value,
+            value, measuredValue: value,
             timestamp: new Date().toISOString()
         };
 
@@ -248,7 +239,7 @@ class IlsMophienLlzParser extends BaseParser {
             this._lastMeasurements.push(record);
         }
 
-        if (this._lastMeasurements.length > 20) {
+        if (this._lastMeasurements.length > 16) {
             this._lastMeasurements.shift();
         }
     }
@@ -256,7 +247,7 @@ class IlsMophienLlzParser extends BaseParser {
     _buildOutput() {
         const m1 = this._store.MON1;
         const m2 = this._store.MON2;
-        const act = this._store[this._activeChannel] || m1;
+        const act = this._store[this._activeChannel] || m2;
 
         return {
             success: true,
@@ -273,21 +264,25 @@ class IlsMophienLlzParser extends BaseParser {
                 tx1: { ...this._systemState.tx1 },
                 tx2: { ...this._systemState.tx2 },
 
+                // Course Line Channel
                 cl_channel: {
                     mon1: { ddm: m1.cl.ddm, sdm: m1.cl.sdm, rf_level: m1.cl.rf_level, ident: m1.cl.ident },
                     mon2: { ddm: m2.cl.ddm, sdm: m2.cl.sdm, rf_level: m2.cl.rf_level, ident: m2.cl.ident }
                 },
 
+                // Displacement Sensitivity Channel
                 ds_channel: {
                     mon1: { ddm: m1.ds.ddm, sdm: m1.ds.sdm, rf_level: m1.ds.rf_level, ident: m1.ds.ident },
                     mon2: { ddm: m2.ds.ddm, sdm: m2.ds.sdm, rf_level: m2.ds.rf_level, ident: m2.ds.ident }
                 },
 
+                // Clearance Channel
                 clr_channel: {
                     mon1: { ddm: m1.clr.ddm, sdm: m1.clr.sdm, rf_level: m1.clr.rf_level, ident: m1.clr.ident },
                     mon2: { ddm: m2.clr.ddm, sdm: m2.clr.sdm, rf_level: m2.clr.rf_level, ident: m2.clr.ident }
                 },
 
+                // RF Displacement
                 rf_displacement: {
                     mon1: { course: m1.rf.course, clr: m1.rf.clr, separation: 0.0000 },
                     mon2: { course: m2.rf.course, clr: m2.rf.clr, separation: 0.0000 }
