@@ -657,6 +657,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     if (ipInput) ipInput.value = editSource.ip_address || '';
     if (supCategorySelect) supCategorySelect.value = editSource.sup_category || '';
     if (portInput) portInput.value = editSource.tcp_port || editSource.udp_port || '';
+    const ifaceInput = document.getElementById('dataSourceNetworkInterface');
+    if (ifaceInput) ifaceInput.value = editSource.network_interface || '';
     if (latInput) latInput.value = editSource.latitude || '';
     if (lngInput) lngInput.value = editSource.longitude || '';
 
@@ -966,6 +968,8 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     const isSnmpTemplate = isSnmpParsingId(templateSelect.value);
     const normalizedPort = isSnmpTemplate ? null : (portInput.value ? portInput.value : null);
 
+    const ifaceInput = document.getElementById('dataSourceNetworkInterface');
+
     const payload = {
       name: nameInput.value,
       ip_address: ipInput.value,
@@ -973,6 +977,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       sup_category: supCategorySelect ? supCategorySelect.value : null,
       parsing_id: templateSelect.value,
       tcp_port: normalizedPort,
+      network_interface: ifaceInput && ifaceInput.value ? ifaceInput.value.trim() : null,
       latitude: latInput.value,
       longitude: lngInput.value,
       extra_config: templateSelect.value === 'vhf_t6tv' ? JSON.stringify({

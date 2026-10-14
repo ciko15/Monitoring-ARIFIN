@@ -221,7 +221,12 @@
           <div class="form-group">
             <div id="dataSourceTcpPortGroup">
               <label for="dataSourceUdpPort">TCP Port</label>
-              <input type="number" id="dataSourceUdpPort" placeholder="e.g., 950">
+              <input type="number" id="dataSourceUdpPort" placeholder="e.g., 950 atau 38317">
+            </div>
+            <div id="dataSourceIfaceGroup" style="margin-top: 10px;">
+              <label for="dataSourceNetworkInterface">Network Interface (Port Mirror / Sniffer)</label>
+              <input type="text" id="dataSourceNetworkInterface" placeholder="e.g., Ethernet 3 atau 5 (Kosongkan untuk otomatis)">
+              <small style="color: #64748b; font-size: 11px;">Pilih interface capture (misal: Ethernet 2, Ethernet 3, Ethernet 4, atau nomor 1-10).</small>
             </div>
 
             <!-- SNMP Extra Fields — shown only when template = snmp_* -->

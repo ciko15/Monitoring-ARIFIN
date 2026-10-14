@@ -934,19 +934,33 @@ class NetworkListenerService {
                     console.log(`[LLZ-SNIFFER] Available capture interfaces:\n${stdout.trim()}`);
                     const lines = stdout.split('\n').map(l => l.trim()).filter(Boolean);
                     
-                    // Prioritas 1: Cocokkan persis nama kartu jaringan yang diminta (misal: "ethernet 3" atau "eth3")
+                    // Prioritas 1: Cocokkan persis nama kartu jaringan yang diminta oleh user jika ada (misal: "ethernet 2", "ethernet 4", dsb)
+                    if (targetIfaceName) {
+                        for (const line of lines) {
+                            const m = line.match(/^(\d+)\.\s*(.*)/);
+                            if (m) {
+                                const idx = m[1];
+                                const desc = m[2].toLowerCase();
+                                if (desc.includes(targetIfaceName)) {
+                                    return resolve(idx);
+                                }
+                            }
+                        }
+                    }
+
+                    // Prioritas 2: Cocokkan 'ethernet 3' (kabel default port mirror Surabaya)
                     for (const line of lines) {
                         const m = line.match(/^(\d+)\.\s*(.*)/);
                         if (m) {
                             const idx = m[1];
                             const desc = m[2].toLowerCase();
-                            if (desc.includes('ethernet 3') || (targetIfaceName && desc.includes(targetIfaceName))) {
+                            if (desc.includes('ethernet 3')) {
                                 return resolve(idx);
                             }
                         }
                     }
 
-                    // Prioritas 2: Cocokkan nama ethernet umum
+                    // Prioritas 3: Cocokkan sembarang ethernet yang aktif
                     for (const line of lines) {
                         const m = line.match(/^(\d+)\.\s*(.*)/);
                         if (m) {
