@@ -167,9 +167,9 @@ class NetworkListenerService {
         let isPingable = false;
 
         if (isInitialDisconnect) {
-            // Jika parsing_id adalah ils_mophien_llz atau modul TCP streaming khusus,
+            // Jika parsing_id adalah ils_mophien_llz / ils_mophien_gp atau modul TCP streaming khusus,
             // jangan biarkan ping ICMP yang di-block mematikan status alat
-            if (source.parsing_id === 'ils_mophien_llz') {
+            if (source.parsing_id === 'ils_mophien_llz' || source.parsing_id === 'ils_mophien_gp') {
                 isPingable = true;
                 if (!parsedData.data) parsedData.data = {};
                 parsedData.data.ping_status = 'Normal';
@@ -349,7 +349,7 @@ class NetworkListenerService {
         }
 
         // Jangan timpa parameter menjadi strip jika alat adalah streaming TCP aktif yang sudah menerima paket
-        if ((isDisconnect || finalStatus === 'Offline') && source.parsing_id !== 'ils_mophien_llz') {
+        if ((isDisconnect || finalStatus === 'Offline') && source.parsing_id !== 'ils_mophien_llz' && source.parsing_id !== 'ils_mophien_gp') {
             const prevData = this._lkgvCache.get(source.id);
             if (prevData) {
                 const dashData = {};
@@ -436,7 +436,7 @@ class NetworkListenerService {
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal) atau memiliki default port internal
             const PORTLESS_PARSERS = [
                 'snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv_snmp', 'vhf_t6tv',
-                'ils_mophien_llz', 'ils_gp_normac', 'ils_llz_normac'
+                'ils_mophien_llz', 'ils_mophien_gp', 'ils_gp_normac', 'ils_llz_normac'
             ];
             const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 25;
             const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 1000;
@@ -705,7 +705,7 @@ class NetworkListenerService {
     startBinaryTcpListener(source) {
         const net = require('net');
         const { id, equipt_id, ip_address, tcp_port, parsing_id, name } = source;
-        const port = parseInt(tcp_port) || (parsing_id === 'ils_mophien_llz' ? 38317 : 950);
+        const port = parseInt(tcp_port) || ((parsing_id === 'ils_mophien_llz' || parsing_id === 'ils_mophien_gp') ? 38317 : 950);
 
         // Petakan custom_id ke file js yang benar
         let moduleName = this._getParserModule(parsing_id);
@@ -718,7 +718,7 @@ class NetworkListenerService {
             typeof parser.getHeartbeatReply === 'function';
         const hasPollRequests = typeof parser.getPollRequests === 'function';
 
-        console.log(`[LLZ-TCP] Persistent worker initialized for ${name} (${ip_address}:${port}), module=${moduleName}`);
+        console.log(`[ILS-TCP] Persistent worker initialized for ${name} (${ip_address}:${port}), module=${moduleName}`);
 
         let socket = null;
         let stopped = false;
@@ -732,7 +732,7 @@ class NetworkListenerService {
             reconnectTimer = setTimeout(() => {
                 reconnectTimer = null;
                 if (!stopped) {
-                    console.log(`[LLZ-TCP] Attempting auto-reconnect for ${name} (${ip_address}:${port}) in backoff mode...`);
+                    console.log(`[ILS-TCP] Attempting auto-reconnect for ${name} (${ip_address}:${port}) in backoff mode...`);
                     connect();
                 }
             }, delay);
@@ -750,14 +750,14 @@ class NetworkListenerService {
             socket.setKeepAlive(true, 10000);
             socket.setNoDelay(true);
 
-            // Untuk streaming pasif (sniffing) seperti ils_mophien_llz, jangan gunakan socket timeout pendek
+            // Untuk streaming pasif (sniffing) seperti ils_mophien_llz / ils_mophien_gp, jangan gunakan socket timeout pendek
             // agar koneksi tetap standby mendengarkan stream tanpa diputus paksa.
-            if (moduleName !== 'ils_mophien_llz') {
+            if (moduleName !== 'ils_mophien_llz' && moduleName !== 'ils_mophien_gp') {
                 socket.setTimeout(60000);
             }
 
             socket.connect(port, ip_address, () => {
-                console.log(`[LLZ-TCP] Connected to ${name} (${ip_address}:${port})`);
+                console.log(`[ILS-TCP] Connected to ${name} (${ip_address}:${port})`);
                 if (reconnectTimer) {
                     clearTimeout(reconnectTimer);
                     reconnectTimer = null;
@@ -766,7 +766,7 @@ class NetworkListenerService {
                 this._binaryTcpSockets = this._binaryTcpSockets || new Map();
                 this._binaryTcpSockets.set(id, socket);
 
-                // Catatan: ils_mophien_llz murni pasif (sniffing), TIDAK mengirim trigger/write apapun ke perangkat.
+                // Catatan: ils_mophien_llz & ils_mophien_gp murni pasif (sniffing), TIDAK mengirim trigger/write apapun ke perangkat.
 
                 // Emit status Normal dan data awal saat terkoneksi agar equipment langsung aktif di dashboard
                 try {
@@ -781,8 +781,8 @@ class NetworkListenerService {
                     }
                 } catch (e) { }
 
-                // Kirim trigger secara berkala HANYA jika bukan ils_mophien_llz (karena LLZ murni sniffing pasif)
-                if (moduleName !== 'ils_mophien_llz' && (hasTriggerProtocol || hasPollRequests)) {
+                // Kirim trigger secara berkala HANYA jika bukan ils_mophien_llz / ils_mophien_gp (karena murni sniffing pasif)
+                if (moduleName !== 'ils_mophien_llz' && moduleName !== 'ils_mophien_gp' && (hasTriggerProtocol || hasPollRequests)) {
                     const doPoll = () => {
                         let triggerReqs = [];
                         if (hasPollRequests) {
@@ -1950,9 +1950,9 @@ class NetworkListenerService {
             return;
         }
 
-        // ILS Mophien LLZ Juanda — Gunakan dedicated passive packet sniffer di interface eth3
-        if (moduleName === 'ils_mophien_llz') {
-            console.log(`[LLZ-TRACE] Routing ${source.name} to startIlsMophienSnifferListener (Passive Sniffing on eth3)`);
+        // ILS Mophien LLZ & GP Juanda — Gunakan dedicated passive packet sniffer di interface mirror
+        if (moduleName === 'ils_mophien_llz' || moduleName === 'ils_mophien_gp') {
+            console.log(`[ILS-TRACE] Routing ${source.name} to startIlsMophienSnifferListener (Passive Sniffing on mirror interface)`);
             this.startIlsMophienSnifferListener(source);
             return;
         }

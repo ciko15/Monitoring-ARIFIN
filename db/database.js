@@ -116,6 +116,14 @@ const PARSER_TEMPLATES = {
     'rf_disp_course', 'rf_disp_clr', 'rf_disp_sep',
     'heartbeat'
   ],
+  'ils_mophien_gp': [
+    'station_ident', 'active_channel',
+    'cl_ddm', 'cl_sdm', 'cl_rf_level',
+    'clr_ddm', 'clr_sdm', 'clr_rf_level',
+    'ds_ddm', 'ds_sdm',
+    'rf_disp_course', 'rf_disp_clr',
+    'heartbeat'
+  ],
   'default': ['Status']
 };
 

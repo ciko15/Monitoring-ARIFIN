@@ -23,6 +23,7 @@ const DatakomD700Parser = require('./datakom_d700_modbus');
 const UniversalApiParser = require('./universal_api');
 const OteDtr100Parser = require('./ote_dtr100');
 const IlsMophienLlzParser = require('./ils_mophien_llz');
+const IlsMophienGpParser = require('./ils_mophien_gp');
 
 class ParserFactory {
     /**
@@ -158,6 +159,9 @@ class ParserFactory {
             case 'ils_mophien_llz':
                 return new IlsMophienLlzParser(config);
 
+            case 'ils_mophien_gp':
+                return new IlsMophienGpParser(config);
+
             case 'json':
                 return new JsonParser(config);
 
@@ -208,7 +212,8 @@ class ParserFactory {
             'datakom_d700_modbus',
             'dse7320_modbus',
             'universal_api',
-            'ils_mophien_llz'
+            'ils_mophien_llz',
+            'ils_mophien_gp'
         ];
     }
 }

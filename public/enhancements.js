@@ -34,7 +34,8 @@
         'diris_a20': ['VLN_avg', 'VLL_avg', 'HZ', 'PF', 'KW', 'KVAR'],
         'pm5350_modbus': ['V_RN', 'V_SN', 'V_TN', 'V_RS', 'V_ST', 'V_TR', 'I_R', 'I_S', 'I_T', 'FREQ', 'KW', 'KVA', 'PF'],
         'ils_llz_thales421': ['CRS_RF', 'WIDTH_RF', 'NF_RF', 'CRS_SDM', 'IDENT_AM', 'FREQ_DEV'],
-        'ils_mophien_llz': ['station_ident', 'active_channel', 'cl_ddm', 'ds_ddm', 'clr_ddm', 'service_status']
+        'ils_mophien_llz': ['station_ident', 'active_channel', 'cl_ddm', 'ds_ddm', 'clr_ddm', 'service_status'],
+        'ils_mophien_gp': ['station_ident', 'active_channel', 'cl_ddm', 'ds_ddm', 'clr_ddm', 'service_status']
     };
 
     function isMetricPlaceholder(value) {
@@ -600,15 +601,15 @@
 
         // Cache persistent untuk modal agar jika ada reconnect sesaat, telemetry tidak mendadak hilang jadi '-'
         if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
-        const isLlzSrc = effParserId === 'ils_mophien_llz' || 
-                         src?.parsing_id === 'ils_mophien_llz' || 
-                         (src?.name && src.name.toLowerCase().includes('localizer')) || 
-                         (src?.ip_address && String(src.ip_address).includes('10.62.3.20'));
+        const isIlsMophienSrc = effParserId === 'ils_mophien_llz' || effParserId === 'ils_mophien_gp' ||
+                                src?.parsing_id === 'ils_mophien_llz' || src?.parsing_id === 'ils_mophien_gp' ||
+                                (src?.name && (src.name.toLowerCase().includes('localizer') || src.name.toLowerCase().includes('glide'))) ||
+                                (src?.ip_address && (String(src.ip_address).includes('10.62.3.20') || String(src.ip_address).includes('10.62.3.21')));
                          
-        const modalCacheKey = src?.id || src?.ip_address || src?.name || 'llz_active';
+        const modalCacheKey = src?.id || src?.ip_address || src?.name || 'ils_active';
         const hasValidLlzData = latestData && (latestData.cl_channel || latestData.ds_channel || latestData.station_ident || latestData.cl_ddm !== undefined);
         
-        if (isLlzSrc) {
+        if (isIlsMophienSrc) {
             if (hasValidLlzData) {
                 window._modalTelemetryLkgv.set(modalCacheKey, JSON.parse(JSON.stringify(latestData)));
             } else if (window._modalTelemetryLkgv.has(modalCacheKey)) {
@@ -1204,14 +1205,18 @@
             pingBadge + `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${statusColors[status]}18;color:${statusColors[status]};border:1px solid ${statusColors[status]}40;letter-spacing:0.5px;">${status.toUpperCase()}</span>`;
 
         const modalContainer = modal.querySelector('div');
-        const isIlsLlz = src && (src.parsing_id === 'ils_mophien_llz' || (src.name && src.name.toLowerCase().includes('localizer')) || (data && data._parsing_id === 'ils_mophien_llz'));
-        if (modalContainer) modalContainer.style.maxWidth = isIlsLlz ? '960px' : '920px';
+        const isIlsMophien = src && (
+            src.parsing_id === 'ils_mophien_llz' || src.parsing_id === 'ils_mophien_gp' ||
+            (src.name && (src.name.toLowerCase().includes('localizer') || src.name.toLowerCase().includes('glide'))) ||
+            (data && (data._parsing_id === 'ils_mophien_llz' || data._parsing_id === 'ils_mophien_gp'))
+        );
+        if (modalContainer) modalContainer.style.maxWidth = isIlsMophien ? '960px' : '920px';
         const body = document.getElementById('srcDetailBody');
         if (body) {
-            if (isIlsLlz) {
+            if (isIlsMophien) {
                 // Gunakan cache LKGV jika data saat ini kosong atau null
                 if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
-                const cacheKey = src?.id || src?.ip_address || src?.name || 'llz_active';
+                const cacheKey = src?.id || src?.ip_address || src?.name || 'ils_active';
                 let renderData = data || {};
                 const hasMetrics = renderData && (renderData.cl_channel || renderData.ds_channel || renderData.station_ident || renderData.cl_ddm !== undefined);
                 if (hasMetrics) {
@@ -1308,13 +1313,22 @@
             separation: data.mon2_rf_disp_sep ?? null
         };
 
-        const targetSup = supCategory || 'ILS-LLZ';
-        currentActiveParserId = 'ils_mophien_llz';
-        window.currentDetailParserId = 'ils_mophien_llz';
+        const isGp = data.equipment_type === 'GLIDE_PATH' ||
+                     (src?.parsing_id && src.parsing_id.includes('gp')) ||
+                     (src?.name && (src.name.toLowerCase().includes('glide') || src.name.toLowerCase().includes('gp')));
+
+        const activeParser = isGp ? 'ils_mophien_gp' : 'ils_mophien_llz';
+        const targetSup = supCategory || (isGp ? 'ILS-GP' : 'ILS-LLZ');
+        currentActiveParserId = activeParser;
+        window.currentDetailParserId = activeParser;
+
+        const clTitle = isGp ? 'ON PATH (CL) CHANNEL' : 'COURSE LINE (CL) CHANNEL';
+        const dsTitle = 'DISPLACEMENT SENSITIVITY (DS)';
+        const clrTitle = 'CLEARANCE (CLR) CHANNEL';
 
         const renderParamRow = (label, rawVal, valStr, lookupKey = null) => {
             const queryLabel = lookupKey || label;
-            const limColor = getLimitColor(targetSup, queryLabel, rawVal, 'ils_mophien_llz');
+            const limColor = getLimitColor(targetSup, queryLabel, rawVal, activeParser);
 
             // Aturan Pewarnaan Dinamis:
             // - Jika parameter TIDAK memiliki konfigurasi limit pada database (unconfigured/null):
@@ -1381,7 +1395,7 @@
                         ${renderParamRow('DDM', mon1Obj.ddm, formatDec2(mon1Obj.ddm, '%'), lookupKeys.ddm)}
                         ${renderParamRow('SDM', mon1Obj.sdm, formatDec2(mon1Obj.sdm, '%'), lookupKeys.sdm)}
                         ${renderParamRow('RF Level', mon1Obj.rf_level, formatDec2(mon1Obj.rf_level, 'dB'), lookupKeys.rf_level)}
-                        ${renderParamRow('Ident AM', mon1Obj.ident, formatDec2(mon1Obj.ident, '%'), lookupKeys.ident)}
+                        ${!isGp || mon1Obj.ident != null ? renderParamRow('Ident AM', mon1Obj.ident, formatDec2(mon1Obj.ident, '%'), lookupKeys.ident) : ''}
                     </div>
 
                     <!-- MON2 Column -->
@@ -1395,7 +1409,7 @@
                         ${renderParamRow('DDM', mon2Obj.ddm, formatDec2(mon2Obj.ddm, '%'), lookupKeys.ddm)}
                         ${renderParamRow('SDM', mon2Obj.sdm, formatDec2(mon2Obj.sdm, '%'), lookupKeys.sdm)}
                         ${renderParamRow('RF Level', mon2Obj.rf_level, formatDec2(mon2Obj.rf_level, 'dB'), lookupKeys.rf_level)}
-                        ${renderParamRow('Ident AM', mon2Obj.ident, formatDec2(mon2Obj.ident, '%'), lookupKeys.ident)}
+                        ${!isGp || mon2Obj.ident != null ? renderParamRow('Ident AM', mon2Obj.ident, formatDec2(mon2Obj.ident, '%'), lookupKeys.ident) : ''}
                     </div>
                 </div>
             </div>
@@ -1513,14 +1527,14 @@
 
             <!-- 2. Executive Monitor Layout (Tabel Perbandingan MON1 vs MON2) -->
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:16px;">
-                <!-- A. CL Channel (Course Line) -->
-                ${renderChannelCard('COURSE LINE (CL) CHANNEL', 'fas fa-arrows-alt-v', mon1CL, mon2CL, 'cl')}
+                <!-- A. CL / Path Channel -->
+                ${renderChannelCard(clTitle, 'fas fa-arrows-alt-v', mon1CL, mon2CL, 'cl')}
 
                 <!-- B. DS Channel (Displacement Sensitivity) -->
-                ${renderChannelCard('DISPLACEMENT SENSITIVITY (DS)', 'fas fa-arrows-alt-h', mon1DS, mon2DS, 'ds')}
+                ${renderChannelCard(dsTitle, 'fas fa-arrows-alt-h', mon1DS, mon2DS, 'ds')}
 
                 <!-- C. CLR Channel (Clearance) -->
-                ${renderChannelCard('CLEARANCE (CLR) CHANNEL', 'fas fa-compass', mon1CLR, mon2CLR, 'clr')}
+                ${renderChannelCard(clrTitle, 'fas fa-compass', mon1CLR, mon2CLR, 'clr')}
             </div>
 
             <!-- 3. Sub-panel Radio Frequency (RF Displacement) -->
@@ -1709,16 +1723,20 @@
         // JIKA TIDAK ADA DATA (Disconnected / Offline / Belum ada paket)
         // Tetap tampilkan block group & parameter dengan nilai '—' berdasarkan template atau parser
         if (Object.keys(groups).length === 0) {
-            if (effectiveParserId === 'ils_mophien_llz') {
-                groups['CL CHANNEL (COURSE LINE)'] = {
+            if (effectiveParserId === 'ils_mophien_llz' || effectiveParserId === 'ils_mophien_gp') {
+                const isGpOffline = effectiveParserId === 'ils_mophien_gp';
+                groups[isGpOffline ? 'ON PATH (CL) CHANNEL' : 'CL CHANNEL (COURSE LINE)'] = {
                     items: {
                         'MON1 DDM': '—', 'MON2 DDM': '—',
                         'MON1 SDM': '—', 'MON2 SDM': '—',
-                        'MON1 RF LEVEL': '—', 'MON2 RF LEVEL': '—',
-                        'MON1 IDENT AM': '—', 'MON2 IDENT AM': '—'
+                        'MON1 RF LEVEL': '—', 'MON2 RF LEVEL': '—'
                     },
                     rawGroup: {}
                 };
+                if (!isGpOffline) {
+                    groups['CL CHANNEL (COURSE LINE)'].items['MON1 IDENT AM'] = '—';
+                    groups['CL CHANNEL (COURSE LINE)'].items['MON2 IDENT AM'] = '—';
+                }
                 groups['DS CHANNEL (DISPLACEMENT)'] = {
                     items: {
                         'MON1 DDM': '—', 'MON2 DDM': '—',
@@ -2225,20 +2243,21 @@
                         dmeRows.map(r => [r[0], r[1], info])
                 });
             }
-        } else if (parserId === 'ils_mophien_llz') {
+        } else if (parserId === 'ils_mophien_llz' || parserId === 'ils_mophien_gp') {
             const ok = '#00ff88', warn = '#ffcc00', err = '#ff3355', info = '#e8f4ff', accent = '#00d4ff';
+            const isGpSection = parserId === 'ils_mophien_gp' || data.equipment_type === 'GLIDE_PATH';
 
             sections.push({
-                title: 'LOCALIZER (LLZ) STATUS', params: [
+                title: isGpSection ? 'GLIDE PATH (GP) STATUS' : 'LOCALIZER (LLZ) STATUS', params: [
                     ['Station IDENT', data.station_ident || 'ISBY', accent],
                     ['Active Channel', data.active_channel || 'MON1', '#00ffcc'],
-                    ['DDM Course Line (CL)', data.cl_ddm != null ? `${data.cl_ddm} %` : '-2.47 %', ok],
-                    ['SDM Course Line (CL)', data.cl_sdm != null ? `${data.cl_sdm} %` : '40.00 %', info],
+                    [isGpSection ? 'DDM On Path (CL)' : 'DDM Course Line (CL)', data.cl_ddm != null ? `${data.cl_ddm} %` : '0.00 %', ok],
+                    ['SDM Course Line (CL)', data.cl_sdm != null ? `${data.cl_sdm} %` : (isGpSection ? '80.00 %' : '40.00 %'), info],
                     ['RF Level CL', data.cl_rf_level != null ? `${data.cl_rf_level} dB` : '0.00 dB', info],
-                    ['DDM Displacement (DS)', data.ds_ddm != null ? `${data.ds_ddm} %` : '15.57 %', ok],
-                    ['SDM Displacement (DS)', data.ds_sdm != null ? `${data.ds_sdm} %` : '40.00 %', info],
-                    ['DDM Clearance (CLR)', data.clr_ddm != null ? `${data.clr_ddm} %` : '0.00 %', info],
-                    ['SDM Clearance (CLR)', data.clr_sdm != null ? `${data.clr_sdm} %` : '40.00 %', info],
+                    ['DDM Displacement (DS)', data.ds_ddm != null ? `${data.ds_ddm} %` : (isGpSection ? '17.10 %' : '15.57 %'), ok],
+                    ['SDM Displacement (DS)', data.ds_sdm != null ? `${data.ds_sdm} %` : (isGpSection ? '80.00 %' : '40.00 %'), info],
+                    ['DDM Clearance (CLR)', data.clr_ddm != null ? `${data.clr_ddm} %` : (isGpSection ? '50.00 %' : '0.00 %'), info],
+                    ['SDM Clearance (CLR)', data.clr_sdm != null ? `${data.clr_sdm} %` : (isGpSection ? '80.00 %' : '40.00 %'), info],
                     ['RF Level CLR', data.clr_rf_level != null ? `${data.clr_rf_level} dB` : '0.00 dB', info],
                     ['RF Disp Course', data.rf_disp_course != null ? `${data.rf_disp_course} %` : '0.0000 %', info],
                     ['RF Disp Clearance', data.rf_disp_clr != null ? `${data.rf_disp_clr} %` : '0.0000 %', info],

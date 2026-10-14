@@ -54,7 +54,8 @@
       "UPS",
       "GENSET",
       "Power Meter",
-      "Radio Link"
+      "Radio Link",
+      "AC"
     ]
   }
 ]
