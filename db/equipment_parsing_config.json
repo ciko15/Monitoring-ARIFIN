@@ -246,10 +246,18 @@
     },
     {
         "id": "ils_mophien_llz",
-        "name": "ILS Mophien LLZ (PMDT Juanda)",
-        "description": "Parser TCP streaming untuk ILS Localizer Mophien / PMDT Juanda",
+        "name": "ILS Mophien LLZ",
+        "description": "Parser TCP streaming untuk ILS Localizer Mophien",
         "category": "Navigation",
         "files": "/src/parsers/ils_mophien_llz.js",
         "createdAt": "2026-10-12T09:00:00.000Z"
+    },
+    {
+        "id": "ils_mophien_gp",
+        "name": "ILS Mophien GP",
+        "description": "Parser TCP streaming untuk ILS GlidePath Mophien",
+        "category": "Navigation",
+        "files": "/src/parsers/ils_mophien_gp.js",
+        "createdAt": "2026-10-14T09:00:00.000Z"
     }
 ]
