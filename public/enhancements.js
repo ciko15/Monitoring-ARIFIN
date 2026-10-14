@@ -1463,7 +1463,7 @@
             rawHtml = `
             <div style="background:#091627; border:1px solid #163252; border-radius:8px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
                 <div style="background:linear-gradient(90deg, #0c1e36, #0e2746); padding:9px 14px; font-size:10px; font-weight:bold; color:#7a9eb8; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #163252;">
-                    <span><i class="fas fa-list-ul" style="margin-right:6px"></i> REGISTER TELEMETRY PARAMETERS (PMDT JUANDA)</span>
+                    <span><i class="fas fa-list-ul" style="margin-right:6px"></i> REGISTER TELEMETRY PARAMETERS</span>
                     <span style="color:#00d4ff">${rawRows.length} PARAMETERS</span>
                 </div>
                 <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:6px; padding:12px;">

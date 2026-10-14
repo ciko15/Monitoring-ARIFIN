@@ -927,7 +927,7 @@ class NetworkListenerService {
 
             const { exec } = require('child_process');
             return new Promise((resolve) => {
-                exec(`"${chosenTool}" -D`, (err, stdout) => {
+                exec(`"${chosenTool}" -D`, { windowsHide: true }, (err, stdout) => {
                     if (err || !stdout) {
                         return resolve('5'); // Default langsung ke 5 (Ethernet 3)
                     }
@@ -1010,7 +1010,10 @@ class NetworkListenerService {
 
             try {
                 console.log(`[LLZ-SNIFFER] Spawning passive sniffer: ${chosenTool} ${args.join(' ')}`);
-                snifferProc = spawn(chosenTool, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+                snifferProc = spawn(chosenTool, args, {
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                    windowsHide: true
+                });
 
                 this.activeListeners.add(id);
 
