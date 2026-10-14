@@ -3824,16 +3824,30 @@ async function loadUsers() {
     const res = await fetch(`${API_URL}/users`, { headers: getAuthHeaders() });
     if (res.ok) {
       usersData = await res.json();
-      // Only show roles: admin, teknisi, user. Hide superadmin.
-      const filteredUsers = usersData.filter(u => ['admin', 'teknisi', 'user'].includes(u.role));
-      renderUserTable(filteredUsers);
+      renderUserTable(usersData);
     } else {
       console.error('Failed to load users');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--danger)">Gagal memuat data user (Permission denied)</td></tr>';
     }
   } catch (err) {
     console.error('Error loading users:', err);
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--danger)">Error koneksi memuat user</td></tr>';
   }
 }
+
+window.filterUsersTable = function(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderUserTable(usersData);
+    return;
+  }
+  const filtered = usersData.filter(u => 
+    (u.name && u.name.toLowerCase().includes(q)) ||
+    (u.username && u.username.toLowerCase().includes(q)) ||
+    (u.role && u.role.toLowerCase().includes(q))
+  );
+  renderUserTable(filtered);
+};
 
 function renderUserTable(data) {
   const tbody = document.getElementById('userTableBody');
@@ -3847,12 +3861,18 @@ function renderUserTable(data) {
   tbody.innerHTML = data.map(user => `
     <tr>
       <td>${user.id}</td>
-      <td>${user.name || user.username}</td>
-      <td>${user.username}</td>
+      <td><strong>${user.name || user.username}</strong></td>
+      <td><code>${user.username}</code></td>
       <td><span class="badge badge-${user.role}">${user.role}</span></td>
-      <td class="actions">
-        <button class="btn-edit" onclick="editUser('${user.id}')" title="Edit User"><i class="fas fa-edit"></i></button>
-        <button class="btn-delete" onclick="deleteUser('${user.id}')" title="Delete User"><i class="fas fa-trash"></i></button>
+      <td class="actions" style="text-align: center;">
+        <button class="btn btn-secondary btn-sm" onclick="editUser('${user.id}')" title="Edit User & Ganti Password" style="margin-right: 5px;">
+          <i class="fas fa-edit"></i> Edit
+        </button>
+        ${user.role !== 'superadmin' ? `
+          <button class="btn btn-danger btn-sm" onclick="deleteUser('${user.id}')" title="Hapus User">
+            <i class="fas fa-trash"></i>
+          </button>
+        ` : ''}
       </td>
     </tr>
   `).join('');

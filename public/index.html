@@ -566,6 +566,60 @@
 
 
 
+  <!-- User Modal (Add/Edit) -->
+  <div class="modal-overlay hidden" id="userModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3><i class="fas fa-user-plus"></i> <span id="userModalFormTitle">Add New User</span></h3>
+        <button class="modal-close" id="closeUserModal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="userForm" autocomplete="off">
+          <input type="hidden" id="userId">
+          <div class="form-row-ux">
+            <div class="form-group-ux">
+              <label for="userName">Name</label>
+              <input type="text" id="userName" name="userName" autocomplete="name" required placeholder="Enter name">
+            </div>
+            <div class="form-group-ux">
+              <label for="userUsername">Username</label>
+              <input type="text" id="userUsername" name="userUsername" autocomplete="username" required
+                placeholder="Enter username">
+            </div>
+          </div>
+          <div class="form-row-ux">
+            <div class="form-group-ux">
+              <label for="userPassword">Password <span id="userPasswordRequiredStar" class="required-indicator">*</span></label>
+              <input type="password" id="userPassword" name="userPassword" autocomplete="new-password"
+                placeholder="Masukkan password baru (kosongkan jika tidak diubah)">
+            </div>
+            <div class="form-group-ux">
+              <label for="userRole">Role</label>
+              <div class="custom-select-wrapper" style="flex: 1;">
+                <select id="userRole" name="userRole" required style="width: 100%;">
+                  <option value="user">User</option>
+                  <option value="teknisi">Teknisi</option>
+                  <option value="admin">Admin</option>
+                  <option value="superadmin">Superadmin</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="form-actions-ux" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save"></i> Save User
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('userModal').classList.add('hidden')">
+              <i class="fas fa-times"></i> Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Airport Modal (Add/Edit) -->
   <div class="modal-overlay hidden" id="airportModal">
     <div class="modal-container">
@@ -1065,6 +1119,12 @@
         <!-- Surveillance - RADAR & ADS-B -->
 
 
+
+        <!-- Users Management (Superadmin & Admin) -->
+        <a href="#" class="nav-item hidden-initial" data-section="users" id="usersNavItem">
+          <i class="fas fa-users-cog"></i>
+          <span>User Management</span>
+        </a>
 
         <!-- Configuration - Configure Sub-menu (Limitation, Otentication, Parsing, Sup/Category) -->
         <a href="#" class="nav-item hidden-initial" data-section="configure" id="configureNavItem">
@@ -1846,6 +1906,46 @@
 
 
 
+
+      <!-- Users Section -->
+      <section class="content-section hidden" id="usersSection">
+        <div class="crud-container">
+          <div class="card">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <h2><i class="fas fa-users-cog"></i> User Management</h2>
+              <div class="header-actions" style="display:flex; gap:10px; align-items:center;">
+                <div class="search-box">
+                  <i class="fas fa-search"></i>
+                  <input type="text" id="searchUsers" placeholder="Search users..." onkeyup="filterUsersTable(this.value)">
+                </div>
+                <button class="btn btn-primary" id="addUserBtn">
+                  <i class="fas fa-user-plus"></i> Add User
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Username</th>
+                      <th>Role</th>
+                      <th style="text-align: center; width: 120px;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="userTableBody">
+                    <tr>
+                      <td colspan="5" class="empty-state">Loading users...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Configure Section (Issue #12) -->
       <section class="content-section hidden" id="configureSection">
