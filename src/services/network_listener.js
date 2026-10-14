@@ -983,7 +983,10 @@ class NetworkListenerService {
             const iface = await resolveInterface();
             console.log(`[LLZ-SNIFFER] Selected capture interface index: "${iface}"`);
 
-            const captureFilter = `tcp port ${port} and host ${ip_address}`;
+            // Filter capture: tangkap port TCP (38317) di port mirror.
+            // Gunakan filter langsung 'tcp port 38317' agar paket dari IP 10.62.3.20 maupun mirror traffic langsung tertangkap tanpa delay BPF.
+            const capturePort = port || 38317;
+            const captureFilter = `tcp port ${capturePort}`;
             let args = [];
 
             if (isTshark) {

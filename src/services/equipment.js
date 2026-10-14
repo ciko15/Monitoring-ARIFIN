@@ -332,13 +332,12 @@ class EquipmentService {
                 cache.mergedData.source_name = parsedData.source_name;
             }
 
-            // Reset timer (Tunggu 1 detik untuk mengumpulkan sisa potongan data)
-            // BUGFIX: Gunakan Throttle (jangan reset timer jika sudah jalan) agar data yang mengalir deras tidak menahan timer selamanya!
+            // 2. Database logging & Local Update (Cepat: 1s agar UI langsung update tanpa menunggu 30 detik)
             if (!cache.timer) {
+                const localUpdateDelayMs = 1000; // 1 detik agar data langsung muncul di Web UI
                 cache.timer = setTimeout(async () => {
                     cache.timer = null;
 
-                    // 2. Database logging & Local Update (Cepat)
                     const datalog = {
                         equipmentId,
                         equipment_name: equipName,
@@ -355,7 +354,7 @@ class EquipmentService {
                     };
 
                     await this.db.createEquipmentLog(datalog);
-                }, parseInt(process.env.EMS_TELEMETRY_INTERVAL_MS || '30000', 10)); // Local logging throttle disamakan 30s
+                }, localUpdateDelayMs);
             }
 
             // EMS Publish Throttle (Lambat, contoh 30 detik)

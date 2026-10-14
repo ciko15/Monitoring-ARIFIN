@@ -199,8 +199,21 @@ class IlsMophienLlzParser extends BaseParser {
         if (msgType === 0x86 && plain.length >= 10) {
             const regId = plain.readUInt16LE(4);
             const v1 = plain.readUInt16LE(6);
-            const v1Low = v1 & 0x000F;
-            const channel = (v1Low === 0x00 || v1Low === 0x02 || v1Low === 0x0C) ? 'MON1' : 'MON2';
+            const byte3 = plain[3];
+
+            // Deteksi Channel:
+            // 1. Berdasarkan flag byte3 (0x90 = MON1, 0xb0 = MON2)
+            // 2. Fallback ke v1 low nibble (0x0, 0x2, 0xC = MON1, lainnya = MON2)
+            let channel = 'MON1';
+            if (byte3 === 0x90 || (byte3 & 0x20) === 0) {
+                channel = 'MON1';
+            } else if (byte3 === 0xb0 || (byte3 & 0x20) !== 0) {
+                channel = 'MON2';
+            } else {
+                const v1Low = v1 & 0x000F;
+                channel = (v1Low === 0x00 || v1Low === 0x02 || v1Low === 0x0C) ? 'MON1' : 'MON2';
+            }
+
             const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
 
             if (regId === 5125) {
