@@ -1446,6 +1446,20 @@
             </div>`;
         }
 
+        const isDisconnected = !data || data._status === 'Disconnect' || data._status === 'Offline' || data.connectivity === 'Disconnected';
+
+        const serviceColor = isDisconnected ? '#3a5a7a' : '#00ff88';
+        const serviceBg = isDisconnected ? 'rgba(58,90,122,0.2)' : 'rgba(0,255,136,0.15)';
+        const serviceBorder = isDisconnected ? 'rgba(58,90,122,0.4)' : '#00ff88';
+
+        const tx1Color = isDisconnected ? '#64748b' : '#00ff88';
+        const tx1Bg = isDisconnected ? 'rgba(100,116,139,0.15)' : 'rgba(0,255,136,0.12)';
+        const tx1Border = isDisconnected ? 'rgba(100,116,139,0.3)' : 'rgba(0,255,136,0.4)';
+
+        const tx2Color = isDisconnected ? '#64748b' : '#ffcc00';
+        const tx2Bg = isDisconnected ? 'rgba(100,116,139,0.15)' : 'rgba(255,204,0,0.12)';
+        const tx2Border = isDisconnected ? 'rgba(100,116,139,0.3)' : 'rgba(255,204,0,0.4)';
+
         return `
         <div style="display:flex; flex-direction:column; gap:0;">
             <!-- 1. Header Status Bar (Top Panel) -->
@@ -1455,8 +1469,8 @@
                     <div style="display:flex; align-items:center; gap:8px;">
                         <i class="fas fa-broadcast-tower" style="color:#00d4ff; font-size:16px;"></i>
                         <span style="font-size:11px; color:#7a9eb8; font-weight:600;">IDENT:</span>
-                        <span style="font-size:15px; font-weight:800; color:#00ff88; letter-spacing:1.5px; background:rgba(0,255,136,0.12); padding:3px 10px; border-radius:4px; border:1px solid rgba(0,255,136,0.35);">${ident}</span>
-                        <span style="font-size:10px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); padding:2px 8px; border-radius:4px;">NORMAL</span>
+                        <span style="font-size:15px; font-weight:800; color:${ident !== '-' ? '#00ff88' : '#94a3b8'}; letter-spacing:1.5px; background:rgba(0,255,136,0.08); padding:3px 10px; border-radius:4px; border:1px solid rgba(0,255,136,0.25);">${ident}</span>
+                        ${isDisconnected ? '<span style="font-size:10px; font-weight:bold; color:#ff3355; background:rgba(255,51,85,0.1); border:1px solid rgba(255,51,85,0.3); padding:2px 8px; border-radius:4px;">DISCONNECTED</span>' : '<span style="font-size:10px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); padding:2px 8px; border-radius:4px;">NORMAL</span>'}
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="font-size:11px; color:#7a9eb8; font-weight:600;">Frekuensi:</span>
@@ -1467,13 +1481,13 @@
                 <!-- Right: Service Status & Transmitter Status Box -->
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="font-size:11px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.15); border:1px solid #00ff88; padding:4px 12px; border-radius:4px; letter-spacing:0.5px;"><i class="fas fa-check-circle" style="margin-right:4px;"></i> Service Status: ${serviceStatus}</span>
+                        <span style="font-size:11px; font-weight:bold; color:${serviceColor}; background:${serviceBg}; border:1px solid ${serviceBorder}; padding:4px 12px; border-radius:4px; letter-spacing:0.5px;"><i class="fas fa-circle-notch ${isDisconnected ? '' : 'fa-spin'}" style="margin-right:4px;"></i> Service Status: ${isDisconnected ? 'DISCONNECTED' : serviceStatus}</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:11px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.12); border:1px solid rgba(0,255,136,0.4); padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
+                        <span style="font-size:11px; font-weight:bold; color:${tx1Color}; background:${tx1Bg}; border:1px solid ${tx1Border}; padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
                             <i class="fas fa-satellite-dish" style="margin-right:4px;"></i> ${tx1Text}
                         </span>
-                        <span style="font-size:11px; font-weight:bold; color:#ffcc00; background:rgba(255,204,0,0.12); border:1px solid rgba(255,204,0,0.4); padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
+                        <span style="font-size:11px; font-weight:bold; color:${tx2Color}; background:${tx2Bg}; border:1px solid ${tx2Border}; padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
                             <i class="fas fa-shield-alt" style="margin-right:4px;"></i> ${tx2Text}
                         </span>
                     </div>

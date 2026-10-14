@@ -746,6 +746,10 @@ class NetworkListenerService {
             }
 
             socket = new net.Socket();
+            // Aktifkan TCP keepalive agar koneksi tidak diputus oleh router/firewall/NAT di jaringan bandara
+            socket.setKeepAlive(true, 10000);
+            socket.setNoDelay(true);
+
             // Untuk streaming pasif (sniffing) seperti ils_mophien_llz, jangan gunakan socket timeout pendek
             // agar koneksi tetap standby mendengarkan stream tanpa diputus paksa.
             if (moduleName !== 'ils_mophien_llz') {

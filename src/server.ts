@@ -311,6 +311,12 @@ async function checkEquipmentWatchdog() {
                             const parserId = String(src._parser_id || item.parser_id || '').toLowerCase();
                             const category = String(item.category || item.sup_category || '').toLowerCase();
                             
+                            // Jika parser adalah ils_mophien_llz, jangan dipaksa Disconnect oleh watchdog
+                            // karena status dan stream-nya dipelihara langsung oleh TCP persistent listener
+                            if (parserId.includes('ils_mophien_llz')) {
+                                return src._status || 'Normal';
+                            }
+
                             // Bypass ping for Radar and ADSB
                             if (parserId.includes('radar') || parserId.includes('adsb') || category.includes('radar') || category.includes('adsb')) {
                                 return 'Alarm';
