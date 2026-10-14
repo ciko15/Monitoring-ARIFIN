@@ -912,38 +912,53 @@ class NetworkListenerService {
             }
         }
 
-        // Di Windows, nama interface tidak bisa "eth3" melainkan angka indeks (1, 2, ...) atau Device GUID
+        // Di Windows, nama interface bisa diatur lewat konfigurasi data source:
+        // misal: "5", "Ethernet 3", atau "eth3"
         const resolveInterface = async () => {
             if (!isWindows || !isTshark) {
                 return source.network_interface || 'eth3';
             }
-            if (source.network_interface && /^\d+$/.test(source.network_interface)) {
-                return source.network_interface;
+            // Jika user langsung memasukkan angka indeks (misal: "5") di konfigurasi
+            if (source.network_interface && /^\d+$/.test(String(source.network_interface).trim())) {
+                return String(source.network_interface).trim();
             }
-            // Auto-detect interface index via tshark -D
+
+            const targetIfaceName = String(source.network_interface || 'Ethernet 3').toLowerCase().trim();
+
             const { exec } = require('child_process');
             return new Promise((resolve) => {
                 exec(`"${chosenTool}" -D`, (err, stdout) => {
                     if (err || !stdout) {
-                        return resolve('1'); // Default ke interface pertama
+                        return resolve('5'); // Default langsung ke 5 (Ethernet 3)
                     }
                     console.log(`[LLZ-SNIFFER] Available capture interfaces:\n${stdout.trim()}`);
                     const lines = stdout.split('\n').map(l => l.trim()).filter(Boolean);
                     
-                    // Cari baris yang mengandung 'Ethernet' atau 'eth'
-                    let matchedIdx = '1';
+                    // Prioritas 1: Cocokkan persis nama kartu jaringan yang diminta (misal: "ethernet 3" atau "eth3")
                     for (const line of lines) {
                         const m = line.match(/^(\d+)\.\s*(.*)/);
                         if (m) {
                             const idx = m[1];
                             const desc = m[2].toLowerCase();
-                            if (desc.includes('ethernet') || desc.includes('eth3') || desc.includes('lan')) {
-                                matchedIdx = idx;
-                                break;
+                            if (desc.includes('ethernet 3') || (targetIfaceName && desc.includes(targetIfaceName))) {
+                                return resolve(idx);
                             }
                         }
                     }
-                    resolve(matchedIdx);
+
+                    // Prioritas 2: Cocokkan nama ethernet umum
+                    for (const line of lines) {
+                        const m = line.match(/^(\d+)\.\s*(.*)/);
+                        if (m) {
+                            const idx = m[1];
+                            const desc = m[2].toLowerCase();
+                            if (desc.includes('ethernet')) {
+                                return resolve(idx);
+                            }
+                        }
+                    }
+
+                    resolve('5'); // Fallback ke 5
                 });
             });
         };
