@@ -316,8 +316,9 @@ class EquipmentService {
             
             // BUGFIX: Jika statusnya Offline/Disconnect tapi network_listener gagal mengirimkan dashData 
             // (misal karena _lkgvCache kosong saat baru restart), paksa ubah cache.mergedData menjadi '-'
+            // KECUALIKAN parser 'ils_mophien_llz' agar datanya tidak mendadak kosong/strip saat reconnect sesaat
             const isDead = String(finalStatus || '').toLowerCase() === 'disconnect' || String(finalStatus || '').toLowerCase() === 'offline' || String(finalStatus || '').toLowerCase() === 'error';
-            if (isDead) {
+            if (isDead && source?.parsing_id !== 'ils_mophien_llz') {
                 for (const key of Object.keys(cache.mergedData)) {
                     if (key !== 'connectivity' && key !== 'source_name' && !key.startsWith('_')) {
                         cache.mergedData[key] = '—';

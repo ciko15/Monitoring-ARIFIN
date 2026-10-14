@@ -192,6 +192,28 @@
             const res = await fetch('/api/config/limitations', { headers });
             const data = await res.json();
             window.limitationsCache = Array.isArray(data) ? data : [];
+
+            // TRIGGER LANGSUNG: Segera render ulang tampilan tanpa menunggu auto-refresh!
+            if (typeof window.renderCabangGrid === 'function') {
+                window.renderCabangGrid(true);
+            }
+
+            // Jika side panel sedang terbuka, langsung render ulang kartu-kartunya
+            if (_selectedEqId) {
+                const body = document.getElementById('detailPanelBody');
+                const panel = document.getElementById('equipmentDetailPanel');
+                if (panel && panel.classList.contains('open') && body) {
+                    const sources = _sourcesCache[_selectedEqId] || getBestAvailableSources(_selectedEqId);
+                    if (sources && sources.length > 0) {
+                        renderSourcePanel(sources, body, _selectedEqId);
+                    }
+                }
+            }
+
+            // Jika modal detail sedang terbuka, langsung refresh modal
+            if (_activeSourceDetail) {
+                refreshSourceDetailModal(_activeSourceDetail, true);
+            }
         } catch (e) {
             console.warn('[Enhancements] Failed to load limitations:', e);
         }
@@ -309,40 +331,23 @@
         const isExplicitlyInactive = window.limitationsCache.some(l => {
             if (l.is_active !== false && l.is_active !== 'false' && l.is_active !== 0 && l.is_active !== '0') return false;
             if (!matchesParser(l, effectiveParserId)) return false;
-            const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
-                .map(s => s.trim().toLowerCase()).filter(Boolean);
-            const isGenericSup = limitSups.length === 0 || limitSups.some(s => s === 'generic' || s === 'all' || s === '*');
-            const matchesCategory = (!!targetSup && limitSups.includes(targetSup)) || isGenericSup;
-            return matchesCategory && matchesLabel(l);
+            return matchesLabel(l);
         });
 
         if (isExplicitlyInactive) {
             return '#ffffff';
         }
 
-        const findLimit = (mode) => window.limitationsCache.find(l => {
+        const findLimit = () => window.limitationsCache.find(l => {
             // Abaikan jika limitasi berstatus nonaktif:
             if (l.is_active === false || l.is_active === 'false' || l.is_active === 0 || l.is_active === '0') return false;
 
+            // Prioritas: Parser cocok (atau berlaku global untuk semua parser) DAN Nama/Label parameter cocok
             if (!matchesParser(l, effectiveParserId)) return false;
-
-            const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
-                .map(s => s.trim().toLowerCase()).filter(Boolean);
-            const isGenericSup = limitSups.length === 0 || limitSups.some(s => s === 'generic' || s === 'all' || s === '*');
-
-            if (mode === 'exact') {
-                return !!targetSup && limitSups.includes(targetSup) && matchesLabel(l);
-            }
-
-            if (mode === 'generic') {
-                return isGenericSup && matchesLabel(l);
-            }
-
-            return false;
+            return matchesLabel(l);
         });
 
-        // HANYA cocokkan dengan sub-kategori yang sesuai atau rule generic. JANGAN bocor antar sub-kategori!
-        const limit = findLimit('exact') || findLimit('generic');
+        const limit = findLimit();
 
         // JIKA TIDAK ADA ATURAN LIMITASI: SEMUANYA PUTIH!
         if (!limit) return '#ffffff';
@@ -407,7 +412,8 @@
         if (numVal < minAlarm || numVal > maxAlarm) return '#ff3355'; // Alarm (Merah)
         if (numVal < minWarn || numVal > maxWarn) return '#ffcc00';   // Warning / Pre-Alarm (Kuning)
         return '#00ff88'; // Normal / Dalam batas aman pre-alarm (Hijau)
-    }   // equipmentId → [{...source}]
+    }
+    window.getLimitColor = getLimitColor;
 
     // ── Wait until cabang-app renders ────────────────────────────────────────
     function waitForGrid(cb) {
@@ -592,6 +598,18 @@
             }
         }
 
+        // Cache persistent untuk modal agar jika ada reconnect sesaat, telemetry tidak mendadak hilang jadi '-'
+        if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
+        const modalCacheKey = `${src?.id}_${src?.parsing_id}`;
+        const hasValidLlzData = latestData && (latestData.cl_channel || latestData.ds_channel || latestData.station_ident);
+        if (effParserId === 'ils_mophien_llz') {
+            if (hasValidLlzData) {
+                window._modalTelemetryLkgv.set(modalCacheKey, latestData);
+            } else if (window._modalTelemetryLkgv.has(modalCacheKey)) {
+                latestData = { ...window._modalTelemetryLkgv.get(modalCacheKey), ...(latestData || {}) };
+            }
+        }
+
         return { latestData, eqSup };
     }
 
@@ -740,12 +758,48 @@
                 _sourcesCache[equipmentId] = immediateSources;
                 renderSourcePanel(immediateSources, body, equipmentId);
             }
+            // Start live periodic refresh for the open side panel (every 3 seconds)
+            startSourcePanelLiveUpdates(equipmentId);
         } catch (e) {
             _sourceFetchMeta[equipmentId] = 0;
             if (immediateSources.length === 0) {
                 body.innerHTML = `<div style="padding:20px;color:#ff3355">Gagal memuat sources: ${e.message}</div>`;
             }
         }
+    }
+
+    let _sourcePanelTimer = null;
+    function stopSourcePanelLiveUpdates() {
+        if (_sourcePanelTimer) {
+            clearInterval(_sourcePanelTimer);
+            _sourcePanelTimer = null;
+        }
+    }
+
+    function startSourcePanelLiveUpdates(equipmentId) {
+        stopSourcePanelLiveUpdates();
+        _sourcePanelTimer = setInterval(async () => {
+            const panel = document.getElementById('equipmentDetailPanel');
+            const body = document.getElementById('detailPanelBody');
+            if (!panel || !panel.classList.contains('open') || _selectedEqId !== equipmentId) {
+                stopSourcePanelLiveUpdates();
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/equipment/${equipmentId}`, {
+                    headers: window.getAuthHeaders ? window.getAuthHeaders() : {}
+                });
+                if (res.ok) {
+                    const eqData = await res.json();
+                    updateEquipmentCacheEntry(eqData);
+                    const sources = _sourcesCache[equipmentId] || getBestAvailableSources(equipmentId);
+                    if (sources && sources.length > 0) {
+                        renderSourcePanel(sources, body, equipmentId);
+                    }
+                }
+            } catch (err) {}
+        }, 3000);
     }
 
     function resolveEffectiveParserId(src) {
@@ -965,19 +1019,43 @@
 
     function getSourceStatus(src) {
         let rawStatus = 'Disconnect';
+        let srcData = null;
+        let eqSup = '';
         if (window.equipmentDataCache) {
             const eq = window.equipmentDataCache.find(e => String(e.id) === String(src.equipt_id));
-            if (eq && eq.lastData) {
-                const srcData = resolveSourceData(eq, src);
-                if (srcData) {
-                    rawStatus = srcData._status || 'Normal';
-                } else {
-                    // Fallback: try first available
-                    const first = Object.values(eq.lastData)[0];
-                    if (first) rawStatus = first._status || 'Normal';
+            if (eq) {
+                eqSup = eq.sup_category || '';
+                if (eq.lastData) {
+                    srcData = resolveSourceData(eq, src);
+                    if (srcData) {
+                        rawStatus = srcData._status || 'Normal';
+                    } else {
+                        // Fallback: try first available
+                        const first = Object.values(eq.lastData)[0];
+                        if (first) {
+                            srcData = first;
+                            rawStatus = first._status || 'Normal';
+                        }
+                    }
                 }
             }
         }
+
+        // Evaluasi limit secara dinamis langsung dari data parameter
+        if (srcData && typeof srcData === 'object' && rawStatus !== 'Disconnect' && rawStatus !== 'Offline' && window.getLimitColor) {
+            const effPid = resolveEffectiveParserId(src) || srcData._parsing_id || src.parsing_id;
+            const hasBreach = Object.entries(srcData).some(([k, v]) => {
+                if (k.startsWith('_') || v === null || v === undefined) return false;
+                const c = window.getLimitColor(eqSup, k.replace(/_/g, ' '), v, effPid);
+                return c === '#ff3355' || c === '#ffcc00';
+            });
+            if (hasBreach) {
+                rawStatus = 'Warning';
+            } else {
+                rawStatus = 'Normal';
+            }
+        }
+
         // Aturan 1: Untuk data source, berapapun pembacaan nilainya (warning maupun alarm), status data source tetap Warning
         const norm = window.normalizeSourceStatus ? window.normalizeSourceStatus(rawStatus) : rawStatus;
         const normLower = String(norm || '').toLowerCase();
@@ -1063,6 +1141,22 @@
         document.getElementById('srcDetailTitle').textContent = titleText;
 
         let status = data ? (data._status || 'Normal') : 'Disconnect';
+
+        // Evaluasi apakah ada parameter di dalam data yang melanggar limit (Alarm / Warning):
+        if (data && typeof data === 'object' && status !== 'Disconnect' && status !== 'Offline') {
+            const hasBreach = Object.entries(data).some(([k, v]) => {
+                if (k.startsWith('_') || v === null || v === undefined) return false;
+                const c = getLimitColor(eqSup, k.replace(/_/g, ' '), v, src?.parsing_id);
+                return c === '#ff3355' || c === '#ffcc00';
+            });
+            if (hasBreach) {
+                status = 'Warning';
+            } else {
+                // Jika limitasi dinonaktifkan atau semua parameter normal, pastikan status kembali ke Normal (tidak stuck di Warning)
+                status = 'Normal';
+            }
+        }
+
         const statusLower = String(status).toLowerCase();
         if (statusLower === 'alarm' || statusLower === 'alert' || statusLower === 'fail' || statusLower === 'critical') {
             status = 'Warning';
@@ -1102,26 +1196,16 @@
         document.getElementById('srcDetailStatus').innerHTML =
             pingBadge + `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${statusColors[status]}18;color:${statusColors[status]};border:1px solid ${statusColors[status]}40;letter-spacing:0.5px;">${status.toUpperCase()}</span>`;
 
+        const modalContainer = modal.querySelector('div');
+        const isIlsLlz = src && (src.parsing_id === 'ils_mophien_llz' || (src.name && src.name.toLowerCase().includes('localizer')) || (data && data._parsing_id === 'ils_mophien_llz'));
+        if (modalContainer) modalContainer.style.maxWidth = isIlsLlz ? '960px' : '920px';
         const body = document.getElementById('srcDetailBody');
-
-        if (!data || Object.keys(data).filter(k => !k.startsWith('_')).length === 0) {
-            body.innerHTML = `<div style="text-align:center;padding:48px 20px;color:#475569">
-                <i class="fas fa-satellite-dish fa-3x" style="margin-bottom:14px;color:#334155;"></i>
-                <p style="font-size:13px;font-weight:500;">Belum ada data telemetri yang diterima dari perangkat ini.</p>
-            </div>`;
-        } else if (data._isMarcMulti) {
-            body.innerHTML = renderMarcMultiRadioDetail(data.radios, eqSup, data._logged_at);
-        } else if (data._parsing_id === 'vhf_marc_rse' || data._parsing_id === 'marc_pae') {
-            const radioName = src ? src.name : 'Radio';
-            body.innerHTML = renderMarcMultiRadioDetail({ [radioName]: data }, eqSup, data._logged_at);
-        } else if (src && (src.parsing_id === 'ils_mophien_llz' || data._parsing_id === 'ils_mophien_llz' || (src.name && src.name.toLowerCase().includes('localizer')))) {
-            const modalContainer = modal.querySelector('div');
-            if (modalContainer) modalContainer.style.maxWidth = '940px';
-            body.innerHTML = renderIlsMophienLlzDetail(data, src, eqSup);
-        } else {
-            const modalContainer = modal.querySelector('div');
-            if (modalContainer) modalContainer.style.maxWidth = '920px';
-            body.innerHTML = renderUniversalEquipmentModal(data, src, eqSup);
+        if (body) {
+            if (isIlsLlz) {
+                body.innerHTML = renderIlsMophienLlzDetail(data || {}, src, eqSup);
+            } else {
+                body.innerHTML = renderDetailData(src?.parsing_id || data?._parsing_id, data || {}, eqSup);
+            }
         }
 
         modal.style.display = 'flex';
@@ -1563,7 +1647,17 @@
                 Object.entries(val).forEach(([subK, subV]) => {
                     const subLower = subK.toLowerCase();
                     if (subK.startsWith('_') || subK.endsWith('_unit') || IGNORED_ROOT_KEYS.has(subLower) || Array.isArray(subV) || isMetricPlaceholder(subV)) return;
-                    subItems[subK] = subV;
+                    
+                    // Support 2-level nesting (misal: cl_channel.mon1.ddm => Mon1 Ddm)
+                    if (typeof subV === 'object' && subV !== null && !Array.isArray(subV)) {
+                        Object.entries(subV).forEach(([deepK, deepV]) => {
+                            if (!deepK.startsWith('_') && !Array.isArray(deepV) && !isMetricPlaceholder(deepV)) {
+                                subItems[`${subK}_${deepK}`] = deepV;
+                            }
+                        });
+                    } else {
+                        subItems[subK] = subV;
+                    }
                 });
                 if (Object.keys(subItems).length > 0) {
                     groups[key] = { items: subItems, rawGroup: val };
@@ -1581,7 +1675,68 @@
             groups['TELEMETRY / PARAMETER'] = { items: flatItems, rawGroup: data };
         }
 
-        // Jika tidak ada data yang bisa ditampilkan
+        // JIKA TIDAK ADA DATA (Disconnected / Offline / Belum ada paket)
+        // Tetap tampilkan block group & parameter dengan nilai '—' berdasarkan template atau parser
+        if (Object.keys(groups).length === 0) {
+            if (effectiveParserId === 'ils_mophien_llz') {
+                groups['CL CHANNEL (COURSE LINE)'] = {
+                    items: {
+                        'MON1 DDM': '—', 'MON2 DDM': '—',
+                        'MON1 SDM': '—', 'MON2 SDM': '—',
+                        'MON1 RF LEVEL': '—', 'MON2 RF LEVEL': '—',
+                        'MON1 IDENT AM': '—', 'MON2 IDENT AM': '—'
+                    },
+                    rawGroup: {}
+                };
+                groups['DS CHANNEL (DISPLACEMENT)'] = {
+                    items: {
+                        'MON1 DDM': '—', 'MON2 DDM': '—',
+                        'MON1 SDM': '—', 'MON2 SDM': '—',
+                        'MON1 RF LEVEL': '—', 'MON2 RF LEVEL': '—',
+                        'MON1 IDENT AM': '—', 'MON2 IDENT AM': '—'
+                    },
+                    rawGroup: {}
+                };
+                groups['CLR CHANNEL (CLEARANCE)'] = {
+                    items: {
+                        'MON1 DDM': '—', 'MON2 DDM': '—',
+                        'MON1 SDM': '—', 'MON2 SDM': '—',
+                        'MON1 RF LEVEL': '—', 'MON2 RF LEVEL': '—',
+                        'MON1 IDENT AM': '—', 'MON2 IDENT AM': '—'
+                    },
+                    rawGroup: {}
+                };
+                groups['RF DISPLACEMENT'] = {
+                    items: {
+                        'MON1 COURSE': '—', 'MON2 COURSE': '—',
+                        'MON1 CLR': '—', 'MON2 CLR': '—',
+                        'MON1 SEPARATION': '—', 'MON2 SEPARATION': '—'
+                    },
+                    rawGroup: {}
+                };
+                groups['SYSTEM STATUS'] = {
+                    items: {
+                        'STATION IDENT': '—',
+                        'ACTIVE CHANNEL': '—',
+                        'FREQUENCY': '—',
+                        'SERVICE STATUS': '—'
+                    },
+                    rawGroup: {}
+                };
+            } else if (tmplParams.length > 0) {
+                const placeholderItems = {};
+                tmplParams.forEach(p => {
+                    const label = p.label || p.name;
+                    placeholderItems[label] = '—';
+                });
+                groups[tmpl?.name ? tmpl.name.toUpperCase() : 'TELEMETRY PARAMETERS'] = {
+                    items: placeholderItems,
+                    rawGroup: {}
+                };
+            }
+        }
+
+        // Jika benar-benar tidak ada template maupun konfigurasi fallback
         if (Object.keys(groups).length === 0) {
             return `
             <div style="text-align:center;padding:40px 20px;color:#64748b;">
@@ -1682,10 +1837,62 @@
     function renderDetailData(parserId, data, supCategory) {
         currentActiveParserId = parserId;
         window.currentDetailParserId = parserId;
-        if (parserId === 'ils_mophien_llz') {
-            return renderIlsMophienLlzDetail(data, null, supCategory);
+        const sections = getDetailSections(parserId, data, supCategory);
+        if (!sections || sections.length === 0) {
+            return renderUniversalEquipmentModal(data, { parsing_id: parserId }, supCategory);
         }
-        return renderUniversalEquipmentModal(data, { parsing_id: parserId }, supCategory);
+        return sections.map(sec => `
+            <div style="margin-bottom:18px">
+                <div style="font-size:11px;font-weight:700;color:#00d4ff;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.08);">${sec.title}</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px">
+                    ${sec.params.map(([label, val, cls]) => {
+                        let limColor = getLimitColor(supCategory, label, val, parserId);
+                        if (sec.title === 'Connection Error') {
+                            limColor = cls || '#ff3355';
+                        }
+
+                        let finalColor = '#ffffff';
+                        let isAlarm = false;
+                        let isWarning = false;
+                        let isNormalLimit = false;
+
+                        if (limColor === '#ff3355') {
+                            finalColor = '#ff3355';
+                            isAlarm = true;
+                        } else if (limColor === '#ffcc00') {
+                            finalColor = '#ffcc00';
+                            isWarning = true;
+                        } else if (limColor === '#00ff88') {
+                            finalColor = '#00ff88';
+                            isNormalLimit = true;
+                        }
+
+                        const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
+                        const cardBorder = isAlarm 
+                            ? '1px solid rgba(255, 51, 85, 0.5)' 
+                            : isWarning 
+                            ? '1px solid rgba(255, 204, 0, 0.5)' 
+                            : isNormalLimit 
+                            ? '1px solid rgba(0, 255, 136, 0.35)' 
+                            : '1px solid #0d2a45';
+                        const cardBg = isAlarm 
+                            ? 'rgba(255, 51, 85, 0.1)' 
+                            : isWarning 
+                            ? 'rgba(255, 204, 0, 0.1)' 
+                            : isNormalLimit 
+                            ? 'rgba(0, 255, 136, 0.06)' 
+                            : '#0f1e35';
+
+                        const displayVal = (val === null || val === undefined || val === '' || val === '-' || val === '—') ? '—' : val;
+
+                        return `
+                        <div style="background:${cardBg};border:${cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;">
+                            <div style="font-size:10px;color:${labelColor};letter-spacing:0.5px;margin-bottom:4px;font-weight:${(isAlarm || isWarning || isNormalLimit) ? '700' : '500'};overflow-wrap:anywhere;">${label}</div>
+                            <div style="font-size:13px;font-weight:700;color:${finalColor};overflow-wrap:anywhere;">${displayVal}</div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`).join('');
     }
 
     function getDetailSections(parserId, data, supCategory) {
@@ -2672,6 +2879,7 @@
             if (overlay) overlay.classList.remove('open');
             document.querySelectorAll('.cabang-card').forEach(c => c.classList.remove('card-selected'));
             _selectedEqId = null;
+            stopSourcePanelLiveUpdates();
         };
 
         if (closeBtn) {

@@ -23,7 +23,7 @@ const cabangModule = (function () {
   let lastRenderSignature = '';
   let lastEquipmentFetchAt = 0;
   let sourceConfigs = [];
-  const MIN_FETCH_INTERVAL_MS = 7000;
+  const MIN_FETCH_INTERVAL_MS = 2500;
   const CACHE_VERSION = 'source-aware-2026-06-30';
 
   // DOM Elements
@@ -38,6 +38,7 @@ const cabangModule = (function () {
   function init() {
     refreshCacheVersion();
     loadCachedSourceConfigs();
+    loadSourceConfigs();
     bindEvents();
     loadAirports();
     // Load all equipment initially
@@ -75,6 +76,9 @@ const cabangModule = (function () {
 
       sourceConfigs = normalizeList(await response.json());
       localStorage.setItem('cabang_source_config_cache', JSON.stringify(sourceConfigs));
+      if (equipmentData.length > 0) {
+        renderCabangGrid(true);
+      }
     } catch (error) {
       console.warn('[Cabang] Failed loading source configs:', error);
     }
@@ -150,7 +154,7 @@ const cabangModule = (function () {
     }
   }
 
-  // Auto-refresh every 20 seconds
+  // Auto-refresh every 5 seconds
   function startAutoRefresh() {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     autoRefreshInterval = setInterval(() => {
@@ -159,7 +163,7 @@ const cabangModule = (function () {
       if (section && !section.classList.contains('hidden') && document.visibilityState !== 'hidden') {
         loadEquipment(true); // silent refresh
       }
-    }, 20000);
+    }, 5000);
   }
 
   async function loadAirports() {
@@ -265,7 +269,8 @@ const cabangModule = (function () {
   }
 
   function buildRenderSignature(items) {
-    return JSON.stringify(items.map(item => ({
+    const limKey = window.limitationsCache ? window.limitationsCache.map(l => `${l.id}:${l.is_active}`).join(',') : '';
+    return limKey + '||' + JSON.stringify(items.map(item => ({
       id: item.id,
       status: item.status,
       lastUpdate: item.lastUpdate,
@@ -279,7 +284,7 @@ const cabangModule = (function () {
     })));
   }
 
-  function renderCabangGrid() {
+  function renderCabangGrid(force = false) {
     if (!cabangGrid) return;
 
     window.normalizeSourceStatus = function (rawStatus) {
@@ -293,7 +298,24 @@ const cabangModule = (function () {
 
     function deriveEquipmentStatus(item) {
       if (item && item.lastData && Object.keys(item.lastData).length > 0) {
-        const sourceStatuses = Object.values(item.lastData).map(src => normalizeSourceStatus(src?._status));
+        const sourceStatuses = Object.entries(item.lastData).map(([srcName, src]) => {
+          let s = src?._status || 'Normal';
+          if (s !== 'Disconnect' && s !== 'Offline' && window.getLimitColor && typeof src === 'object') {
+            const cfg = sourceConfigs.find(c => String(c.equipt_id ?? c.equipmentId ?? '') === String(item.id) && c.name === srcName);
+            const pid = src._parsing_id || cfg?.parsing_id || null;
+            const hasBreach = Object.entries(src).some(([k, v]) => {
+              if (k.startsWith('_') || v === null || v === undefined) return false;
+              const c = window.getLimitColor(item.sup_category, k.replace(/_/g, ' '), v, pid);
+              return c === '#ff3355' || c === '#ffcc00';
+            });
+            if (hasBreach) {
+              s = 'Warning';
+            } else {
+              s = 'Normal';
+            }
+          }
+          return normalizeSourceStatus(s);
+        });
         const uniqueStatuses = Array.from(new Set(sourceStatuses));
         if (uniqueStatuses.length === 1) {
           return uniqueStatuses[0].toLowerCase();
@@ -377,7 +399,7 @@ const cabangModule = (function () {
       return;
     }
 
-    if (renderSignature === lastRenderSignature) {
+    if (!force && renderSignature === lastRenderSignature) {
       return;
     }
     lastRenderSignature = renderSignature;
@@ -401,7 +423,22 @@ const cabangModule = (function () {
         if (sources.length > 0) {
           const cardsHtml = sources.map(sourceName => {
             const sourceData = item.lastData[sourceName] || {};
-            const srcStatus = normalizeSourceStatus(sourceData._status || 'Normal');
+            let rawSrcStatus = sourceData._status || 'Normal';
+            if (rawSrcStatus !== 'Disconnect' && rawSrcStatus !== 'Offline' && window.getLimitColor) {
+              const cfg = sourceConfigs.find(c => String(c.equipt_id ?? c.equipmentId ?? '') === String(item.id) && c.name === sourceName);
+              const parserId = sourceData._parsing_id || cfg?.parsing_id || null;
+              const hasLimitBreach = Object.entries(sourceData).some(([k, v]) => {
+                if (k.startsWith('_') || v === null || v === undefined) return false;
+                const c = window.getLimitColor(item.sup_category, k.replace(/_/g, ' '), v, parserId);
+                return c === '#ff3355' || c === '#ffcc00';
+              });
+              if (hasLimitBreach) {
+                rawSrcStatus = 'Warning';
+              } else {
+                rawSrcStatus = 'Normal';
+              }
+            }
+            const srcStatus = normalizeSourceStatus(rawSrcStatus);
             const logDate = sourceData._logged_at ? new Date(sourceData._logged_at) : null;
             const isToday = logDate && logDate.toDateString() === new Date().toDateString();
             const srcTime = logDate
@@ -542,12 +579,21 @@ const cabangModule = (function () {
       renderCabangGrid();
     },
 
-    refresh: () => loadEquipment()
+    refresh: () => loadEquipment(),
+    renderGrid: (force = false) => {
+      if (force) lastRenderSignature = '';
+      renderCabangGrid(force);
+    }
   };
 })();
 
 // Global reference for external access
 window.cabangModule = cabangModule;
+window.renderCabangGrid = function(force = false) {
+  if (cabangModule && typeof cabangModule.renderGrid === 'function') {
+    cabangModule.renderGrid(force);
+  }
+};
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {

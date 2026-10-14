@@ -261,7 +261,9 @@
     "max_warning_limit": "30.0",
     "max_alarm_limit": "35.0",
     "whv": "30.0",
-    "ahv": "35.0"
+    "ahv": "35.0",
+    "label": "Temperature",
+    "is_active": true
   },
   {
     "id": 7001,
@@ -367,14 +369,20 @@
     "id": 9006,
     "name": "Temperature",
     "category": "Data Processing",
-    "sup_category": "Switch",
+    "sup_category": "All",
     "value_type": "numeric",
-    "max_warning_limit": "65.0",
+    "max_warning_limit": "35.0",
     "max_alarm_limit": "75.0",
-    "whv": "65.0",
+    "whv": "35.0",
     "ahv": "75.0",
     "label": "Temperature",
-    "is_active": false
+    "is_active": false,
+    "match_mode": "contains",
+    "target_parsers": [],
+    "min_alarm_limit": null,
+    "alv": null,
+    "min_warning_limit": null,
+    "wlv": null
   },
   {
     "id": 1791698838435,

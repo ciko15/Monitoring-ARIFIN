@@ -1173,6 +1173,10 @@ async function getLimitationsByEquipment(equipmentId, specificParsingId = null) 
         if (!hasMatchingParser && activeParsingIds.length > 0) {
           return false;
         }
+        // Jika target_parsers cocok, anggap rule valid (kategori/sub-kategori hanya untuk pendataan)
+        if (hasMatchingParser) {
+          return true;
+        }
       }
     }
 

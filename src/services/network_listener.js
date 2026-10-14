@@ -746,8 +746,11 @@ class NetworkListenerService {
             }
 
             socket = new net.Socket();
-            // 60s timeout agar stream tetap terjaga
-            socket.setTimeout(60000);
+            // Untuk streaming pasif (sniffing) seperti ils_mophien_llz, jangan gunakan socket timeout pendek
+            // agar koneksi tetap standby mendengarkan stream tanpa diputus paksa.
+            if (moduleName !== 'ils_mophien_llz') {
+                socket.setTimeout(60000);
+            }
 
             socket.connect(port, ip_address, () => {
                 console.log(`[LLZ-TCP] Connected to ${name} (${ip_address}:${port})`);
@@ -759,27 +762,7 @@ class NetworkListenerService {
                 this._binaryTcpSockets = this._binaryTcpSockets || new Map();
                 this._binaryTcpSockets.set(id, socket);
 
-                // Kirim frame inisiasi sesi / trigger secara periodik untuk PMDT Juanda
-                if (moduleName === 'ils_mophien_llz') {
-                    const triggerCommand = Buffer.from([0x01, 0x02, 0xc5, 0x35, 0x17, 0x8b, 0x1a, 0x0e, 0x01, 0x03, 0xab, 0x39]);
-                    const sendTrigger = () => {
-                        if (socket && !socket.destroyed) {
-                            try {
-                                socket.write(triggerCommand);
-                            } catch (err) {
-                                console.warn(`[LLZ-TCP] Trigger write warning: ${err.message}`);
-                            }
-                        }
-                    };
-
-                    // Kirim trigger pertama saat konek
-                    sendTrigger();
-                    console.log(`[LLZ-TCP] Session trigger loop started for ${ip_address}:${port}`);
-
-                    // Ulangi kirim trigger setiap 3 detik agar alat terus menyemburkan paket live
-                    if (pollTimer) clearInterval(pollTimer);
-                    pollTimer = setInterval(sendTrigger, 3000);
-                }
+                // Catatan: ils_mophien_llz murni pasif (sniffing), TIDAK mengirim trigger/write apapun ke perangkat.
 
                 // Emit status Normal dan data awal saat terkoneksi agar equipment langsung aktif di dashboard
                 try {
@@ -794,8 +777,8 @@ class NetworkListenerService {
                     }
                 } catch (e) { }
 
-                // Kirim trigger secara berkala jika parser mendukung poll requests atau heartbeat
-                if (hasTriggerProtocol || hasPollRequests) {
+                // Kirim trigger secara berkala HANYA jika bukan ils_mophien_llz (karena LLZ murni sniffing pasif)
+                if (moduleName !== 'ils_mophien_llz' && (hasTriggerProtocol || hasPollRequests)) {
                     const doPoll = () => {
                         let triggerReqs = [];
                         if (hasPollRequests) {
@@ -809,7 +792,7 @@ class NetworkListenerService {
                                 const bytes = req.bytes ? req.bytes : req;
                                 socket.write(bytes);
                             } catch (e) {
-                                console.warn(`[NetworkListener] ILS trigger write error ${name}: ${e.message}`);
+                                console.warn(`[NetworkListener] TCP trigger write error ${name}: ${e.message}`);
                             }
                         }
                     };
@@ -825,25 +808,15 @@ class NetworkListenerService {
                     console.log(`[LLZ-TCP] Received ${chunk.length} bytes from ${name}: ${chunk.slice(0, 32).toString('hex')}...`);
                 }
 
-                // Balas heartbeat dari device agar stream tetap hidup tanpa RCMS
-                if (hasTriggerProtocol && parser.isHeartbeat(chunk)) {
-                    const lastReply = this._lastHeartbeatReply.get(id) || 0;
-                    if (Date.now() - lastReply > 5000) {
-                        try {
-                            socket.write(parser.getHeartbeatReply());
-                            this._lastHeartbeatReply.set(id, Date.now());
-                        } catch (e) {
-                            console.warn(`[NetworkListener] ILS heartbeat reply error ${name}: ${e.message}`);
-                        }
-                    }
-                }
-
                 // Alirkan chunk mentah langsung ke parser & handler log/WebSocket
                 await this.handleIncomingData(source, chunk, parser);
             });
 
             const reportDisconnect = (reason) => {
-                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
+                // Untuk ils_mophien_llz, pertahankan data terakhir saat reconnect sesaat agar tampilan tidak kosong
+                const cached = this._lkgvCache ? this._lkgvCache.get(source.id) : null;
+                const fallbackData = (moduleName === 'ils_mophien_llz' && cached) ? cached : {};
+                this._handleLogOutput(source, { data: fallbackData, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
             };
 
             socket.on('error', (err) => {
@@ -870,7 +843,6 @@ class NetworkListenerService {
                 reportDisconnect('close');
                 if (pollTimer) clearInterval(pollTimer);
                 this.activeListeners.delete(id);
-                if (typeof parser.reset === 'function') parser.reset();
                 scheduleReconnect();
             });
         };
