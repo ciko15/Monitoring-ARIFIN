@@ -600,13 +600,20 @@
 
         // Cache persistent untuk modal agar jika ada reconnect sesaat, telemetry tidak mendadak hilang jadi '-'
         if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
-        const modalCacheKey = `${src?.id}_${src?.parsing_id}`;
-        const hasValidLlzData = latestData && (latestData.cl_channel || latestData.ds_channel || latestData.station_ident);
-        if (effParserId === 'ils_mophien_llz') {
+        const isLlzSrc = effParserId === 'ils_mophien_llz' || 
+                         src?.parsing_id === 'ils_mophien_llz' || 
+                         (src?.name && src.name.toLowerCase().includes('localizer')) || 
+                         (src?.ip_address && String(src.ip_address).includes('10.62.3.20'));
+                         
+        const modalCacheKey = src?.id || src?.ip_address || src?.name || 'llz_active';
+        const hasValidLlzData = latestData && (latestData.cl_channel || latestData.ds_channel || latestData.station_ident || latestData.cl_ddm !== undefined);
+        
+        if (isLlzSrc) {
             if (hasValidLlzData) {
-                window._modalTelemetryLkgv.set(modalCacheKey, latestData);
+                window._modalTelemetryLkgv.set(modalCacheKey, JSON.parse(JSON.stringify(latestData)));
             } else if (window._modalTelemetryLkgv.has(modalCacheKey)) {
-                latestData = { ...window._modalTelemetryLkgv.get(modalCacheKey), ...(latestData || {}) };
+                const cached = window._modalTelemetryLkgv.get(modalCacheKey);
+                latestData = { ...cached, ...(latestData || {}) };
             }
         }
 
@@ -1202,7 +1209,17 @@
         const body = document.getElementById('srcDetailBody');
         if (body) {
             if (isIlsLlz) {
-                body.innerHTML = renderIlsMophienLlzDetail(data || {}, src, eqSup);
+                // Gunakan cache LKGV jika data saat ini kosong atau null
+                if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
+                const cacheKey = src?.id || src?.ip_address || src?.name || 'llz_active';
+                let renderData = data || {};
+                const hasMetrics = renderData && (renderData.cl_channel || renderData.ds_channel || renderData.station_ident || renderData.cl_ddm !== undefined);
+                if (hasMetrics) {
+                    window._modalTelemetryLkgv.set(cacheKey, JSON.parse(JSON.stringify(renderData)));
+                } else if (window._modalTelemetryLkgv.has(cacheKey)) {
+                    renderData = { ...window._modalTelemetryLkgv.get(cacheKey), ...(renderData || {}) };
+                }
+                body.innerHTML = renderIlsMophienLlzDetail(renderData, src, eqSup);
             } else {
                 body.innerHTML = renderDetailData(src?.parsing_id || data?._parsing_id, data || {}, eqSup);
             }

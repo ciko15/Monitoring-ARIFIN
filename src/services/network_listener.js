@@ -866,8 +866,8 @@ class NetworkListenerService {
 
     /**
      * Passive Sniffer untuk ILS Mophien LLZ Juanda.
-     * Menggunakan tshark untuk menyadap paket tanpa menghubunginya langsung (menghindari ECONNREFUSED),
-     * dengan auto-discovery antarmuka / fallback graceful jika tshark belum tersedia.
+     * Menggunakan tcpdump atau tshark pada interface eth3 untuk menyadap paket port mirror
+     * tanpa pernah menghubunginya langsung (0% beban ke alat & tidak rebutan koneksi dengan PC Surabaya).
      */
     startIlsMophienSnifferListener(source) {
         const { spawn } = require('child_process');
@@ -879,84 +879,146 @@ class NetworkListenerService {
         const ParserModule = require('../parsers/' + moduleName);
         const parser = new ParserModule({ equipt_id });
 
-        console.log(`[LLZ-SNIFFER] Initializing passive packet sniffer for ${name} (${ip_address}:${port})...`);
+        const iface = source.network_interface || 'eth3';
+        console.log(`[LLZ-SNIFFER] Initializing passive packet sniffer for ${name} on interface ${iface} (port ${port}, host ${ip_address})...`);
 
         let snifferProc = null;
         let isStopped = false;
         let restartTimer = null;
 
-        // Cari executable tshark di Windows atau Linux/macOS
-        const tsharkPaths = [
-            'C:\\Program Files\\Wireshark\\tshark.exe',
-            'C:\\Program Files (x86)\\Wireshark\\tshark.exe',
-            '/usr/bin/tshark',
-            '/usr/local/bin/tshark',
-            'tshark'
-        ];
+        // Cek tool sniffer yang tersedia untuk Windows dan Linux/macOS
+        const isWindows = process.platform === 'win32';
+        const candidates = isWindows
+            ? [
+                'C:\\Program Files\\Wireshark\\tshark.exe',
+                'C:\\Program Files (x86)\\Wireshark\\tshark.exe',
+                'tshark'
+            ]
+            : [
+                '/usr/sbin/tcpdump',
+                '/usr/bin/tcpdump',
+                'tcpdump',
+                '/usr/bin/tshark',
+                '/usr/local/bin/tshark',
+                'tshark'
+            ];
 
-        let chosenTshark = 'tshark';
-        for (const p of tsharkPaths) {
-            if (p.includes('\\') || p.includes('/')) {
-                if (fs.existsSync(p)) {
-                    chosenTshark = p;
-                    break;
-                }
+        let chosenTool = isWindows ? 'C:\\Program Files\\Wireshark\\tshark.exe' : 'tcpdump';
+        let isTshark = isWindows;
+        for (const c of candidates) {
+            if (fs.existsSync(c)) {
+                chosenTool = c;
+                isTshark = c.toLowerCase().includes('tshark');
+                break;
             }
         }
 
         const runSniffer = () => {
             if (isStopped) return;
 
-            // Filter paket: tangkap paket TCP port 38317 baik dari atau ke IP LLZ
             const captureFilter = `tcp port ${port} and host ${ip_address}`;
-            const args = [
-                '-i', 'any', // dengarkan di semua interface yang aktif
-                '-f', captureFilter,
-                '-T', 'fields',
-                '-e', 'tcp.payload',
-                '-l' // line-buffered output
-            ];
+            let args = [];
+
+            if (isTshark) {
+                // Di Windows, tshark bisa menggunakan nama interface atau index (seperti eth3 atau nomor antarmuka Npcap)
+                args = [
+                    '-i', iface,
+                    '-f', captureFilter,
+                    '-T', 'fields',
+                    '-e', 'tcp.payload',
+                    '-l'
+                ];
+            } else {
+                // tcpdump mode: output raw packet data via -xx (hex dump of ethernet/ip/tcp payload)
+                // -s 0 (full packet), -l (line-buffered), -nn (no DNS), -U (packet-buffered)
+                args = [
+                    '-i', iface,
+                    '-nn',
+                    '-s', '0',
+                    '-U',
+                    '-xx',
+                    captureFilter
+                ];
+            }
 
             try {
-                console.log(`[LLZ-SNIFFER] Spawning ${chosenTshark} with filter: "${captureFilter}"`);
-                snifferProc = spawn(chosenTshark, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+                console.log(`[LLZ-SNIFFER] Spawning passive sniffer: ${chosenTool} ${args.join(' ')}`);
+                snifferProc = spawn(chosenTool, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
                 this.activeListeners.add(id);
 
+                // Kirim event status Normal saat sniffer aktif
+                try {
+                    const initResult = typeof parser.parse === 'function' ? parser.parse(Buffer.alloc(0)) : null;
+                    if (initResult && initResult.success) {
+                        this._handleLogOutput(
+                            source,
+                            { ...initResult, source: name, _ip: ip_address },
+                            moduleName,
+                            'Normal'
+                        ).catch(e => { });
+                    }
+                } catch (e) { }
+
+                let tcpdumpHexBuf = '';
+
                 snifferProc.stdout.on('data', async (data) => {
-                    const output = data.toString().trim();
-                    if (!output) return;
+                    const text = data.toString();
+                    if (!text) return;
 
-                    const lines = output.split('\n');
-                    for (let line of lines) {
-                        line = line.trim();
-                        if (!line) continue;
-
-                        const payloads = line.split(',');
-                        for (let hexStr of payloads) {
-                            hexStr = hexStr.replace(/[:\s]/g, '');
-                            if (hexStr.length >= 8 && hexStr.length % 2 === 0) {
-                                const chunk = Buffer.from(hexStr, 'hex');
-                                await this.handleIncomingData(source, chunk, parser);
+                    if (isTshark) {
+                        const lines = text.split('\n');
+                        for (let line of lines) {
+                            line = line.trim();
+                            if (!line) continue;
+                            const payloads = line.split(',');
+                            for (let hexStr of payloads) {
+                                hexStr = hexStr.replace(/[:\s]/g, '');
+                                if (hexStr.length >= 8 && hexStr.length % 2 === 0) {
+                                    const chunk = Buffer.from(hexStr, 'hex');
+                                    await this.handleIncomingData(source, chunk, parser);
+                                }
+                            }
+                        }
+                    } else {
+                        // tcpdump -xx output parser:
+                        // Baris diawali "0x0000:  0011 2233 4455 ..."
+                        // Pisahkan per packet header (baris yang dimulai tanpa spasi / IP ...)
+                        const lines = text.split('\n');
+                        for (const line of lines) {
+                            if (/^\s+0x[0-9a-fA-F]+:/.test(line)) {
+                                const hexOnly = line.replace(/^\s+0x[0-9a-fA-F]+:\s+/, '').replace(/\s+/g, '');
+                                tcpdumpHexBuf += hexOnly;
+                            } else if (line.includes('IP ') || line.includes('IP6 ')) {
+                                // Selesai 1 paket sebelumnya
+                                if (tcpdumpHexBuf.length > 108) {
+                                    // Ethernet (14 bytes = 28 hex) + IP header (20 bytes = 40 hex) + TCP header (~20-32 bytes = 40-64 hex)
+                                    // Cari signature framing ILS LLZ: 0x01 0x02 (STX)
+                                    const fullPacketBuf = Buffer.from(tcpdumpHexBuf, 'hex');
+                                    const stxIndex = fullPacketBuf.indexOf(Buffer.from([0x01, 0x02]));
+                                    if (stxIndex >= 0 && stxIndex < fullPacketBuf.length) {
+                                        const payloadChunk = fullPacketBuf.slice(stxIndex);
+                                        await this.handleIncomingData(source, payloadChunk, parser);
+                                    }
+                                }
+                                tcpdumpHexBuf = '';
                             }
                         }
                     }
                 });
 
                 snifferProc.stderr.on('data', (data) => {
-                    const msg = data.toString();
-                    if (msg.includes('Capturing on') || msg.includes('Packets captured')) return;
-                    if (msg.toLowerCase().includes('error') || msg.toLowerCase().includes('invalid')) {
-                        console.warn(`[LLZ-SNIFFER] ${msg.trim()}`);
+                    const msg = data.toString().trim();
+                    if (!msg) return;
+                    if (msg.includes('Capturing on') || msg.includes('Packets captured') || msg.includes('listening on')) {
+                        console.log(`[LLZ-SNIFFER] ${msg}`);
+                        return;
                     }
+                    console.warn(`[LLZ-SNIFFER stderr] ${msg}`);
                 });
 
                 snifferProc.on('error', (err) => {
-                    console.warn(`[LLZ-SNIFFER] TShark spawn error (${err.message}). Mencoba direct passive connection...`);
-                    // Jika tshark tidak ada di OS, fallback ke TCP client standar
-                    if (!isStopped) {
-                        this.startBinaryTcpListener(source);
-                    }
+                    console.warn(`[LLZ-SNIFFER] Sniffer spawn error (${err.message}).`);
                 });
 
                 snifferProc.on('close', (code) => {
@@ -1817,10 +1879,10 @@ class NetworkListenerService {
             return;
         }
 
-        // ILS Mophien LLZ Juanda — Gunakan dedicated persistent TCP streaming listener
+        // ILS Mophien LLZ Juanda — Gunakan dedicated passive packet sniffer di interface eth3
         if (moduleName === 'ils_mophien_llz') {
-            console.log(`[LLZ-TRACE] Routing ${source.name} to startBinaryTcpListener`);
-            this.startBinaryTcpListener(source);
+            console.log(`[LLZ-TRACE] Routing ${source.name} to startIlsMophienSnifferListener (Passive Sniffing on eth3)`);
+            this.startIlsMophienSnifferListener(source);
             return;
         }
 
