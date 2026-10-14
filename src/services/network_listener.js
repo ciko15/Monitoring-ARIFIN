@@ -886,7 +886,6 @@ class NetworkListenerService {
         let isStopped = false;
         let restartTimer = null;
 
-        // Cek tool sniffer yang tersedia untuk Windows dan Linux/macOS
         const isWindows = process.platform === 'win32';
         const candidates = isWindows
             ? [
@@ -913,26 +912,62 @@ class NetworkListenerService {
             }
         }
 
-        const runSniffer = () => {
+        // Di Windows, nama interface tidak bisa "eth3" melainkan angka indeks (1, 2, ...) atau Device GUID
+        const resolveInterface = async () => {
+            if (!isWindows || !isTshark) {
+                return source.network_interface || 'eth3';
+            }
+            if (source.network_interface && /^\d+$/.test(source.network_interface)) {
+                return source.network_interface;
+            }
+            // Auto-detect interface index via tshark -D
+            const { exec } = require('child_process');
+            return new Promise((resolve) => {
+                exec(`"${chosenTool}" -D`, (err, stdout) => {
+                    if (err || !stdout) {
+                        return resolve('1'); // Default ke interface pertama
+                    }
+                    console.log(`[LLZ-SNIFFER] Available capture interfaces:\n${stdout.trim()}`);
+                    const lines = stdout.split('\n').map(l => l.trim()).filter(Boolean);
+                    
+                    // Cari baris yang mengandung 'Ethernet' atau 'eth'
+                    let matchedIdx = '1';
+                    for (const line of lines) {
+                        const m = line.match(/^(\d+)\.\s*(.*)/);
+                        if (m) {
+                            const idx = m[1];
+                            const desc = m[2].toLowerCase();
+                            if (desc.includes('ethernet') || desc.includes('eth3') || desc.includes('lan')) {
+                                matchedIdx = idx;
+                                break;
+                            }
+                        }
+                    }
+                    resolve(matchedIdx);
+                });
+            });
+        };
+
+        const runSniffer = async () => {
             if (isStopped) return;
+
+            const iface = await resolveInterface();
+            console.log(`[LLZ-SNIFFER] Selected capture interface index: "${iface}"`);
 
             const captureFilter = `tcp port ${port} and host ${ip_address}`;
             let args = [];
 
             if (isTshark) {
-                // Di Windows, tshark bisa menggunakan nama interface atau index (seperti eth3 atau nomor antarmuka Npcap)
                 args = [
-                    '-i', iface,
+                    '-i', String(iface),
                     '-f', captureFilter,
                     '-T', 'fields',
                     '-e', 'tcp.payload',
                     '-l'
                 ];
             } else {
-                // tcpdump mode: output raw packet data via -xx (hex dump of ethernet/ip/tcp payload)
-                // -s 0 (full packet), -l (line-buffered), -nn (no DNS), -U (packet-buffered)
                 args = [
-                    '-i', iface,
+                    '-i', String(iface),
                     '-nn',
                     '-s', '0',
                     '-U',
