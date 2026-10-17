@@ -49,29 +49,30 @@ class IlsMophienLlzParser extends BaseParser {
         super(opts);
         this._buf = Buffer.alloc(0);
         this._mode = 'LIVE';
-        this._stationIdent = 'ISBY';
-        this._frequency = '110.10 MHz';
-        this._lastHeartbeat = new Date().toISOString();
+        this._stationIdent = '—';
+        this._frequency = '—';
+        this._lastHeartbeat = null;
+        this._hasReceivedData = false;
 
-        // Database memori terpisah mutlak MON 1 dan MON 2
+        // Inisialisasi awal null (tanpa data dummy sebelum paket telemetry diterima)
         this._mon1 = {
-            cl: { ddm: 0.03, sdm: 40.10, rf_level: 0.01, ident: 8.01 },
-            ds: { ddm: 15.78, sdm: 40.16, rf_level: 0.01, ident: 7.93 },
-            clr: { ddm: 21.88, sdm: 40.17, rf_level: -0.04, ident: 8.03 },
-            rf: { course: 0.0000, clr: 0.0000, sep: 0.0000 }
+            cl: { ddm: null, sdm: null, rf_level: null, ident: null },
+            ds: { ddm: null, sdm: null, rf_level: null, ident: null },
+            clr: { ddm: null, sdm: null, rf_level: null, ident: null },
+            rf: { course: null, clr: null, sep: null }
         };
 
         this._mon2 = {
-            cl: { ddm: 0.02, sdm: 40.07, rf_level: -0.02, ident: 8.00 },
-            ds: { ddm: 15.78, sdm: 40.14, rf_level: -0.03, ident: 8.00 },
-            clr: { ddm: 21.83, sdm: 40.08, rf_level: -0.03, ident: 8.01 },
-            rf: { course: 0.0001, clr: 0.0001, sep: 0.0000 }
+            cl: { ddm: null, sdm: null, rf_level: null, ident: null },
+            ds: { ddm: null, sdm: null, rf_level: null, ident: null },
+            clr: { ddm: null, sdm: null, rf_level: null, ident: null },
+            rf: { course: null, clr: null, sep: null }
         };
 
         this._systemState = {
-            service_status: 'NORMAL',
-            tx1: { state: 'ON', role: 'MAIN', load: 'ANT' },
-            tx2: { state: 'ON', role: 'STANDBY', load: 'DUMMY LOAD' }
+            service_status: 'UNKNOWN',
+            tx1: { state: 'UNKNOWN', role: '—', load: '—' },
+            tx2: { state: 'UNKNOWN', role: '—', load: '—' }
         };
 
         this._cachedRows = new Map();
@@ -131,6 +132,7 @@ class IlsMophienLlzParser extends BaseParser {
                         if (crc16_aug_ccitt(frameForCrc) === expectedCrc) {
                             const plain = unmaskPayload(Buffer.from(bodyBytes));
                             if (plain && plain.length >= 6) {
+                                this._hasReceivedData = true;
                                 this._decodeFrame(plain);
                             }
                         }
@@ -348,6 +350,17 @@ class IlsMophienLlzParser extends BaseParser {
     }
 
     _buildOutput() {
+        if (!this._hasReceivedData) {
+            return {
+                success: false,
+                status: 'Menunggu Data',
+                error: 'No valid LLZ frames',
+                data: {},
+                measurements: [],
+                timestamp: new Date().toISOString()
+            };
+        }
+
         const m1 = this._mon1;
         const m2 = this._mon2;
 
@@ -361,7 +374,7 @@ class IlsMophienLlzParser extends BaseParser {
                 last_sync: this._lastHeartbeat,
                 connectivity: 'Connected',
                 overall_status: 'Normal',
-                service_status: 'NORMAL',
+                service_status: this._systemState.service_status || 'NORMAL',
                 frequency: this._frequency,
                 tx1: { ...this._systemState.tx1 },
                 tx2: { ...this._systemState.tx2 },

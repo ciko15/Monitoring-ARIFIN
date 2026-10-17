@@ -50,29 +50,30 @@ class IlsMophienGpParser extends BaseParser {
         this._buf = Buffer.alloc(0);
         this._mode = 'LIVE';
         this._equipmentType = 'GLIDE_PATH';
-        this._stationIdent = 'ISBY';
-        this._frequency = '334.40 MHz'; // Sesuai frekuensi UHF GP Juanda
-        this._lastHeartbeat = new Date().toISOString();
+        this._stationIdent = '—';
+        this._frequency = '—';
+        this._lastHeartbeat = null;
+        this._hasReceivedData = false;
 
-        // Baseline Store disesuaikan persis dengan foto Executive Monitor GP
+        // Inisialisasi awal null (tanpa data dummy sebelum paket telemetry diterima)
         this._mon1 = {
-            cl: { ddm: 0.03, sdm: 79.83, rf_level: -0.49 },
-            ds: { ddm: 17.11, sdm: 79.84, rf_level: 0.30 },
-            clr: { ddm: 50.08, sdm: 80.07, rf_level: 0.09 },
-            rf: { course: 0.0000, clr: 0.0000, sep: 0.0000 }
+            cl: { ddm: null, sdm: null, rf_level: null },
+            ds: { ddm: null, sdm: null, rf_level: null },
+            clr: { ddm: null, sdm: null, rf_level: null },
+            rf: { course: null, clr: null, sep: null }
         };
 
         this._mon2 = {
-            cl: { ddm: 0.03, sdm: 79.88, rf_level: -0.47 },
-            ds: { ddm: 17.07, sdm: 79.76, rf_level: 0.32 },
-            clr: { ddm: 50.02, sdm: 79.99, rf_level: 0.09 },
-            rf: { course: 0.0001, clr: 0.0001, sep: 0.0000 }
+            cl: { ddm: null, sdm: null, rf_level: null },
+            ds: { ddm: null, sdm: null, rf_level: null },
+            clr: { ddm: null, sdm: null, rf_level: null },
+            rf: { course: null, clr: null, sep: null }
         };
 
         this._systemState = {
-            service_status: 'NORMAL',
-            tx1: { state: 'ON', role: 'MAIN', load: 'ANT' },
-            tx2: { state: 'ON', role: 'STANDBY', load: 'DUMMY LOAD' }
+            service_status: 'UNKNOWN',
+            tx1: { state: 'UNKNOWN', role: '—', load: '—' },
+            tx2: { state: 'UNKNOWN', role: '—', load: '—' }
         };
 
         this._cachedRows = new Map();
@@ -132,6 +133,7 @@ class IlsMophienGpParser extends BaseParser {
                         if (crc16_aug_ccitt(frameForCrc) === expectedCrc) {
                             const plain = unmaskPayload(Buffer.from(bodyBytes));
                             if (plain && plain.length >= 6) {
+                                this._hasReceivedData = true;
                                 this._decodeFrame(plain);
                             }
                         }
@@ -341,6 +343,17 @@ class IlsMophienGpParser extends BaseParser {
     }
 
     _buildOutput() {
+        if (!this._hasReceivedData) {
+            return {
+                success: false,
+                status: 'Menunggu Data',
+                error: 'No valid GP frames',
+                data: {},
+                measurements: [],
+                timestamp: new Date().toISOString()
+            };
+        }
+
         const m1 = this._mon1;
         const m2 = this._mon2;
 
@@ -355,7 +368,7 @@ class IlsMophienGpParser extends BaseParser {
                 last_sync: this._lastHeartbeat,
                 connectivity: 'Connected',
                 overall_status: 'Normal',
-                service_status: 'NORMAL',
+                service_status: this._systemState.service_status || 'NORMAL',
                 frequency: this._frequency,
                 tx1: { ...this._systemState.tx1 },
                 tx2: { ...this._systemState.tx2 },
