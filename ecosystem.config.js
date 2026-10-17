@@ -48,6 +48,8 @@ module.exports = {
     watch: false,
     ignore_watch: ["data", "logs", "db", "*.sqlite", "*.log", "node_modules"],
     max_memory_restart: '2G',
+    kill_timeout: 4000,
+    windowsHide: true,
     env: {
       NODE_ENV: 'production',
       PORT: process.env.PORT || 3100,
