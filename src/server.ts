@@ -1976,15 +1976,9 @@ const app = new Elysia()
                 }
             });
     })
-    // Move Static Plugin to the END to avoid intercepting API calls
-    .use(staticPlugin({ assets: 'public', prefix: '' }))
-
-    // Root Dashboard Serving (Direct Bun file serving via Response with Node fallback)
+    // Root Dashboard Serving (Explicit direct serving with Node fallback BEFORE staticPlugin)
     .get('/', () => {
         try {
-            if ((globalThis as any).Bun?.file) {
-                return (globalThis as any).Bun.file('public/index.html');
-            }
             const fs = require('fs');
             const path = require('path');
             const filePath = path.resolve(process.cwd(), 'public/index.html');
@@ -2000,9 +1994,6 @@ const app = new Elysia()
     })
     .get('/index.html', () => {
         try {
-            if ((globalThis as any).Bun?.file) {
-                return (globalThis as any).Bun.file('public/index.html');
-            }
             const fs = require('fs');
             const path = require('path');
             const filePath = path.resolve(process.cwd(), 'public/index.html');
@@ -2025,9 +2016,6 @@ const app = new Elysia()
             const targetPath = fs.existsSync(icoPath) ? icoPath : (fs.existsSync(pngPath) ? pngPath : null);
 
             if (targetPath) {
-                if ((globalThis as any).Bun?.file) {
-                    return (globalThis as any).Bun.file(targetPath);
-                }
                 const isPng = targetPath.endsWith('.png');
                 return new Response(fs.readFileSync(targetPath), {
                     headers: { 'Content-Type': isPng ? 'image/png' : 'image/x-icon' }
@@ -2039,6 +2027,9 @@ const app = new Elysia()
         set.status = 204;
         return '';
     })
+
+    // Move Static Plugin to the END to serve other static assets
+    .use(staticPlugin({ assets: 'public', prefix: '' }))
 
     .get('/api/test-chain', () => {
         console.log('[DEBUG-ROUTER] Hit /api/test-chain');

@@ -127,38 +127,49 @@ const PARSER_TEMPLATES = {
   'default': ['Status']
 };
 
-// --- GENERIC JSON HELPERS ---
+// --- GENERIC JSON HELPERS WITH IN-MEMORY CACHE ---
+const jsonCache = new Map(); // filePath -> { mtimeMs: number, data: any }
+
 async function readJson(filePath, defaultValue = []) {
   const maxAttempts = 3;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const file = globalThis.Bun ? globalThis.Bun.file(filePath) : null;
-      if (file) {
-        if (!(await file.exists())) {
-          if (defaultValue !== null) await writeJson(filePath, defaultValue);
-          return defaultValue;
-        }
-        const text = await file.text();
-        return JSON.parse(text);
-      }
-      // Fallback to Node fs for environments without Bun (though this is a Bun app)
-      if (!fs.existsSync(filePath)) {
-        if (defaultValue !== null) await writeJson(filePath, defaultValue);
-        return defaultValue;
-      }
-      const data = await fs.promises.readFile(filePath, 'utf8');
-      return JSON.parse(data);
-    } catch (err) {
-      const isTruncatedJson = err instanceof SyntaxError && (/Unexpected end of JSON input/.test(err.message) || /JSON Parse error/.test(err.message));
-      if (isTruncatedJson && attempt < maxAttempts) {
-        await sleep(25 * attempt);
-        continue;
-      }
-
-      console.error(`Error reading JSON from ${filePath}:`, err);
+  try {
+    const stats = await fs.promises.stat(filePath).catch(() => null);
+    if (!stats) {
+      if (defaultValue !== null) await writeJson(filePath, defaultValue);
       return defaultValue;
     }
+
+    const cached = jsonCache.get(filePath);
+    if (cached && cached.mtimeMs === stats.mtimeMs) {
+      return JSON.parse(JSON.stringify(cached.data));
+    }
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const data = await fs.promises.readFile(filePath, 'utf8');
+        const parsed = JSON.parse(data);
+        jsonCache.set(filePath, { mtimeMs: stats.mtimeMs, data: parsed });
+        return JSON.parse(JSON.stringify(parsed));
+      } catch (err) {
+        const isTruncatedJson = err instanceof SyntaxError && (/Unexpected end of JSON input/.test(err.message) || /JSON Parse error/.test(err.message));
+        if (isTruncatedJson && attempt < maxAttempts) {
+          await sleep(25 * attempt);
+          continue;
+        }
+        if (cached) {
+          return JSON.parse(JSON.stringify(cached.data));
+        }
+        throw err;
+      }
+    }
+  } catch (err) {
+    const cached = jsonCache.get(filePath);
+    if (cached) {
+      return JSON.parse(JSON.stringify(cached.data));
+    }
+    console.error(`Error reading JSON from ${filePath}:`, err.message || err);
+    return defaultValue;
   }
 
   return defaultValue;
@@ -201,8 +212,11 @@ async function writeJson(filePath, data) {
           }
         }
       }
-      if (renameSuccess && onConfigUpdated) {
-        setTimeout(() => onConfigUpdated(filePath, data), 0);
+      if (renameSuccess) {
+        jsonCache.set(filePath, { mtimeMs: Date.now(), data: JSON.parse(content) });
+        if (onConfigUpdated) {
+          setTimeout(() => onConfigUpdated(filePath, data), 0);
+        }
       }
       return true;
     } catch (err) {
