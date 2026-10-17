@@ -210,41 +210,32 @@ class IlsMophienLlzParser extends BaseParser {
             // --- COURSE LINE (CL) ---
             case 0x000A: { // DDM CL
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (Math.abs(val) <= 0.50) {
-                    target.cl.ddm = val;
-                    paramName = 'DDM Course Line (CL)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.cl.ddm = val;
+                paramName = 'DDM Course Line (CL)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
-            case 0x000B: { // SDM CL (~40.00%)
+            case 0x000B: { // SDM CL
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 20.0 && val <= 60.0) {
-                    target.cl.sdm = val;
-                    paramName = 'SDM Course Line (CL)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.cl.sdm = val;
+                paramName = 'SDM Course Line (CL)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
-            case 0x000C: { // RF Level CL (~0.15 dB)
+            case 0x000C: { // RF Level CL
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -20.0 && val <= 20.0) {
-                    target.cl.rf_level = val;
-                    paramName = 'RF Level CL';
-                    displayVal = `${val.toFixed(2)} dB`;
-                }
+                target.cl.rf_level = val;
+                paramName = 'RF Level CL';
+                displayVal = `${val.toFixed(2)} dB`;
                 break;
             }
-            case 0x000E: { // Ident AM CL (~8.00%)
+            case 0x000E: { // Ident AM CL
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 3.0 && val <= 20.0) {
-                    target.cl.ident = val;
-                    // Salurkan nilai Ident AM yang sepadan ke DS dan CLR
-                    target.ds.ident = +(val - (chName === 'MON1' ? 0.08 : 0.01)).toFixed(2);
-                    target.clr.ident = +(val + (chName === 'MON1' ? 0.02 : 0.01)).toFixed(2);
-                    paramName = 'Ident-AM Depth CL';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.cl.ident = val;
+                if (target.ds.ident == null) target.ds.ident = +(val - (chName === 'MON1' ? 0.08 : 0.01)).toFixed(2);
+                if (target.clr.ident == null) target.clr.ident = +(val + (chName === 'MON1' ? 0.02 : 0.01)).toFixed(2);
+                paramName = 'Ident-AM Depth CL';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
 
@@ -253,60 +244,52 @@ class IlsMophienLlzParser extends BaseParser {
                 const rawDdm = +(rawSigned / 100.0).toFixed(2);
                 if (rawDdm > 16.5 && rawDdm < 18.5) {
                     target.ds.ddm = +(rawDdm * 0.9228).toFixed(2);
-                } else if (rawDdm >= 14.0 && rawDdm <= 16.5) {
+                } else {
                     target.ds.ddm = rawDdm;
                 }
                 paramName = 'DDM Displacement (DS)';
                 displayVal = `${target.ds.ddm.toFixed(2)} %`;
                 break;
             }
-            case 0x001A: { // SDM DS (~40.00%)
+            case 0x001A: { // SDM DS
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 20.0 && val <= 60.0) {
-                    target.ds.sdm = val;
-                    paramName = 'SDM Displacement (DS)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.ds.sdm = val;
+                paramName = 'SDM Displacement (DS)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
-            case 0x001B: { // RF Level DS (~0.20 dB)
+            case 0x001B: { // RF Level DS
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -20.0 && val <= 20.0) {
-                    target.ds.rf_level = val;
-                    paramName = 'RF Level DS';
-                    displayVal = `${val.toFixed(2)} dB`;
-                }
+                target.ds.rf_level = val;
+                paramName = 'RF Level DS';
+                displayVal = `${val.toFixed(2)} dB`;
                 break;
             }
 
             // --- CLEARANCE (CLR) ---
-            case 0x0014: { // SDM CLR (~40.00%)
+            case 0x0014: { // SDM CLR
                 const rawSdm = +(rawUnsigned / 100.0).toFixed(2);
                 if (rawSdm > 42.0 && rawSdm < 48.0) {
                     target.clr.sdm = +(rawSdm * 0.8935).toFixed(2);
-                } else if (rawSdm >= 35.0 && rawSdm <= 42.0) {
+                } else {
                     target.clr.sdm = rawSdm;
                 }
                 paramName = 'SDM Clearance (CLR)';
                 displayVal = `${target.clr.sdm.toFixed(2)} %`;
                 break;
             }
-            case 0x0015: { // DDM CLR (~21.70%)
+            case 0x0015: { // DDM CLR
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= 15.0 && val <= 30.0) {
-                    target.clr.ddm = val;
-                    paramName = 'DDM Clearance (CLR)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.clr.ddm = val;
+                paramName = 'DDM Clearance (CLR)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
-            case 0x0016: { // RF Level CLR (~0.15 dB)
+            case 0x0016: { // RF Level CLR
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -20.0 && val <= 20.0) {
-                    target.clr.rf_level = val;
-                    paramName = 'RF Level CLR';
-                    displayVal = `${val.toFixed(2)} dB`;
-                }
+                target.clr.rf_level = val;
+                paramName = 'RF Level CLR';
+                displayVal = `${val.toFixed(2)} dB`;
                 break;
             }
 
@@ -413,9 +396,9 @@ class IlsMophienLlzParser extends BaseParser {
                 clr_ddm: m1.clr.ddm,
                 clr_sdm: m1.clr.sdm,
 
-                _amv_txs_rows: Array.from(this._cachedRows.values()).slice(0, 16)
+                _amv_txs_rows: Array.from(this._cachedRows.values())
             },
-            measurements: this._lastMeasurements.slice(-16),
+            measurements: this._lastMeasurements.slice(-32),
             timestamp: new Date().toISOString()
         };
     }

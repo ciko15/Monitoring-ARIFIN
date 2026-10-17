@@ -212,29 +212,23 @@ class IlsMophienGpParser extends BaseParser {
             // ==========================================
             case 0x000A: { // DDM CL / Path
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (Math.abs(val) <= 0.60) {
-                    target.cl.ddm = val;
-                    paramName = 'DDM Course Line (CL)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.cl.ddm = val;
+                paramName = 'DDM Course Line (CL)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
             case 0x000B: { // SDM CL / Path (Nominal GP ~80%)
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 70.0 && val <= 90.0) {
-                    target.cl.sdm = val;
-                    paramName = 'SDM Course Line (CL)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.cl.sdm = val;
+                paramName = 'SDM Course Line (CL)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
             case 0x000C: { // RF Level CL / Path
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -5.0 && val <= 5.0) {
-                    target.cl.rf_level = val;
-                    paramName = 'RF Level CL';
-                    displayVal = `${val.toFixed(2)} dB`;
-                }
+                target.cl.rf_level = val;
+                paramName = 'RF Level CL';
+                displayVal = `${val.toFixed(2)} dB`;
                 break;
             }
 
@@ -243,29 +237,23 @@ class IlsMophienGpParser extends BaseParser {
             // ==========================================
             case 0x0019: { // DDM DS (Pada GP bernilai ~17.10%)
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= 15.0 && val <= 19.0) {
-                    target.ds.ddm = val;
-                    paramName = 'DDM Displacement (DS)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.ds.ddm = val;
+                paramName = 'DDM Displacement (DS)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
             case 0x001A: { // SDM DS (~80%)
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 70.0 && val <= 90.0) {
-                    target.ds.sdm = val;
-                    paramName = 'SDM Displacement (DS)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.ds.sdm = val;
+                paramName = 'SDM Displacement (DS)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
             case 0x001B: { // RF Level DS (~0.30 dB)
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -5.0 && val <= 5.0) {
-                    target.ds.rf_level = val;
-                    paramName = 'RF Level DS';
-                    displayVal = `${val.toFixed(2)} dB`;
-                }
+                target.ds.rf_level = val;
+                paramName = 'RF Level DS';
+                displayVal = `${val.toFixed(2)} dB`;
                 break;
             }
 
@@ -274,29 +262,23 @@ class IlsMophienGpParser extends BaseParser {
             // ==========================================
             case 0x0014: { // SDM CLR (~80%)
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 70.0 && val <= 90.0) {
-                    target.clr.sdm = val;
-                    paramName = 'SDM Clearance (CLR)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.clr.sdm = val;
+                paramName = 'SDM Clearance (CLR)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
             case 0x0015: { // DDM CLR (Pada GP bernilai ~50.00%)
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= 45.0 && val <= 55.0) {
-                    target.clr.ddm = val;
-                    paramName = 'DDM Clearance (CLR)';
-                    displayVal = `${val.toFixed(2)} %`;
-                }
+                target.clr.ddm = val;
+                paramName = 'DDM Clearance (CLR)';
+                displayVal = `${val.toFixed(2)} %`;
                 break;
             }
             case 0x0016: { // RF Level CLR (~0.09 dB)
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -5.0 && val <= 5.0) {
-                    target.clr.rf_level = val;
-                    paramName = 'RF Level CLR';
-                    displayVal = `${val.toFixed(2)} dB`;
-                }
+                target.clr.rf_level = val;
+                paramName = 'RF Level CLR';
+                displayVal = `${val.toFixed(2)} dB`;
                 break;
             }
 
