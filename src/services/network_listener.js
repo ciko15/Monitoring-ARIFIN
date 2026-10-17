@@ -1046,9 +1046,9 @@ class NetworkListenerService {
                                 hexStr = hexStr.replace(/[:\s]/g, '');
                                 if (hexStr.length >= 8 && hexStr.length % 2 === 0) {
                                     const chunk = Buffer.from(hexStr, 'hex');
-                                    // Log jika paket data telemetry LLZ tertangkap
+                                    // Log jika paket data telemetry LLZ tertangkap (throttled 15s agar tidak membanjiri log)
                                     if (chunk.includes(0x01) && chunk.includes(0x02)) {
-                                        console.log(`[LLZ-SNIFFER] Captured live LLZ packet (${chunk.length} bytes) from mirror interface`);
+                                        this._logThrottled('log', `llz-sniffer:live-packet:${id}`, `[LLZ-SNIFFER] Captured live LLZ packet (${chunk.length} bytes) from mirror interface (streaming active)`, 15000);
                                     }
                                     await this.handleIncomingData(source, chunk, parser);
                                 }
@@ -2267,11 +2267,11 @@ class NetworkListenerService {
 
             if (parsedResult.success) {
                 const mode = parsedResult.data && parsedResult.data._mode ? parsedResult.data._mode : 'PASSIVE';
-                console.log(`[NetworkListener] Successfully parsed data for ${name}. Status: ${parsedResult.status} | Mode: ${mode}`);
+                this._logThrottled('log', `net-listener:success:${id}`, `[NetworkListener] Successfully parsed data for ${name}. Status: ${parsedResult.status} | Mode: ${mode}`, 15000);
                 // Status is now handled by the watchdog consolidation in server.ts
                 // await this.equipmentService.updateEquipmentStatus(equipt_id, parsedResult.status || 'Normal');
             } else {
-                console.warn(`[NetworkListener] Parsing failed for ${name}: ${parsedResult.error}`);
+                this._logThrottled('warn', `net-listener:fail:${id}`, `[NetworkListener] Parsing failed for ${name}: ${parsedResult.error}`, 30000);
             }
 
         } catch (error) {
