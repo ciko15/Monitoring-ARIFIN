@@ -1979,10 +1979,66 @@ const app = new Elysia()
     // Move Static Plugin to the END to avoid intercepting API calls
     .use(staticPlugin({ assets: 'public', prefix: '' }))
 
-    // Root Dashboard Serving (Direct Bun file serving via Response)
-    .get('/', () => (globalThis as any).Bun?.file('public/index.html'))
-    .get('/index.html', () => (globalThis as any).Bun?.file('public/index.html'))
-    .get('/favicon.ico', () => (globalThis as any).Bun?.file('public/icon.png'))
+    // Root Dashboard Serving (Direct Bun file serving via Response with Node fallback)
+    .get('/', () => {
+        try {
+            if ((globalThis as any).Bun?.file) {
+                return (globalThis as any).Bun.file('public/index.html');
+            }
+            const fs = require('fs');
+            const path = require('path');
+            const filePath = path.resolve(process.cwd(), 'public/index.html');
+            if (fs.existsSync(filePath)) {
+                return new Response(fs.readFileSync(filePath), {
+                    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+                });
+            }
+        } catch (e) {
+            console.error('[ROUTER] Error serving index.html:', e);
+        }
+        return new Response('Monitoring ARIFIN', { headers: { 'Content-Type': 'text/plain' } });
+    })
+    .get('/index.html', () => {
+        try {
+            if ((globalThis as any).Bun?.file) {
+                return (globalThis as any).Bun.file('public/index.html');
+            }
+            const fs = require('fs');
+            const path = require('path');
+            const filePath = path.resolve(process.cwd(), 'public/index.html');
+            if (fs.existsSync(filePath)) {
+                return new Response(fs.readFileSync(filePath), {
+                    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+                });
+            }
+        } catch (e) {
+            console.error('[ROUTER] Error serving index.html:', e);
+        }
+        return new Response('Monitoring ARIFIN', { headers: { 'Content-Type': 'text/plain' } });
+    })
+    .get('/favicon.ico', ({ set }) => {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const icoPath = path.resolve(process.cwd(), 'public/favicon.ico');
+            const pngPath = path.resolve(process.cwd(), 'public/icon.png');
+            const targetPath = fs.existsSync(icoPath) ? icoPath : (fs.existsSync(pngPath) ? pngPath : null);
+
+            if (targetPath) {
+                if ((globalThis as any).Bun?.file) {
+                    return (globalThis as any).Bun.file(targetPath);
+                }
+                const isPng = targetPath.endsWith('.png');
+                return new Response(fs.readFileSync(targetPath), {
+                    headers: { 'Content-Type': isPng ? 'image/png' : 'image/x-icon' }
+                });
+            }
+        } catch (e) {
+            console.error('[ROUTER] Error serving favicon.ico:', e);
+        }
+        set.status = 204;
+        return '';
+    })
 
     .get('/api/test-chain', () => {
         console.log('[DEBUG-ROUTER] Hit /api/test-chain');

@@ -34,8 +34,8 @@
         'diris_a20': ['VLN_avg', 'VLL_avg', 'HZ', 'PF', 'KW', 'KVAR'],
         'pm5350_modbus': ['V_RN', 'V_SN', 'V_TN', 'V_RS', 'V_ST', 'V_TR', 'I_R', 'I_S', 'I_T', 'FREQ', 'KW', 'KVA', 'PF'],
         'ils_llz_thales421': ['CRS_RF', 'WIDTH_RF', 'NF_RF', 'CRS_SDM', 'IDENT_AM', 'FREQ_DEV'],
-        'ils_mophien_llz': ['station_ident', 'active_channel', 'cl_ddm', 'ds_ddm', 'clr_ddm', 'service_status'],
-        'ils_mophien_gp': ['station_ident', 'active_channel', 'cl_ddm', 'ds_ddm', 'clr_ddm', 'service_status']
+        'ils_mophien_llz': ['station_ident', 'active_channel', 'cl_ddm', 'ds_ddm'],
+        'ils_mophien_gp': ['station_ident', 'active_channel', 'cl_ddm', 'ds_ddm']
     };
 
     function isMetricPlaceholder(value) {
@@ -1493,34 +1493,51 @@
 
         return `
         <div style="display:flex; flex-direction:column; gap:0;">
-            <!-- 1. Header Status Bar (Top Panel) -->
-            <div style="background:#071322; border:1px solid #142a42; border-radius:8px; padding:12px 16px; margin-bottom:16px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
-                <!-- Left: IDENT & Frequency -->
-                <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <i class="fas fa-broadcast-tower" style="color:#00d4ff; font-size:16px;"></i>
-                        <span style="font-size:11px; color:#7a9eb8; font-weight:600;">IDENT:</span>
-                        <span style="font-size:15px; font-weight:800; color:${ident !== '-' ? '#00ff88' : '#94a3b8'}; letter-spacing:1.5px; background:rgba(0,255,136,0.08); padding:3px 10px; border-radius:4px; border:1px solid rgba(0,255,136,0.25);">${ident}</span>
-                        ${isDisconnected ? '<span style="font-size:10px; font-weight:bold; color:#ff3355; background:rgba(255,51,85,0.1); border:1px solid rgba(255,51,85,0.3); padding:2px 8px; border-radius:4px;">DISCONNECTED</span>' : '<span style="font-size:10px; font-weight:bold; color:#00ff88; background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); padding:2px 8px; border-radius:4px;">NORMAL</span>'}
-                    </div>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="font-size:11px; color:#7a9eb8; font-weight:600;">Frekuensi:</span>
-                        <span style="font-size:13px; font-weight:700; color:#ffffff; background:#0d2238; padding:3px 10px; border-radius:4px; border:1px solid #1a3a5c; font-family:'Roboto Mono',monospace;">${freq}</span>
+            <!-- 1. Header Status Bar (Top Panel: Grid 4 Kolom) -->
+            <div style="background:#071322; border:1px solid #142a42; border-radius:8px; padding:12px 16px; margin-bottom:16px; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; align-items:center; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+                <!-- 1. Station IDENT -->
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-broadcast-tower" style="color:#00d4ff; font-size:18px;"></i>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Station IDENT</span>
+                        <span style="font-size:15px; font-weight:800; color:#00d4ff; letter-spacing:1.5px; font-family:'Roboto Mono',monospace;">${ident}</span>
                     </div>
                 </div>
 
-                <!-- Right: Service Status & Transmitter Status Box -->
-                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="font-size:11px; font-weight:bold; color:${serviceColor}; background:${serviceBg}; border:1px solid ${serviceBorder}; padding:4px 12px; border-radius:4px; letter-spacing:0.5px;"><i class="fas fa-circle-notch ${isDisconnected ? '' : 'fa-spin'}" style="margin-right:4px;"></i> Service Status: ${isDisconnected ? 'DISCONNECTED' : serviceStatus}</span>
+                <!-- 2. Active Channel / Monitor -->
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-desktop" style="color:#00ffcc; font-size:16px;"></i>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Active Channel</span>
+                        <div>
+                            <span style="font-size:11px; font-weight:800; color:#00ffcc; background:rgba(0,255,204,0.15); border:1px solid rgba(0,255,204,0.35); padding:2px 8px; border-radius:4px; letter-spacing:1px;">${activeCh}</span>
+                        </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:11px; font-weight:bold; color:${tx1Color}; background:${tx1Bg}; border:1px solid ${tx1Border}; padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
-                            <i class="fas fa-satellite-dish" style="margin-right:4px;"></i> ${tx1Text}
-                        </span>
-                        <span style="font-size:11px; font-weight:bold; color:${tx2Color}; background:${tx2Bg}; border:1px solid ${tx2Border}; padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
-                            <i class="fas fa-shield-alt" style="margin-right:4px;"></i> ${tx2Text}
-                        </span>
+                </div>
+
+                <!-- 3. Service Status -->
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-heartbeat" style="color:${serviceColor}; font-size:16px;"></i>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Service Status</span>
+                        <div>
+                            <span style="font-size:11px; font-weight:800; color:${serviceColor}; background:${serviceBg}; border:1px solid ${serviceBorder}; padding:2px 8px; border-radius:4px; letter-spacing:0.5px;">
+                                <i class="fas fa-circle" style="font-size:8px; margin-right:4px;"></i>${isDisconnected ? 'DISCONNECTED' : serviceStatus}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Frequency & TX State -->
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-wave-square" style="color:#a5b4fc; font-size:16px;"></i>
+                    <div style="display:flex; flex-direction:column; min-width:0;">
+                        <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Frequency & TX State</span>
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <span style="font-size:12px; font-weight:700; color:#ffffff; font-family:'Roboto Mono',monospace;">${freq}</span>
+                            <span style="font-size:9px; font-weight:700; color:${tx1Color}; background:${tx1Bg}; border:1px solid ${tx1Border}; padding:1px 5px; border-radius:3px;" title="${tx1Text}">TX1</span>
+                            <span style="font-size:9px; font-weight:700; color:${tx2Color}; background:${tx2Bg}; border:1px solid ${tx2Border}; padding:1px 5px; border-radius:3px;" title="${tx2Text}">TX2</span>
+                        </div>
                     </div>
                 </div>
             </div>
