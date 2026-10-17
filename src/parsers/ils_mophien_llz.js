@@ -171,28 +171,33 @@ class IlsMophienLlzParser extends BaseParser {
         }
 
         if (msgType === 0x86 && plain.length >= 10) {
-            const regId = plain.readUInt16LE(4);
-            const v1 = plain.readUInt16LE(6);
+            // Jika paket membawa multiple registers (bulk frame), iterasi setiap blok register (6 byte per reg: regId [2B] + v1 [2B] + val [2B])
+            for (let offset = 4; offset + 6 <= plain.length; offset += 6) {
+                const regId = plain.readUInt16LE(offset);
+                if (regId === 0) continue;
 
-            // Penentuan MON 1 vs MON 2 pasti (bitmask nibble rendah byte ke-6)
-            const isMon2 = (v1 & 0x000F) === 0x03;
-            const target = isMon2 ? this._mon2 : this._mon1;
-            const chName = isMon2 ? 'MON2' : 'MON1';
-            const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
+                const v1 = plain.readUInt16LE(offset + 2);
 
-            // Ekstraksi Station IDENT (ISBY)
-            if (regId === 0x1405 || regId === 5125) {
-                const str = plain.slice(6, 10).toString('ascii').replace(/[^\x20-\x7E]/g, '').trim();
-                if (str && str.length >= 3) {
-                    this._stationIdent = str;
+                // Penentuan MON 1 vs MON 2 pasti (bitmask nibble rendah byte status)
+                const isMon2 = (v1 & 0x000F) === 0x03;
+                const target = isMon2 ? this._mon2 : this._mon1;
+                const chName = isMon2 ? 'MON2' : 'MON1';
+                const regHex = '0x' + regId.toString(16).toUpperCase().padStart(4, '0');
+
+                // Ekstraksi Station IDENT (ISBY)
+                if (regId === 0x1405 || regId === 5125) {
+                    const str = plain.slice(offset + 2, offset + 6).toString('ascii').replace(/[^\x20-\x7E]/g, '').trim();
+                    if (str && str.length >= 3) {
+                        this._stationIdent = str;
+                    }
+                    continue;
                 }
-                return;
+
+                const rawSigned = plain.readInt16LE(offset + 4);
+                const rawUnsigned = plain.readUInt16LE(offset + 4);
+
+                this._processTargetRegister(target, chName, regId, rawSigned, rawUnsigned, seqNum, regHex);
             }
-
-            const rawSigned = plain.readInt16LE(8);
-            const rawUnsigned = plain.readUInt16LE(8);
-
-            this._processTargetRegister(target, chName, regId, rawSigned, rawUnsigned, seqNum, regHex);
             this._lastHeartbeat = new Date().toISOString();
         }
     }
