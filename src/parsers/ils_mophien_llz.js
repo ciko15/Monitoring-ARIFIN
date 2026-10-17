@@ -212,28 +212,29 @@ class IlsMophienLlzParser extends BaseParser {
                 }
                 break;
             }
-            case 0x000B: { // SDM CL
+            case 0x000B: { // SDM CL (~40.00%)
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 35.0 && val <= 45.0) {
+                if (val >= 20.0 && val <= 60.0) {
                     target.cl.sdm = val;
                     paramName = 'SDM Course Line (CL)';
                     displayVal = `${val.toFixed(2)} %`;
                 }
                 break;
             }
-            case 0x000C: { // RF Level CL
+            case 0x000C: { // RF Level CL (~0.15 dB)
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -10.0 && val <= 10.0) {
+                if (val >= -20.0 && val <= 20.0) {
                     target.cl.rf_level = val;
                     paramName = 'RF Level CL';
                     displayVal = `${val.toFixed(2)} dB`;
                 }
                 break;
             }
-            case 0x000E: { // Ident AM CL
+            case 0x000E: { // Ident AM CL (~8.00%)
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 5.0 && val <= 12.0) {
+                if (val >= 3.0 && val <= 20.0) {
                     target.cl.ident = val;
+                    // Salurkan nilai Ident AM yang sepadan ke DS dan CLR
                     target.ds.ident = +(val - (chName === 'MON1' ? 0.08 : 0.01)).toFixed(2);
                     target.clr.ident = +(val + (chName === 'MON1' ? 0.02 : 0.01)).toFixed(2);
                     paramName = 'Ident-AM Depth CL';
@@ -254,18 +255,18 @@ class IlsMophienLlzParser extends BaseParser {
                 displayVal = `${target.ds.ddm.toFixed(2)} %`;
                 break;
             }
-            case 0x001A: { // SDM DS
+            case 0x001A: { // SDM DS (~40.00%)
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                if (val >= 35.0 && val <= 45.0) {
+                if (val >= 20.0 && val <= 60.0) {
                     target.ds.sdm = val;
                     paramName = 'SDM Displacement (DS)';
                     displayVal = `${val.toFixed(2)} %`;
                 }
                 break;
             }
-            case 0x001B: { // RF Level DS
+            case 0x001B: { // RF Level DS (~0.20 dB)
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -10.0 && val <= 10.0) {
+                if (val >= -20.0 && val <= 20.0) {
                     target.ds.rf_level = val;
                     paramName = 'RF Level DS';
                     displayVal = `${val.toFixed(2)} dB`;
@@ -274,29 +275,29 @@ class IlsMophienLlzParser extends BaseParser {
             }
 
             // --- CLEARANCE (CLR) ---
-            case 0x0014: { // SDM CLR
+            case 0x0014: { // SDM CLR (~40.00%)
                 const rawSdm = +(rawUnsigned / 100.0).toFixed(2);
                 if (rawSdm > 42.0 && rawSdm < 48.0) {
                     target.clr.sdm = +(rawSdm * 0.8935).toFixed(2);
-                } else if (rawSdm >= 38.0 && rawSdm <= 42.0) {
+                } else if (rawSdm >= 35.0 && rawSdm <= 42.0) {
                     target.clr.sdm = rawSdm;
                 }
                 paramName = 'SDM Clearance (CLR)';
                 displayVal = `${target.clr.sdm.toFixed(2)} %`;
                 break;
             }
-            case 0x0015: { // DDM CLR
+            case 0x0015: { // DDM CLR (~21.70%)
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= 18.0 && val <= 25.0) {
+                if (val >= 15.0 && val <= 30.0) {
                     target.clr.ddm = val;
                     paramName = 'DDM Clearance (CLR)';
                     displayVal = `${val.toFixed(2)} %`;
                 }
                 break;
             }
-            case 0x0016: { // RF Level CLR
+            case 0x0016: { // RF Level CLR (~0.15 dB)
                 const val = +(rawSigned / 100.0).toFixed(2);
-                if (val >= -10.0 && val <= 10.0) {
+                if (val >= -20.0 && val <= 20.0) {
                     target.clr.rf_level = val;
                     paramName = 'RF Level CLR';
                     displayVal = `${val.toFixed(2)} dB`;

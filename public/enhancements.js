@@ -1263,43 +1263,43 @@
         const tx2Text = data.tx2?.status_text || 'TX2: STANDBY (DUMMY LOAD)';
 
         // Extracted Channel Metrics from Parser (Tanpa fallback dummy)
-        const mon1CL = data.cl_channel?.mon1 || {
-            ddm: data.mon1_cl_ddm ?? null,
-            sdm: data.mon1_cl_sdm ?? null,
-            rf_level: data.mon1_cl_rf_level ?? null,
-            ident: data.mon1_cl_ident_am ?? null
+        const mon1CL = {
+            ddm: data.cl_channel?.mon1?.ddm ?? data.mon1_cl_ddm ?? data.cl_ddm ?? null,
+            sdm: data.cl_channel?.mon1?.sdm ?? data.mon1_cl_sdm ?? data.cl_sdm ?? null,
+            rf_level: data.cl_channel?.mon1?.rf_level ?? data.mon1_cl_rf_level ?? data.cl_rf_level ?? null,
+            ident: data.cl_channel?.mon1?.ident ?? data.mon1_cl_ident_am ?? data.cl_ident_am ?? null
         };
-        const mon2CL = data.cl_channel?.mon2 || {
-            ddm: data.mon2_cl_ddm ?? null,
-            sdm: data.mon2_cl_sdm ?? null,
-            rf_level: data.mon2_cl_rf_level ?? null,
-            ident: data.mon2_cl_ident_am ?? null
-        };
-
-        const mon1DS = data.ds_channel?.mon1 || {
-            ddm: data.mon1_ds_ddm ?? null,
-            sdm: data.mon1_ds_sdm ?? null,
-            rf_level: data.mon1_ds_rf_level ?? null,
-            ident: data.mon1_ds_ident_am ?? null
-        };
-        const mon2DS = data.ds_channel?.mon2 || {
-            ddm: data.mon2_ds_ddm ?? null,
-            sdm: data.mon2_ds_sdm ?? null,
-            rf_level: data.mon2_ds_rf_level ?? null,
-            ident: data.mon2_ds_ident_am ?? null
+        const mon2CL = {
+            ddm: data.cl_channel?.mon2?.ddm ?? data.mon2_cl_ddm ?? null,
+            sdm: data.cl_channel?.mon2?.sdm ?? data.mon2_cl_sdm ?? null,
+            rf_level: data.cl_channel?.mon2?.rf_level ?? data.mon2_cl_rf_level ?? null,
+            ident: data.cl_channel?.mon2?.ident ?? data.mon2_cl_ident_am ?? null
         };
 
-        const mon1CLR = data.clr_channel?.mon1 || {
-            ddm: data.mon1_clr_ddm ?? null,
-            sdm: data.mon1_clr_sdm ?? null,
-            rf_level: data.mon1_clr_rf_level ?? null,
-            ident: data.mon1_clr_ident_am ?? null
+        const mon1DS = {
+            ddm: data.ds_channel?.mon1?.ddm ?? data.mon1_ds_ddm ?? data.ds_ddm ?? null,
+            sdm: data.ds_channel?.mon1?.sdm ?? data.mon1_ds_sdm ?? data.ds_sdm ?? null,
+            rf_level: data.ds_channel?.mon1?.rf_level ?? data.mon1_ds_rf_level ?? data.ds_rf_level ?? null,
+            ident: data.ds_channel?.mon1?.ident ?? data.mon1_ds_ident_am ?? null
         };
-        const mon2CLR = data.clr_channel?.mon2 || {
-            ddm: data.mon2_clr_ddm ?? null,
-            sdm: data.mon2_clr_sdm ?? null,
-            rf_level: data.mon2_clr_rf_level ?? null,
-            ident: data.mon2_clr_ident_am ?? null
+        const mon2DS = {
+            ddm: data.ds_channel?.mon2?.ddm ?? data.mon2_ds_ddm ?? null,
+            sdm: data.ds_channel?.mon2?.sdm ?? data.mon2_ds_sdm ?? null,
+            rf_level: data.ds_channel?.mon2?.rf_level ?? data.mon2_ds_rf_level ?? null,
+            ident: data.ds_channel?.mon2?.ident ?? data.mon2_ds_ident_am ?? null
+        };
+
+        const mon1CLR = {
+            ddm: data.clr_channel?.mon1?.ddm ?? data.mon1_clr_ddm ?? data.clr_ddm ?? null,
+            sdm: data.clr_channel?.mon1?.sdm ?? data.mon1_clr_sdm ?? data.clr_sdm ?? null,
+            rf_level: data.clr_channel?.mon1?.rf_level ?? data.mon1_clr_rf_level ?? data.clr_rf_level ?? null,
+            ident: data.clr_channel?.mon1?.ident ?? data.mon1_clr_ident_am ?? null
+        };
+        const mon2CLR = {
+            ddm: data.clr_channel?.mon2?.ddm ?? data.mon2_clr_ddm ?? null,
+            sdm: data.clr_channel?.mon2?.sdm ?? data.mon2_clr_sdm ?? null,
+            rf_level: data.clr_channel?.mon2?.rf_level ?? data.mon2_clr_rf_level ?? null,
+            ident: data.clr_channel?.mon2?.ident ?? data.mon2_clr_ident_am ?? null
         };
 
         const mon1RF = data.rf_displacement?.mon1 || {
