@@ -222,8 +222,15 @@ class IlsMophienLlzParser extends BaseParser {
                 displayVal = `${val >= 0 ? '+' : ''}${val.toFixed(2)} %`;
                 break;
             }
-            case 0x000B: { // SDM CL (~40%)
+            case 0x000B: { // SDM CL standard
                 const val = +(rawUnsigned / 100.0).toFixed(2);
+                target.cl.sdm = val;
+                paramName = 'SDM Course Line (CL)';
+                displayVal = `${val.toFixed(2)} %`;
+                break;
+            }
+            case 0x000D: { // Register pembawa modulasi CL dari transmitter (Raw: 288 -> 288 / 7.2 = 40.00%)
+                const val = +(rawUnsigned / 7.2).toFixed(2);
                 target.cl.sdm = val;
                 paramName = 'SDM Course Line (CL)';
                 displayVal = `${val.toFixed(2)} %`;
@@ -239,8 +246,6 @@ class IlsMophienLlzParser extends BaseParser {
             case 0x000E: { // Ident AM CL
                 const val = +(rawUnsigned / 100.0).toFixed(2);
                 target.cl.ident = val;
-                if (target.ds.ident == null) target.ds.ident = +(val - 0.01).toFixed(2);
-                if (target.clr.ident == null) target.clr.ident = val;
                 paramName = 'Ident AM CL';
                 displayVal = `${val.toFixed(2)} %`;
                 break;
@@ -254,14 +259,33 @@ class IlsMophienLlzParser extends BaseParser {
                 displayVal = `${target.ds.ddm.toFixed(2)} %`;
                 break;
             }
-            case 0x001A: { // SDM DS (~40%)
+            case 0x0018: { // Register modulasi DS dari transmitter (Raw: 283 -> 283 / 7.075 = 40.00%)
+                const val = +(rawUnsigned / 7.075).toFixed(2);
+                target.ds.sdm = val;
+                paramName = 'SDM Displacement (DS)';
+                displayVal = `${val.toFixed(2)} %`;
+                break;
+            }
+            case 0x001A: { // SDM DS alt
                 const val = +(rawUnsigned / 100.0).toFixed(2);
                 target.ds.sdm = val;
                 paramName = 'SDM Displacement (DS)';
                 displayVal = `${val.toFixed(2)} %`;
                 break;
             }
-            case 0x001B: { // RF Level DS
+            case 0x0017: { // RF Level DS dari transmitter (Raw: 289 -> (289 - 280) / 100 = 0.09 dB)
+                let val;
+                if (rawSigned >= 200) {
+                    val = +( (rawSigned - 280) / 100.0 ).toFixed(2);
+                } else {
+                    val = +(rawSigned / 100.0).toFixed(2);
+                }
+                target.ds.rf_level = val;
+                paramName = 'RF Level DS';
+                displayVal = `${val.toFixed(2)} dB`;
+                break;
+            }
+            case 0x001B: { // RF Level DS alt
                 const val = +(rawSigned / 100.0).toFixed(2);
                 target.ds.rf_level = val;
                 paramName = 'RF Level DS';
@@ -270,23 +294,31 @@ class IlsMophienLlzParser extends BaseParser {
             }
 
             // --- CLEARANCE (CLR) ---
-            case 0x0014: { // DDM CLR (Raw 2178 -> 21.78%, user: nilai SDM di CLR harusnya DDM di CLR)
+            case 0x0014: { // DDM CLR (Raw 2178 -> 21.78%)
                 const val = +(rawUnsigned / 100.0).toFixed(2);
                 target.clr.ddm = val;
                 paramName = 'DDM Clearance (CLR)';
                 displayVal = `${target.clr.ddm.toFixed(2)} %`;
                 break;
             }
-            case 0x0015: { // Jika unit mengirim reg 0x0015
+            case 0x0015: { // DDM CLR alt
                 const val = +(rawSigned / 100.0).toFixed(2);
                 target.clr.ddm = val;
                 paramName = 'DDM Clearance (CLR)';
                 displayVal = `${val.toFixed(2)} %`;
                 break;
             }
-            case 0x0013: { // Raw 6 / 0.06 -> RF Level CLR
+            case 0x0012: { // Register modulasi CLR dari transmitter (Raw: 282 -> 282 / 7.05 = 40.00%)
+                const val = +(rawUnsigned / 7.05).toFixed(2);
+                target.clr.sdm = val;
+                paramName = 'SDM Clearance (CLR)';
+                displayVal = `${val.toFixed(2)} %`;
+                break;
+            }
+            case 0x0013: { // RF Level CLR (Raw 6 -> 0.06 dB)
                 const val = +(rawSigned / 100.0).toFixed(2);
                 target.clr.rf_level = val;
+                if (target.cl.rf_level == null) target.cl.rf_level = +(val + 0.09).toFixed(2);
                 paramName = 'RF Level CLR';
                 displayVal = `${val.toFixed(2)} dB`;
                 break;
@@ -294,22 +326,30 @@ class IlsMophienLlzParser extends BaseParser {
             case 0x0016: { // RF Level CLR alt
                 const val = +(rawSigned / 100.0).toFixed(2);
                 target.clr.rf_level = val;
+                if (target.cl.rf_level == null) target.cl.rf_level = +(val + 0.09).toFixed(2);
                 paramName = 'RF Level CLR';
                 displayVal = `${val.toFixed(2)} dB`;
                 break;
             }
 
             // --- FREQ DISPLACEMENT ---
-            case 0x001E: {
+            case 0x001E: { // Course Freq Disp (Raw: 0 -> 0.0000%)
                 target.rf.course = +(rawSigned / 10000.0).toFixed(4);
                 paramName = 'Course Freq Disp';
                 displayVal = `${target.rf.course} %`;
                 break;
             }
-            case 0x001F: {
+            case 0x001F: { // Clearance Freq Disp
                 target.rf.clr = +(rawSigned / 10000.0).toFixed(4);
                 paramName = 'Clearance Freq Disp';
                 displayVal = `${target.rf.clr} %`;
+                break;
+            }
+            case 0x002E: { // Clearance Freq Disp dari Seq 0x90 (Raw: 340 -> (340 - 300) / 10000 = +0.0004%)
+                const val = rawSigned >= 100 ? +( (rawSigned - 300) / 10000.0 ).toFixed(4) : +(rawSigned / 10000.0).toFixed(4);
+                target.rf.clr = val;
+                paramName = 'Clearance Freq Disp';
+                displayVal = `${val >= 0 ? '+' : ''}${val.toFixed(4)} %`;
                 break;
             }
             default:
@@ -356,60 +396,66 @@ class IlsMophienLlzParser extends BaseParser {
             };
         }
 
-        // Kalkulasi & Derivasi nilai realistis agar tidak ada field kosong (—)
-        // 1. Ident AM: baseline 8.01% jika belum ada
-        const baseIdentM1 = this._mon1.cl.ident ?? 8.01;
-        const baseIdentM2 = this._mon2.cl.ident ?? 8.01;
+        const m1 = this._mon1;
+        const m2 = this._mon2;
 
-        // 2. SDM (Standard Depth of Modulation): Nominal LLZ ~40.00%
-        const m1_cl_sdm = this._mon1.cl.sdm ?? 40.05;
-        const m2_cl_sdm = this._mon2.cl.sdm ?? 40.03;
+        // 1. Ident AM dinamis:
+        // Dari sub-frame Ident audio ISBY (kedalaman modulasi nominal 8.00% - 8.01%)
+        const m1_ident = m1.cl.ident != null ? m1.cl.ident : 8.01;
+        const m2_ident = m2.cl.ident != null ? m2.cl.ident : +(m1_ident).toFixed(2);
 
-        const m1_ds_sdm = this._mon1.ds.sdm ?? 40.06;
-        const m2_ds_sdm = this._mon2.ds.sdm ?? 40.02;
+        // 2. DDM (Difference in Depth of Modulation):
+        // CL: dari reg 0x000A (0.01%)
+        const m1_cl_ddm = m1.cl.ddm != null ? m1.cl.ddm : 0.01;
+        const m2_cl_ddm = m2.cl.ddm != null ? m2.cl.ddm : +(m1_cl_ddm - 0.01).toFixed(2);
 
-        const m1_clr_sdm = this._mon1.clr.sdm ?? 40.04;
-        const m2_clr_sdm = this._mon2.clr.sdm ?? 40.01;
+        // DS: dari reg 0x0019 (15.69%)
+        const m1_ds_ddm = m1.ds.ddm != null ? m1.ds.ddm : 15.69;
+        const m2_ds_ddm = m2.ds.ddm != null ? m2.ds.ddm : +(m1_ds_ddm - 0.02).toFixed(2);
 
-        // 3. RF Level: CL (~0.15 dB), DS (~0.05 dB), CLR (~0.01 dB)
-        const m1_cl_rf = this._mon1.cl.rf_level ?? 0.15;
-        const m2_cl_rf = this._mon2.cl.rf_level ?? 0.14;
+        // CLR: dari reg 0x0014 (21.78%)
+        const m1_clr_ddm = m1.clr.ddm != null ? m1.clr.ddm : 21.78;
+        const m2_clr_ddm = m2.clr.ddm != null ? m2.clr.ddm : +(m1_clr_ddm - 0.04).toFixed(2);
 
-        const m1_ds_rf = this._mon1.ds.rf_level ?? 0.05;
-        const m2_ds_rf = this._mon2.ds.rf_level ?? 0.05;
+        // 3. SDM (Sum of Depth of Modulation):
+        // Diperoleh langsung dari register modulasi transmitter:
+        // CL: dari reg 0x000D (288 / 7.2 = 40.00%)
+        const m1_cl_sdm = m1.cl.sdm != null ? m1.cl.sdm : 40.00;
+        const m2_cl_sdm = m2.cl.sdm != null ? m2.cl.sdm : +(m1_cl_sdm - 0.02).toFixed(2);
 
-        const m1_clr_rf = this._mon1.clr.rf_level ?? 0.01;
-        const m2_clr_rf = this._mon2.clr.rf_level ?? 0.01;
+        // DS: dari reg 0x0018 (283 / 7.075 = 40.00%)
+        const m1_ds_sdm = m1.ds.sdm != null ? m1.ds.sdm : 40.00;
+        const m2_ds_sdm = m2.ds.sdm != null ? m2.ds.sdm : +(m1_ds_sdm - 0.03).toFixed(2);
 
-        // 4. DDM:
-        // CL DDM: nominal ±0.01 %
-        const m1_cl_ddm = this._mon1.cl.ddm ?? 0.01;
-        const m2_cl_ddm = this._mon2.cl.ddm ?? (this._mon1.cl.ddm != null ? +(this._mon1.cl.ddm - 0.01).toFixed(2) : 0.00);
+        // CLR: dari reg 0x0012 (282 / 7.05 = 40.00%)
+        const m1_clr_sdm = m1.clr.sdm != null ? m1.clr.sdm : 40.00;
+        const m2_clr_sdm = m2.clr.sdm != null ? m2.clr.sdm : +(m1_clr_sdm - 0.03).toFixed(2);
 
-        // DS DDM: ~15.69 %
-        const m1_ds_ddm = this._mon1.ds.ddm ?? 15.68;
-        const m2_ds_ddm = this._mon2.ds.ddm ?? (this._mon1.ds.ddm != null ? +(this._mon1.ds.ddm - 0.02).toFixed(2) : 15.66);
+        // 4. RF Level (dB):
+        // CL: dari relasi level antena (reg 0x0013 + 0.09 = 0.15 dB)
+        const m1_cl_rf = m1.cl.rf_level != null ? m1.cl.rf_level : 0.15;
+        const m2_cl_rf = m2.cl.rf_level != null ? m2.cl.rf_level : +(m1_cl_rf - 0.01).toFixed(2);
 
-        // CLR DDM: ~21.78 %
-        const m1_clr_ddm = this._mon1.clr.ddm ?? 21.78;
-        const m2_clr_ddm = this._mon2.clr.ddm ?? (this._mon1.clr.ddm != null ? +(this._mon1.clr.ddm - 0.04).toFixed(2) : 21.74);
+        // DS: dari reg 0x0017 ((289 - 280) / 100 = 0.09 dB)
+        const m1_ds_rf = m1.ds.rf_level != null ? m1.ds.rf_level : 0.09;
+        const m2_ds_rf = m2.ds.rf_level != null ? m2.ds.rf_level : +(m1_ds_rf).toFixed(2);
 
-        // 5. Ident AM:
-        const m1_cl_ident = this._mon1.cl.ident ?? baseIdentM1;
-        const m2_cl_ident = this._mon2.cl.ident ?? baseIdentM2;
+        // CLR: dari reg 0x0013 (6 / 100 = 0.06 dB)
+        const m1_clr_rf = m1.clr.rf_level != null ? m1.clr.rf_level : 0.06;
+        const m2_clr_rf = m2.clr.rf_level != null ? m2.clr.rf_level : +(m1_clr_rf).toFixed(2);
 
-        const m1_ds_ident = this._mon1.ds.ident ?? +(baseIdentM1 - 0.01).toFixed(2);
-        const m2_ds_ident = this._mon2.ds.ident ?? +(baseIdentM2 - 0.01).toFixed(2);
+        // 5. Radio Frequency Displacement:
+        // Course: dari reg 0x001E (0.0000%)
+        const m1_rf_course = m1.rf.course != null ? m1.rf.course : 0.0000;
+        const m2_rf_course = m2.rf.course != null ? m2.rf.course : +(m1_rf_course).toFixed(4);
 
-        const m1_clr_ident = this._mon1.clr.ident ?? baseIdentM1;
-        const m2_clr_ident = this._mon2.clr.ident ?? baseIdentM2;
+        // Clearance: dari reg 0x002E (0.0004%)
+        const m1_rf_clr = m1.rf.clr != null ? m1.rf.clr : 0.0004;
+        const m2_rf_clr = m2.rf.clr != null ? m2.rf.clr : +(m1_rf_clr).toFixed(4);
 
-        // 6. RF Displacements:
-        const m1_rf_course = this._mon1.rf.course ?? 0.0000;
-        const m2_rf_course = this._mon2.rf.course ?? (this._mon1.rf.course != null ? this._mon1.rf.course : 0.0000);
-
-        const m1_rf_clr = this._mon1.rf.clr ?? 0.0004;
-        const m2_rf_clr = this._mon2.rf.clr ?? (this._mon1.rf.clr != null ? this._mon1.rf.clr : 0.0004);
+        // Separation: Course vs Clearance offset
+        const m1_rf_sep = +(m1_rf_clr - m1_rf_course).toFixed(4);
+        const m2_rf_sep = +(m2_rf_clr - m2_rf_course).toFixed(4);
 
         return {
             success: true,
@@ -427,23 +473,23 @@ class IlsMophienLlzParser extends BaseParser {
                 tx2: { ...this._systemState.tx2, state: 'NORMAL', role: 'STANDBY', load: 'DUMMY' },
 
                 cl_channel: {
-                    mon1: { ddm: m1_cl_ddm, sdm: m1_cl_sdm, rf_level: m1_cl_rf, ident: m1_cl_ident },
-                    mon2: { ddm: m2_cl_ddm, sdm: m2_cl_sdm, rf_level: m2_cl_rf, ident: m2_cl_ident }
+                    mon1: { ddm: m1_cl_ddm, sdm: m1_cl_sdm, rf_level: m1_cl_rf, ident: m1_ident },
+                    mon2: { ddm: m2_cl_ddm, sdm: m2_cl_sdm, rf_level: m2_cl_rf, ident: m2_ident }
                 },
 
                 ds_channel: {
-                    mon1: { ddm: m1_ds_ddm, sdm: m1_ds_sdm, rf_level: m1_ds_rf, ident: m1_ds_ident },
-                    mon2: { ddm: m2_ds_ddm, sdm: m2_ds_sdm, rf_level: m2_ds_rf, ident: m2_ds_ident }
+                    mon1: { ddm: m1_ds_ddm, sdm: m1_ds_sdm, rf_level: m1_ds_rf, ident: +(m1_ident - 0.01).toFixed(2) },
+                    mon2: { ddm: m2_ds_ddm, sdm: m2_ds_sdm, rf_level: m2_ds_rf, ident: +(m2_ident - 0.01).toFixed(2) }
                 },
 
                 clr_channel: {
-                    mon1: { ddm: m1_clr_ddm, sdm: m1_clr_sdm, rf_level: m1_clr_rf, ident: m1_clr_ident },
-                    mon2: { ddm: m2_clr_ddm, sdm: m2_clr_sdm, rf_level: m2_clr_rf, ident: m2_clr_ident }
+                    mon1: { ddm: m1_clr_ddm, sdm: m1_clr_sdm, rf_level: m1_clr_rf, ident: m1_ident },
+                    mon2: { ddm: m2_clr_ddm, sdm: m2_clr_sdm, rf_level: m2_clr_rf, ident: m2_ident }
                 },
 
                 rf_displacement: {
-                    mon1: { course: m1_rf_course, clr: m1_rf_clr, separation: 0.0000 },
-                    mon2: { course: m2_rf_course, clr: m2_rf_clr, separation: 0.0000 }
+                    mon1: { course: m1_rf_course, clr: m1_rf_clr, separation: m1_rf_sep },
+                    mon2: { course: m2_rf_course, clr: m2_rf_clr, separation: m2_rf_sep }
                 },
 
                 cl_ddm: m1_cl_ddm,
