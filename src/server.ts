@@ -1194,7 +1194,7 @@ const app = new Elysia()
                 const b = body as any;
                 const result = await db.createOtentication(b);
                 pushSyncToTOC();
-                publishDataSourceConfigurationChanged('add', b).catch((e: any) => console.error('[EMS] Failed to publish datasource update:', e.message));
+                publishDataSourceConfigurationChanged('add', result || b).catch((e: any) => console.error('[EMS] Failed to publish datasource update:', e.message));
                 return result;
             })
             .delete('/:equipmentId', async ({ params }) => {
