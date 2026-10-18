@@ -1496,9 +1496,13 @@
 
         const isDisconnected = !data || data._status === 'Disconnect' || data._status === 'Offline' || data.connectivity === 'Disconnected';
 
-        const serviceColor = isDisconnected ? '#3a5a7a' : '#00ff88';
-        const serviceBg = isDisconnected ? 'rgba(58,90,122,0.2)' : 'rgba(0,255,136,0.15)';
-        const serviceBorder = isDisconnected ? 'rgba(58,90,122,0.4)' : '#00ff88';
+        const isNormalService = serviceStatus === 'NORMAL' || serviceStatus === 'OK';
+        const isWarnService = serviceStatus === 'WARNING' || serviceStatus === 'WARN';
+        const isAlarmService = serviceStatus === 'ALARM' || serviceStatus === 'FAIL' || serviceStatus === 'ERROR';
+
+        const serviceColor = isDisconnected ? '#3a5a7a' : (isAlarmService ? '#ff3355' : (isWarnService ? '#ffcc00' : '#00ff88'));
+        const serviceBg = isDisconnected ? 'rgba(58,90,122,0.2)' : (isAlarmService ? 'rgba(255,51,85,0.15)' : (isWarnService ? 'rgba(255,204,0,0.15)' : 'rgba(0,255,136,0.15)'));
+        const serviceBorder = isDisconnected ? 'rgba(58,90,122,0.4)' : (isAlarmService ? '#ff3355' : (isWarnService ? '#ffcc00' : '#00ff88'));
 
         const tx1Color = isDisconnected ? '#64748b' : '#00ff88';
         const tx1Bg = isDisconnected ? 'rgba(100,116,139,0.15)' : 'rgba(0,255,136,0.12)';

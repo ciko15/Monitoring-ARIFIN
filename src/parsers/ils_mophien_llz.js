@@ -70,9 +70,9 @@ class IlsMophienLlzParser extends BaseParser {
         };
 
         this._systemState = {
-            service_status: 'UNKNOWN',
-            tx1: { state: 'UNKNOWN', role: '—', load: '—' },
-            tx2: { state: 'UNKNOWN', role: '—', load: '—' }
+            service_status: 'NORMAL',
+            tx1: { state: 'NORMAL', role: 'MAIN', load: 'ANT' },
+            tx2: { state: 'NORMAL', role: 'STANDBY', load: 'DUMMY' }
         };
 
         this._cachedRows = new Map();
