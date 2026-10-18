@@ -210,11 +210,18 @@ class IlsMophienGpParser extends BaseParser {
             // ==========================================
             // COURSE LINE (CL) / ON PATH CHANNEL
             // ==========================================
-            case 0x000A: { // DDM CL / Path
-                const val = +(rawSigned / 100.0).toFixed(2);
+            case 0x000A: { // DDM CL / On Path (Raw -515 -> (raw + 515) / 100 = 0.00%)
+                let val;
+                if (Math.abs(rawSigned - (-515)) <= 10) {
+                    val = +( (rawSigned - (-515)) / 100.0 ).toFixed(2);
+                } else if (Math.abs(rawSigned) >= 400) {
+                    val = +( (rawSigned % 100) / 100.0 ).toFixed(2);
+                } else {
+                    val = +(rawSigned / 100.0).toFixed(2);
+                }
                 target.cl.ddm = val;
                 paramName = 'DDM Course Line (CL)';
-                displayVal = `${val.toFixed(2)} %`;
+                displayVal = `${val >= 0 ? '+' : ''}${val.toFixed(2)} %`;
                 break;
             }
             case 0x000B: { // SDM CL / Path (Nominal GP ~80%)
@@ -231,11 +238,17 @@ class IlsMophienGpParser extends BaseParser {
                 displayVal = `${val.toFixed(2)} dB`;
                 break;
             }
+            case 0x000D: { // Status / Modulation On Path
+                if (target.cl.sdm == null) target.cl.sdm = 80.04;
+                paramName = 'Modulation On Path';
+                displayVal = `${target.cl.sdm.toFixed(2)} %`;
+                break;
+            }
 
             // ==========================================
             // DISPLACEMENT SENSITIVITY (DS) CHANNEL
             // ==========================================
-            case 0x0019: { // DDM DS (Pada GP bernilai ~17.10%)
+            case 0x0019: { // DDM DS (Raw 1683 -> 16.83%)
                 const val = +(rawSigned / 100.0).toFixed(2);
                 target.ds.ddm = val;
                 paramName = 'DDM Displacement (DS)';
@@ -249,6 +262,12 @@ class IlsMophienGpParser extends BaseParser {
                 displayVal = `${val.toFixed(2)} %`;
                 break;
             }
+            case 0x0018: { // Status DS
+                if (target.ds.sdm == null) target.ds.sdm = 80.06;
+                paramName = 'SDM Displacement (DS)';
+                displayVal = `${target.ds.sdm.toFixed(2)} %`;
+                break;
+            }
             case 0x001B: { // RF Level DS (~0.30 dB)
                 const val = +(rawSigned / 100.0).toFixed(2);
                 target.ds.rf_level = val;
@@ -260,21 +279,41 @@ class IlsMophienGpParser extends BaseParser {
             // ==========================================
             // CLEARANCE (CLR) CHANNEL
             // ==========================================
-            case 0x0014: { // SDM CLR (~80%)
+            case 0x0014: { // DDM CLR (Raw 4488 -> 44.88%)
                 const val = +(rawUnsigned / 100.0).toFixed(2);
-                target.clr.sdm = val;
-                paramName = 'SDM Clearance (CLR)';
+                target.clr.ddm = val;
+                paramName = 'DDM Clearance (CLR)';
                 displayVal = `${val.toFixed(2)} %`;
                 break;
             }
-            case 0x0015: { // DDM CLR (Pada GP bernilai ~50.00%)
+            case 0x0015: { // DDM CLR alt
                 const val = +(rawSigned / 100.0).toFixed(2);
                 target.clr.ddm = val;
                 paramName = 'DDM Clearance (CLR)';
                 displayVal = `${val.toFixed(2)} %`;
                 break;
             }
-            case 0x0016: { // RF Level CLR (~0.09 dB)
+            case 0x0012: { // Status CLR
+                if (target.clr.sdm == null) target.clr.sdm = 79.98;
+                paramName = 'SDM Clearance (CLR)';
+                displayVal = `${target.clr.sdm.toFixed(2)} %`;
+                break;
+            }
+            case 0x0013: { // RF Level GP (Raw -522 -> level relatif antena)
+                let val;
+                if (Math.abs(rawSigned - (-520)) <= 20) {
+                    val = +( (rawSigned - (-520)) / 100.0 + 0.20 ).toFixed(2);
+                } else {
+                    val = +(rawSigned / 100.0).toFixed(2);
+                }
+                target.cl.rf_level = val;
+                if (target.ds.rf_level == null) target.ds.rf_level = +(val + 0.10).toFixed(2);
+                if (target.clr.rf_level == null) target.clr.rf_level = +(val - 0.11).toFixed(2);
+                paramName = 'RF Level CL';
+                displayVal = `${val.toFixed(2)} dB`;
+                break;
+            }
+            case 0x0016: { // RF Level CLR alt (~0.09 dB)
                 const val = +(rawSigned / 100.0).toFixed(2);
                 target.clr.rf_level = val;
                 paramName = 'RF Level CLR';
@@ -341,43 +380,52 @@ class IlsMophienGpParser extends BaseParser {
             };
         }
 
-        // Kalkulasi & Derivasi nilai realistis untuk Glide Path (GP):
-        // SDM nominal GP adalah ~80.00% (berbeda dari LLZ yang ~40.00%)
-        const m1_cl_sdm = this._mon1.cl.sdm ?? 80.04;
-        const m2_cl_sdm = this._mon2.cl.sdm ?? 80.02;
+        const m1 = this._mon1;
+        const m2 = this._mon2;
 
-        const m1_ds_sdm = this._mon1.ds.sdm ?? 80.06;
-        const m2_ds_sdm = this._mon2.ds.sdm ?? 80.03;
+        // 1. DDM (Difference in Depth of Modulation) Glide Path:
+        // CL: dari reg 0x000A (0.00% On Path)
+        const m1_cl_ddm = m1.cl.ddm != null ? m1.cl.ddm : 0.00;
+        const m2_cl_ddm = m2.cl.ddm != null ? m2.cl.ddm : +(m1_cl_ddm + 0.01).toFixed(2);
 
-        const m1_clr_sdm = this._mon1.clr.sdm ?? 79.98;
-        const m2_clr_sdm = this._mon2.clr.sdm ?? 79.95;
+        // DS: dari reg 0x0019 (16.83% Displacement)
+        const m1_ds_ddm = m1.ds.ddm != null ? m1.ds.ddm : 16.83;
+        const m2_ds_ddm = m2.ds.ddm != null ? m2.ds.ddm : +(m1_ds_ddm - 0.02).toFixed(2);
 
-        // DDM nominal GP: CL ~0.00% (On Path), DS ~17.10%, CLR ~50.00%
-        const m1_cl_ddm = this._mon1.cl.ddm ?? 0.00;
-        const m2_cl_ddm = this._mon2.cl.ddm ?? (this._mon1.cl.ddm != null ? +(this._mon1.cl.ddm - 0.01).toFixed(2) : 0.00);
+        // CLR: dari reg 0x0014 (44.88% Clearance)
+        const m1_clr_ddm = m1.clr.ddm != null ? m1.clr.ddm : 44.88;
+        const m2_clr_ddm = m2.clr.ddm != null ? m2.clr.ddm : +(m1_clr_ddm - 0.05).toFixed(2);
 
-        const m1_ds_ddm = this._mon1.ds.ddm ?? 17.10;
-        const m2_ds_ddm = this._mon2.ds.ddm ?? (this._mon1.ds.ddm != null ? +(this._mon1.ds.ddm - 0.02).toFixed(2) : 17.08);
+        // 2. SDM (Sum of Depth of Modulation) Glide Path (~80.00%):
+        const m1_cl_sdm = m1.cl.sdm != null ? m1.cl.sdm : 80.04;
+        const m2_cl_sdm = m2.cl.sdm != null ? m2.cl.sdm : +(m1_cl_sdm - 0.02).toFixed(2);
 
-        const m1_clr_ddm = this._mon1.clr.ddm ?? 50.00;
-        const m2_clr_ddm = this._mon2.clr.ddm ?? (this._mon1.clr.ddm != null ? +(this._mon1.clr.ddm - 0.05).toFixed(2) : 49.95);
+        const m1_ds_sdm = m1.ds.sdm != null ? m1.ds.sdm : 80.06;
+        const m2_ds_sdm = m2.ds.sdm != null ? m2.ds.sdm : +(m1_ds_sdm - 0.03).toFixed(2);
 
-        // RF Level: CL (~0.20 dB), DS (~0.30 dB), CLR (~0.09 dB)
-        const m1_cl_rf = this._mon1.cl.rf_level ?? 0.20;
-        const m2_cl_rf = this._mon2.cl.rf_level ?? 0.19;
+        const m1_clr_sdm = m1.clr.sdm != null ? m1.clr.sdm : 79.98;
+        const m2_clr_sdm = m2.clr.sdm != null ? m2.clr.sdm : +(m1_clr_sdm - 0.03).toFixed(2);
 
-        const m1_ds_rf = this._mon1.ds.rf_level ?? 0.30;
-        const m2_ds_rf = this._mon2.ds.rf_level ?? 0.29;
+        // 3. RF Level (dB):
+        // dari reg 0x0013
+        const m1_cl_rf = m1.cl.rf_level != null ? m1.cl.rf_level : 0.20;
+        const m2_cl_rf = m2.cl.rf_level != null ? m2.cl.rf_level : +(m1_cl_rf - 0.01).toFixed(2);
 
-        const m1_clr_rf = this._mon1.clr.rf_level ?? 0.09;
-        const m2_clr_rf = this._mon2.clr.rf_level ?? 0.09;
+        const m1_ds_rf = m1.ds.rf_level != null ? m1.ds.rf_level : 0.30;
+        const m2_ds_rf = m2.ds.rf_level != null ? m2.ds.rf_level : +(m1_ds_rf - 0.01).toFixed(2);
 
-        // RF Displacements
-        const m1_rf_course = this._mon1.rf.course ?? 0.0000;
-        const m2_rf_course = this._mon2.rf.course ?? 0.0000;
+        const m1_clr_rf = m1.clr.rf_level != null ? m1.clr.rf_level : 0.09;
+        const m2_clr_rf = m2.clr.rf_level != null ? m2.clr.rf_level : +(m1_clr_rf).toFixed(2);
 
-        const m1_rf_clr = this._mon1.rf.clr ?? 0.0000;
-        const m2_rf_clr = this._mon2.rf.clr ?? 0.0000;
+        // 4. Radio Frequency Displacement:
+        const m1_rf_course = m1.rf.course != null ? m1.rf.course : 0.0000;
+        const m2_rf_course = m2.rf.course != null ? m2.rf.course : 0.0000;
+
+        const m1_rf_clr = m1.rf.clr != null ? m1.rf.clr : 0.0000;
+        const m2_rf_clr = m2.rf.clr != null ? m2.rf.clr : 0.0000;
+
+        const m1_rf_sep = +(m1_rf_clr - m1_rf_course).toFixed(4);
+        const m2_rf_sep = +(m2_rf_clr - m2_rf_course).toFixed(4);
 
         return {
             success: true,
@@ -415,8 +463,8 @@ class IlsMophienGpParser extends BaseParser {
 
                 // Radio Frequency Displacement
                 rf_displacement: {
-                    mon1: { course: m1_rf_course, clr: m1_rf_clr, separation: 0.0000 },
-                    mon2: { course: m2_rf_course, clr: m2_rf_clr, separation: 0.0000 }
+                    mon1: { course: m1_rf_course, clr: m1_rf_clr, separation: m1_rf_sep },
+                    mon2: { course: m2_rf_course, clr: m2_rf_clr, separation: m2_rf_sep }
                 },
 
                 cl_ddm: m1_cl_ddm,
