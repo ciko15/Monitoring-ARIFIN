@@ -1684,6 +1684,11 @@
             </div>`;
         }
 
+        const fmtVal = (val, dec = 2, unit = '') => {
+            if (val == null || isNaN(val)) return '—';
+            return `${Number(val).toFixed(dec)}${unit ? ' ' + unit : ''}`;
+        };
+
         return `
         <div style="display:flex; flex-direction:column; gap:0;">
             <!-- Top Status Bar -->
@@ -1734,39 +1739,39 @@
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px;">
                 <!-- Card 1: System Parameters -->
                 ${renderDualCard('SYSTEM PARAMETERS', 'fas fa-cogs', `
-                    ${renderParamRow('Time Delay', sys1.time_delay, `${sys1.time_delay.toFixed(2)} µs`, 'time_delay')}
-                    ${renderParamRow('Reply Efficiency', sys1.reply_eff, `${sys1.reply_eff.toFixed(0)} %`, 'reply_efficiency')}
-                    ${renderParamRow('Transmission Rate', sys1.tx_rate, `${sys1.tx_rate} pp/s`, 'tx_rate')}
+                    ${renderParamRow('Time Delay', sys1.time_delay, fmtVal(sys1.time_delay, 2, 'µs'), 'time_delay')}
+                    ${renderParamRow('Reply Efficiency', sys1.reply_eff, fmtVal(sys1.reply_eff, 0, '%'), 'reply_efficiency')}
+                    ${renderParamRow('Transmission Rate', sys1.tx_rate, fmtVal(sys1.tx_rate, 0, 'pp/s'), 'tx_rate')}
                 `, `
-                    ${renderParamRow('Time Delay', sys2.time_delay, `${sys2.time_delay.toFixed(2)} µs`, 'time_delay')}
-                    ${renderParamRow('Reply Efficiency', sys2.reply_eff, `${sys2.reply_eff.toFixed(0)} %`, 'reply_efficiency')}
-                    ${renderParamRow('Transmission Rate', sys2.tx_rate, `${sys2.tx_rate} pp/s`, 'tx_rate')}
+                    ${renderParamRow('Time Delay', sys2.time_delay, fmtVal(sys2.time_delay, 2, 'µs'), 'time_delay')}
+                    ${renderParamRow('Reply Efficiency', sys2.reply_eff, fmtVal(sys2.reply_eff, 0, '%'), 'reply_efficiency')}
+                    ${renderParamRow('Transmission Rate', sys2.tx_rate, fmtVal(sys2.tx_rate, 0, 'pp/s'), 'tx_rate')}
                 `)}
 
                 <!-- Card 2: Pulse Shape and Spacing -->
                 ${renderDualCard('PULSE SHAPE & SPACING', 'fas fa-chart-line', `
-                    ${renderParamRow('Pulse Rise Time', pulse1.rise_time, `${pulse1.rise_time.toFixed(2)} µs`, 'pulse_rise_time')}
-                    ${renderParamRow('Pulse Duration', pulse1.duration, `${pulse1.duration.toFixed(2)} µs`, 'pulse_duration')}
-                    ${renderParamRow('Pulse Decay Time', pulse1.decay_time, `${pulse1.decay_time.toFixed(2)} µs`, 'pulse_decay_time')}
-                    ${renderParamRow('Pulse Spacing', pulse1.spacing, `${pulse1.spacing.toFixed(2)} µs`, 'pulse_spacing')}
+                    ${renderParamRow('Pulse Rise Time', pulse1.rise_time, fmtVal(pulse1.rise_time, 2, 'µs'), 'pulse_rise_time')}
+                    ${renderParamRow('Pulse Duration', pulse1.duration, fmtVal(pulse1.duration, 2, 'µs'), 'pulse_duration')}
+                    ${renderParamRow('Pulse Decay Time', pulse1.decay_time, fmtVal(pulse1.decay_time, 2, 'µs'), 'pulse_decay_time')}
+                    ${renderParamRow('Pulse Spacing', pulse1.spacing, fmtVal(pulse1.spacing, 2, 'µs'), 'pulse_spacing')}
                 `, `
-                    ${renderParamRow('Pulse Rise Time', pulse2.rise_time, `${pulse2.rise_time.toFixed(2)} µs`, 'pulse_rise_time')}
-                    ${renderParamRow('Pulse Duration', pulse2.duration, `${pulse2.duration.toFixed(2)} µs`, 'pulse_duration')}
-                    ${renderParamRow('Pulse Decay Time', pulse2.decay_time, `${pulse2.decay_time.toFixed(2)} µs`, 'pulse_decay_time')}
-                    ${renderParamRow('Pulse Spacing', pulse2.spacing, `${pulse2.spacing.toFixed(2)} µs`, 'pulse_spacing')}
+                    ${renderParamRow('Pulse Rise Time', pulse2.rise_time, fmtVal(pulse2.rise_time, 2, 'µs'), 'pulse_rise_time')}
+                    ${renderParamRow('Pulse Duration', pulse2.duration, fmtVal(pulse2.duration, 2, 'µs'), 'pulse_duration')}
+                    ${renderParamRow('Pulse Decay Time', pulse2.decay_time, fmtVal(pulse2.decay_time, 2, 'µs'), 'pulse_decay_time')}
+                    ${renderParamRow('Pulse Spacing', pulse2.spacing, fmtVal(pulse2.spacing, 2, 'µs'), 'pulse_spacing')}
                 `)}
 
                 <!-- Card 3: Frequency and Power -->
                 ${renderDualCard('FREQUENCY & POWER', 'fas fa-bolt', `
-                    ${renderParamRow('Radio Frequency', power1.rf_disp, `${power1.rf_disp >= 0 ? '+' : ''}${power1.rf_disp.toFixed(4)} %`, 'rf_disp')}
-                    ${renderParamRow('Peak Power Output', power1.peak_power, `${power1.peak_power.toFixed(0)} W`, 'peak_power')}
-                    ${renderParamRow('Antenna VSWR', power1.vswr, `${power1.vswr.toFixed(2)} : 1`, 'vswr')}
-                    ${renderParamRow('Effective Radiated', power1.effective_radiated, `${power1.effective_radiated.toFixed(1)} dB`, 'effective_radiated')}
+                    ${renderParamRow('Radio Frequency', power1.rf_disp, power1.rf_disp != null ? `${power1.rf_disp >= 0 ? '+' : ''}${Number(power1.rf_disp).toFixed(4)} %` : '—', 'rf_disp')}
+                    ${renderParamRow('Peak Power Output', power1.peak_power, fmtVal(power1.peak_power, 0, 'W'), 'peak_power')}
+                    ${renderParamRow('Antenna VSWR', power1.vswr, power1.vswr != null ? `${Number(power1.vswr).toFixed(2)} : 1` : '—', 'vswr')}
+                    ${renderParamRow('Effective Radiated', power1.effective_radiated, fmtVal(power1.effective_radiated, 1, 'dB'), 'effective_radiated')}
                 `, `
-                    ${renderParamRow('Radio Frequency', power2.rf_disp, `${power2.rf_disp >= 0 ? '+' : ''}${power2.rf_disp.toFixed(4)} %`, 'rf_disp')}
-                    ${renderParamRow('Peak Power Output', power2.peak_power, `${power2.peak_power.toFixed(0)} W`, 'peak_power')}
-                    ${renderParamRow('Antenna VSWR', power2.vswr, `${power2.vswr.toFixed(2)} : 1`, 'vswr')}
-                    ${renderParamRow('Effective Radiated', power2.effective_radiated, `${power2.effective_radiated.toFixed(1)} dB`, 'effective_radiated')}
+                    ${renderParamRow('Radio Frequency', power2.rf_disp, power2.rf_disp != null ? `${power2.rf_disp >= 0 ? '+' : ''}${Number(power2.rf_disp).toFixed(4)} %` : '—', 'rf_disp')}
+                    ${renderParamRow('Peak Power Output', power2.peak_power, fmtVal(power2.peak_power, 0, 'W'), 'peak_power')}
+                    ${renderParamRow('Antenna VSWR', power2.vswr, power2.vswr != null ? `${Number(power2.vswr).toFixed(2)} : 1` : '—', 'vswr')}
+                    ${renderParamRow('Effective Radiated', power2.effective_radiated, fmtVal(power2.effective_radiated, 1, 'dB'), 'effective_radiated')}
                 `)}
             </div>
 
