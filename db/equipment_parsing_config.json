@@ -259,5 +259,13 @@
         "category": "Navigation",
         "files": "/src/parsers/ils_mophien_gp.js",
         "createdAt": "2026-10-14T09:00:00.000Z"
+    },
+    {
+        "id": "dme_mophien_tdme",
+        "name": "DME Mophien T-DME",
+        "description": "Parser TCP streaming untuk Transponder DME (T-DME) Mophien Juanda PMDT",
+        "category": "Navigation",
+        "files": "/src/parsers/dme_mophien_tdme.js",
+        "createdAt": "2026-10-18T15:45:00.000Z"
     }
 ]

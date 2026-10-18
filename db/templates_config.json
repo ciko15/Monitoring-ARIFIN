@@ -279,5 +279,29 @@
     ],
     "isDefault": true,
     "isSystem": true
+  },
+  {
+    "id": "dme_mophien_tdme",
+    "name": "DME Mophien T-DME",
+    "protocol": "tcp",
+    "category": "Navigation",
+    "description": "Standard DME Mophien Transponder (T-DME) PMDT Juanda template",
+    "parameters": [
+      { "name": "station_ident", "label": "Station IDENT", "unit": "" },
+      { "name": "dme_channel", "label": "DME Channel", "unit": "" },
+      { "name": "time_delay", "label": "Time Delay", "unit": "µs" },
+      { "name": "reply_efficiency", "label": "Reply Efficiency", "unit": "%" },
+      { "name": "tx_rate", "label": "Transmission Rate", "unit": "pp/s" },
+      { "name": "pulse_rise_time", "label": "Pulse Rise Time", "unit": "µs" },
+      { "name": "pulse_duration", "label": "Pulse Duration", "unit": "µs" },
+      { "name": "pulse_decay_time", "label": "Pulse Decay Time", "unit": "µs" },
+      { "name": "pulse_spacing", "label": "Pulse Spacing", "unit": "µs" },
+      { "name": "rf_disp", "label": "Radio Frequency Disp", "unit": "%" },
+      { "name": "peak_power", "label": "Peak Power Output", "unit": "W" },
+      { "name": "vswr", "label": "Antenna VSWR", "unit": ":1" },
+      { "name": "effective_radiated", "label": "Effective Radiated", "unit": "dB" }
+    ],
+    "isDefault": true,
+    "isSystem": true
   }
 ]

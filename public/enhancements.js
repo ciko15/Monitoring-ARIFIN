@@ -601,13 +601,13 @@
 
         // Cache persistent untuk modal agar jika ada reconnect sesaat, telemetry tidak mendadak hilang jadi '-'
         if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
-        const isIlsMophienSrc = effParserId === 'ils_mophien_llz' || effParserId === 'ils_mophien_gp' ||
-                                src?.parsing_id === 'ils_mophien_llz' || src?.parsing_id === 'ils_mophien_gp' ||
-                                (src?.name && (src.name.toLowerCase().includes('localizer') || src.name.toLowerCase().includes('glide'))) ||
-                                (src?.ip_address && (String(src.ip_address).includes('10.62.3.20') || String(src.ip_address).includes('10.62.3.21')));
+        const isIlsMophienSrc = effParserId === 'ils_mophien_llz' || effParserId === 'ils_mophien_gp' || effParserId === 'dme_mophien_tdme' ||
+                                src?.parsing_id === 'ils_mophien_llz' || src?.parsing_id === 'ils_mophien_gp' || src?.parsing_id === 'dme_mophien_tdme' ||
+                                (src?.name && (src.name.toLowerCase().includes('localizer') || src.name.toLowerCase().includes('glide') || src.name.toLowerCase().includes('dme'))) ||
+                                (src?.ip_address && (String(src.ip_address).includes('10.62.3.20') || String(src.ip_address).includes('10.62.3.10') || String(src.ip_address).includes('10.62.3.30')));
                          
         const modalCacheKey = src?.id || src?.ip_address || src?.name || 'ils_active';
-        const hasValidLlzData = latestData && (latestData.cl_channel || latestData.ds_channel || latestData.station_ident || latestData.cl_ddm !== undefined);
+        const hasValidLlzData = latestData && (latestData.cl_channel || latestData.ds_channel || latestData.system_params || latestData.pulse_params || latestData.station_ident || latestData.cl_ddm !== undefined);
         
         if (isIlsMophienSrc) {
             if (hasValidLlzData) {
@@ -1205,15 +1205,32 @@
             pingBadge + `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${statusColors[status]}18;color:${statusColors[status]};border:1px solid ${statusColors[status]}40;letter-spacing:0.5px;">${status.toUpperCase()}</span>`;
 
         const modalContainer = modal.querySelector('div');
-        const isIlsMophien = src && (
+        const isTdme = src && (
+            src.parsing_id === 'dme_mophien_tdme' ||
+            (data && (data._parsing_id === 'dme_mophien_tdme' || data.equipment_type === 'TDME')) ||
+            (src.name && src.name.toLowerCase().includes('tdme')) ||
+            (src.ip_address && String(src.ip_address).includes('10.62.3.30'))
+        );
+        const isIlsMophien = src && !isTdme && (
             src.parsing_id === 'ils_mophien_llz' || src.parsing_id === 'ils_mophien_gp' ||
             (src.name && (src.name.toLowerCase().includes('localizer') || src.name.toLowerCase().includes('glide'))) ||
             (data && (data._parsing_id === 'ils_mophien_llz' || data._parsing_id === 'ils_mophien_gp'))
         );
-        if (modalContainer) modalContainer.style.maxWidth = isIlsMophien ? '960px' : '920px';
+        if (modalContainer) modalContainer.style.maxWidth = (isIlsMophien || isTdme) ? '960px' : '920px';
         const body = document.getElementById('srcDetailBody');
         if (body) {
-            if (isIlsMophien) {
+            if (isTdme) {
+                if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
+                const cacheKey = src?.id || src?.ip_address || src?.name || 'tdme_active';
+                let renderData = data || {};
+                const hasMetrics = renderData && (renderData.system_params || renderData.pulse_params || renderData.power_params || renderData.time_delay !== undefined);
+                if (hasMetrics) {
+                    window._modalTelemetryLkgv.set(cacheKey, JSON.parse(JSON.stringify(renderData)));
+                } else if (window._modalTelemetryLkgv.has(cacheKey)) {
+                    renderData = { ...window._modalTelemetryLkgv.get(cacheKey), ...(renderData || {}) };
+                }
+                body.innerHTML = renderDmeMophienTdmeDetail(renderData, src, eqSup);
+            } else if (isIlsMophien) {
                 // Gunakan cache LKGV jika data saat ini kosong atau null
                 if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
                 const cacheKey = src?.id || src?.ip_address || src?.name || 'ils_active';
@@ -1558,6 +1575,202 @@
             ${renderRfDisplacementPanel(mon1RF, mon2RF)}
 
             <!-- 4. Raw / Telemetry Parameters (Optional Inspection) -->
+            ${rawHtml}
+        </div>
+        `;
+    }
+
+    function renderDmeMophienTdmeDetail(data, src, supCategory) {
+        if (!data || Object.keys(data).length === 0) {
+            return `
+            <div style="text-align:center; padding:48px 20px; color:#4a7a9a;">
+                <i class="fas fa-radar fa-3x" style="margin-bottom:14px; opacity:0.5; color:#00d4ff;"></i>
+                <div style="font-size:14px; font-weight:bold; color:#8baac8; margin-bottom:6px;">Menunggu Data Telemetri T-DME...</div>
+                <div style="font-size:11px; color:#4a7a9a;">Memverifikasi koneksi streaming port 38317...</div>
+            </div>`;
+        }
+
+        const ident = data.station_ident || 'ISBY';
+        const channel = data.dme_channel || '38X';
+        const freq = data.frequency || '1062 / 1000 MHz';
+        const serviceStatus = (data.service_status || 'NORMAL').toUpperCase();
+        const activeCh = data.active_channel || 'DUAL';
+
+        const sys1 = data.system_params?.mon1 || { time_delay: 50.00, reply_eff: 98, tx_rate: 911 };
+        const sys2 = data.system_params?.mon2 || { time_delay: 50.00, reply_eff: 100, tx_rate: 909 };
+
+        const pulse1 = data.pulse_params?.mon1 || { rise_time: 2.05, duration: 3.50, decay_time: 2.05, spacing: 12.03 };
+        const pulse2 = data.pulse_params?.mon2 || { rise_time: 2.05, duration: 3.50, decay_time: 2.05, spacing: 12.05 };
+
+        const power1 = data.power_params?.mon1 || { rf_disp: 0.0004, peak_power: 100, vswr: 1.09, effective_radiated: 0.1 };
+        const power2 = data.power_params?.mon2 || { rf_disp: 0.0003, peak_power: 101, vswr: 1.09, effective_radiated: 0.1 };
+
+        const targetSup = supCategory || 'DME';
+
+        const renderParamRow = (label, rawVal, valStr, lookupKey = null) => {
+            const queryLabel = lookupKey || label;
+            const limColor = getLimitColor(targetSup, queryLabel, rawVal, 'dme_mophien_tdme');
+            let textColor = '#ffffff';
+            let borderColor = 'transparent';
+
+            if (limColor === '#ff3355') {
+                textColor = '#ff3355';
+                borderColor = 'rgba(255,51,85,0.4)';
+            } else if (limColor === '#ffcc00') {
+                textColor = '#ffcc00';
+                borderColor = 'rgba(255,204,0,0.4)';
+            } else if (limColor === '#00ff88') {
+                textColor = '#00ff88';
+                borderColor = 'rgba(0,255,136,0.3)';
+            }
+
+            return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 8px; margin-bottom:4px; background:#0c1a2c; border:1px solid ${borderColor}; border-radius:4px;">
+                <span style="font-size:11px; color:#8baac8; font-weight:500;">${label}</span>
+                <span style="font-size:13px; font-weight:700; font-family:'Roboto Mono',monospace,sans-serif; color:${textColor};">${valStr}</span>
+            </div>
+            `;
+        };
+
+        const renderDualCard = (title, icon, mon1Rows, mon2Rows) => {
+            return `
+            <div style="background:#091627; border:1px solid #163252; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+                <div style="background:linear-gradient(90deg, #0c1e36, #0e2746); padding:10px 14px; font-size:11px; font-weight:bold; color:#00d4ff; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #163252;">
+                    <span><i class="${icon}" style="margin-right:7px; color:#00d4ff;"></i> ${title}</span>
+                    <span style="font-size:9px; color:#5a8aaa; letter-spacing:0.5px;">DUAL MONITOR</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#163252; flex:1;">
+                    <!-- MON1 -->
+                    <div style="background:#0a1728; padding:12px 14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed #1a3a5c;">
+                            <span style="font-size:11px; font-weight:bold; color:#00ff88; letter-spacing:0.5px;">
+                                <i class="fas fa-check-circle" style="font-size:10px; margin-right:4px;"></i>MON 1
+                            </span>
+                            <span style="font-size:8px; font-weight:bold; background:rgba(0,255,136,0.15); color:#00ff88; border:1px solid rgba(0,255,136,0.4); padding:1px 6px; border-radius:3px;">ACTIVE</span>
+                        </div>
+                        ${mon1Rows}
+                    </div>
+
+                    <!-- MON2 -->
+                    <div style="background:#0a1728; padding:12px 14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed #1a3a5c;">
+                            <span style="font-size:11px; font-weight:bold; color:#8baac8; letter-spacing:0.5px;">MON 2</span>
+                            <span style="font-size:8px; color:#4a7a9a;">STANDBY</span>
+                        </div>
+                        ${mon2Rows}
+                    </div>
+                </div>
+            </div>
+            `;
+        };
+
+        const rawRows = data._amv_txs_rows || [];
+        let rawHtml = '';
+        if (rawRows.length > 0) {
+            rawHtml = `
+            <div style="background:#091627; border:1px solid #163252; border-radius:8px; overflow:hidden; margin-top:14px; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+                <div style="background:linear-gradient(90deg, #0c1e36, #0e2746); padding:9px 14px; font-size:10px; font-weight:bold; color:#7a9eb8; letter-spacing:1px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #163252;">
+                    <span><i class="fas fa-list-ul" style="margin-right:6px"></i> REGISTER TELEMETRY PARAMETERS (T-DME)</span>
+                    <span style="color:#00d4ff">${rawRows.length} PARAMETERS</span>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:6px; padding:12px;">
+                    ${rawRows.map(r => `
+                        <div style="background:#0c1d33; border:1px solid #163252; border-radius:5px; padding:6px 10px;">
+                            <div style="font-size:9px; color:#5a8aaa; margin-bottom:2px;">${r[0]}</div>
+                            <div style="font-size:12px; font-weight:bold; color:#e8f4ff; font-family:'Roboto Mono',monospace;">${r[1]}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        }
+
+        return `
+        <div style="display:flex; flex-direction:column; gap:0;">
+            <!-- Top Status Bar -->
+            <div style="background:#071322; border:1px solid #142a42; border-radius:8px; padding:12px 16px; margin-bottom:16px; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; align-items:center; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-broadcast-tower" style="color:#00d4ff; font-size:18px;"></i>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase;">Station IDENT / CH</span>
+                        <span style="font-size:15px; font-weight:800; color:#00d4ff; letter-spacing:1.5px; font-family:'Roboto Mono',monospace;">${ident} (${channel})</span>
+                    </div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-desktop" style="color:#00ffcc; font-size:16px;"></i>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase;">Active Channel</span>
+                        <div>
+                            <span style="font-size:11px; font-weight:800; color:#00ffcc; background:rgba(0,255,204,0.15); border:1px solid rgba(0,255,204,0.35); padding:2px 8px; border-radius:4px;">${activeCh}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-heartbeat" style="color:#00ff88; font-size:16px;"></i>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase;">Service Status</span>
+                        <div>
+                            <span style="font-size:11px; font-weight:800; color:#00ff88; background:rgba(0,255,136,0.15); border:1px solid #00ff88; padding:2px 8px; border-radius:4px;">
+                                <i class="fas fa-circle" style="font-size:8px; margin-right:4px;"></i>${serviceStatus}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-wave-square" style="color:#a5b4fc; font-size:16px;"></i>
+                    <div style="display:flex; flex-direction:column; min-width:0;">
+                        <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase;">TXP Status</span>
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <span style="font-size:12px; font-weight:700; color:#ffffff; font-family:'Roboto Mono',monospace;">TXP1 (ANT)</span>
+                            <span style="font-size:9px; font-weight:700; color:#00ff88; background:rgba(0,255,136,0.15); border:1px solid rgba(0,255,136,0.4); padding:1px 5px; border-radius:3px;">MAIN</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Executive Monitor 3 Panels -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px;">
+                <!-- Card 1: System Parameters -->
+                ${renderDualCard('SYSTEM PARAMETERS', 'fas fa-cogs', `
+                    ${renderParamRow('Time Delay', sys1.time_delay, `${sys1.time_delay.toFixed(2)} µs`, 'time_delay')}
+                    ${renderParamRow('Reply Efficiency', sys1.reply_eff, `${sys1.reply_eff.toFixed(0)} %`, 'reply_efficiency')}
+                    ${renderParamRow('Transmission Rate', sys1.tx_rate, `${sys1.tx_rate} pp/s`, 'tx_rate')}
+                `, `
+                    ${renderParamRow('Time Delay', sys2.time_delay, `${sys2.time_delay.toFixed(2)} µs`, 'time_delay')}
+                    ${renderParamRow('Reply Efficiency', sys2.reply_eff, `${sys2.reply_eff.toFixed(0)} %`, 'reply_efficiency')}
+                    ${renderParamRow('Transmission Rate', sys2.tx_rate, `${sys2.tx_rate} pp/s`, 'tx_rate')}
+                `)}
+
+                <!-- Card 2: Pulse Shape and Spacing -->
+                ${renderDualCard('PULSE SHAPE & SPACING', 'fas fa-chart-line', `
+                    ${renderParamRow('Pulse Rise Time', pulse1.rise_time, `${pulse1.rise_time.toFixed(2)} µs`, 'pulse_rise_time')}
+                    ${renderParamRow('Pulse Duration', pulse1.duration, `${pulse1.duration.toFixed(2)} µs`, 'pulse_duration')}
+                    ${renderParamRow('Pulse Decay Time', pulse1.decay_time, `${pulse1.decay_time.toFixed(2)} µs`, 'pulse_decay_time')}
+                    ${renderParamRow('Pulse Spacing', pulse1.spacing, `${pulse1.spacing.toFixed(2)} µs`, 'pulse_spacing')}
+                `, `
+                    ${renderParamRow('Pulse Rise Time', pulse2.rise_time, `${pulse2.rise_time.toFixed(2)} µs`, 'pulse_rise_time')}
+                    ${renderParamRow('Pulse Duration', pulse2.duration, `${pulse2.duration.toFixed(2)} µs`, 'pulse_duration')}
+                    ${renderParamRow('Pulse Decay Time', pulse2.decay_time, `${pulse2.decay_time.toFixed(2)} µs`, 'pulse_decay_time')}
+                    ${renderParamRow('Pulse Spacing', pulse2.spacing, `${pulse2.spacing.toFixed(2)} µs`, 'pulse_spacing')}
+                `)}
+
+                <!-- Card 3: Frequency and Power -->
+                ${renderDualCard('FREQUENCY & POWER', 'fas fa-bolt', `
+                    ${renderParamRow('Radio Frequency', power1.rf_disp, `${power1.rf_disp >= 0 ? '+' : ''}${power1.rf_disp.toFixed(4)} %`, 'rf_disp')}
+                    ${renderParamRow('Peak Power Output', power1.peak_power, `${power1.peak_power.toFixed(0)} W`, 'peak_power')}
+                    ${renderParamRow('Antenna VSWR', power1.vswr, `${power1.vswr.toFixed(2)} : 1`, 'vswr')}
+                    ${renderParamRow('Effective Radiated', power1.effective_radiated, `${power1.effective_radiated.toFixed(1)} dB`, 'effective_radiated')}
+                `, `
+                    ${renderParamRow('Radio Frequency', power2.rf_disp, `${power2.rf_disp >= 0 ? '+' : ''}${power2.rf_disp.toFixed(4)} %`, 'rf_disp')}
+                    ${renderParamRow('Peak Power Output', power2.peak_power, `${power2.peak_power.toFixed(0)} W`, 'peak_power')}
+                    ${renderParamRow('Antenna VSWR', power2.vswr, `${power2.vswr.toFixed(2)} : 1`, 'vswr')}
+                    ${renderParamRow('Effective Radiated', power2.effective_radiated, `${power2.effective_radiated.toFixed(1)} dB`, 'effective_radiated')}
+                `)}
+            </div>
+
+            <!-- Register Telemetry Table -->
             ${rawHtml}
         </div>
         `;
