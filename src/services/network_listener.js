@@ -983,10 +983,9 @@ class NetworkListenerService {
             const iface = await resolveInterface();
             console.log(`[LLZ-SNIFFER] Selected capture interface index: "${iface}"`);
 
-            // Filter capture: tangkap port TCP (38317) di port mirror.
-            // Gunakan filter langsung 'tcp port 38317' agar paket dari IP 10.62.3.20 maupun mirror traffic langsung tertangkap tanpa delay BPF.
+            // Filter capture: tangkap port TCP (38317) dan spesifik IP perangkat agar LLZ (10.62.3.20) dan GP (10.62.3.30) tidak saling tertukar
             const capturePort = port || 38317;
-            const captureFilter = `tcp port ${capturePort}`;
+            const captureFilter = ip_address ? `tcp port ${capturePort} and host ${ip_address}` : `tcp port ${capturePort}`;
             let args = [];
 
             if (isTshark) {
@@ -994,6 +993,7 @@ class NetworkListenerService {
                     '-i', String(iface),
                     '-f', captureFilter,
                     '-T', 'fields',
+                    '-e', 'ip.src',
                     '-e', 'tcp.payload',
                     '-l'
                 ];
@@ -1041,14 +1041,27 @@ class NetworkListenerService {
                         for (let line of lines) {
                             line = line.trim();
                             if (!line) continue;
-                            const payloads = line.split(',');
-                            for (let hexStr of payloads) {
-                                hexStr = hexStr.replace(/[:\s]/g, '');
-                                if (hexStr.length >= 8 && hexStr.length % 2 === 0) {
-                                    const chunk = Buffer.from(hexStr, 'hex');
-                                    // Log jika paket data telemetry LLZ tertangkap (throttled 15s agar tidak membanjiri log)
+                            const parts = line.split('\t');
+                            let hexStr = '';
+                            if (parts.length >= 2) {
+                                const srcIp = parts[0].trim();
+                                // Jika source IP terdeteksi, pastikan hanya memproses paket dari IP perangkat yang sesuai
+                                if (ip_address && srcIp && srcIp !== ip_address) {
+                                    continue;
+                                }
+                                hexStr = parts[1].trim();
+                            } else {
+                                hexStr = parts[0].trim();
+                            }
+
+                            const payloads = hexStr.split(',');
+                            for (let payload of payloads) {
+                                payload = payload.replace(/[:\s]/g, '');
+                                if (payload.length >= 8 && payload.length % 2 === 0) {
+                                    const chunk = Buffer.from(payload, 'hex');
+                                    // Log jika paket data telemetry LLZ/GP tertangkap (throttled 15s)
                                     if (chunk.includes(0x01) && chunk.includes(0x02)) {
-                                        this._logThrottled('log', `llz-sniffer:live-packet:${id}`, `[LLZ-SNIFFER] Captured live LLZ packet (${chunk.length} bytes) from mirror interface (streaming active)`, 15000);
+                                        this._logThrottled('log', `llz-sniffer:live-packet:${id}`, `[ILS-SNIFFER] Captured live packet (${chunk.length} bytes) for ${name} [${ip_address}] (streaming active)`, 15000);
                                     }
                                     await this.handleIncomingData(source, chunk, parser);
                                 }
