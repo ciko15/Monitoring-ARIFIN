@@ -167,9 +167,9 @@ class NetworkListenerService {
         let isPingable = false;
 
         if (isInitialDisconnect) {
-            // Jika parsing_id adalah ils_mophien_llz / ils_mophien_gp atau modul TCP streaming khusus,
+            // Jika parsing_id adalah ils_mophien_llz / ils_mophien_gp / dme_mophien_tdme atau modul TCP streaming khusus,
             // jangan biarkan ping ICMP yang di-block mematikan status alat
-            if (source.parsing_id === 'ils_mophien_llz' || source.parsing_id === 'ils_mophien_gp') {
+            if (source.parsing_id === 'ils_mophien_llz' || source.parsing_id === 'ils_mophien_gp' || source.parsing_id === 'dme_mophien_tdme') {
                 isPingable = true;
                 if (!parsedData.data) parsedData.data = {};
                 parsedData.data.ping_status = 'Normal';
@@ -436,7 +436,7 @@ class NetworkListenerService {
             // Parsers yang tidak butuh port (SNMP pakai UDP 161 internal) atau memiliki default port internal
             const PORTLESS_PARSERS = [
                 'snmp_system', 'snmp_host_resources_01', 'snmp_network_basic', 'ups_netagent_snmp', 'vhf_t6tv_snmp', 'vhf_t6tv',
-                'ils_mophien_llz', 'ils_mophien_gp', 'ils_gp_normac', 'ils_llz_normac'
+                'ils_mophien_llz', 'ils_mophien_gp', 'dme_mophien_tdme', 'ils_gp_normac', 'ils_llz_normac'
             ];
             const startBatchSize = parseInt(process.env.COLLECTOR_START_BATCH_SIZE || '') || 25;
             const startBatchDelayMs = parseInt(process.env.COLLECTOR_START_BATCH_DELAY_MS || '') || 1000;
@@ -1966,8 +1966,8 @@ class NetworkListenerService {
             return;
         }
 
-        // ILS Mophien LLZ & GP Juanda — Gunakan dedicated passive packet sniffer di interface mirror
-        if (moduleName === 'ils_mophien_llz' || moduleName === 'ils_mophien_gp') {
+        // ILS Mophien LLZ & GP & T-DME Juanda — Gunakan dedicated passive packet sniffer di interface mirror
+        if (moduleName === 'ils_mophien_llz' || moduleName === 'ils_mophien_gp' || moduleName === 'dme_mophien_tdme') {
             console.log(`[ILS-TRACE] Routing ${source.name} to startIlsMophienSnifferListener (Passive Sniffing on mirror interface)`);
             this.startIlsMophienSnifferListener(source);
             return;

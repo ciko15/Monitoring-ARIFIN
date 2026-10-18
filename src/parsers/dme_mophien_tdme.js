@@ -58,15 +58,15 @@ class DmeMophienTdmeParser extends BaseParser {
         this._hasReceivedData = false;
 
         this._mon1 = {
-            system: { time_delay: 50.00, reply_eff: 98.0, tx_rate: 911 },
-            pulse: { rise_time: 2.05, duration: 3.50, decay_time: 2.05, spacing: 12.05 },
-            power: { rf_disp: 0.0004, peak_power: 100.0, vswr: 1.09, effective_radiated: 0.1 }
+            system: { time_delay: null, reply_eff: null, tx_rate: null },
+            pulse: { rise_time: null, duration: null, decay_time: null, spacing: null },
+            power: { rf_disp: null, peak_power: null, vswr: null, effective_radiated: null }
         };
 
         this._mon2 = {
-            system: { time_delay: 50.00, reply_eff: 100.0, tx_rate: 909 },
-            pulse: { rise_time: 2.05, duration: 3.50, decay_time: 2.05, spacing: 12.05 },
-            power: { rf_disp: 0.0003, peak_power: 101.0, vswr: 1.09, effective_radiated: 0.1 }
+            system: { time_delay: null, reply_eff: null, tx_rate: null },
+            pulse: { rise_time: null, duration: null, decay_time: null, spacing: null },
+            power: { rf_disp: null, peak_power: null, vswr: null, effective_radiated: null }
         };
 
         this._systemState = {
