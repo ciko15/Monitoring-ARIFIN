@@ -2759,9 +2759,25 @@ function updateLimitationFilterOptions() {
   }
 }
 
+window.filterAuthenticationTable = function () {
+  const tbody = document.getElementById('configAuthenticationTableBody');
+  if (tbody && Array.isArray(configAuthenticationCache)) {
+    renderConfigTable('authentication', configAuthenticationCache, tbody);
+  }
+};
+
 // Filter for authentications
 function updateAuthenticationFilterOptions() {
   const select = document.getElementById('filterAuthenticationLinkedEquipment');
+  const searchInput = document.getElementById('searchAuthenticationInput');
+
+  if (searchInput && !searchInput.dataset.listenerAdded) {
+    searchInput.addEventListener('input', () => {
+      window.filterAuthenticationTable();
+    });
+    searchInput.dataset.listenerAdded = 'true';
+  }
+
   if (!select) return;
 
   const currentFilter = select.value;
@@ -2784,8 +2800,7 @@ function updateAuthenticationFilterOptions() {
   // Add event listener if not already added
   if (!select.dataset.listenerAdded) {
     select.addEventListener('change', () => {
-      const tbody = document.getElementById('configAuthenticationTableBody');
-      if (tbody) renderConfigTable('authentication', configAuthenticationCache, tbody);
+      window.filterAuthenticationTable();
     });
     select.dataset.listenerAdded = 'true';
   }
@@ -2839,6 +2854,7 @@ window.renderConfigTable = function (tab, data, tbody) {
   const filterValue = tab === 'limitation' ? document.getElementById('filterLimitationSupCategory')?.value : null;
   const searchVal = tab === 'limitation' ? (document.getElementById('searchLimitationInput')?.value || '').trim().toLowerCase() : '';
   const authEquiptFilter = tab === 'authentication' ? document.getElementById('filterAuthenticationLinkedEquipment')?.value : null;
+  const authSearchVal = tab === 'authentication' ? (document.getElementById('searchAuthenticationInput')?.value || '').trim().toLowerCase() : '';
 
   data.forEach(item => {
     // Apply filter for limitations
@@ -2856,11 +2872,22 @@ window.renderConfigTable = function (tab, data, tbody) {
     }
 
     // Apply filter for authentication
-    if (tab === 'authentication' && authEquiptFilter) {
-      if (authEquiptFilter === 'global') {
-        if (item.equipt_id) return;
-      } else if (String(item.equipt_id) !== String(authEquiptFilter)) {
-        return;
+    if (tab === 'authentication') {
+      if (authEquiptFilter) {
+        if (authEquiptFilter === 'global') {
+          if (item.equipt_id) return;
+        } else if (String(item.equipt_id) !== String(authEquiptFilter)) {
+          return;
+        }
+      }
+
+      if (authSearchVal) {
+        const equipt = (equipmentData || []).find(e => String(e.id) === String(item.equipt_id));
+        const equiptName = equipt ? equipt.name : '';
+        const haystack = `${item.id || ''} ${item.name || ''} ${item.ip_address || ''} ${item.equipt_id || ''} ${equiptName} ${item.parsing_id || ''}`.toLowerCase();
+        if (!haystack.includes(authSearchVal)) {
+          return;
+        }
       }
     }
 
@@ -2912,9 +2939,13 @@ window.renderConfigTable = function (tab, data, tbody) {
       const equiptName = equipt ? equipt.name : (item.equipt_id ? `ID: ${item.equipt_id}` : '<span class="text-muted">Global</span>');
 
       tr.innerHTML = `
+        <td><code style="color: #00d4ff; font-weight: 600; font-size: 0.82rem;">${item.id}</code></td>
         <td><strong>${item.name}</strong></td>
         <td><code>${item.ip_address}</code></td>
-        <td><span class="badge badge-outline">${equiptName}</span></td>
+        <td>
+          <span class="badge badge-outline">${equiptName}</span>
+          ${item.equipt_id ? `<br><small class="text-muted" style="font-size: 0.72rem;">Eq ID: ${item.equipt_id}</small>` : ''}
+        </td>
         <td>
           <div class="action-buttons">
             <button class="btn-edit" onclick="editConfig('authentication', '${item.id}')" title="Edit"><i class="fas fa-edit"></i></button>

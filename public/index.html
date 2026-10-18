@@ -2032,7 +2032,15 @@
                     <div class="card-header"
                       style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                       <h3><i class="fas fa-network-wired"></i> Global Components / IP Config</h3>
-                      <div class="filter-group" style="display: flex; align-items: center; gap: 10px;">
+                      <div class="filter-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div style="position: relative; display: inline-flex; align-items: center;">
+                          <i class="fas fa-search" style="position: absolute; left: 9px; color: var(--text-secondary, #7a9eb8); font-size: 0.8rem; pointer-events: none;"></i>
+                          <input type="text" id="searchAuthenticationInput" placeholder="Cari ID, nama source, IP, atau alat..." 
+                            style="padding-left: 28px; padding-right: 10px; height: 31px; font-size: 0.82rem; background: var(--bg-secondary, #1e222d); border: 1px solid var(--border-color, #2c3242); border-radius: 6px; color: var(--text-primary, #fff); width: 220px; outline: none; transition: border-color 0.2s;" 
+                            onfocus="this.style.borderColor='var(--accent-primary, #00d4ff)'" 
+                            onblur="this.style.borderColor='var(--border-color, #2c3242)'"
+                            oninput="window.filterAuthenticationTable()" autocomplete="off">
+                        </div>
                         <select id="filterAuthenticationLinkedEquipment" class="btn btn-outline btn-sm"
                           style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer;">
                           <option value="">All Equipment</option>
@@ -2047,6 +2055,7 @@
                       <table class="config-table">
                         <thead>
                           <tr>
+                            <th style="width: 140px;">ID Source</th>
                             <th>Component Name</th>
                             <th>IP Address</th>
                             <th>Linked Equipment</th>
@@ -2055,7 +2064,7 @@
                         </thead>
                         <tbody id="configAuthenticationTableBody">
                           <tr>
-                            <td colspan="4" class="empty-state">Loading...</td>
+                            <td colspan="5" class="empty-state">Loading...</td>
                           </tr>
                         </tbody>
                       </table>
