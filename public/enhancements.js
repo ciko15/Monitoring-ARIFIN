@@ -316,8 +316,8 @@
         };
 
         const matchesParser = (limitItem, targetParserId) => {
-            if (!limitItem.target_parsers || limitItem.target_parsers.length === 0) return true; // Global / Semua parser
-            if (!targetParserId) return true;
+            if (!limitItem.target_parsers || limitItem.target_parsers.length === 0) return true; // Global / Generic fallback
+            if (!targetParserId) return false;
             const parsers = Array.isArray(limitItem.target_parsers) ? limitItem.target_parsers : String(limitItem.target_parsers).split(',');
             return parsers.some(p => p.trim().toLowerCase() === String(targetParserId).trim().toLowerCase());
         };
@@ -325,6 +325,8 @@
         let targetSup = String(supCategory || '').toLowerCase();
         if (effectiveParserId === 'temp_humidity_modbus' && (!targetSup || targetSup === 'support' || targetSup === 'generic')) {
             targetSup = 'shelter';
+        } else if ((effectiveParserId === 'dvor_maru_220' || effectiveParserId === 'dvor') && (!targetSup || targetSup === 'navigation' || targetSup === 'generic')) {
+            targetSup = 'dvor';
         }
 
         // Cek jika ada aturan limitasi yang cocok namun berstatus NONAKTIF:
@@ -332,21 +334,51 @@
         const isExplicitlyInactive = window.limitationsCache.some(l => {
             if (l.is_active !== false && l.is_active !== 'false' && l.is_active !== 0 && l.is_active !== '0') return false;
             if (!matchesParser(l, effectiveParserId)) return false;
-            return matchesLabel(l);
+            const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
+                .map(s => s.trim().toLowerCase()).filter(Boolean);
+            const isGenericSup = limitSups.length === 0 || limitSups.some(s => s === 'generic' || s === 'all' || s === '*');
+            const matchesCategory = (!!targetSup && limitSups.includes(targetSup)) || isGenericSup;
+            return matchesCategory && matchesLabel(l);
         });
 
         if (isExplicitlyInactive) {
             return '#ffffff';
         }
 
-        const findLimit = () => window.limitationsCache.find(l => {
-            // Abaikan jika limitasi berstatus nonaktif:
-            if (l.is_active === false || l.is_active === 'false' || l.is_active === 0 || l.is_active === '0') return false;
+        const findLimit = () => {
+            // 1. Prioritas Utama: Cocokkan rule yang secara eksplisit menargetkan parser ini (target_parsers)
+            if (effectiveParserId) {
+                const specificMatch = window.limitationsCache.find(l => {
+                    if (l.is_active === false || l.is_active === 'false' || l.is_active === 0 || l.is_active === '0') return false;
+                    if (!l.target_parsers || l.target_parsers.length === 0) return false;
+                    return matchesParser(l, effectiveParserId) && matchesLabel(l);
+                });
+                if (specificMatch) return specificMatch;
+            }
 
-            // Prioritas: Parser cocok (atau berlaku global untuk semua parser) DAN Nama/Label parameter cocok
-            if (!matchesParser(l, effectiveParserId)) return false;
-            return matchesLabel(l);
-        });
+            // 2. Prioritas Kedua: Cocokkan rule berdasarkan sub-kategori spesifik alat (misal DVOR, DME, ILS-GP)
+            if (targetSup) {
+                const supMatch = window.limitationsCache.find(l => {
+                    if (l.is_active === false || l.is_active === 'false' || l.is_active === 0 || l.is_active === '0') return false;
+                    // Abaikan rule yang menargetkan parser lain
+                    if (l.target_parsers && l.target_parsers.length > 0 && !matchesParser(l, effectiveParserId)) return false;
+                    const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
+                        .map(s => s.trim().toLowerCase()).filter(Boolean);
+                    return limitSups.includes(targetSup) && matchesLabel(l);
+                });
+                if (supMatch) return supMatch;
+            }
+
+            // 3. Prioritas Ketiga: Rule Generic / All (hanya jika rule tidak membatasi parser tertentu)
+            return window.limitationsCache.find(l => {
+                if (l.is_active === false || l.is_active === 'false' || l.is_active === 0 || l.is_active === '0') return false;
+                if (l.target_parsers && l.target_parsers.length > 0 && !matchesParser(l, effectiveParserId)) return false;
+                const limitSups = (Array.isArray(l.sup_category) ? l.sup_category : String(l.sup_category || '').split(','))
+                    .map(s => s.trim().toLowerCase()).filter(Boolean);
+                const isGenericSup = limitSups.length === 0 || limitSups.some(s => s === 'generic' || s === 'all' || s === '*');
+                return isGenericSup && matchesLabel(l);
+            });
+        };
 
         const limit = findLimit();
 

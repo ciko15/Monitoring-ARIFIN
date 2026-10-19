@@ -9,7 +9,10 @@
     "max_alarm_limit": "120.0",
     "alv": "80.0",
     "ahv": "120.0",
-    "is_active": true
+    "is_active": true,
+    "target_parsers": [
+      "dvor_maru_220"
+    ]
   },
   {
     "id": 1002,
@@ -20,14 +23,20 @@
     "min_alarm_limit": "-25.0",
     "max_alarm_limit": "0.0",
     "alv": "-25.0",
-    "ahv": "0.0"
+    "ahv": "0.0",
+    "target_parsers": [
+      "dvor_maru_220"
+    ]
   },
   {
     "id": 1003,
     "name": "Azimuth",
     "category": "Navigation",
     "sup_category": "DVOR",
-    "value_type": "numeric"
+    "value_type": "numeric",
+    "target_parsers": [
+      "dvor_maru_220"
+    ]
   },
   {
     "id": 1004,
@@ -40,7 +49,10 @@
     "alv": "15.0",
     "ahv": "17.0",
     "label": "FM Index",
-    "is_active": false
+    "is_active": false,
+    "target_parsers": [
+      "dvor_maru_220"
+    ]
   },
   {
     "id": 1005,
@@ -51,7 +63,10 @@
     "min_alarm_limit": "28.0",
     "max_alarm_limit": "32.0",
     "alv": "28.0",
-    "ahv": "32.0"
+    "ahv": "32.0",
+    "target_parsers": [
+      "dvor_maru_220"
+    ]
   },
   {
     "id": 1006,
@@ -62,7 +77,10 @@
     "min_alarm_limit": "25.0",
     "max_alarm_limit": "32.5",
     "alv": "25.0",
-    "ahv": "32.5"
+    "ahv": "32.5",
+    "target_parsers": [
+      "dvor_maru_220"
+    ]
   },
   {
     "id": 1007,
@@ -73,7 +91,10 @@
     "min_alarm_limit": "6.0",
     "max_alarm_limit": "8.0",
     "alv": "6.0",
-    "ahv": "8.0"
+    "ahv": "8.0",
+    "target_parsers": [
+      "dvor_maru_220"
+    ]
   },
   {
     "id": 2001,
@@ -86,7 +107,10 @@
     "alv": "49.5",
     "ahv": "50.5",
     "label": "System Delay",
-    "is_active": false
+    "is_active": false,
+    "target_parsers": [
+      "dme_maru_310_320"
+    ]
   },
   {
     "id": 2002,
@@ -99,7 +123,10 @@
     "alv": "11.5",
     "ahv": "12.5",
     "label": "Pulse Spacing",
-    "is_active": false
+    "is_active": false,
+    "target_parsers": [
+      "dme_maru_310_320"
+    ]
   },
   {
     "id": 2003,
@@ -111,7 +138,10 @@
     "alv": "70.0",
     "label": "Reply Efficiency",
     "is_active": false,
-    "unit": "%"
+    "unit": "%",
+    "target_parsers": [
+      "dme_maru_310_320"
+    ]
   },
   {
     "id": 2004,
@@ -124,7 +154,10 @@
     "alv": "800.0",
     "ahv": "1200.0",
     "label": "Forward Power",
-    "is_active": false
+    "is_active": false,
+    "target_parsers": [
+      "dme_maru_310_320"
+    ]
   },
   {
     "id": 3001,
@@ -137,7 +170,11 @@
     "alv": "2.75",
     "ahv": "3.25",
     "label": "GP Angle",
-    "is_active": false
+    "is_active": false,
+    "target_parsers": [
+      "ils_gp_thales421",
+      "ils_gp_normac"
+    ]
   },
   {
     "id": 3002,
@@ -151,7 +188,11 @@
     "ahv": "110.0",
     "label": "RF Power",
     "is_active": false,
-    "unit": "%"
+    "unit": "%",
+    "target_parsers": [
+      "ils_gp_thales421",
+      "ils_gp_normac"
+    ]
   },
   {
     "id": 3003,
@@ -162,7 +203,11 @@
     "min_alarm_limit": "-4.0",
     "max_alarm_limit": "4.0",
     "alv": "-4.0",
-    "ahv": "4.0"
+    "ahv": "4.0",
+    "target_parsers": [
+      "ils_gp_thales421",
+      "ils_gp_normac"
+    ]
   },
   {
     "id": 3004,
@@ -173,7 +218,11 @@
     "min_alarm_limit": "65.0",
     "max_alarm_limit": "82.0",
     "alv": "65.0",
-    "ahv": "82.0"
+    "ahv": "82.0",
+    "target_parsers": [
+      "ils_gp_thales421",
+      "ils_gp_normac"
+    ]
   },
   {
     "id": 4001,
@@ -184,7 +233,11 @@
     "min_alarm_limit": "85.0",
     "max_alarm_limit": "115.0",
     "alv": "85.0",
-    "ahv": "115.0"
+    "ahv": "115.0",
+    "target_parsers": [
+      "ils_llz_thales421",
+      "ils_llz_normac"
+    ]
   },
   {
     "id": 4002,
@@ -195,7 +248,11 @@
     "min_alarm_limit": "-4.0",
     "max_alarm_limit": "4.0",
     "alv": "-4.0",
-    "ahv": "4.0"
+    "ahv": "4.0",
+    "target_parsers": [
+      "ils_llz_thales421",
+      "ils_llz_normac"
+    ]
   },
   {
     "id": 4003,
@@ -206,7 +263,11 @@
     "min_alarm_limit": "35.0",
     "max_alarm_limit": "45.0",
     "alv": "35.0",
-    "ahv": "45.0"
+    "ahv": "45.0",
+    "target_parsers": [
+      "ils_llz_thales421",
+      "ils_llz_normac"
+    ]
   },
   {
     "id": 4004,
@@ -217,7 +278,11 @@
     "min_alarm_limit": "5.0",
     "max_alarm_limit": "20.0",
     "alv": "5.0",
-    "ahv": "20.0"
+    "ahv": "20.0",
+    "target_parsers": [
+      "ils_llz_thales421",
+      "ils_llz_normac"
+    ]
   },
   {
     "id": 5001,
@@ -230,7 +295,12 @@
     "alv": "200.0",
     "ahv": "240.0",
     "label": "Van Voltage",
-    "is_active": false
+    "is_active": false,
+    "target_parsers": [
+      "pm5560_modbus",
+      "pm5350_modbus",
+      "diris_a20"
+    ]
   },
   {
     "id": 5002,
@@ -241,7 +311,12 @@
     "min_alarm_limit": "49.5",
     "max_alarm_limit": "50.5",
     "alv": "49.5",
-    "ahv": "50.5"
+    "ahv": "50.5",
+    "target_parsers": [
+      "pm5560_modbus",
+      "pm5350_modbus",
+      "diris_a20"
+    ]
   },
   {
     "id": 5003,
@@ -250,7 +325,12 @@
     "sup_category": "Power Meter",
     "value_type": "numeric",
     "min_alarm_limit": "0.8",
-    "alv": "0.8"
+    "alv": "0.8",
+    "target_parsers": [
+      "pm5560_modbus",
+      "pm5350_modbus",
+      "diris_a20"
+    ]
   },
   {
     "id": 6001,
@@ -263,7 +343,10 @@
     "whv": "30.0",
     "ahv": "35.0",
     "label": "Temperature",
-    "is_active": true
+    "is_active": true,
+    "target_parsers": [
+      "temp_humidity_modbus"
+    ]
   },
   {
     "id": 7001,
@@ -274,7 +357,10 @@
     "max_warning_limit": "80.0",
     "max_alarm_limit": "95.0",
     "whv": "80.0",
-    "ahv": "95.0"
+    "ahv": "95.0",
+    "target_parsers": [
+      "asterix_radar"
+    ]
   },
   {
     "id": 7002,
@@ -285,7 +371,10 @@
     "max_warning_limit": "80.0",
     "max_alarm_limit": "95.0",
     "whv": "80.0",
-    "ahv": "95.0"
+    "ahv": "95.0",
+    "target_parsers": [
+      "ups_netagent_snmp"
+    ]
   },
   {
     "id": 7003,
@@ -296,7 +385,11 @@
     "max_warning_limit": "80.0",
     "max_alarm_limit": "95.0",
     "whv": "80.0",
-    "ahv": "95.0"
+    "ahv": "95.0",
+    "target_parsers": [
+      "dse7320_modbus",
+      "datakom_d700_modbus"
+    ]
   },
   {
     "id": 8001,
@@ -307,7 +400,12 @@
     "min_alarm_limit": "22.0",
     "max_alarm_limit": "30.0",
     "alv": "22.0",
-    "ahv": "30.0"
+    "ahv": "30.0",
+    "target_parsers": [
+      "vhf_t6tv",
+      "vhf_t6tv_snmp",
+      "vhf_marc_rse"
+    ]
   },
   {
     "id": 9002,
@@ -321,7 +419,11 @@
     "ahv": "95.0",
     "label": "CPU Usage",
     "is_active": false,
-    "unit": "%"
+    "unit": "%",
+    "target_parsers": [
+      "snmp_system",
+      "snmp_host_resources_01"
+    ]
   },
   {
     "id": 9003,
@@ -335,7 +437,11 @@
     "ahv": "95.0",
     "label": "RAM Usage",
     "is_active": false,
-    "unit": "%"
+    "unit": "%",
+    "target_parsers": [
+      "snmp_system",
+      "snmp_host_resources_01"
+    ]
   },
   {
     "id": 9004,
@@ -349,7 +455,11 @@
     "alv": "5.0",
     "label": "RAM Available",
     "is_active": false,
-    "unit": "%"
+    "unit": "%",
+    "target_parsers": [
+      "snmp_system",
+      "snmp_host_resources_01"
+    ]
   },
   {
     "id": 9005,
@@ -363,7 +473,11 @@
     "ahv": "95.0",
     "label": "Disk Usage",
     "is_active": false,
-    "unit": "%"
+    "unit": "%",
+    "target_parsers": [
+      "snmp_system",
+      "snmp_host_resources_01"
+    ]
   },
   {
     "id": 9006,
@@ -378,7 +492,10 @@
     "label": "Temperature",
     "is_active": false,
     "match_mode": "contains",
-    "target_parsers": [],
+    "target_parsers": [
+      "snmp_system",
+      "temp_humidity_modbus"
+    ],
     "min_alarm_limit": null,
     "alv": null,
     "min_warning_limit": null,
