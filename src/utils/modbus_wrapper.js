@@ -2,22 +2,32 @@ const ModbusRTU = require("modbus-serial");
 
 // Mutex lock global per IP:Port agar 2 request tidak tabrakan
 const modbusLocks = new Map();
+const lastReleaseTimes = new Map();
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function acquireLock(lockKey, timeoutMs = 10000) {
+async function acquireLock(lockKey, timeoutMs = 25000) {
     const start = Date.now();
     while (modbusLocks.get(lockKey)) {
         if (Date.now() - start > timeoutMs) {
             throw new Error(`Timeout waiting for Modbus lock on ${lockKey}`);
         }
-        await sleep(50);
+        await sleep(100);
     }
+    // Berikan sedikit jeda cooldown (150ms) setelah request sebelumnya selesai 
+    // agar socket hardware ioLogik benar-benar tertutup bersih sebelum request baru dibuka
+    const lastRelease = lastReleaseTimes.get(lockKey) || 0;
+    const elapsedSinceRelease = Date.now() - lastRelease;
+    if (elapsedSinceRelease < 150) {
+        await sleep(150 - elapsedSinceRelease);
+    }
+
     modbusLocks.set(lockKey, true);
 }
 
 function releaseLock(lockKey) {
     modbusLocks.delete(lockKey);
+    lastReleaseTimes.set(lockKey, Date.now());
 }
 
 /**
@@ -50,8 +60,9 @@ async function executeModbus(options, executor) {
     const slaveId = options.slaveId || 1;
     const timeoutMs = options.timeout || 3000;
     const lockKey = `${host}:${port}`;
+    const queueTimeout = Math.max(timeoutMs * 5, 25000);
 
-    await acquireLock(lockKey, timeoutMs * 2);
+    await acquireLock(lockKey, queueTimeout);
 
     const client = new ModbusRTU();
     

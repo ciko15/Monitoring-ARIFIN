@@ -1415,6 +1415,10 @@ class NetworkListenerService {
             if (isPolling) return;
             isPolling = true;
             try {
+                // Jitter kecil (0 - 400ms) agar request multi-channel tidak menabrak lock di milidetik yang sama
+                const jitter = Math.floor(Math.random() * 400);
+                if (jitter > 0) await new Promise(r => setTimeout(r, jitter));
+
                 const result = await pollIoLogik(ip_address, port, slaveId, devicesConfig);
                 if (result.error && result.data) {
                     result.data.error = result.error;
