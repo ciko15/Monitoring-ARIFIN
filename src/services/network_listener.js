@@ -380,7 +380,7 @@ class NetworkListenerService {
             return;
         }
 
-        const dataToSave = { ...parsedData, source: source.name, source_id: source.id, source_name: source.name };
+        const dataToSave = { ...parsedData, source: source.name, source_id: source.id, source_name: source.name, source_parsing_id: source.parsing_id };
         if (dataToSave.data) {
             dataToSave.data.source_id = source.id;
             dataToSave.data.source_name = source.name;
@@ -1429,6 +1429,29 @@ class NetworkListenerService {
                     'iologik_modbus',
                     result.status || 'Disconnect'
                 );
+
+                // Broadcast ke data sources lain yang memakai IP yang sama (misal 3 alat di Surabaya)
+                // agar semua peralatan terupdate serentak tanpa perlu berebut query Modbus TCP
+                try {
+                    const allSources = await this.equipmentService.db.getAllSourceConfigs();
+                    if (Array.isArray(allSources)) {
+                        const peerSources = allSources.filter(s =>
+                            s && s.id !== source.id &&
+                            s.ip_address === ip_address &&
+                            (s.parsing_id === 'iologik_modbus' || this._getParserModule(s.parsing_id) === 'iologik_modbus')
+                        );
+                        for (const peer of peerSources) {
+                            await this._handleLogOutput(
+                                peer,
+                                { data: result.data, source: peer.name, _ip: ip_address },
+                                'iologik_modbus',
+                                result.status || 'Disconnect'
+                            );
+                        }
+                    }
+                } catch (bcastErr) {
+                    // Non-fatal
+                }
             } catch (err) {
                 console.error(`[ioLogik] Poll error ${name}:`, err.message);
                 throw err;

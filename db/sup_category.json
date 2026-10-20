@@ -55,7 +55,8 @@
       "GENSET",
       "Power Meter",
       "Radio Link",
-      "AC"
+      "AC",
+      "CPU"
     ]
   }
 ]
