@@ -1348,6 +1348,9 @@
                 <select id="airportFilter" class="filter-select">
                   <option value="">All Airports</option>
                 </select>
+                <button class="btn btn-success" id="syncEquipmentToPusatBtn" title="Kirim data konfigurasi alat dan data source yang dipilih ke Message Broker Pusat" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: #fff;">
+                  <i class="fas fa-paper-plane"></i> Sync to Pusat
+                </button>
                 <button class="btn btn-primary" id="addEquipmentBtn">
                   <i class="fas fa-plus"></i> Add Equipment
                 </button>
@@ -1358,6 +1361,9 @@
                 <table>
                   <thead>
                     <tr>
+                      <th style="text-align: center; width: 40px;">
+                        <input type="checkbox" id="selectAllEquipmentCheckbox" title="Pilih Semua Alat" style="cursor: pointer; transform: scale(1.2);">
+                      </th>
                       <th style="text-align: center;">Status Aktif</th>
                       <th style="text-align: center;">Name</th>
                       <th style="text-align: center;">Category</th>
@@ -1369,7 +1375,7 @@
                   </thead>
                   <tbody id="equipmentTableBody">
                     <tr>
-                      <td colspan="7" class="empty-state">Loading equipment...</td>
+                      <td colspan="8" class="empty-state">Loading equipment...</td>
                     </tr>
                   </tbody>
                 </table>

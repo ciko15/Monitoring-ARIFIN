@@ -1423,7 +1423,7 @@ function renderEquipmentTable(data) {
       normalizeEquipmentSearchValue(document.getElementById('searchEquipment')?.value) ||
       normalizeEquipmentSearchValue(document.getElementById('filterCategory')?.value)
     );
-    newHtml = `<tr><td colspan="7" class="empty-state">${hasActiveFilters ? 'No equipment match the current search/filter' : 'No equipment available'}</td></tr>`;
+    newHtml = `<tr><td colspan="8" class="empty-state">${hasActiveFilters ? 'No equipment match the current search/filter' : 'No equipment available'}</td></tr>`;
   } else {
     newHtml = data.map(item => {
       const airport = (window.airportsData || []).find(a => String(a.id) === String(item.airportId || item.branch_id));
@@ -1431,6 +1431,9 @@ function renderEquipmentTable(data) {
 
       return `
         <tr>
+          <td style="text-align: center;">
+            <input type="checkbox" class="equipment-select-checkbox" data-id="${item.id}" data-name="${encodeURIComponent(item.name)}" style="cursor: pointer; transform: scale(1.2);">
+          </td>
           <td style="text-align: center;">
             <span class="status-badge ${item.isActive !== false ? 'Active' : 'Inactive'}">
               ${item.isActive !== false ? 'Active' : 'Inactive'}
@@ -1457,11 +1460,80 @@ function renderEquipmentTable(data) {
     }).join('');
   }
   
-  if (window._lastEquipmentTableHtml !== newHtml) {
+    if (window._lastEquipmentTableHtml !== newHtml) {
     tbody.innerHTML = newHtml;
     window._lastEquipmentTableHtml = newHtml;
   }
+
+  // Bind Select All checkbox listener
+  const selectAllCb = document.getElementById('selectAllEquipmentCheckbox');
+  if (selectAllCb) {
+    selectAllCb.checked = false;
+    selectAllCb.onchange = () => {
+      const rowCheckboxes = document.querySelectorAll('.equipment-select-checkbox');
+      rowCheckboxes.forEach(cb => { cb.checked = selectAllCb.checked; });
+    };
+  }
 }
+
+// Handler untuk Tombol Sync Selected to Pusat via Message Broker Solace (EMS)
+async function handleSyncEquipmentToPusat() {
+  const selectedCbs = Array.from(document.querySelectorAll('.equipment-select-checkbox:checked'));
+  if (selectedCbs.length === 0) {
+    showNotification('Silakan checklist minimal satu alat yang ingin disinkronkan ke Pusat.', 'warning');
+    return;
+  }
+
+  const selectedIds = selectedCbs.map(cb => cb.getAttribute('data-id'));
+  const selectedNames = selectedCbs.map(cb => decodeURIComponent(cb.getAttribute('data-name') || 'Alat')).join(', ');
+
+  const confirmed = confirm(`Kirim konfigurasi untuk ${selectedIds.length} alat terpilih (${selectedNames}) ke Message Broker Pusat?`);
+  if (!confirmed) return;
+
+  const syncBtn = document.getElementById('syncEquipmentToPusatBtn');
+  const originalHtml = syncBtn ? syncBtn.innerHTML : '';
+  if (syncBtn) {
+    syncBtn.disabled = true;
+    syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+  }
+
+  try {
+    const response = await fetch('/api/equipment/sync-to-pusat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+      },
+      body: JSON.stringify({ equipmentIds: selectedIds })
+    });
+
+    const result = await response.json();
+    if (response.ok && result.success) {
+      showNotification(result.message || 'Konfigurasi berhasil dipush ke Message Broker Pusat!', 'success');
+      // Uncheck all
+      const selectAllCb = document.getElementById('selectAllEquipmentCheckbox');
+      if (selectAllCb) selectAllCb.checked = false;
+      document.querySelectorAll('.equipment-select-checkbox').forEach(cb => { cb.checked = false; });
+    } else {
+      showNotification(`Gagal sync ke pusat: ${result.message || 'Unknown error'}`, 'error');
+    }
+  } catch (error) {
+    showNotification(`Error saat sync ke pusat: ${error.message}`, 'error');
+  } finally {
+    if (syncBtn) {
+      syncBtn.disabled = false;
+      syncBtn.innerHTML = originalHtml;
+    }
+  }
+}
+
+// Bind button on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+  const syncBtn = document.getElementById('syncEquipmentToPusatBtn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', handleSyncEquipmentToPusat);
+  }
+});
 
 async function handleEquipmentSubmit(e) {
   e.preventDefault();

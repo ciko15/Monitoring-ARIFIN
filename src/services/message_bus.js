@@ -379,6 +379,38 @@ async function publishDataSourceConfigurationChanged(action, datasource = {}) {
     );
 }
 
+async function publishBatchEquipmentSync(syncData = {}) {
+    const airportCode = await getAirportCode();
+    const branchServiceName = await getBranchServiceName();
+    const localSiteId = await getLocalSiteId();
+    const centralServiceName = await getCentralServiceName();
+
+    const category = syncData.equipment?.category || 'Support';
+
+    return publishCategorizedEvent(
+        category,
+        'equipment.configuration.sync',
+        {
+            action: 'sync',
+            airport_code: airportCode,
+            equipment: syncData.equipment || null,
+            datasources: syncData.datasources || [],
+            limitations: syncData.limitations || [],
+            synced_at: new Date().toISOString()
+        },
+        {
+            producerService: branchServiceName,
+            producerSiteId: localSiteId,
+            targetService: centralServiceName,
+            targetSiteId: 'PUSAT',
+            occurredAt: new Date().toISOString(),
+            eventType: 'configuration',
+            domain: 'equipment',
+            equipmentId: syncData.equipment?.id || null,
+        }
+    );
+}
+
 module.exports = {
     getLocalSiteId,
     publishEquipmentTelemetry,
@@ -392,6 +424,7 @@ module.exports = {
     publishCollectorRefreshResult,
     publishEquipmentConfigurationChanged,
     publishDataSourceConfigurationChanged,
+    publishBatchEquipmentSync,
     buildEquipmentSnapshot,
     buildConfigurationSnapshot
 };

@@ -116,6 +116,7 @@ const {
     publishEquipmentSnapshotResponded,
     publishEquipmentConfigurationChanged,
     publishDataSourceConfigurationChanged,
+    publishBatchEquipmentSync,
     buildEquipmentSnapshot
 } = require('./services/message_bus');
 
@@ -1548,6 +1549,63 @@ const app = new Elysia()
         } catch (error: any) {
             set.status = 500;
             return { success: false, message: 'Failed to process equipment snapshot request', error: error.message };
+        }
+    }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
+
+    .post('/api/equipment/sync-to-pusat', async ({ body, set }) => {
+        try {
+            const payload = (body || {}) as any;
+            const equipmentIds = Array.isArray(payload.equipmentIds) ? payload.equipmentIds : [];
+
+            if (equipmentIds.length === 0) {
+                set.status = 400;
+                return { success: false, message: 'Daftar alat belum dipilih (equipmentIds kosong)' };
+            }
+
+            const results: any[] = [];
+            const allAuths = await db.getAllOtentication();
+            const allLimitations = await db.getAllLimitations ? await db.getAllLimitations() : [];
+
+            for (const id of equipmentIds) {
+                const equipment = await db.getEquipmentById(id);
+                if (!equipment) continue;
+
+                // Ambil data source / otentikasi terkait alat ini
+                const datasources = allAuths.filter((a: any) => String(a.equipt_id) === String(id));
+
+                // Ambil limitations / threshold terkait alat ini
+                const limitations = allLimitations.filter((lim: any) => String(lim.equipment_id || lim.equipt_id) === String(id));
+
+                const publishResult = await publishBatchEquipmentSync({
+                    equipment,
+                    datasources,
+                    limitations
+                }).catch((err: any) => {
+                    console.error(`[EMS Sync] Error syncing equipment ${equipment.name} (${id}):`, err.message);
+                    return { error: err.message };
+                });
+
+                results.push({
+                    equipmentId: id,
+                    name: equipment.name,
+                    category: equipment.category,
+                    sup_category: equipment.sup_category,
+                    datasourcesCount: datasources.length,
+                    limitationsCount: limitations.length,
+                    queue: publishResult?.queue || (publishResult?.error ? 'FAILED' : 'PUBLISHED'),
+                    status: publishResult?.error ? 'failed' : 'success',
+                    error: publishResult?.error || null
+                });
+            }
+
+            return {
+                success: true,
+                message: `Berhasil mengirim ${results.filter(r => r.status === 'success').length}/${results.length} konfigurasi alat ke Message Broker Pusat`,
+                results
+            };
+        } catch (error: any) {
+            set.status = 500;
+            return { success: false, message: 'Gagal melakukan sinkronisasi ke pusat: ' + error.message };
         }
     }, { beforeHandle: authorize(['superadmin', 'admin', 'user_pusat']) })
 
