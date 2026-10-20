@@ -103,6 +103,7 @@ function showToast(message, type = 'info') {
   }, 4000);
 }
 window.showToast = showToast;
+window.showNotification = showToast;
 
 
 // Global Custom Confirmation Modal
@@ -1480,7 +1481,7 @@ function renderEquipmentTable(data) {
 async function handleSyncEquipmentToPusat() {
   const selectedCbs = Array.from(document.querySelectorAll('.equipment-select-checkbox:checked'));
   if (selectedCbs.length === 0) {
-    showNotification('Silakan checklist minimal satu alat yang ingin disinkronkan ke Pusat.', 'warning');
+    showToast('Silakan checklist minimal satu alat yang ingin disinkronkan ke Pusat.', 'warning');
     return;
   }
 
@@ -1509,16 +1510,16 @@ async function handleSyncEquipmentToPusat() {
 
     const result = await response.json();
     if (response.ok && result.success) {
-      showNotification(result.message || 'Konfigurasi berhasil dipush ke Message Broker Pusat!', 'success');
+      showToast(result.message || 'Konfigurasi berhasil dipush ke Message Broker Pusat!', 'success');
       // Uncheck all
       const selectAllCb = document.getElementById('selectAllEquipmentCheckbox');
       if (selectAllCb) selectAllCb.checked = false;
       document.querySelectorAll('.equipment-select-checkbox').forEach(cb => { cb.checked = false; });
     } else {
-      showNotification(`Gagal sync ke pusat: ${result.message || 'Unknown error'}`, 'error');
+      showToast(`Gagal sync ke pusat: ${result.message || 'Unknown error'}`, 'error');
     }
   } catch (error) {
-    showNotification(`Error saat sync ke pusat: ${error.message}`, 'error');
+    showToast(`Error saat sync ke pusat: ${error.message}`, 'error');
   } finally {
     if (syncBtn) {
       syncBtn.disabled = false;
