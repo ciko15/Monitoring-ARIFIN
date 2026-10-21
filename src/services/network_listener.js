@@ -1475,12 +1475,38 @@ class NetworkListenerService {
     // ─────────────────────────────────────────────────────────────────────────
     startAsterixListener(source, parserId) {
         const dgram = require('dgram');
-        const { id, equipt_id, name, ip_address, udp_port,
+        let { id, equipt_id, name, ip_address, udp_port,
             lat, lon, location, sac, sic,
-            multicast_ip, multicast_port, timeout_ms } = source;
+            multicast_ip, multicast_port, timeout_ms, extra_config } = source;
 
-        const port = parseInt(udp_port) || (parserId === 'asterix_adsb' ? 50000 : 4001);
-        const mcastIp = multicast_ip || ip_address;
+        let extraCfg = {};
+        if (extra_config) {
+            try {
+                extraCfg = typeof extra_config === 'string' ? JSON.parse(extra_config) : extra_config;
+            } catch (e) { }
+        }
+
+        const port = parseInt(udp_port || extraCfg.port || extraCfg.udp_port) || (parserId === 'asterix_adsb' ? 50000 : 13842);
+        
+        // Cek jika ip_address diisi alamat Multicast (224.0.0.0 s/d 239.255.255.255)
+        let mcastIp = multicast_ip || extraCfg.multicast_ip;
+        let radarSenderIp = extraCfg.radar_ip || extraCfg.sender_ip;
+
+        const isIpMulticast = (ip) => {
+            if (!ip || typeof ip !== 'string') return false;
+            const oct = parseInt(ip.split('.')[0] || '0', 10);
+            return oct >= 224 && oct <= 239;
+        };
+
+        if (!mcastIp) {
+            if (isIpMulticast(ip_address)) {
+                mcastIp = ip_address;
+            } else {
+                radarSenderIp = ip_address;
+                // Default fallback jika tidak ada multicast IP tapi tahu ini radar Surabaya/Papua
+                mcastIp = '239.255.0.54';
+            }
+        }
 
         const ParserClass = require('../parsers/' + parserId);
         const parser = new ParserClass({
@@ -1499,9 +1525,9 @@ class NetworkListenerService {
         if (!this._asterixParsers) this._asterixParsers = new Map();
         if (!this._asterixTimers) this._asterixTimers = new Map();
 
-        const socketKey = `asterix_udp_${mcastIp}_${port}`;
+        const socketKey = `asterix_udp_${port}`;
         if (!this._asterixParsers.has(socketKey)) this._asterixParsers.set(socketKey, new Map());
-        this._asterixParsers.get(socketKey).set(id, { parser, source, parserId });
+        this._asterixParsers.get(socketKey).set(id, { parser, source, parserId, radarSenderIp, mcastIp });
 
         if (!this._asterixSockets.has(socketKey)) {
             const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
@@ -1510,12 +1536,9 @@ class NetworkListenerService {
                 const parsersOnSocket = this._asterixParsers.get(socketKey);
                 if (!parsersOnSocket) return;
                 for (const [srcId, entry] of parsersOnSocket) {
-                    // Filter berdasarkan source IP jika ada, agar data tidak nyasar ke radar lain
-                    // KECUALI jika IP tersebut adalah IP Multicast (dimulai dengan 224-239)
-                    if (entry.source.ip_address && entry.source.ip_address !== rinfo.address) {
-                        const firstOctet = parseInt(entry.source.ip_address.split('.')[0] || '0', 10);
-                        const isMulticast = firstOctet >= 224 && firstOctet <= 239;
-                        if (!isMulticast && entry.source.ip_address !== '0.0.0.0') {
+                    // Filter berdasarkan sender IP jika didefinisikan (dan bukan 0.0.0.0 / bukan multicast)
+                    if (entry.radarSenderIp && entry.radarSenderIp !== '0.0.0.0' && !isIpMulticast(entry.radarSenderIp)) {
+                        if (entry.radarSenderIp !== rinfo.address) {
                             continue;
                         }
                     }
