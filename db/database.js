@@ -263,7 +263,7 @@ async function writeAirportConfig(data) {
   return await writeJson(AIRPORT_CONFIG_PATH, data);
 }
 
-async function readBranchProfile() {
+async function getBranchProfile() {
   const airports = await readAirportConfig();
   const fallbackAirport = airports.length > 0 ? airports[0] : {};
   const fallback = {
@@ -305,6 +305,8 @@ async function readBranchProfile() {
       : 30
   };
 }
+
+const readBranchProfile = getBranchProfile;
 
 async function updateBranchProfile(partialProfile) {
   const current = await getBranchProfile();
@@ -1660,6 +1662,7 @@ module.exports = {
 
   // Branch Profile & Settings
   getBranchProfile,
+  readBranchProfile: getBranchProfile,
   updateBranchProfile,
 
   // Logs

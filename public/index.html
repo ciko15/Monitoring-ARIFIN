@@ -1953,261 +1953,264 @@
         </div>
       </section>
 
-      <!-- Configure Section (Issue #12) -->
+      <!-- Configure Section (Matching dev-smart Pusat) -->
       <section class="content-section hidden" id="configureSection">
-        <div class="crud-container">
-          <div class="card" style="margin-top: 0;">
-            <div class="card-header">
-              <h2><i class="fas fa-sliders-h"></i> System Configuration Control Center</h2>
-            </div>
-            <div class="card-body" style="padding: 0;">
-              <div class="monitoring-layout">
-                <!-- Config Interior Navbar -->
-                <div class="config-nav-sidebar">
-                  <div class="config-nav-list">
-                    <div class="config-nav-item active" data-config="limitation">
-                      <i class="fas fa-exclamation-triangle"></i>
-                      <span>Limitation</span>
-                    </div>
-                    <div class="config-nav-item" data-config="authentication">
-                      <i class="fas fa-network-wired"></i>
-                      <span>Authentication</span>
-                    </div>
-                    <div class="config-nav-item" data-config="parsing">
-                      <i class="fas fa-terminal"></i>
-                      <span>Parsing</span>
-                    </div>
-                    <div class="config-nav-item" data-config="sup-category">
-                      <i class="fas fa-sitemap"></i>
-                      <span>Sup Category</span>
-                    </div>
-                    <div class="config-nav-item" data-config="category">
-                      <i class="fas fa-list-ul"></i>
-                      <span>Category</span>
-                    </div>
-                    <div class="config-nav-item" data-config="ems-settings">
-                      <i class="fas fa-satellite-dish"></i>
-                      <span>EMS / Broker</span>
-                    </div>
-                  </div>
+        <div class="premium-dashboard animate-in">
+          <div class="monitoring-layout" style="gap: 24px;">
+            <!-- Config Interior Navbar -->
+            <div class="config-nav-sidebar card" style="padding: 16px;">
+              <div class="config-nav-list">
+                <div class="config-nav-item active" data-config="limitation">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  <span>Limitation</span>
                 </div>
-
-                <!-- Config Tab Content -->
-                <div class="config-content-display">
-                  <!-- Limitations Tab -->
-                  <div id="configLimitationContent" class="config-content-item">
-                    <div class="card-header"
-                      style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                      <h3><i class="fas fa-exclamation-triangle"></i> Standard Limitations</h3>
-                      <div class="filter-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                        <div class="search-box" style="position: relative; display: flex; align-items: center;">
-                          <i class="fas fa-search" style="position: absolute; left: 10px; color: var(--text-secondary, #888); font-size: 0.8rem; pointer-events: none;"></i>
-                          <input type="text" id="searchLimitationInput" placeholder="Cari limitasi..." 
-                            style="padding-left: 28px; padding-right: 10px; height: 31px; font-size: 0.82rem; background: var(--bg-secondary, #1e222d); border: 1px solid var(--border-color, #2c3242); border-radius: 6px; color: var(--text-primary, #fff); width: 190px; outline: none; transition: border-color 0.2s;" 
-                            onfocus="this.style.borderColor='var(--accent-primary, #00d4ff)'" 
-                            onblur="this.style.borderColor='var(--border-color, #2c3242)'"
-                            oninput="window.filterLimitationTable()" autocomplete="off">
-                        </div>
-                        <select id="filterLimitationSupCategory" class="btn btn-outline btn-sm"
-                          style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer;">
-                          <option value="">All Sub-Categories</option>
-                        </select>
-                        <button class="btn btn-primary btn-sm" onclick="showAddConfigModal('limitation')">
-                          <i class="fas fa-plus"></i> Add Limitation
-                        </button>
-                      </div>
-                    </div>
-                    <div class="table-responsive">
-                      <table class="config-table">
-                        <thead>
-                          <tr>
-                            <th>Parameter Name</th>
-                            <th>Sub-Category</th>
-                            <th>Value Type</th>
-                            <th>Limits</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody id="configLimitationTableBody">
-                          <tr>
-                            <td colspan="5" class="empty-state">Loading...</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <!-- Authentication Tab -->
-                  <div id="configAuthenticationContent" class="config-content-item hidden">
-                    <div class="card-header"
-                      style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                      <h3><i class="fas fa-network-wired"></i> Global Components / IP Config</h3>
-                      <div class="filter-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                        <div style="position: relative; display: inline-flex; align-items: center;">
-                          <i class="fas fa-search" style="position: absolute; left: 9px; color: var(--text-secondary, #7a9eb8); font-size: 0.8rem; pointer-events: none;"></i>
-                          <input type="text" id="searchAuthenticationInput" placeholder="Cari ID, nama source, IP, atau alat..." 
-                            style="padding-left: 28px; padding-right: 10px; height: 31px; font-size: 0.82rem; background: var(--bg-secondary, #1e222d); border: 1px solid var(--border-color, #2c3242); border-radius: 6px; color: var(--text-primary, #fff); width: 220px; outline: none; transition: border-color 0.2s;" 
-                            onfocus="this.style.borderColor='var(--accent-primary, #00d4ff)'" 
-                            onblur="this.style.borderColor='var(--border-color, #2c3242)'"
-                            oninput="window.filterAuthenticationTable()" autocomplete="off">
-                        </div>
-                        <select id="filterAuthenticationLinkedEquipment" class="btn btn-outline btn-sm"
-                          style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer;">
-                          <option value="">All Equipment</option>
-                          <option value="global">Global (No Link)</option>
-                        </select>
-                        <button class="btn btn-primary btn-sm" onclick="showAddConfigModal('authentication')">
-                          <i class="fas fa-plus"></i> Add Component
-                        </button>
-                      </div>
-                    </div>
-                    <div class="table-responsive">
-                      <table class="config-table">
-                        <thead>
-                          <tr>
-                            <th style="width: 140px;">ID Source</th>
-                            <th>Component Name</th>
-                            <th>IP Address</th>
-                            <th>Linked Equipment</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody id="configAuthenticationTableBody">
-                          <tr>
-                            <td colspan="5" class="empty-state">Loading...</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <!-- Parsing Tab -->
-                  <div id="configParsingContent" class="config-content-item hidden">
-                    <div class="card-header" style="border: none; padding-top: 0;">
-                      <h3><i class="fas fa-terminal"></i> Equipment Parsing Config</h3>
-                      <button class="btn btn-primary btn-sm" onclick="showAddConfigModal('parsing')">
-                        <i class="fas fa-plus"></i> Add Parsing
-                      </button>
-                    </div>
-                    <div class="table-responsive">
-                      <table class="config-table">
-                        <thead>
-                          <tr>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th>Description</th>
-                            <th>How to Use</th>
-                            <th>File Path</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody id="configParsingTableBody">
-                          <tr>
-                            <td colspan="4" class="empty-state">Loading...</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <!-- Sup Category Tab -->
-                  <div id="configSupCategoryContent" class="config-content-item hidden">
-                    <div class="card-header" style="border: none; padding-top: 0;">
-                      <h3><i class="fas fa-sitemap"></i> Sub-Category Management</h3>
-                      <button class="btn btn-primary btn-sm" onclick="showAddConfigModal('sup-category')">
-                        <i class="fas fa-plus"></i> Add Sub-Category
-                      </button>
-                    </div>
-                    <div class="table-responsive">
-                      <table class="config-table">
-                        <thead>
-                          <tr>
-                            <th>Main Category</th>
-                            <th>Sub-Categories</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody id="configSupCategoryTableBody">
-                          <tr>
-                            <td colspan="3" class="empty-state">Loading...</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <!-- Category Tab -->
-                  <div id="configCategoryContent" class="config-content-item hidden">
-                    <div class="card-header" style="border: none; padding-top: 0;">
-                      <h3><i class="fas fa-list-ul"></i> Main Categories</h3>
-                    </div>
-                    <div class="table-responsive">
-                      <table class="config-table">
-                        <thead>
-                          <tr>
-                            <th>Category Name</th>
-                            <th>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody id="configCategoryTableBody">
-                          <tr>
-                            <td colspan="2" class="empty-state">Loading...</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <!-- EMS / Broker Settings Tab -->
-                  <div id="configEmsSettingsContent" class="config-content-item hidden">
-                    <div class="card-header"
-                      style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                      <h3><i class="fas fa-satellite-dish"></i> Pengaturan Sinkronisasi & Interval EMS</h3>
-                    </div>
-                    <div style="padding: 20px; max-width: 650px;">
-                      <form id="emsSettingsForm" onsubmit="event.preventDefault(); saveEmsSettings();">
-                        <div class="form-group" style="margin-bottom: 20px;">
-                          <label for="emsIntervalInput" style="font-weight: 600; display: block; margin-bottom: 8px;">
-                            Interval Pengiriman Telemetri ke EMS Pusat
-                          </label>
-                          <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="number" id="emsIntervalInput" min="1" max="3600" step="1" required value="30"
-                              style="width: 140px; padding: 10px; font-size: 1.1rem; font-weight: bold; text-align: center; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                            <span style="font-weight: 600; font-size: 1rem;">Detik</span>
-                          </div>
-                          <small style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 6px;">
-                            Default: <strong>30 detik</strong>. Rekomendasi: 10 - 60 detik agar tidak membebani antrean broker Solace.
-                          </small>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 20px;">
-                          <label style="font-weight: 600; display: block; margin-bottom: 6px;">Pilihan Cepat (Presets):</label>
-                          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="setEmsIntervalPreset(5)">5 Detik (Agresif)</button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="setEmsIntervalPreset(10)">10 Detik (Cepat)</button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="setEmsIntervalPreset(30)">30 Detik (Standar)</button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="setEmsIntervalPreset(60)">60 Detik (Santai)</button>
-                          </div>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 20px; padding: 14px; background: rgba(0, 212, 255, 0.05); border-left: 4px solid #00d4ff; border-radius: 4px;">
-                          <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; color: #00d4ff;">
-                            <i class="fas fa-info-circle"></i> Info Perilaku Pengiriman:
-                          </div>
-                          <ul style="margin: 0; padding-left: 20px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-                            <li><strong>Telemetri Parameter:</strong> Dikirim berkala sesuai interval di atas ke queue masing-masing (<code>Q.COM</code>, <code>Q.NAV</code>, <code>Q.SUR</code>, <code>Q.DAT</code>, <code>Q.SUP</code>).</li>
-                            <li><strong>Perubahan Status (Alarm / Disconnect / Normal):</strong> Dikirim <em>seketika saat itu juga</em> (tanpa delay).</li>
-                          </ul>
-                        </div>
-
-                        <button type="submit" id="saveEmsSettingsBtn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
-                          <i class="fas fa-save"></i> Simpan Pengaturan Interval
-                        </button>
-                      </form>
-                    </div>
-                  </div>
+                <div class="config-nav-item" data-config="authentication">
+                  <i class="fas fa-network-wired"></i>
+                  <span>Authentication</span>
+                </div>
+                <div class="config-nav-item" data-config="parsing">
+                  <i class="fas fa-file-code"></i>
+                  <span>Parsing</span>
+                </div>
+                <div class="config-nav-item" data-config="sup-category">
+                  <i class="fas fa-sitemap"></i>
+                  <span>Sup Category</span>
+                </div>
+                <div class="config-nav-item" data-config="category">
+                  <i class="fas fa-list-ul"></i>
+                  <span>Category</span>
+                </div>
+                <div class="config-nav-item" data-config="ems-settings">
+                  <i class="fas fa-satellite-dish"></i>
+                  <span>EMS / Broker</span>
                 </div>
               </div>
+            </div>
+
+            <!-- Config Tab Content -->
+            <div class="config-content-display card" style="padding: 24px; display: flex; flex-direction: column; min-height: 500px;">
+              <!-- Limitations Tab -->
+              <div id="configLimitationContent" class="config-content-item">
+                <div class="card-header" style="border: none; padding-top: 0;">
+                  <h3><i class="fas fa-exclamation-triangle"></i> Standard Limitations</h3>
+                  <div class="header-actions">
+                    <div class="search-box">
+                      <i class="fas fa-search"></i>
+                      <input type="text" id="searchLimitation" placeholder="Cari parameter..." oninput="filterConfigTable('limitation')">
+                    </div>
+                    <select id="filterLimitationSupCategory" class="filter-select" onchange="filterConfigTable('limitation')">
+                      <option value="">All Sub-Categories</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="showAddConfigModal('limitation')">
+                      <i class="fas fa-plus"></i> Add Limitation
+                    </button>
+                  </div>
+                </div>
+                <div class="premium-table-container" style="display: block; margin-top: 20px; overflow-y: auto; max-height: calc(100vh - 280px);">
+                  <table class="premium-table">
+                    <thead>
+                      <tr>
+                        <th>Parameter Name</th>
+                        <th>Sub-Category</th>
+                        <th>Value Type</th>
+                        <th>Limits</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="configLimitationTableBody">
+                      <tr>
+                        <td colspan="6" style="text-align: center; color: #9ca3af; padding: 32px;">Loading...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div id="limitationPagination" class="pagination-container" style="display: flex; justify-content: center; margin-top: 20px; gap: 5px;"></div>
+              </div>
+
+              <!-- Authentication Tab -->
+              <div id="configAuthenticationContent" class="config-content-item hidden">
+                <div class="card-header" style="border: none; padding-top: 0;">
+                  <h3><i class="fas fa-network-wired"></i> Global Components / IP Config</h3>
+                  <div class="header-actions">
+                    <div class="search-box">
+                      <i class="fas fa-search"></i>
+                      <input type="text" id="searchAuthentication" placeholder="Cari komponen..." oninput="filterConfigTable('authentication')">
+                    </div>
+                    <select id="filterAuthenticationLinkedEquipment" class="filter-select" onchange="filterConfigTable('authentication')">
+                      <option value="">All Equipment</option>
+                      <option value="global">Global (No Link)</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="showAddConfigModal('authentication')">
+                      <i class="fas fa-plus"></i> Add Component
+                    </button>
+                  </div>
+                </div>
+                <div class="premium-table-container" style="display: block; margin-top: 20px; overflow-y: auto; max-height: calc(100vh - 280px);">
+                  <table class="premium-table">
+                    <thead>
+                      <tr>
+                        <th>Component Name</th>
+                        <th>IP Address</th>
+                        <th>Linked Equipment</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="configAuthenticationTableBody">
+                      <tr>
+                        <td colspan="4" style="text-align: center; color: #9ca3af; padding: 32px;">Loading...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div id="authenticationPagination" class="pagination-container" style="display: flex; justify-content: center; margin-top: 20px; gap: 5px;"></div>
+              </div>
+
+              <!-- Parsing Tab -->
+              <div id="configParsingContent" class="config-content-item hidden">
+                <div class="card-header" style="border: none; padding-top: 0;">
+                  <h3><i class="fas fa-file-code"></i> Parsing Configuration</h3>
+                  <div class="header-actions">
+                    <div class="search-box">
+                      <i class="fas fa-search"></i>
+                      <input type="text" id="searchParsing" placeholder="Cari parsing..." oninput="filterConfigTable('parsing')">
+                    </div>
+                    <button class="btn btn-primary" onclick="showAddConfigModal('parsing')">
+                      <i class="fas fa-plus"></i> Add Parsing
+                    </button>
+                  </div>
+                </div>
+                <div class="premium-table-container" style="display: block; margin-top: 20px; overflow-y: auto; max-height: calc(100vh - 280px);">
+                  <table class="premium-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Parser File</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="configParsingTableBody">
+                      <tr>
+                        <td colspan="4" style="text-align: center; color: #9ca3af; padding: 32px;">Loading parsing data...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div id="parsingPagination" class="pagination-container" style="display: flex; justify-content: center; margin-top: 20px; gap: 5px;"></div>
+              </div>
+
+              <!-- Sup Category Tab -->
+              <div id="configSupCategoryContent" class="config-content-item hidden">
+                <div class="card-header" style="border: none; padding-top: 0;">
+                  <h3><i class="fas fa-sitemap"></i> Sub-Category Management</h3>
+                  <div class="header-actions">
+                    <div class="search-box">
+                      <i class="fas fa-search"></i>
+                      <input type="text" id="searchSupCategory" placeholder="Cari sub-category..." oninput="filterConfigTable('sup-category')">
+                    </div>
+                    <button class="btn btn-primary" onclick="showAddConfigModal('sup-category')">
+                      <i class="fas fa-plus"></i> Add Sub-Category
+                    </button>
+                  </div>
+                </div>
+                <div class="premium-table-container" style="display: block; margin-top: 20px; overflow-y: auto; max-height: calc(100vh - 280px);">
+                  <table class="premium-table">
+                    <thead>
+                      <tr>
+                        <th>Main Category</th>
+                        <th>Sub-Categories</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="configSupCategoryTableBody">
+                      <tr>
+                        <td colspan="3" style="text-align: center; color: #9ca3af; padding: 32px;">Loading...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Category Tab -->
+              <div id="configCategoryContent" class="config-content-item hidden">
+                <div class="card-header" style="border: none; padding-top: 0;">
+                  <h3><i class="fas fa-list-ul"></i> Main Categories</h3>
+                  <div class="header-actions">
+                    <div class="search-box">
+                      <i class="fas fa-search"></i>
+                      <input type="text" id="searchCategory" placeholder="Cari kategori..." oninput="filterConfigTable('category')">
+                    </div>
+                  </div>
+                </div>
+                <div class="premium-table-container" style="display: block; margin-top: 20px; overflow-y: auto; max-height: calc(100vh - 280px);">
+                  <table class="premium-table">
+                    <thead>
+                      <tr>
+                        <th>Category Name</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="configCategoryTableBody">
+                      <tr>
+                        <td colspan="2" style="text-align: center; color: #9ca3af; padding: 32px;">Loading...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- EMS / Broker Settings Tab -->
+              <div id="configEmsSettingsContent" class="config-content-item hidden">
+                <div class="card-header" style="border: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                  <h3><i class="fas fa-satellite-dish"></i> Pengaturan Sinkronisasi & Interval EMS</h3>
+                </div>
+                <div style="padding: 20px; max-width: 650px;">
+                  <form id="emsSettingsForm" onsubmit="event.preventDefault(); saveEmsSettings();">
+                    <div class="form-group" style="margin-bottom: 20px;">
+                      <label for="emsIntervalInput" style="font-weight: 600; display: block; margin-bottom: 8px;">
+                        Interval Pengiriman Telemetri ke EMS Pusat
+                      </label>
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="number" id="emsIntervalInput" min="1" max="3600" step="1" required value="30"
+                          style="width: 140px; padding: 10px; font-size: 1.1rem; font-weight: bold; text-align: center; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                        <span style="font-weight: 600; font-size: 1rem;">Detik</span>
+                      </div>
+                      <small style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 6px;">
+                        Default: <strong>30 detik</strong>. Rekomendasi: 10 - 60 detik agar tidak membebani antrean broker Solace.
+                      </small>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                      <label style="font-weight: 600; display: block; margin-bottom: 6px;">Pilihan Cepat (Presets):</label>
+                      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setEmsIntervalPreset(5)">5 Detik (Agresif)</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setEmsIntervalPreset(10)">10 Detik (Cepat)</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setEmsIntervalPreset(30)">30 Detik (Standar)</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setEmsIntervalPreset(60)">60 Detik (Santai)</button>
+                      </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px; padding: 14px; background: rgba(0, 212, 255, 0.05); border-left: 4px solid #00d4ff; border-radius: 4px;">
+                      <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; color: #00d4ff;">
+                        <i class="fas fa-info-circle"></i> Info Perilaku Pengiriman:
+                      </div>
+                      <ul style="margin: 0; padding-left: 20px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+                        <li><strong>Telemetri Parameter:</strong> Dikirim berkala sesuai interval di atas ke queue masing-masing (<code>Q.COM</code>, <code>Q.NAV</code>, <code>Q.SUR</code>, <code>Q.DAT</code>, <code>Q.SUP</code>).</li>
+                        <li><strong>Perubahan Status (Alarm / Disconnect / Normal):</strong> Dikirim <em>seketika saat itu juga</em> (tanpa delay).</li>
+                      </ul>
+                    </div>
+
+                    <button type="submit" id="saveEmsSettingsBtn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
+                      <i class="fas fa-save"></i> Simpan Pengaturan Interval
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
             </div>
           </div>
         </div>
@@ -2263,28 +2266,31 @@
     </div>
   </div>
 
-  <!-- Global Config Modal -->
+  <!-- Config Modal (Generic for Limitation, Authentication, Parsing, Sup-Category, Category) -->
   <div class="modal-overlay hidden" id="configModal" style="z-index: 11000;">
     <div class="modal-container modal-large" style="max-width: 980px; width: 92vw;">
       <div class="modal-header">
-        <h3><i class="fas fa-cog"></i> <span id="configModalTitle">Configure Item</span></h3>
-        <button class="modal-close" onclick="closeModal('configModal')">
+        <h3><i class="fas fa-sliders-h"></i> <span id="configModalTitle">Add Configuration</span></h3>
+        <button class="modal-close" onclick="closeConfigModal()">
           <i class="fas fa-times"></i>
         </button>
       </div>
       <div class="modal-body">
         <form id="configForm" autocomplete="off">
-          <input type="hidden" id="configId" name="configId">
-          <input type="hidden" id="configType" name="configType">
-          <input type="hidden" id="configMode" name="configMode">
+          <input type="hidden" id="configItemType" name="configItemType">
+          <input type="hidden" id="configItemId" name="configItemId">
 
-          <div id="configFieldsContainer">
-            <!-- Dynamic Fields will be injected here -->
+          <div id="configFormFields">
+            <!-- Dynamic fields based on type -->
           </div>
 
-          <div class="modal-footer" style="padding: 15px 0 0 0;">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('configModal')">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save Changes</button>
+          <div class="form-actions modal-footer" style="padding: 15px 0 0 0; display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save"></i> Save Configuration
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="closeConfigModal()">
+              <i class="fas fa-times"></i> Cancel
+            </button>
           </div>
         </form>
       </div>
@@ -2329,12 +2335,13 @@
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-  <script src="app.js?v=33"></script>
+  <script src="app.js?v=34"></script>
   <script src="enhancements.js?v=29"></script>
   <script src="cabang-app.js?v=7"></script>
   <script src="snmp-tools.js"></script>
 
   <script src="template-app.js"></script>
+  <script src="configure-app.js?v=2"></script>
 
 </body>
 

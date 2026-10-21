@@ -223,3 +223,178 @@
   text-decoration: none !important;
 }
 
+/* Premium Dashboard & Modern Table (Matched with dev-smart Pusat) */
+.premium-dashboard {
+  font-family: inherit;
+  color: #fff;
+  width: 100%;
+}
+
+.premium-table-container {
+  margin-top: 16px;
+  background: rgba(21, 24, 33, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.premium-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.premium-table th {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px 16px;
+  font-weight: 600;
+  font-size: 12px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.premium-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  font-size: 13.5px;
+  color: #e5e7eb;
+}
+
+.premium-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Modern Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.btn-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.btn-action.btn-edit {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btn-action.btn-edit:hover {
+  background: #1d4ed8;
+}
+
+.btn-action.btn-delete {
+  background: #dc2626;
+  color: #fff;
+}
+
+.btn-action.btn-delete:hover {
+  background: #b91c1c;
+}
+
+/* Form UX Styles for Config Modal */
+.form-group-ux {
+  margin-bottom: 16px;
+}
+
+.form-group-ux label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  margin-bottom: 6px;
+}
+
+.form-group-ux input,
+.form-group-ux select,
+.form-group-ux textarea {
+  width: 100%;
+  background: var(--bg-secondary, #1e293b);
+  border: 1px solid var(--border-color, #334155);
+  color: var(--text-primary, #f8fafc);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.92rem;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.form-group-ux input:focus,
+.form-group-ux select:focus,
+.form-group-ux textarea:focus {
+  border-color: var(--accent-primary, #00d4ff);
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.2);
+}
+
+.form-row-ux {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: var(--bg-secondary, #1e222d);
+  border: 1px solid var(--border-color, #2c3242);
+  color: var(--text-primary, #fff);
+  outline: none;
+}
+
+/* Pagination container */
+.pagination-container button {
+  padding: 6px 12px;
+  background: var(--bg-card, #162032);
+  border: 1px solid var(--border-color, #334155);
+  color: var(--text-secondary, #94a3b8);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.15s ease;
+}
+
+.pagination-container button:hover:not(:disabled) {
+  background: var(--accent-primary, #00d4ff);
+  color: #000;
+  border-color: var(--accent-primary, #00d4ff);
+}
+
+.pagination-container button.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  font-weight: 700;
+}
+
+.pagination-container button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+

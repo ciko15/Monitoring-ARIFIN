@@ -2352,7 +2352,11 @@ function initNavigation() {
     }
 
     if (sectionId === 'configure') {
-      initConfigureNav();
+      if (typeof window.initConfigureModule === 'function') {
+        window.initConfigureModule();
+      } else if (typeof initConfigureNav === 'function') {
+        initConfigureNav();
+      }
     }
     if (sectionId === 'users') {
       loadUsers();
