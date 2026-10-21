@@ -351,10 +351,20 @@ class EquipmentService {
             };
             await this.db.createEquipmentLog(datalog);
 
-            // EMS Publish Throttle (Lambat, contoh 30 detik)
+            // EMS Publish Throttle (Dinamis dari Pengaturan Profile / Setting Web, default 30 detik)
             // EMS hanya butuh snapshot data terakhir yang sudah matang
             if (!cache.emsTimer) {
-                const emsInterval = parseInt(process.env.EMS_TELEMETRY_INTERVAL_MS || '30000', 10);
+                let intervalSec = 30;
+                try {
+                    const profile = await this.db.getBranchProfile();
+                    if (profile && profile.emsTelemetryIntervalSeconds) {
+                        intervalSec = Number(profile.emsTelemetryIntervalSeconds);
+                    }
+                } catch (e) { }
+
+                const envIntervalMs = parseInt(process.env.EMS_TELEMETRY_INTERVAL_MS || '', 10);
+                const emsInterval = !isNaN(envIntervalMs) && envIntervalMs > 0 ? envIntervalMs : (intervalSec * 1000);
+
                 cache.emsTimer = setTimeout(async () => {
                     cache.emsTimer = null;
                     const emsDatalog = {

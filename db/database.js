@@ -299,8 +299,32 @@ async function readBranchProfile() {
     services: {
       ...fallback.services,
       ...((data && data.services) || {})
+    },
+    emsTelemetryIntervalSeconds: (data && data.emsTelemetryIntervalSeconds !== undefined) 
+      ? Number(data.emsTelemetryIntervalSeconds) 
+      : 30
+  };
+}
+
+async function updateBranchProfile(partialProfile) {
+  const current = await getBranchProfile();
+  const updated = {
+    ...current,
+    ...partialProfile,
+    rabbitmq: {
+      ...(current.rabbitmq || {}),
+      ...((partialProfile && partialProfile.rabbitmq) || {})
+    },
+    services: {
+      ...(current.services || {}),
+      ...((partialProfile && partialProfile.services) || {})
     }
   };
+  if (partialProfile.emsTelemetryIntervalSeconds !== undefined) {
+    updated.emsTelemetryIntervalSeconds = Math.max(1, parseInt(partialProfile.emsTelemetryIntervalSeconds, 10) || 30);
+  }
+  await writeJson(BRANCH_PROFILE_PATH, updated);
+  return updated;
 }
 
 /**
@@ -1633,6 +1657,10 @@ module.exports = {
 
   // Categories
   getAllCategories,
+
+  // Branch Profile & Settings
+  getBranchProfile,
+  updateBranchProfile,
 
   // Logs
   createEquipmentLog,

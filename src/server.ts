@@ -1903,6 +1903,16 @@ const app = new Elysia()
             .get('/parsings', async () => await db.getAllParsingConfigs())
             .get('/categories', async () => await db.getAllCategories())
             .get('/sup-categories', async () => await db.getAllSupCategories())
+            .get('/branch-profile', async () => await db.getBranchProfile())
+            .put('/branch-profile', async ({ body, set }) => {
+                try {
+                    const updated = await db.updateBranchProfile(body as any);
+                    return { success: true, message: 'Branch profile updated successfully', data: updated };
+                } catch (err: any) {
+                    set.status = 500;
+                    return { success: false, message: 'Failed to update branch profile: ' + err.message };
+                }
+            })
 
             // Require authentication for modifications
             .use(authenticate)

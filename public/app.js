@@ -2879,7 +2879,70 @@ function updateAuthenticationFilterOptions() {
   }
 }
 
+window.loadEmsSettings = async function () {
+  try {
+    const res = await fetch('/api/config/branch-profile', { headers: getAuthHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      const intervalInput = document.getElementById('emsIntervalInput');
+      if (intervalInput && data) {
+        intervalInput.value = data.emsTelemetryIntervalSeconds || 30;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load EMS settings:', err);
+  }
+};
+
+window.setEmsIntervalPreset = function (sec) {
+  const input = document.getElementById('emsIntervalInput');
+  if (input) input.value = sec;
+};
+
+window.saveEmsSettings = async function () {
+  const input = document.getElementById('emsIntervalInput');
+  const btn = document.getElementById('saveEmsSettingsBtn');
+  if (!input) return;
+
+  const seconds = parseInt(input.value, 10);
+  if (isNaN(seconds) || seconds < 1) {
+    showToast('Interval harus berupa angka minimal 1 detik.', 'warning');
+    return;
+  }
+
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
+  }
+
+  try {
+    const res = await fetch('/api/config/branch-profile', {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ emsTelemetryIntervalSeconds: seconds })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      showToast(`Interval telemetri EMS berhasil diubah ke ${seconds} detik!`, 'success');
+    } else {
+      showToast(`Gagal menyimpan interval: ${result.message || 'Error'}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+};
+
 window.loadConfigData = async function (tab) {
+  if (tab === 'ems-settings') {
+    return window.loadEmsSettings();
+  }
+
   // Simple helper for dynamic tbody ID to avoid complex template literal
   const baseTab = tab.charAt(0).toUpperCase() + tab.slice(1);
   const formattedTab = baseTab.replace(/-([a-z])/g, g => g[1].toUpperCase());
