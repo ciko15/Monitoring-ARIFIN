@@ -2881,16 +2881,18 @@ function updateAuthenticationFilterOptions() {
 
 window.loadEmsSettings = async function () {
   try {
-    const res = await fetch('/api/config/branch-profile', { headers: getAuthHeaders() });
+    const res = await fetch('/api/config/branch-profile');
     if (res.ok) {
       const data = await res.json();
       const intervalInput = document.getElementById('emsIntervalInput');
-      if (intervalInput && data) {
-        intervalInput.value = data.emsTelemetryIntervalSeconds || 30;
+      if (intervalInput) {
+        intervalInput.value = (data && data.emsTelemetryIntervalSeconds) ? data.emsTelemetryIntervalSeconds : 30;
       }
     }
   } catch (err) {
     console.error('Failed to load EMS settings:', err);
+    const intervalInput = document.getElementById('emsIntervalInput');
+    if (intervalInput && !intervalInput.value) intervalInput.value = 30;
   }
 };
 
