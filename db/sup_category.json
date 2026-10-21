@@ -56,7 +56,8 @@
       "Power Meter",
       "Radio Link",
       "AC",
-      "CPU"
+      "CPU",
+      "Switch"
     ]
   }
 ]
