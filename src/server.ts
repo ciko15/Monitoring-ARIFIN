@@ -1114,13 +1114,16 @@ const app = new Elysia()
             .post('/ping', async ({ body, set }) => {
                 const { pingHost, isValidIP } = require('./utils/network');
                 try {
-                    const { ip } = body as any;
-                    if (!ip || !isValidIP(ip)) {
+                    let rawIp = String(body?.ip || '').trim();
+                    // Buang protokol (http://, https://) atau port (:502) jika terbawa
+                    rawIp = rawIp.replace(/^https?:\/\//i, '').split('/')[0].split(':')[0].trim();
+
+                    if (!rawIp || !isValidIP(rawIp)) {
                         set.status = 400;
-                        return { success: false, message: 'Invalid IP address format' };
+                        return { success: false, message: `Invalid IP address format: "${body?.ip}"` };
                     }
 
-                    const result = await pingHost(ip, 3);
+                    const result = await pingHost(rawIp, 3);
                     return {
                         success: result.alive,
                         ip: ip,

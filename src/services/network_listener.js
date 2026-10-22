@@ -604,6 +604,8 @@ class NetworkListenerService {
         let socket = null;
         let stopped = false;
         let lastReceivedTime = 0;
+        let pollTimer = null;
+        let reconnectTimer = null;
 
         const connect = () => {
             if (stopped) return;
@@ -640,22 +642,44 @@ class NetworkListenerService {
                 this._handleLogOutput(source, { data: fallbackData, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
             };
 
+            const scheduleReconnect = () => {
+                if (stopped || reconnectTimer) return;
+                const retryDelayMs = 8000 + Math.floor(Math.random() * 4000);
+                this._logThrottled('warn', `modbus:reconnect:${id}`, `[NetworkListener] ${moduleName} scheduling reconnect for ${source.name} in ${Math.round(retryDelayMs / 1000)}s...`, 20000);
+                reconnectTimer = setTimeout(() => {
+                    reconnectTimer = null;
+                    if (!stopped) {
+                        console.log(`[NetworkListener] Auto-reconnecting ${moduleName} for ${source.name}...`);
+                        connect();
+                    }
+                }, retryDelayMs);
+            };
+
             socket.on('error', (err) => {
                 this._logThrottled('error', `${moduleName}:error:${id}:${err.message}`, `[NetworkListener] ${moduleName} error ${source.name}: ${err.message}`);
                 reportDisconnect(err.message);
+                if (socket) {
+                    try { socket.destroy(); } catch (e) { }
+                }
+                scheduleReconnect();
             });
 
             socket.on('timeout', () => {
                 this._logThrottled('warn', `${moduleName}:timeout:${id}`, `[NetworkListener] ${moduleName} timeout ${source.name}, reconnecting...`);
                 reportDisconnect('timeout');
-                socket.destroy();
+                if (socket) {
+                    try { socket.destroy(); } catch (e) { }
+                }
+                scheduleReconnect();
             });
 
             socket.on('close', () => {
-                this._logThrottled('log', `${moduleName}:close:${id}`, `[NetworkListener] ${moduleName} disconnected ${source.name}, watchdog will restart listener`);
+                this._logThrottled('log', `${moduleName}:close:${id}`, `[NetworkListener] ${moduleName} disconnected ${source.name}, auto-reconnecting...`);
                 reportDisconnect('close');
+                if (pollTimer) clearInterval(pollTimer);
                 this.activeListeners.delete(id);
                 parser.reset();
+                scheduleReconnect();
             });
         };
 
@@ -663,7 +687,6 @@ class NetworkListenerService {
         const POLL_INTERVAL = ParserModule.POLL_INTERVAL;
         const POLL_REQ_DELAY = ParserModule.POLL_REQ_DELAY;
         const sleep = ms => new Promise(r => setTimeout(r, ms));
-        let pollTimer = null;
 
         const doPoll = async () => {
             if (lastReceivedTime > 0 && (Date.now() - lastReceivedTime < 25000)) {
@@ -700,6 +723,7 @@ class NetworkListenerService {
         this._modbusTcpCleanup.set(id, () => {
             stopped = true;
             if (pollTimer) clearInterval(pollTimer);
+            if (reconnectTimer) clearTimeout(reconnectTimer);
             if (socket) socket.destroy();
         });
 

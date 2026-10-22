@@ -1224,24 +1224,29 @@
             const badgeId = `ping_badge_${src.id}`;
             pingBadge = `<span id="${badgeId}" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(148,163,184,0.2);display:inline-flex;align-items:center;gap:5px;"><i class="fas fa-spinner fa-spin"></i> Ping...</span>`;
             
-            fetch('/api/equipment/ping', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(window.getAuthHeaders ? window.getAuthHeaders() : {}) },
-                body: JSON.stringify({ ip: src.ip_address })
-            })
-            .then(res => res.json())
-            .then(res => {
-                const badgeEl = document.getElementById(badgeId);
-                if (!badgeEl) return;
-                const isAlive = res.success || res.status === 'online';
-                const pc = isAlive ? '#00ff88' : '#ff3355';
-                const icon = isAlive ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
-                badgeEl.style.background = isAlive ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,85,0.1)';
-                badgeEl.style.color = pc;
-                badgeEl.style.borderColor = isAlive ? 'rgba(0,255,136,0.25)' : 'rgba(255,51,85,0.25)';
-                badgeEl.innerHTML = `${icon} Ping: ${isAlive ? 'Normal' : 'Gagal'}`;
-            })
-            .catch(() => {});
+            const cleanIp = String(src.ip_address || '').trim().replace(/^https?:\/\//i, '').split('/')[0].split(':')[0].trim();
+            if (cleanIp && /^\d{1,3}(\.\d{1,3}){3}$/.test(cleanIp)) {
+                fetch('/api/equipment/ping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(window.getAuthHeaders ? window.getAuthHeaders() : {}) },
+                    body: JSON.stringify({ ip: cleanIp })
+                })
+                .then(res => res.json())
+                .then(res => {
+                    const badgeEl = document.getElementById(badgeId);
+                    if (!badgeEl) return;
+                    const isAlive = res.success || res.status === 'online';
+                    const pc = isAlive ? '#00ff88' : '#ff3355';
+                    const icon = isAlive ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
+                    badgeEl.style.background = isAlive ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,85,0.1)';
+                    badgeEl.style.color = pc;
+                    badgeEl.style.borderColor = isAlive ? 'rgba(0,255,136,0.25)' : 'rgba(255,51,85,0.25)';
+                    badgeEl.innerHTML = `${icon} Ping: ${isAlive ? 'Normal' : 'Gagal'}`;
+                })
+                .catch(() => {});
+            } else {
+                pingBadge = '';
+            }
         }
 
         document.getElementById('srcDetailStatus').innerHTML =

@@ -316,10 +316,11 @@ class EquipmentService {
             
             // BUGFIX: Jika statusnya Offline/Disconnect tapi network_listener gagal mengirimkan dashData 
             // (misal karena _lkgvCache kosong saat baru restart), paksa ubah cache.mergedData menjadi '-'
-            // KECUALIKAN parser 'ils_mophien_llz' & 'ils_mophien_gp' agar datanya tidak mendadak kosong/strip saat reconnect sesaat
+            // KECUALIKAN parser streaming/metering (ILS, PM5560, DSE7320, Diris) agar datanya tidak mendadak hilang saat reconnect sesaat
             const isDead = String(finalStatus || '').toLowerCase() === 'disconnect' || String(finalStatus || '').toLowerCase() === 'offline' || String(finalStatus || '').toLowerCase() === 'error';
             const parsingId = parsedData.parsing_id || parsedData.source_parsing_id || '';
-            if (isDead && parsingId !== 'ils_mophien_llz' && parsingId !== 'ils_mophien_gp') {
+            const isPersistentStreamOrMeter = parsingId.includes('ils_') || parsingId.includes('pm5560') || parsingId.includes('diris') || parsingId.includes('dse7320');
+            if (isDead && !isPersistentStreamOrMeter) {
                 for (const key of Object.keys(cache.mergedData)) {
                     if (key !== 'connectivity' && key !== 'source_name' && !key.startsWith('_')) {
                         cache.mergedData[key] = '—';
