@@ -620,14 +620,24 @@ class NetworkListenerService {
                 startPollLoop();
             });
 
+            let consecutiveFails = 0;
+            const MAX_FAILS_BEFORE_DISCONNECT = 3;
+
             // Forward chunk langsung ke parser — tanpa buffering tambahan
             socket.on('data', async (chunk) => {
+                consecutiveFails = 0;
                 lastReceivedTime = Date.now();
                 await this.handleIncomingData(source, chunk, parser);
             });
 
             const reportDisconnect = (reason) => {
-                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
+                consecutiveFails += 1;
+                if (consecutiveFails < MAX_FAILS_BEFORE_DISCONNECT) {
+                    return; // Jangan langsung ubah status UI ke Disconnect pada glitch/timeout sesaat
+                }
+                const cached = this._lkgvCache ? this._lkgvCache.get(source.id) : null;
+                const fallbackData = cached ? JSON.parse(JSON.stringify(cached)) : {};
+                this._handleLogOutput(source, { data: fallbackData, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
             };
 
             socket.on('error', (err) => {

@@ -633,10 +633,13 @@
 
         // Cache persistent untuk modal agar jika ada reconnect sesaat, telemetry tidak mendadak hilang jadi '-'
         if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
-        const isIlsMophienSrc = effParserId === 'ils_mophien_llz' || effParserId === 'ils_mophien_gp' || effParserId === 'dme_mophien_tdme' ||
+        const isThalesIls = effParserId === 'ils_llz_thales421' || effParserId === 'ils_gp_thales421' ||
+                            src?.parsing_id === 'ils_llz_thales421' || src?.parsing_id === 'ils_gp_thales421';
+        const isIlsMophienSrc = !isThalesIls && (
+                                effParserId === 'ils_mophien_llz' || effParserId === 'ils_mophien_gp' || effParserId === 'dme_mophien_tdme' ||
                                 src?.parsing_id === 'ils_mophien_llz' || src?.parsing_id === 'ils_mophien_gp' || src?.parsing_id === 'dme_mophien_tdme' ||
-                                (src?.name && (src.name.toLowerCase().includes('localizer') || src.name.toLowerCase().includes('glide') || src.name.toLowerCase().includes('dme'))) ||
-                                (src?.ip_address && (String(src.ip_address).includes('10.62.3.20') || String(src.ip_address).includes('10.62.3.10') || String(src.ip_address).includes('10.62.3.30')));
+                                (src?.name && (src.name.toLowerCase().includes('mophien') || src.name.toLowerCase().includes('juanda') || (src.name.toLowerCase().includes('localizer') && !src.name.toLowerCase().includes('thales')))) ||
+                                (src?.ip_address && (String(src.ip_address).includes('10.62.3.20') || String(src.ip_address).includes('10.62.3.10') || String(src.ip_address).includes('10.62.3.30'))));
                          
         const modalCacheKey = src?.id || src?.ip_address || src?.name || 'ils_active';
         const hasValidLlzData = latestData && (latestData.cl_channel || latestData.ds_channel || latestData.system_params || latestData.pulse_params || latestData.station_ident || latestData.cl_ddm !== undefined);
@@ -1181,6 +1184,14 @@
         document.getElementById('srcDetailTitle').textContent = titleText;
 
         let status = data ? (data._status || 'Normal') : 'Disconnect';
+        if (!data || Object.keys(data).length === 0) {
+            // Cek apakah ada data di cache LKGV sebelum memutuskan Disconnect
+            const cacheKey = src?.id || src?.ip_address || src?.name;
+            if (window._modalTelemetryLkgv && window._modalTelemetryLkgv.has(cacheKey)) {
+                data = window._modalTelemetryLkgv.get(cacheKey);
+                status = data._status || 'Normal';
+            }
+        }
 
         // Evaluasi apakah ada parameter di dalam data yang melanggar limit (Alarm / Warning):
         if (data && typeof data === 'object' && status !== 'Disconnect' && status !== 'Offline') {
@@ -1243,10 +1254,16 @@
             (src.name && src.name.toLowerCase().includes('tdme')) ||
             (src.ip_address && String(src.ip_address).includes('10.62.3.30'))
         );
-        const isIlsMophien = src && !isTdme && (
+        const isThalesOrNormac = (
+            src?.parsing_id === 'ils_llz_thales421' || src?.parsing_id === 'ils_gp_thales421' ||
+            src?.parsing_id === 'ils_llz_normac' || src?.parsing_id === 'ils_gp_normac' ||
+            (data && (data._parsing_id === 'ils_llz_thales421' || data._parsing_id === 'ils_gp_thales421' ||
+                      data._parsing_id === 'ils_llz_normac' || data._parsing_id === 'ils_gp_normac'))
+        );
+        const isIlsMophien = src && !isTdme && !isThalesOrNormac && (
             src.parsing_id === 'ils_mophien_llz' || src.parsing_id === 'ils_mophien_gp' ||
-            (src.name && (src.name.toLowerCase().includes('localizer') || src.name.toLowerCase().includes('glide'))) ||
-            (data && (data._parsing_id === 'ils_mophien_llz' || data._parsing_id === 'ils_mophien_gp'))
+            (data && (data._parsing_id === 'ils_mophien_llz' || data._parsing_id === 'ils_mophien_gp')) ||
+            (src.name && (src.name.toLowerCase().includes('mophien') || src.name.toLowerCase().includes('juanda') || (src.name.toLowerCase().includes('localizer') && !src.name.toLowerCase().includes('thales'))))
         );
         if (modalContainer) modalContainer.style.maxWidth = (isIlsMophien || isTdme) ? '960px' : '920px';
         const body = document.getElementById('srcDetailBody');
