@@ -1311,7 +1311,9 @@ class NetworkListenerService {
             name,
             pollSec,
             timersMap: this._snmpSystemTimers,
-            doPoll
+            doPoll,
+            maxFailures: 5,
+            backoffMs: 30000 // 30 detik agar tidak tertidur 2 menit jika ada packet drop sesaat
         });
     }
 

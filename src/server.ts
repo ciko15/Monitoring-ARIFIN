@@ -1111,7 +1111,7 @@ const app = new Elysia()
                 }
             })
             // Manual Ping Test (Custom IP)
-            .post('/ping', async ({ body, set }) => {
+            .post('/ping', async ({ body, set }: { body: any; set: any }) => {
                 const { pingHost, isValidIP } = require('./utils/network');
                 try {
                     let rawIp = String(body?.ip || '').trim();
@@ -1126,7 +1126,7 @@ const app = new Elysia()
                     const result = await pingHost(rawIp, 3);
                     return {
                         success: result.alive,
-                        ip: ip,
+                        ip: rawIp,
                         status: result.alive ? 'online' : 'offline',
                         statistics: result.alive ? { avg: result.avg } : null,
                         timestamp: new Date().toISOString()
