@@ -153,7 +153,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [2000, 2000],
+        timeouts: [3000, 4000, 5000],
     });
 }
 function snmpGet(session, oid) {

@@ -2326,44 +2326,53 @@
                     ['Ident', unflattenedData.mon2?.ident, '#00d4ff'],
                 ]
             });
-            // Transmitter
+            // Transmitter 1
+            const isTx1Active = String(unflattenedData.tx_active) === '1';
             sections.push({
-                title: 'TRANSMITTER', params: [
-                    ['TX Active', unflattenedData.tx_active ? 'TX' + unflattenedData.tx_active : '—', '#00ffcc'],
-                    ['TX1 Carrier (W)', unflattenedData.tx1?.carrier_power, '#e8f4ff'],
-                    ['TX1 USB Sin', unflattenedData.tx1?.usb_sin, '#e8f4ff'],
-                    ['TX1 USB Cos', unflattenedData.tx1?.usb_cos, '#e8f4ff'],
-                    ['TX1 LSB Sin', unflattenedData.tx1?.lsb_sin, '#e8f4ff'],
-                    ['TX1 LSB Cos', unflattenedData.tx1?.lsb_cos, '#e8f4ff'],
-                    ['TX1 Az Offset', unflattenedData.tx1?.az_offset, '#e8f4ff'],
-                    ['TX1 AM 30Hz', unflattenedData.tx1?.am_30hz, '#e8f4ff'],
-                    ['TX1 AM 1020Hz', unflattenedData.tx1?.am_1020hz, '#e8f4ff'],
-                    ['TX1 Phase Offset', unflattenedData.tx1?.phase_offset, '#e8f4ff'],
-                    ['TX1 CPA Temp (°C)', unflattenedData.tx1?.cpa_temp, '#e8f4ff'],
-                    ['TX1 MSG Temp (°C)', unflattenedData.tx1?.msg_temp, '#e8f4ff'],
-                    ['TX1 Ident', unflattenedData.tx1?.ident, '#00d4ff'],
-                    ['TX2 Carrier (W)', unflattenedData.tx2?.carrier_power, '#e8f4ff'],
-                    ['TX2 USB Sin', unflattenedData.tx2?.usb_sin, '#e8f4ff'],
-                    ['TX2 USB Cos', unflattenedData.tx2?.usb_cos, '#e8f4ff'],
-                    ['TX2 LSB Sin', unflattenedData.tx2?.lsb_sin, '#e8f4ff'],
-                    ['TX2 LSB Cos', unflattenedData.tx2?.lsb_cos, '#e8f4ff'],
-                    ['TX2 Az Offset', unflattenedData.tx2?.az_offset, '#e8f4ff'],
-                    ['TX2 AM 30Hz', unflattenedData.tx2?.am_30hz, '#e8f4ff'],
-                    ['TX2 AM 1020Hz', unflattenedData.tx2?.am_1020hz, '#e8f4ff'],
-                    ['TX2 Phase Offset', unflattenedData.tx2?.phase_offset, '#e8f4ff'],
-                    ['TX2 CPA Temp (°C)', unflattenedData.tx2?.cpa_temp, '#e8f4ff'],
-                    ['TX2 MSG Temp (°C)', unflattenedData.tx2?.msg_temp, '#e8f4ff'],
-                    ['TX2 Ident', unflattenedData.tx2?.ident, '#00d4ff'],
+                title: 'TRANSMITTER 1 (TX 1)', params: [
+                    ['TX Status', isTx1Active ? 'ACTIVE (ON-AIR)' : 'STANDBY', isTx1Active ? '#00ffcc' : '#94a3b8'],
+                    ['Carrier Power (W)', unflattenedData.tx1?.carrier_power, getLimitColor(sup, 'Carrier Power', unflattenedData.tx1?.carrier_power, parserId)],
+                    ['USB Sin', unflattenedData.tx1?.usb_sin, '#e8f4ff'],
+                    ['USB Cos', unflattenedData.tx1?.usb_cos, '#e8f4ff'],
+                    ['LSB Sin', unflattenedData.tx1?.lsb_sin, '#e8f4ff'],
+                    ['LSB Cos', unflattenedData.tx1?.lsb_cos, '#e8f4ff'],
+                    ['Az Offset', unflattenedData.tx1?.az_offset, getLimitColor(sup, 'Azimuth', unflattenedData.tx1?.az_offset, parserId)],
+                    ['AM 30Hz', unflattenedData.tx1?.am_30hz, getLimitColor(sup, 'AM 30Hz', unflattenedData.tx1?.am_30hz, parserId)],
+                    ['AM 1020Hz', unflattenedData.tx1?.am_1020hz, getLimitColor(sup, 'AM 1020Hz', unflattenedData.tx1?.am_1020hz, parserId)],
+                    ['Phase Offset', unflattenedData.tx1?.phase_offset, '#e8f4ff'],
+                    ['CPA Temp (°C)', unflattenedData.tx1?.cpa_temp, getLimitColor(sup, 'Temperature', unflattenedData.tx1?.cpa_temp, parserId)],
+                    ['MSG Temp (°C)', unflattenedData.tx1?.msg_temp, getLimitColor(sup, 'Temperature', unflattenedData.tx1?.msg_temp, parserId)],
+                    ['Ident', unflattenedData.tx1?.ident, '#00d4ff'],
+                ]
+            });
+
+            // Transmitter 2
+            const isTx2Active = String(unflattenedData.tx_active) === '2';
+            sections.push({
+                title: 'TRANSMITTER 2 (TX 2)', params: [
+                    ['TX Status', isTx2Active ? 'ACTIVE (ON-AIR)' : 'STANDBY', isTx2Active ? '#00ffcc' : '#94a3b8'],
+                    ['Carrier Power (W)', unflattenedData.tx2?.carrier_power, getLimitColor(sup, 'Carrier Power', unflattenedData.tx2?.carrier_power, parserId)],
+                    ['USB Sin', unflattenedData.tx2?.usb_sin, '#e8f4ff'],
+                    ['USB Cos', unflattenedData.tx2?.usb_cos, '#e8f4ff'],
+                    ['LSB Sin', unflattenedData.tx2?.lsb_sin, '#e8f4ff'],
+                    ['LSB Cos', unflattenedData.tx2?.lsb_cos, '#e8f4ff'],
+                    ['Az Offset', unflattenedData.tx2?.az_offset, getLimitColor(sup, 'Azimuth', unflattenedData.tx2?.az_offset, parserId)],
+                    ['AM 30Hz', unflattenedData.tx2?.am_30hz, getLimitColor(sup, 'AM 30Hz', unflattenedData.tx2?.am_30hz, parserId)],
+                    ['AM 1020Hz', unflattenedData.tx2?.am_1020hz, getLimitColor(sup, 'AM 1020Hz', unflattenedData.tx2?.am_1020hz, parserId)],
+                    ['Phase Offset', unflattenedData.tx2?.phase_offset, '#e8f4ff'],
+                    ['CPA Temp (°C)', unflattenedData.tx2?.cpa_temp, getLimitColor(sup, 'Temperature', unflattenedData.tx2?.cpa_temp, parserId)],
+                    ['MSG Temp (°C)', unflattenedData.tx2?.msg_temp, getLimitColor(sup, 'Temperature', unflattenedData.tx2?.msg_temp, parserId)],
+                    ['Ident', unflattenedData.tx2?.ident, '#00d4ff'],
                 ]
             });
 
             // LCU
             sections.push({
                 title: 'LCU — POWER SUPPLY', params: [
-                    ['DC +5V', unflattenedData.lcu?.dc_5v, '#e8f4ff'],
-                    ['DC +7V', unflattenedData.lcu?.dc_7v, '#e8f4ff'],
-                    ['DC +15V', unflattenedData.lcu?.dc_15v, '#e8f4ff'],
-                    ['DC +28V', unflattenedData.lcu?.dc_28v, '#e8f4ff'],
+                    ['DC +5V', unflattenedData.lcu?.dc_5v, getLimitColor(sup, 'Voltage', unflattenedData.lcu?.dc_5v, parserId)],
+                    ['DC +7V', unflattenedData.lcu?.dc_7v, getLimitColor(sup, 'Voltage', unflattenedData.lcu?.dc_7v, parserId)],
+                    ['DC +15V', unflattenedData.lcu?.dc_15v, getLimitColor(sup, 'Voltage', unflattenedData.lcu?.dc_15v, parserId)],
+                    ['DC +28V', unflattenedData.lcu?.dc_28v, getLimitColor(sup, 'Voltage', unflattenedData.lcu?.dc_28v, parserId)],
                     // ['AC +28V', unflattenedData.lcu?.ac_28v, '#e8f4ff'],
                     ['MSG1 Comm', unflattenedData.lcu?.msg1_comm, '#00d4ff'],
                     ['MSG2 Comm', unflattenedData.lcu?.msg2_comm, '#00d4ff'],
