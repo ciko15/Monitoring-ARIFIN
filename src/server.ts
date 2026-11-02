@@ -135,73 +135,6 @@ const SHOULD_START_PROCESSOR = SERVICE_ROLE === 'all' || SERVICE_ROLE === 'proce
 const SERVICE_STARTED_AT = Date.now();
 const STARTUP_WATCHDOG_GRACE_MS = parseInt(process.env.STARTUP_WATCHDOG_GRACE_MS || '') || 3 * 60 * 1000;
 
-// Sinkronisasi otomatis Alarm Limit dari Server Pusat
-const CENTER_SYNC_URL = process.env.CENTER_LIMITATIONS_SYNC_URL || 'http://172.19.16.116:3000/api/sync/limitations';
-let isConsumingLimitations = false;
-
-async function consumeLimitationsFromCenter() {
-    if (isConsumingLimitations) return;
-    isConsumingLimitations = true;
-    try {
-        console.log(`[SYNC-CONSUME] Mengambil alarm limit terbaru dari Pusat (${CENTER_SYNC_URL})...`);
-        const res = await fetch(CENTER_SYNC_URL, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            signal: AbortSignal.timeout(10000)
-        });
-
-        if (!res.ok) {
-            console.warn(`[SYNC-CONSUME] Server Pusat merespon dengan status: ${res.status}`);
-            return;
-        }
-
-        const payload = await res.json();
-        if (!Array.isArray(payload) || payload.length === 0) {
-            console.log('[SYNC-CONSUME] Tidak ada data limitasi atau payload bukan array valid.');
-            return;
-        }
-
-        const path = require('path');
-        const filePath = path.join(__dirname, '../db/limitation_config.json');
-
-        // Tulis / timpa langsung ke db/limitation_config.json
-        await db.writeJson(filePath, payload);
-        console.log(`[SYNC-CONSUME] Berhasil memperbarui ${payload.length} limitation parameters ke db/limitation_config.json`);
-
-        // Re-initialize listener / trigger reload agar threshold baru langsung aktif
-        try {
-            const networkListener = require('./services/network_listener');
-            if (networkListener && typeof networkListener.initialize === 'function') {
-                console.log('[SYNC-CONSUME] Memanggil networkListener.initialize() untuk menerapkan limit baru...');
-                networkListener.initialize();
-            }
-        } catch (initErr: any) {
-            console.warn('[SYNC-CONSUME] Gagal memanggil networkListener.initialize():', initErr.message);
-        }
-
-        // Restart modul collector / processor via PM2 jika berjalan di mode PM2
-        setTimeout(() => {
-            try {
-                const { exec } = require('child_process');
-                exec('pm2 restart monitoring-collector monitoring-processor || pm2 restart monitoring-arifin', (err: any) => {
-                    if (err) {
-                        // Hanya log jika ada error selain modul tidak ditemukan
-                    } else {
-                        console.log('[SYNC-CONSUME] Berhasil merestart proses collector/processor via PM2.');
-                    }
-                });
-            } catch (pm2Err) {
-                // Ignore if outside PM2
-            }
-        }, 1500);
-
-    } catch (err: any) {
-        console.warn(`[SYNC-CONSUME] Gagal mengambil limitasi dari Pusat: ${err.message}`);
-    } finally {
-        isConsumingLimitations = false;
-    }
-}
-
 // Global State
 export const state = {
     snmpTemplatesCache: null as any,
@@ -355,7 +288,7 @@ async function checkEquipmentWatchdog() {
         const limit = 200; // Process in chunks to save memory
         let hasMore = true;
         const now = Date.now();
-        const TIMEOUT_MS = parseInt(process.env.WATCHDOG_TIMEOUT_MS || '') || (8 * 60 * 1000); // 8 menit toleransi agar tidak false disconnect saat jaringan sesak
+        const TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes
 
         while (hasMore) {
             const result = await db.getAllEquipment({ includeData: true, isActive: true, limit, page });
@@ -644,58 +577,14 @@ const app = new Elysia()
                 }
 
                 const filePath = path.join(__dirname, '../db', fileName);
+                await db.writeJson(filePath, payload);
 
-                if (configType === 'limitations' && Array.isArray(payload)) {
-                    // Smart merge: Perbarui atau tambahkan limitasi dari pusat tanpa menghapus parameter lokal yang belum ada di pusat
-                    let currentLimitations: any[] = [];
-                    try {
-                        currentLimitations = await db.readJson(filePath);
-                        if (!Array.isArray(currentLimitations)) currentLimitations = [];
-                    } catch (e) {
-                        currentLimitations = [];
-                    }
-
-                    const mergedMap = new Map();
-                    // 1. Masukkan data lokal terlebih dahulu
-                    for (const item of currentLimitations) {
-                        const key = item.id != null ? String(item.id) : `${String(item.name || '').trim().toLowerCase()}_${String(item.sup_category || '').trim().toLowerCase()}`;
-                        mergedMap.set(key, item);
-                    }
-                    // 2. Timpa / tambahkan dengan data dari pusat
-                    for (const item of payload) {
-                        // Cocokkan berdasarkan ID jika ada, atau name + sup_category
-                        let matchedKey: string | null = null;
-                        if (item.id != null && mergedMap.has(String(item.id))) {
-                            matchedKey = String(item.id);
-                        } else {
-                            const nameSupKey = `${String(item.name || '').trim().toLowerCase()}_${String(item.sup_category || '').trim().toLowerCase()}`;
-                            if (mergedMap.has(nameSupKey)) {
-                                matchedKey = nameSupKey;
-                            }
-                        }
-
-                        if (matchedKey) {
-                            const existing = mergedMap.get(matchedKey);
-                            mergedMap.set(matchedKey, { ...existing, ...item });
-                        } else {
-                            const newKey = item.id != null ? String(item.id) : `${String(item.name || '').trim().toLowerCase()}_${String(item.sup_category || '').trim().toLowerCase()}`;
-                            mergedMap.set(newKey, item);
-                        }
-                    }
-
-                    const mergedList = Array.from(mergedMap.values());
-                    await db.writeJson(filePath, mergedList);
-                    console.log(`[SYNC-RCV] Merged ${payload.length} incoming limitations with local database (${mergedList.length} total)`);
-                } else {
-                    await db.writeJson(filePath, payload);
-                }
-
-                // Restart PM2 to apply configs (Mendukung split mode maupun single process mode)
+                // Restart PM2 to apply configs
                 setTimeout(() => {
                     const { exec } = require('child_process');
-                    console.log('[SYNC-RCV] Triggering PM2 restart to apply new configs...');
-                    exec('pm2 restart monitoring-collector monitoring-processor || pm2 restart monitoring-arifin', (err: any) => {
-                        if (err) console.warn('[SYNC-RCV] PM2 restart warning:', err.message);
+                    console.log('[SYNC-RCV] Restarting monitoring-collector and monitoring-processor...');
+                    exec('pm2 restart monitoring-collector monitoring-processor', (err: any) => {
+                        if (err) console.error('[SYNC-RCV] Restart error:', err.message);
                     });
                 }, 1000);
 
@@ -2384,16 +2273,6 @@ async function startServices() {
 
 try {
     startServices();
-    
-    // Jalankan auto-sync limitasi dari Pusat 1 kali saat startup (dengan jeda 5 detik agar server stabil)
-    setTimeout(() => {
-        consumeLimitationsFromCenter().catch(e => console.warn('[SYNC-CONSUME] Startup sync error:', e.message));
-    }, 5000);
-
-    // Jalankan auto-sync berkala setiap 30 menit (30 * 60 * 1000 ms)
-    setInterval(() => {
-        consumeLimitationsFromCenter().catch(e => console.warn('[SYNC-CONSUME] Interval sync error:', e.message));
-    }, 30 * 60 * 1000);
 } catch (e) {
     console.error('[SYSTEM] Failed to invoke startServices:', e);
 }

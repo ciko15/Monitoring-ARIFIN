@@ -146,8 +146,6 @@ function normalizeSnmpOptions(options = {}) {
     };
 }
 
-const lastKnownSystemData = new Map();
-
 function createSession(host, community, options = {}) {
     const snmpOptions = normalizeSnmpOptions(options);
     return new snmp.Session({
@@ -155,7 +153,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [2000, 3000, 4000],
+        timeouts: [3000, 4000, 5000],
     });
 }
 function snmpGet(session, oid) {
@@ -217,18 +215,23 @@ async function pollSNMP(host, community = 'public', options = {}) {
     const limits = options.limits || null;
     const session = createSession(host, community, options);
     try {
+        // Memecah menjadi dua batch agar paket UDP tidak terlalu besar dan di-drop oleh network switch
         const oids1 = [OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation, OID.sysUpTime];
         const oids2 = [OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal, OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached];
 
-        // Query OIDs secara terurut (sequential) agar tidak membanjiri CPU switch dengan paket paralel
-        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw] = await snmpGetAll(session, oids1);
+        const [
+            [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw],
+            [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb],
+            cpuVbs
+        ] = await Promise.all([
+            snmpGetAll(session, oids1),
+            snmpGetAll(session, oids2),
+            snmpWalk(session, OID.hrProcessorLoad)
+        ]);
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
         }
-
-        const [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await snmpGetAll(session, oids2);
-        const cpuVbs = await snmpWalk(session, OID.hrProcessorLoad);
 
         // CPU average
         let cpu_pct = null;
@@ -237,11 +240,10 @@ async function pollSNMP(host, community = 'public', options = {}) {
             if (vals.length) cpu_pct = vals.reduce((a, b) => a + b, 0) / vals.length;
         }
 
-        // Jalankan walk storage satu per satu agar buffer UDP switch tidak overflow
-        const typeVbs = await snmpWalk(session, OID.hrStorageType);
-        const sizeVbs = await snmpWalk(session, OID.hrStorageSize);
-        const usedVbs = await snmpWalk(session, OID.hrStorageUsed);
-        const allocVbs = await snmpWalk(session, OID.hrStorageAlloc);
+        const walkOids = [OID.hrStorageType, OID.hrStorageSize, OID.hrStorageUsed, OID.hrStorageAlloc];
+        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.all(
+            walkOids.map(oid => snmpWalk(session, oid))
+        );
 
         // Build index maps
         // NOTE: hrStorageType value dikembalikan snmp-native sebagai Array OID
@@ -411,13 +413,10 @@ async function pollSNMP(host, community = 'public', options = {}) {
         };
 
         session.close();
-        const finalStructuredData = buildStructuredSystemData(rawData);
-        lastKnownSystemData.set(host, finalStructuredData);
-
         return {
             success: true,
             status,
-            data: finalStructuredData,
+            data: buildStructuredSystemData(rawData),
             alarms: status === 'Alarm' ? ['Resource usage critical or temperature high'] : [],
             warnings: status === 'Warning' ? ['Resource usage high or temperature elevated'] : [],
             triggeredParams: [],
@@ -426,8 +425,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 
     } catch (err) {
         try { session.close(); } catch (e) { }
-        const prev = lastKnownSystemData.get(host);
-        const fallbackRaw = prev ? { ...prev, connectivity: 'Disconnected' } : {
+        const fallbackRaw = {
             connectivity: 'Disconnected',
             resolved_ip: host,
             sys_name: '—', sys_descr: '—', sys_uptime: '—',
@@ -443,7 +441,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
             disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
             temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
         };
-        const structuredFallback = prev ? { ...prev, connectivity: 'Disconnected' } : {
+        const structuredFallback = {
             ...fallbackRaw,
             'SISTEM': {
                 connectivity: fallbackRaw.connectivity, sys_name: fallbackRaw.sys_name,
