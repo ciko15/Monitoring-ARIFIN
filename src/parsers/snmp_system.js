@@ -146,6 +146,8 @@ function normalizeSnmpOptions(options = {}) {
     };
 }
 
+const lastKnownSystemData = new Map();
+
 function createSession(host, community, options = {}) {
     const snmpOptions = normalizeSnmpOptions(options);
     return new snmp.Session({
@@ -153,7 +155,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [3000, 4000, 5000],
+        timeouts: [2000, 3000, 4000],
     });
 }
 function snmpGet(session, oid) {
@@ -409,10 +411,13 @@ async function pollSNMP(host, community = 'public', options = {}) {
         };
 
         session.close();
+        const finalStructuredData = buildStructuredSystemData(rawData);
+        lastKnownSystemData.set(host, finalStructuredData);
+
         return {
             success: true,
             status,
-            data: buildStructuredSystemData(rawData),
+            data: finalStructuredData,
             alarms: status === 'Alarm' ? ['Resource usage critical or temperature high'] : [],
             warnings: status === 'Warning' ? ['Resource usage high or temperature elevated'] : [],
             triggeredParams: [],
@@ -421,7 +426,8 @@ async function pollSNMP(host, community = 'public', options = {}) {
 
     } catch (err) {
         try { session.close(); } catch (e) { }
-        const fallbackRaw = {
+        const prev = lastKnownSystemData.get(host);
+        const fallbackRaw = prev ? { ...prev, connectivity: 'Disconnected' } : {
             connectivity: 'Disconnected',
             resolved_ip: host,
             sys_name: '—', sys_descr: '—', sys_uptime: '—',
@@ -437,7 +443,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
             disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
             temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
         };
-        const structuredFallback = {
+        const structuredFallback = prev ? { ...prev, connectivity: 'Disconnected' } : {
             ...fallbackRaw,
             'SISTEM': {
                 connectivity: fallbackRaw.connectivity, sys_name: fallbackRaw.sys_name,
