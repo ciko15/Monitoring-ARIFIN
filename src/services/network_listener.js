@@ -1467,10 +1467,11 @@ class NetworkListenerService {
                 // Broadcast ke data sources lain yang memakai IP yang sama (misal 3 alat di Surabaya)
                 // agar semua peralatan terupdate serentak tanpa perlu berebut query Modbus TCP
                 try {
-                    const allSources = await this.equipmentService.db.getAllSourceConfigs();
+                    const dbModule = require('../../db/database');
+                    const allSources = await dbModule.getAllOtentication();
                     if (Array.isArray(allSources)) {
                         const peerSources = allSources.filter(s =>
-                            s && s.id !== source.id &&
+                            s && String(s.id) !== String(source.id) &&
                             s.ip_address === ip_address &&
                             (s.parsing_id === 'iologik_modbus' || this._getParserModule(s.parsing_id) === 'iologik_modbus')
                         );
@@ -1484,7 +1485,7 @@ class NetworkListenerService {
                         }
                     }
                 } catch (bcastErr) {
-                    // Non-fatal
+                    console.error('[ioLogik] Broadcast peer update error:', bcastErr.message);
                 }
             } catch (err) {
                 console.error(`[ioLogik] Poll error ${name}:`, err.message);

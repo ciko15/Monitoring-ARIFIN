@@ -2326,34 +2326,44 @@
                     ['Ident', unflattenedData.mon2?.ident, '#00d4ff'],
                 ]
             });
-            // Transmitter
+            // Transmitter 1 (TX1)
+            const isTx1Active = unflattenedData.tx_active === '1' || unflattenedData.tx_active === 1;
+            const isTx2Active = unflattenedData.tx_active === '2' || unflattenedData.tx_active === 2;
+
             sections.push({
-                title: 'TRANSMITTER', params: [
-                    ['TX Active', unflattenedData.tx_active ? 'TX' + unflattenedData.tx_active : '—', '#00ffcc'],
-                    ['TX1 Carrier (W)', unflattenedData.tx1?.carrier_power, '#e8f4ff'],
-                    ['TX1 USB Sin', unflattenedData.tx1?.usb_sin, '#e8f4ff'],
-                    ['TX1 USB Cos', unflattenedData.tx1?.usb_cos, '#e8f4ff'],
-                    ['TX1 LSB Sin', unflattenedData.tx1?.lsb_sin, '#e8f4ff'],
-                    ['TX1 LSB Cos', unflattenedData.tx1?.lsb_cos, '#e8f4ff'],
-                    ['TX1 Az Offset', unflattenedData.tx1?.az_offset, '#e8f4ff'],
-                    ['TX1 AM 30Hz', unflattenedData.tx1?.am_30hz, '#e8f4ff'],
-                    ['TX1 AM 1020Hz', unflattenedData.tx1?.am_1020hz, '#e8f4ff'],
-                    ['TX1 Phase Offset', unflattenedData.tx1?.phase_offset, '#e8f4ff'],
-                    ['TX1 CPA Temp (°C)', unflattenedData.tx1?.cpa_temp, '#e8f4ff'],
-                    ['TX1 MSG Temp (°C)', unflattenedData.tx1?.msg_temp, '#e8f4ff'],
-                    ['TX1 Ident', unflattenedData.tx1?.ident, '#00d4ff'],
-                    ['TX2 Carrier (W)', unflattenedData.tx2?.carrier_power, '#e8f4ff'],
-                    ['TX2 USB Sin', unflattenedData.tx2?.usb_sin, '#e8f4ff'],
-                    ['TX2 USB Cos', unflattenedData.tx2?.usb_cos, '#e8f4ff'],
-                    ['TX2 LSB Sin', unflattenedData.tx2?.lsb_sin, '#e8f4ff'],
-                    ['TX2 LSB Cos', unflattenedData.tx2?.lsb_cos, '#e8f4ff'],
-                    ['TX2 Az Offset', unflattenedData.tx2?.az_offset, '#e8f4ff'],
-                    ['TX2 AM 30Hz', unflattenedData.tx2?.am_30hz, '#e8f4ff'],
-                    ['TX2 AM 1020Hz', unflattenedData.tx2?.am_1020hz, '#e8f4ff'],
-                    ['TX2 Phase Offset', unflattenedData.tx2?.phase_offset, '#e8f4ff'],
-                    ['TX2 CPA Temp (°C)', unflattenedData.tx2?.cpa_temp, '#e8f4ff'],
-                    ['TX2 MSG Temp (°C)', unflattenedData.tx2?.msg_temp, '#e8f4ff'],
-                    ['TX2 Ident', unflattenedData.tx2?.ident, '#00d4ff'],
+                title: 'TRANSMITTER 1 (TX1)', params: [
+                    ['TX Status', isTx1Active ? 'ACTIVE (ON AIR)' : (unflattenedData.tx_active ? 'STANDBY' : '—'), isTx1Active ? '#00ff88' : '#7a9eb8'],
+                    ['Carrier (W)', unflattenedData.tx1?.carrier_power, '#e8f4ff'],
+                    ['USB Sin', unflattenedData.tx1?.usb_sin, '#e8f4ff'],
+                    ['USB Cos', unflattenedData.tx1?.usb_cos, '#e8f4ff'],
+                    ['LSB Sin', unflattenedData.tx1?.lsb_sin, '#e8f4ff'],
+                    ['LSB Cos', unflattenedData.tx1?.lsb_cos, '#e8f4ff'],
+                    ['Az Offset', unflattenedData.tx1?.az_offset, '#e8f4ff'],
+                    ['AM 30Hz', unflattenedData.tx1?.am_30hz, '#e8f4ff'],
+                    ['AM 1020Hz', unflattenedData.tx1?.am_1020hz, '#e8f4ff'],
+                    ['Phase Offset', unflattenedData.tx1?.phase_offset, '#e8f4ff'],
+                    ['CPA Temp (°C)', unflattenedData.tx1?.cpa_temp, '#e8f4ff'],
+                    ['MSG Temp (°C)', unflattenedData.tx1?.msg_temp, '#e8f4ff'],
+                    ['Ident', unflattenedData.tx1?.ident, '#00d4ff'],
+                ]
+            });
+
+            // Transmitter 2 (TX2)
+            sections.push({
+                title: 'TRANSMITTER 2 (TX2)', params: [
+                    ['TX Status', isTx2Active ? 'ACTIVE (ON AIR)' : (unflattenedData.tx_active ? 'STANDBY' : '—'), isTx2Active ? '#00ff88' : '#7a9eb8'],
+                    ['Carrier (W)', unflattenedData.tx2?.carrier_power, '#e8f4ff'],
+                    ['USB Sin', unflattenedData.tx2?.usb_sin, '#e8f4ff'],
+                    ['USB Cos', unflattenedData.tx2?.usb_cos, '#e8f4ff'],
+                    ['LSB Sin', unflattenedData.tx2?.lsb_sin, '#e8f4ff'],
+                    ['LSB Cos', unflattenedData.tx2?.lsb_cos, '#e8f4ff'],
+                    ['Az Offset', unflattenedData.tx2?.az_offset, '#e8f4ff'],
+                    ['AM 30Hz', unflattenedData.tx2?.am_30hz, '#e8f4ff'],
+                    ['AM 1020Hz', unflattenedData.tx2?.am_1020hz, '#e8f4ff'],
+                    ['Phase Offset', unflattenedData.tx2?.phase_offset, '#e8f4ff'],
+                    ['CPA Temp (°C)', unflattenedData.tx2?.cpa_temp, '#e8f4ff'],
+                    ['MSG Temp (°C)', unflattenedData.tx2?.msg_temp, '#e8f4ff'],
+                    ['Ident', unflattenedData.tx2?.ident, '#00d4ff'],
                 ]
             });
 

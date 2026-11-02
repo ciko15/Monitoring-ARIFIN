@@ -582,9 +582,9 @@ const app = new Elysia()
                 // Restart PM2 to apply configs
                 setTimeout(() => {
                     const { exec } = require('child_process');
-                    console.log('[SYNC-RCV] Restarting monitoring-collector and monitoring-processor...');
-                    exec('pm2 restart monitoring-collector monitoring-processor', (err: any) => {
-                        if (err) console.error('[SYNC-RCV] Restart error:', err.message);
+                    console.log('[SYNC-RCV] Checking and restarting PM2 process...');
+                    exec('pm2 restart monitoring-arifin monitoring-collector monitoring-processor || pm2 restart all', (err: any) => {
+                        if (err) console.error('[SYNC-RCV] Restart warning/error:', err.message);
                     });
                 }, 1000);
 
