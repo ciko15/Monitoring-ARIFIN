@@ -4000,12 +4000,22 @@
                         <button onclick="window.closeRefTxpConfigModal()" style="background: transparent; border: none; color: #94a3b8; font-size: 14px; cursor: pointer;"><i class="fas fa-times"></i></button>
                     </div>
                     <div style="font-size: 11px; color: #cbd5e1; margin-bottom: 14px; line-height: 1.5;">
-                        Masukkan koordinat patokan (*nominal baseline*) transponder acuan (Parrot / Site Monitor) di site radar ini:
+                        Masukkan parameter identifikasi & koordinat patokan (*nominal baseline*) transponder acuan (Parrot / Site Monitor) di site radar ini:
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 10px; font-size: 11px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Mode-3/A Squawk</label>
+                                <input type="text" id="cfgRefSquawk" placeholder="7000" style="width: 100%; box-sizing: border-box; background: #0f1e36; border: 1px solid rgba(0, 212, 255, 0.4); border-radius: 4px; padding: 6px 10px; color: #ffcc00; font-family: monospace; font-weight: bold;">
+                            </div>
+                            <div>
+                                <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Mode-S 24-bit Addr (HEX)</label>
+                                <input type="text" id="cfgRefAddress" placeholder="8A0001" style="width: 100%; box-sizing: border-box; background: #0f1e36; border: 1px solid rgba(0, 212, 255, 0.4); border-radius: 4px; padding: 6px 10px; color: #00ffcc; font-family: monospace; font-weight: bold;">
+                            </div>
+                        </div>
                         <div>
-                            <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Target ID / Callsign / Squawk</label>
-                            <input type="text" id="cfgRefTargetId" placeholder="misal: REF-TXP atau 7000" style="width: 100%; box-sizing: border-box; background: #0f1e36; border: 1px solid rgba(0, 212, 255, 0.4); border-radius: 4px; padding: 6px 10px; color: #fff; font-family: monospace;">
+                            <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Callsign / Identifikasi Site</label>
+                            <input type="text" id="cfgRefTargetId" placeholder="misal: REF-TXP" style="width: 100%; box-sizing: border-box; background: #0f1e36; border: 1px solid rgba(0, 212, 255, 0.4); border-radius: 4px; padding: 6px 10px; color: #fff; font-family: monospace;">
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <div>
@@ -4510,7 +4520,8 @@
                 currentHovered = {
                     id: refCfg.targetId,
                     callsign: `${refCfg.targetId} (Parrot TXP)`,
-                    squawk: '7000 (CAL)',
+                    squawk: refCfg.squawk || '7000',
+                    address: refCfg.address || '8A0001',
                     fl: 1,
                     alt: 85, // elevasi site
                     lat: 'Site Ground Ref',
@@ -4572,14 +4583,14 @@
                 hud.style.top = `${hudY}px`;
 
                 if (currentHovered.isRefTransponder) {
-                    document.getElementById('hudCallsign').textContent = currentHovered.callsign;
-                    document.getElementById('hudSquawk').textContent = 'CALIBRATION BEACON';
-                    document.getElementById('hudAlt').textContent = '85 ft MSL (Ground Station)';
-                    document.getElementById('hudLatLon').textContent = 'Fixed Site Reference';
+                    document.getElementById('hudCallsign').textContent = `${currentHovered.id} (Parrot TXP)`;
+                    document.getElementById('hudSquawk').textContent = `SQ ${currentHovered.squawk} | ADDR: ${currentHovered.address}`;
+                    document.getElementById('hudAlt').textContent = '85 ft MSL (Ground Station / Tower)';
+                    document.getElementById('hudLatLon').textContent = `Target Ref: ${currentHovered.id}`;
                     document.getElementById('hudDist').textContent = `${currentHovered.range_nm} NM (Nominal)`;
                     document.getElementById('hudAzim').textContent = `${currentHovered.azimuth_deg}° (North Align)`;
                     document.getElementById('hudSpd').textContent = '0 kts (Static)';
-                    document.getElementById('hudHdg').textContent = 'Omni (360°)';
+                    document.getElementById('hudHdg').textContent = 'Omni Directional';
                 } else {
                     document.getElementById('hudCallsign').textContent = currentHovered.callsign || currentHovered.id;
                     document.getElementById('hudSquawk').textContent = `SQ ${currentHovered.squawk || '1200'}`;
@@ -4600,6 +4611,8 @@
     function getSavedRefTxpConfig() {
         const defaultCfg = {
             targetId: 'REF-TXP',
+            squawk: '7000',
+            address: '8A0001',
             azimuth: 85.20,
             range: 12.45
         };
@@ -4609,6 +4622,8 @@
                 const parsed = JSON.parse(raw);
                 return {
                     targetId: parsed.targetId || defaultCfg.targetId,
+                    squawk: parsed.squawk || defaultCfg.squawk,
+                    address: (parsed.address || defaultCfg.address).toUpperCase(),
                     azimuth: parseFloat(parsed.azimuth) || defaultCfg.azimuth,
                     range: parseFloat(parsed.range) || defaultCfg.range
                 };
@@ -4622,9 +4637,14 @@
         if (!modal) return;
         const cfg = getSavedRefTxpConfig();
         const inputId = document.getElementById('cfgRefTargetId');
+        const inputSq = document.getElementById('cfgRefSquawk');
+        const inputAddr = document.getElementById('cfgRefAddress');
         const inputAz = document.getElementById('cfgRefAzimuth');
         const inputRng = document.getElementById('cfgRefRange');
+
         if (inputId) inputId.value = cfg.targetId;
+        if (inputSq) inputSq.value = cfg.squawk;
+        if (inputAddr) inputAddr.value = cfg.address;
         if (inputAz) inputAz.value = cfg.azimuth;
         if (inputRng) inputRng.value = cfg.range;
         modal.style.display = 'flex';
@@ -4637,11 +4657,15 @@
 
     window.saveRefTxpConfig = function() {
         const inputId = document.getElementById('cfgRefTargetId');
+        const inputSq = document.getElementById('cfgRefSquawk');
+        const inputAddr = document.getElementById('cfgRefAddress');
         const inputAz = document.getElementById('cfgRefAzimuth');
         const inputRng = document.getElementById('cfgRefRange');
 
         const cfg = {
             targetId: (inputId?.value || 'REF-TXP').trim().toUpperCase(),
+            squawk: (inputSq?.value || '7000').trim(),
+            address: (inputAddr?.value || '8A0001').trim().toUpperCase(),
             azimuth: parseFloat(inputAz?.value) || 85.20,
             range: parseFloat(inputRng?.value) || 12.45
         };
@@ -4738,7 +4762,7 @@
         const calcDrift = (measAz - nomAz).toFixed(2);
         const signDrift = calcDrift >= 0 ? `+${calcDrift}` : `${calcDrift}`;
 
-        if (refIdEl) refIdEl.textContent = `${refCfg.targetId} (Parrot Transponder)`;
+        if (refIdEl) refIdEl.innerHTML = `<span style="color: #ffaa00;">${refCfg.targetId}</span> <span style="font-size: 10px; color: #94a3b8;">(SQ: ${refCfg.squawk} | ADDR: ${refCfg.address})</span>`;
         if (refAzimEl) refAzimEl.textContent = `${measAz.toFixed(2)}° (Drift: ${signDrift}°) | Nom: ${nomAz.toFixed(2)}°`;
         if (refDistEl) refDistEl.textContent = `${refObj.measured_range || (refCfg.range + ' NM')}`;
 
