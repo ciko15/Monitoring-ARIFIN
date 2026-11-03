@@ -2239,6 +2239,7 @@
                             ? 'rgba(0, 255, 136, 0.06)' 
                             : '#0f1e35';
 
+                        const displayVal = (val === null || val === undefined || val === '' || val === '-' || val === '—') ? '—' : val;
                         const isRadarClickable = (parserId === 'asterix_radar' || parserId === 'asterix_adsb') && (label.toLowerCase().includes('target') || label.toLowerCase().includes('antenna') || label.toLowerCase().includes('radar id'));
                         const clickableAttr = isRadarClickable ? `onclick="window.openRadarPpiScope(window._activeSourceDetail ? window._activeSourceDetail.id : null)" style="background:${isRadarClickable ? 'rgba(0,212,255,0.12)' : cardBg};border:${isRadarClickable ? '1px solid #00d4ff' : cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;cursor:pointer;" title="Klik untuk membuka Sidebar Radar PPI Scope (60%)"` : `style="background:${cardBg};border:${cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;"`;
 
