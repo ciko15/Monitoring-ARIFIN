@@ -138,6 +138,7 @@ class NetworkListenerService {
 
                     const backoffTimer = setTimeout(() => {
                         console.log(`[CircuitBreaker] ${name} (${id}) backoff finished. Resuming polling...`);
+                        isTripped = false;
                         const newTimer = setInterval(execute, pollSec * 1000);
                         timersMap.set(id, newTimer);
                         execute();
@@ -150,7 +151,7 @@ class NetworkListenerService {
             }
         };
 
-        const initialDelay = 1000 + Math.floor(Math.random() * 5000); // Jitter 1-6 detik
+        const initialDelay = 1000 + Math.floor(Math.random() * (pollSec > 10 ? Math.min(pollSec * 800, 25000) : 5000)); // Staggering 1-25 detik agar tidak membanjiri UDP
         const startTimer = setTimeout(() => {
             execute();
             const timer = setInterval(execute, pollSec * 1000);
