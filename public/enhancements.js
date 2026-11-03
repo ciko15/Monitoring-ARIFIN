@@ -4501,36 +4501,60 @@
             const rx = cx + Math.cos(refRad) * (refDist * refScale);
             const ry = cy + Math.sin(refRad) * (refDist * refScale);
 
+            // Hit test hover transponder
+            const rdx = _radarMousePos.x - rx;
+            const rdy = _radarMousePos.y - ry;
+            const isRefHovered = Math.sqrt(rdx * rdx + rdy * rdy) <= 18;
+
+            if (isRefHovered) {
+                currentHovered = {
+                    id: refCfg.targetId,
+                    callsign: `${refCfg.targetId} (Parrot TXP)`,
+                    squawk: '7000 (CAL)',
+                    fl: 1,
+                    alt: 85, // elevasi site
+                    lat: 'Site Ground Ref',
+                    lon: 'Permanent Tower',
+                    range_nm: refDist,
+                    azimuth_deg: refAzim,
+                    speed: 0,
+                    heading: 0,
+                    isRefTransponder: true,
+                    screenX: rx,
+                    screenY: ry
+                };
+            }
+
             ctx.save();
             ctx.translate(rx, ry);
 
             // Diamond / Icon Tower Acuan
             ctx.beginPath();
-            ctx.moveTo(0, -7);
-            ctx.lineTo(6, 0);
-            ctx.lineTo(0, 7);
-            ctx.lineTo(-6, 0);
+            ctx.moveTo(0, -8);
+            ctx.lineTo(7, 0);
+            ctx.lineTo(0, 8);
+            ctx.lineTo(-7, 0);
             ctx.closePath();
-            ctx.fillStyle = '#ffaa00';
+            ctx.fillStyle = isRefHovered ? '#ffffff' : '#ffaa00';
             ctx.shadowColor = '#ffaa00';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = isRefHovered ? 16 : 10;
             ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = isRefHovered ? '#00ffff' : '#ffffff';
+            ctx.lineWidth = isRefHovered ? 2 : 1.5;
             ctx.stroke();
 
             // Ring pulsa statis
             ctx.beginPath();
-            ctx.arc(0, 0, 11, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255, 170, 0, 0.4)';
-            ctx.lineWidth = 1;
+            ctx.arc(0, 0, isRefHovered ? 14 : 11, 0, Math.PI * 2);
+            ctx.strokeStyle = isRefHovered ? '#00ffff' : 'rgba(255, 170, 0, 0.4)';
+            ctx.lineWidth = 1.2;
             ctx.stroke();
 
             ctx.restore();
 
             // Label di samping pin
             ctx.font = 'bold 9px monospace';
-            ctx.fillStyle = '#ffaa00';
+            ctx.fillStyle = isRefHovered ? '#ffffff' : '#ffaa00';
             ctx.textAlign = 'left';
             ctx.fillText(`⛯ ${refCfg.targetId} (${refDist}NM)`, rx + 14, ry + 3);
         }
@@ -4547,14 +4571,25 @@
                 hud.style.left = `${hudX}px`;
                 hud.style.top = `${hudY}px`;
 
-                document.getElementById('hudCallsign').textContent = currentHovered.callsign || currentHovered.id;
-                document.getElementById('hudSquawk').textContent = `SQ ${currentHovered.squawk || '1200'}`;
-                document.getElementById('hudAlt').textContent = currentHovered.fl ? `FL${currentHovered.fl} (${(currentHovered.fl * 100).toLocaleString()} ft)` : (currentHovered.alt ? `${currentHovered.alt.toLocaleString()} ft` : '—');
-                document.getElementById('hudLatLon').textContent = (currentHovered.lat && currentHovered.lon) ? `${currentHovered.lat}, ${currentHovered.lon}` : '—';
-                document.getElementById('hudDist').textContent = `${currentHovered.range_nm || 0} NM`;
-                document.getElementById('hudAzim').textContent = `${currentHovered.azimuth_deg || 0}°`;
-                document.getElementById('hudSpd').textContent = `${currentHovered.speed || 320} kts`;
-                document.getElementById('hudHdg').textContent = `${currentHovered.heading || currentHovered.azimuth_deg || 0}°`;
+                if (currentHovered.isRefTransponder) {
+                    document.getElementById('hudCallsign').textContent = currentHovered.callsign;
+                    document.getElementById('hudSquawk').textContent = 'CALIBRATION BEACON';
+                    document.getElementById('hudAlt').textContent = '85 ft MSL (Ground Station)';
+                    document.getElementById('hudLatLon').textContent = 'Fixed Site Reference';
+                    document.getElementById('hudDist').textContent = `${currentHovered.range_nm} NM (Nominal)`;
+                    document.getElementById('hudAzim').textContent = `${currentHovered.azimuth_deg}° (North Align)`;
+                    document.getElementById('hudSpd').textContent = '0 kts (Static)';
+                    document.getElementById('hudHdg').textContent = 'Omni (360°)';
+                } else {
+                    document.getElementById('hudCallsign').textContent = currentHovered.callsign || currentHovered.id;
+                    document.getElementById('hudSquawk').textContent = `SQ ${currentHovered.squawk || '1200'}`;
+                    document.getElementById('hudAlt').textContent = currentHovered.fl ? `FL${currentHovered.fl} (${(currentHovered.fl * 100).toLocaleString()} ft)` : (currentHovered.alt ? `${currentHovered.alt.toLocaleString()} ft` : '—');
+                    document.getElementById('hudLatLon').textContent = (currentHovered.lat && currentHovered.lon) ? `${currentHovered.lat}, ${currentHovered.lon}` : '—';
+                    document.getElementById('hudDist').textContent = `${currentHovered.range_nm || 0} NM`;
+                    document.getElementById('hudAzim').textContent = `${currentHovered.azimuth_deg || 0}°`;
+                    document.getElementById('hudSpd').textContent = `${currentHovered.speed || 320} kts`;
+                    document.getElementById('hudHdg').textContent = `${currentHovered.heading || currentHovered.azimuth_deg || 0}°`;
+                }
             } else {
                 hud.style.display = 'none';
             }
