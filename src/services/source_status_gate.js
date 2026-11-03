@@ -110,16 +110,17 @@ class SourceStatusGate {
             state.failCount += 1;
             state.successCount = 0;
 
-            // If it never succeeded, calculate time since the state was created (startup)
-            const timeSinceLastSuccess = state.lastSuccessAt ? (now - state.lastSuccessAt) : (now - state.lastStatusChangedAt);
-
-            if (confirmDisconnect && state.status !== null && state.status !== 'Disconnect' && state.status !== 'Offline' && timeSinceLastSuccess < 120000) {
-                return {
-                    shouldEmit: false,
-                    status: state.status || 'Warning',
-                    reason: 'disconnect-not-confirmed',
-                    state
-                };
+            // Jangan langsung ubah ke Disconnect/Offline hanya karena 1x gagal!
+            // Harus menunggu failCount mencapai failCountToDisconnect (default 3x gagal berturut-turut)
+            if (confirmDisconnect && state.status !== null && state.status !== 'Disconnect' && state.status !== 'Offline') {
+                if (state.failCount < this.failCountToDisconnect) {
+                    return {
+                        shouldEmit: false,
+                        status: state.status, // Pertahankan status sebelumnya (misal Normal/Warning)
+                        reason: 'disconnect-not-confirmed',
+                        state
+                    };
+                }
             }
 
             const wasDead = state.status === 'Disconnect' || state.status === 'Offline';

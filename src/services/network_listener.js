@@ -151,11 +151,21 @@ class NetworkListenerService {
             }
         };
 
-        const initialDelay = 1000 + Math.floor(Math.random() * (pollSec > 10 ? Math.min(pollSec * 800, 25000) : 5000)); // Staggering 1-25 detik agar tidak membanjiri UDP
-        const startTimer = setTimeout(() => {
-            execute();
-            const timer = setInterval(execute, pollSec * 1000);
+        const scheduleNext = () => {
+            // Berikan sedikit random jitter (+/- 2 detik) agar 14+ perangkat tidak berkonvergensi di detik yang sama
+            const jitterMs = Math.floor((Math.random() - 0.5) * 4000);
+            const nextDelay = Math.max(5000, (pollSec * 1000) + jitterMs);
+            const timer = setTimeout(async () => {
+                await execute();
+                scheduleNext();
+            }, nextDelay);
             timersMap.set(id, timer);
+        };
+
+        const initialDelay = 1000 + Math.floor(Math.random() * (pollSec > 10 ? Math.min(pollSec * 800, 25000) : 5000)); // Staggering 1-25 detik agar tidak membanjiri UDP
+        const startTimer = setTimeout(async () => {
+            await execute();
+            scheduleNext();
         }, initialDelay);
 
         timersMap.set(id, startTimer);
