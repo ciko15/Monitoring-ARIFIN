@@ -976,6 +976,9 @@
                         const isWarning = valColor === '#ffcc00';
                         const isNormalLimit = valColor === '#00ff88';
                         const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : 'inherit';
+                        const badgeStyle = (isAlarm || isWarning || isNormalLimit)
+                            ? `background: ${isAlarm ? 'rgba(255,51,85,0.12)' : isWarning ? 'rgba(255,204,0,0.12)' : 'rgba(0,255,136,0.08)'}; border: 1px solid ${isAlarm ? 'rgba(255,51,85,0.4)' : isWarning ? 'rgba(255,204,0,0.4)' : 'rgba(0,255,136,0.3)'}; border-radius: 4px; padding: 2px 5px;`
+                            : '';
                         const isRadarTargetClickable = effParserId === 'asterix_radar' && (k === 'targets_list' || k === 'target_count' || k === 'radar_id');
                         const radarItemAttr = isRadarTargetClickable ? `onclick="event.stopPropagation(); window.openRadarPpiScope('${src.id}')" style="cursor: pointer; background: rgba(0,212,255,0.12); border: 1px solid #00d4ff; border-radius: 4px; padding: 3px 6px; transition: all 0.2s;" title="Klik untuk membuka Radar PPI Scope (60%)"` : (badgeStyle ? `style="${badgeStyle}"` : '');
 
