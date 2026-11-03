@@ -4495,9 +4495,9 @@
         const refCfg = getSavedRefTxpConfig();
         const refAzim = refCfg.azimuth;
         const refDist = refCfg.range;
-        if (refDist <= _radarPpiRangeNm) {
+        if (refDist <= _radarRangeNm) {
             const refRad = ((refAzim - 90) * Math.PI) / 180;
-            const refScale = maxRadius / _radarPpiRangeNm;
+            const refScale = maxRadius / _radarRangeNm;
             const rx = cx + Math.cos(refRad) * (refDist * refScale);
             const ry = cy + Math.sin(refRad) * (refDist * refScale);
 
