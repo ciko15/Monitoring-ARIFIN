@@ -349,8 +349,12 @@ class NetworkListenerService {
             }
         }
 
-        // Jangan timpa parameter menjadi strip jika alat adalah streaming TCP aktif yang sudah menerima paket
-        if ((isDisconnect || finalStatus === 'Offline') && source.parsing_id !== 'ils_mophien_llz' && source.parsing_id !== 'ils_mophien_gp') {
+        // Jangan timpa parameter menjadi strip jika alat adalah streaming TCP aktif atau SNMP system monitor (biarkan Last Known Good Value bertahan)
+        if ((isDisconnect || finalStatus === 'Offline') &&
+            source.parsing_id !== 'ils_mophien_llz' &&
+            source.parsing_id !== 'ils_mophien_gp' &&
+            source.parsing_id !== 'snmp_system' &&
+            source.parsing_id !== 'snmp_network_basic') {
             const prevData = this._lkgvCache.get(source.id);
             if (prevData) {
                 const dashData = {};

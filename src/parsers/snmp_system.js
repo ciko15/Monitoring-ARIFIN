@@ -190,23 +190,31 @@ async function readDeviceTemperature(session, sysObjectID, sysDescr) {
     const isAlcatelDevice = sysObjectIdText.startsWith('1.3.6.1.4.1.6486.');
     const isLinux = sysObjectIdText.startsWith('1.3.6.1.4.1.8072.') || sysObjectIdText.startsWith('1.3.6.1.4.1.2021.') || descr.includes('linux');
 
-    if (isAlcatelDevice) {
-        const alcatelTemp = await readAlcatelTemperature(session, snmpWalk, snmpGet);
-        if (alcatelTemp.hottest) return alcatelTemp;
+    // Hindari buang waktu probing sensor jika ini PC Windows standar (kebanyakan PC operasional bandara)
+    if (!isAlcatelDevice && !isLinux && (descr.includes('windows') || descr.includes('microsoft'))) {
+        return { sensors: [], hottest: null };
     }
 
-    if (isLinux) {
-        const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
-        if (ucdSensors.hottest) return ucdSensors;
-    } else {
-        const genericSensors = await readTemperatureSensors(session, snmpWalk);
-        if (genericSensors.hottest) return genericSensors;
+    try {
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ sensors: [], hottest: null }), 2000));
+        const probePromise = (async () => {
+            if (isAlcatelDevice) {
+                const alcatelTemp = await readAlcatelTemperature(session, snmpWalk, snmpGet);
+                if (alcatelTemp.hottest) return alcatelTemp;
+            } else if (isLinux) {
+                const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
+                if (ucdSensors.hottest) return ucdSensors;
+            } else {
+                const genericSensors = await readTemperatureSensors(session, snmpWalk);
+                if (genericSensors.hottest) return genericSensors;
+            }
+            return { sensors: [], hottest: null };
+        })();
 
-        const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
-        if (ucdSensors.hottest) return ucdSensors;
+        return await Promise.race([probePromise, timeoutPromise]);
+    } catch (e) {
+        return { sensors: [], hottest: null };
     }
-
-    return { sensors: [], hottest: null };
 }
 
 const lastKnownSystemData = new Map();
