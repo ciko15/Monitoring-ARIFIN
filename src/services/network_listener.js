@@ -139,9 +139,7 @@ class NetworkListenerService {
                     const backoffTimer = setTimeout(() => {
                         console.log(`[CircuitBreaker] ${name} (${id}) backoff finished. Resuming polling...`);
                         isTripped = false;
-                        const newTimer = setInterval(execute, pollSec * 1000);
-                        timersMap.set(id, newTimer);
-                        execute();
+                        execute().then(() => scheduleNext());
                     }, backoffMs);
 
                     timersMap.set(id, backoffTimer);
@@ -162,7 +160,8 @@ class NetworkListenerService {
             timersMap.set(id, timer);
         };
 
-        const initialDelay = 1000 + Math.floor(Math.random() * (pollSec > 10 ? Math.min(pollSec * 800, 25000) : 5000)); // Staggering 1-25 detik agar tidak membanjiri UDP
+        // Startup cepat: Poll pertama langsung dieksekusi cepat (antrean 300ms s/d 2.5s) agar dashboard lekas terisi data
+        const initialDelay = 300 + Math.floor(Math.random() * 2200);
         const startTimer = setTimeout(async () => {
             await execute();
             scheduleNext();
