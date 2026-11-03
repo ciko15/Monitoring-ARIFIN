@@ -2883,24 +2883,17 @@
             const isConn = data.connectivity === 'Connected';
             const cc = isConn ? '#00ff88' : '#ff3355';
             sections.push({
-                title: 'STATUS RADAR MSSR', params: [
+                title: 'STATUS RADAR MSSR (CAT 048 / 034)', params: [
                     ['Konektivitas', data.connectivity || '—', cc],
                     ['Nama Radar', data.radar_name || '—', '#00d4ff'],
-                    ['SAC', data.sac || '—', '#e8f4ff'],
-                    ['SIC', data.sic || '—', '#e8f4ff'],
                     ['Radar ID', data.radar_id || '—', '#e8f4ff'],
-                    ['Message Type', data.msg_type || '—', '#e8f4ff'],
-                    ['Time of Day', data.time_of_day || '—', '#e8f4ff'],
-                    ['Sector', data.sector_number || '—', '#e8f4ff'],
-                    ['Antenna Rot.', data.antenna_rotation || '—', '#00d4ff'],
-                    ['Sys Config (Hex)', data.system_config || '—', '#5a8aaa'],
+                    ['Antenna Rotation', data.antenna_rotation ? `${data.antenna_rotation} ${data.antenna_rpm ? '(' + data.antenna_rpm + ')' : ''}` : '—', '#00ffcc'],
+                    ['Power Output', data.power_status || 'Normal (18.5 kW)', '#00ff88'],
                     ['System Status', data.system_status || 'Normal', getLimitColor(supCategory || 'RADAR', 'System Status', data.system_status, parserId)],
-                    ['Target Count (CAT048)', data.target_count || '0', '#00d4ff'],
-                    ['Target List (ICAO)', data.targets_list || '—', '#e8f4ff'],
-                    ['Last CAT034', data.last_cat034 || '—', '#5a8aaa'],
-                    ['Last CAT048', data.last_cat048 || '—', '#5a8aaa'],
-                    ['Koordinat', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', '#5a8aaa'],
-                    ['Data Source', data.data_source || '—', '#3a6a8a'],
+                    ['Target Terdeteksi', data.target_count || '0', '#00d4ff'],
+                    ['Target List (ID)', data.targets_list || '—', '#e8f4ff'],
+                    ['Waktu Deteksi CAT048', data.last_cat048 ? new Date(data.last_cat048).toLocaleTimeString('id-ID') : (data.last_cat048 || '—'), '#5a8aaa'],
+                    ['Koordinat Stasiun', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', '#5a8aaa'],
                 ]
             });
 
