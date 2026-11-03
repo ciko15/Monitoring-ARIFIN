@@ -4502,7 +4502,7 @@
         });
 
         // 5b. Gambar Transponder Kalibrasi / Acuan Statis di PPI Scope
-        const refCfg = getSavedRefTxpConfig();
+        const refCfg = getSavedRefTxpConfig(_activeRadarSourceId);
         const refAzim = refCfg.azimuth;
         const refDist = refCfg.range;
         if (refDist <= _radarRangeNm) {
@@ -4608,7 +4608,8 @@
     }
 
     // ── Transponder Kalibrasi Config Helpers ───────────────────────────────────
-    function getSavedRefTxpConfig() {
+    function getSavedRefTxpConfig(sourceId = null) {
+        const srcId = sourceId || _activeRadarSourceId || 'default';
         const defaultCfg = {
             targetId: 'REF-TXP',
             squawk: '7000',
@@ -4617,7 +4618,12 @@
             range: 12.45
         };
         try {
-            const raw = localStorage.getItem('radar_ref_txp_config');
+            // Cek setting spesifik untuk source radar ini terlebih dahulu
+            let raw = localStorage.getItem(`radar_ref_txp_config_${srcId}`);
+            if (!raw) {
+                // Fallback ke general jika ada
+                raw = localStorage.getItem('radar_ref_txp_config');
+            }
             if (raw) {
                 const parsed = JSON.parse(raw);
                 return {
@@ -4635,7 +4641,7 @@
     window.openRefTxpConfigModal = function() {
         const modal = document.getElementById('radarRefModal');
         if (!modal) return;
-        const cfg = getSavedRefTxpConfig();
+        const cfg = getSavedRefTxpConfig(_activeRadarSourceId);
         const inputId = document.getElementById('cfgRefTargetId');
         const inputSq = document.getElementById('cfgRefSquawk');
         const inputAddr = document.getElementById('cfgRefAddress');
@@ -4656,6 +4662,7 @@
     };
 
     window.saveRefTxpConfig = function() {
+        const srcId = _activeRadarSourceId || 'default';
         const inputId = document.getElementById('cfgRefTargetId');
         const inputSq = document.getElementById('cfgRefSquawk');
         const inputAddr = document.getElementById('cfgRefAddress');
@@ -4671,7 +4678,7 @@
         };
 
         try {
-            localStorage.setItem('radar_ref_txp_config', JSON.stringify(cfg));
+            localStorage.setItem(`radar_ref_txp_config_${srcId}`, JSON.stringify(cfg));
         } catch (e) {}
 
         window.closeRefTxpConfigModal();
@@ -4750,7 +4757,7 @@
         }
 
         // 3. Transponder Referensi KPI (Berbasis Acuan Setting)
-        const refCfg = getSavedRefTxpConfig();
+        const refCfg = getSavedRefTxpConfig(_activeRadarSourceId);
         const refObj = audit.reference_target || {};
         const refIdEl = document.getElementById('auditRefTargetId');
         const refAzimEl = document.getElementById('auditRefAzim');
@@ -4882,7 +4889,7 @@
         });
 
         // Transponder Reference Marker (Icon Tower Kalibrasi - Menggunakan Nilai Acuan yang Disimpan)
-        const refCfg = getSavedRefTxpConfig();
+        const refCfg = getSavedRefTxpConfig(_activeRadarSourceId);
         const refAzim = refCfg.azimuth;
         const refDist = refCfg.range;
         const refRad = ((refAzim - 90) * Math.PI) / 180;
