@@ -150,9 +150,9 @@ class NetworkListenerService {
         };
 
         const scheduleNext = () => {
-            // Berikan sedikit random jitter (+/- 2 detik) agar 14+ perangkat tidak berkonvergensi di detik yang sama
-            const jitterMs = Math.floor((Math.random() - 0.5) * 4000);
-            const nextDelay = Math.max(5000, (pollSec * 1000) + jitterMs);
+            // Berikan random jitter (+/- 6 detik) agar 15+ perangkat SNMP tersebar rata dan tidak bertubrukan di detik yang sama
+            const jitterMs = Math.floor((Math.random() - 0.5) * 12000);
+            const nextDelay = Math.max(8000, (pollSec * 1000) + jitterMs);
             const timer = setTimeout(async () => {
                 await execute();
                 scheduleNext();

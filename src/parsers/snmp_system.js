@@ -141,6 +141,7 @@ function normalizeSnmpVersion(version) {
 function normalizeSnmpOptions(options = {}) {
     if (!options || typeof options !== 'object') return { port: 161, version: '2c' };
     return {
+        ...options,
         port: parseInt(options.port, 10) || 161,
         version: options.version || '2c',
     };
@@ -499,7 +500,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 }
 
 // Wrapper dengan hard timeout — mencegah hang di Bun runtime
-async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 25000) {
+async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 55000) {
     if (typeof options === 'number') {
         timeoutMs = options;
         options = {};
@@ -509,13 +510,14 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
     const effectiveTimeoutMs = Number(options && options.timeoutMs) || timeoutMs;
 
     return new Promise((resolve) => {
-        // JITTER DELAY: Tunda eksekusi secara acak antara 0 hingga 2500 milidetik (2.5 detik)
+        // JITTER DELAY: Tunda eksekusi secara acak antara 0 hingga 4000 milidetik (4 detik)
         // Ini sangat krusial dan aman untuk mencegah UDP Flooding (Thundering Herd) 
         // ketika puluhan PC di-poll secara serentak di milidetik yang sama.
-        const jitterMs = Math.floor(Math.random() * 2500);
+        const jitterMs = Math.floor(Math.random() * 4000);
 
         setTimeout(() => {
-            const timeoutFallbackRaw = {
+            const prev = lastKnownSystemData.get(host);
+            const timeoutFallbackRaw = prev ? { ...prev, connectivity: 'Disconnected' } : {
                 connectivity: 'Disconnected',
                 resolved_ip: host,
                 sys_name: '—', sys_descr: '—', sys_uptime: '—',
@@ -531,7 +533,7 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
                 disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
                 temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
             };
-            const timeoutStructuredFallback = {
+            const timeoutStructuredFallback = prev ? { ...prev, connectivity: 'Disconnected' } : {
                 ...timeoutFallbackRaw,
                 'SISTEM': {
                     connectivity: timeoutFallbackRaw.connectivity, sys_name: timeoutFallbackRaw.sys_name,
