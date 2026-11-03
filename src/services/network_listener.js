@@ -1299,8 +1299,15 @@ class NetworkListenerService {
                     result.status || 'Disconnect'
                 );
             } catch (err) {
-                console.error(`[SNMP System] Poll error ${name}:`, err.message);
-                throw err;
+                console.warn(`[SNMP System] Poll warning for ${name}:`, err.message);
+                try {
+                    await this._handleLogOutput(
+                        source,
+                        { data: { connectivity: 'Disconnected' }, source: name, _ip: ip_address },
+                        source.parsing_id || 'snmp_system',
+                        'Disconnect'
+                    );
+                } catch (hErr) { }
             } finally {
                 isPolling = false;
             }
@@ -1312,7 +1319,9 @@ class NetworkListenerService {
             name,
             pollSec,
             timersMap: this._snmpSystemTimers,
-            doPoll
+            doPoll,
+            maxFailures: 5,
+            backoffMs: 30000 // 30s backoff (bukan 2 menit)
         });
     }
 

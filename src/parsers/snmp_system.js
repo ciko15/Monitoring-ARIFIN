@@ -220,15 +220,19 @@ async function pollSNMP(host, community = 'public', options = {}) {
         const oids1 = [OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation, OID.sysUpTime];
         const oids2 = [OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal, OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached];
 
-        // Query OID secara berurutan agar paket UDP tidak berbarengan dan di-drop oleh switch/PC
-        const [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw] = await snmpGetAll(session, oids1);
+        const [
+            [sysName, sysDescr, sysObjectID, sysContact, sysLocation, sysUpRaw],
+            [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb],
+            cpuVbs
+        ] = await Promise.all([
+            snmpGetAll(session, oids1),
+            snmpGetAll(session, oids2),
+            snmpWalk(session, OID.hrProcessorLoad)
+        ]);
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
         }
-
-        const [memTotalSwapKb, memAvailSwapKb, memTotalRealKb, memAvailRealKb, memSharedKb, memBufferKb, memCachedKb] = await snmpGetAll(session, oids2);
-        const cpuVbs = await snmpWalk(session, OID.hrProcessorLoad);
 
         // CPU average
         let cpu_pct = null;
@@ -237,11 +241,10 @@ async function pollSNMP(host, community = 'public', options = {}) {
             if (vals.length) cpu_pct = vals.reduce((a, b) => a + b, 0) / vals.length;
         }
 
-        // Query storage secara berurutan
-        const typeVbs = await snmpWalk(session, OID.hrStorageType);
-        const sizeVbs = await snmpWalk(session, OID.hrStorageSize);
-        const usedVbs = await snmpWalk(session, OID.hrStorageUsed);
-        const allocVbs = await snmpWalk(session, OID.hrStorageAlloc);
+        const walkOids = [OID.hrStorageType, OID.hrStorageSize, OID.hrStorageUsed, OID.hrStorageAlloc];
+        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.all(
+            walkOids.map(oid => snmpWalk(session, oid))
+        );
 
         // Build index maps
         // NOTE: hrStorageType value dikembalikan snmp-native sebagai Array OID
