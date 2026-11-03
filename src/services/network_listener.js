@@ -65,6 +65,8 @@ class NetworkListenerService {
         this.pipelineMode = process.env.PIPELINE_MODE || 'inline';
         this.serviceRole = process.env.SERVICE_ROLE || 'all';
         this.rawEventQueue = new RawEventQueue();
+        this._pollerStops = new Map(); // id -> stop function for circuit breaker pollers
+        this._snmpLimitsCache = new Map(); // equipt_id -> { limitsMap, cachedAt } (TTL 5 menit)
 
         // Note: fs.watchFile dihapus karena sekarang direload secara instan 
         // langsung dari trigger db.setConfigUpdateHook di server.ts 
@@ -112,15 +114,34 @@ class NetworkListenerService {
      * @param {number} [options.backoffMs=120000] - lama jeda setelah trip (default 2 menit)
      */
     _startCircuitBreakerPolling({ id, name, pollSec, timersMap, doPoll, maxFailures = 3, backoffMs = 120000 }) {
+        if (!this._pollerStops) this._pollerStops = new Map();
+        if (this._pollerStops.has(id)) {
+            try { this._pollerStops.get(id)(); } catch (e) { }
+            this._pollerStops.delete(id);
+        }
+
         let failureCount = 0;
         let isTripped = false;
         let isExecuting = false;
+        let stopped = false;
+
+        const stop = () => {
+            stopped = true;
+            if (timersMap && timersMap.has(id)) {
+                const t = timersMap.get(id);
+                clearTimeout(t);
+                clearInterval(t);
+                timersMap.delete(id);
+            }
+        };
+        this._pollerStops.set(id, stop);
 
         const execute = async () => {
-            if (isExecuting) return;
+            if (stopped || isExecuting) return;
             isExecuting = true;
             try {
                 await doPoll();
+                if (stopped) return;
                 // Jika sukses tanpa error:
                 failureCount = 0;
                 if (isTripped) {
@@ -128,18 +149,25 @@ class NetworkListenerService {
                     isTripped = false;
                 }
             } catch (err) {
+                if (stopped) return;
                 failureCount++;
                 if (!isTripped && failureCount >= maxFailures) {
                     isTripped = true;
                     console.warn(`[CircuitBreaker] ${name} (${id}) failed ${failureCount}x. Circuit TRIPPED! Sleeping for ${backoffMs / 1000}s.`);
 
                     const currentTimer = timersMap.get(id);
-                    if (currentTimer) clearInterval(currentTimer);
+                    if (currentTimer) {
+                        clearTimeout(currentTimer);
+                        clearInterval(currentTimer);
+                    }
 
                     const backoffTimer = setTimeout(() => {
+                        if (stopped) return;
                         console.log(`[CircuitBreaker] ${name} (${id}) backoff finished. Resuming polling...`);
                         isTripped = false;
-                        execute().then(() => scheduleNext());
+                        execute().then(() => {
+                            if (!stopped) scheduleNext();
+                        });
                     }, backoffMs);
 
                     timersMap.set(id, backoffTimer);
@@ -150,12 +178,14 @@ class NetworkListenerService {
         };
 
         const scheduleNext = () => {
+            if (stopped || isTripped) return;
             // Berikan random jitter (+/- 6 detik) agar 15+ perangkat SNMP tersebar rata dan tidak bertubrukan di detik yang sama
             const jitterMs = Math.floor((Math.random() - 0.5) * 12000);
             const nextDelay = Math.max(8000, (pollSec * 1000) + jitterMs);
             const timer = setTimeout(async () => {
+                if (stopped) return;
                 await execute();
-                scheduleNext();
+                if (!stopped) scheduleNext();
             }, nextDelay);
             timersMap.set(id, timer);
         };
@@ -163,8 +193,9 @@ class NetworkListenerService {
         // Startup cepat: Poll pertama langsung dieksekusi cepat (antrean 300ms s/d 2.5s) agar dashboard lekas terisi data
         const initialDelay = 300 + Math.floor(Math.random() * 2200);
         const startTimer = setTimeout(async () => {
+            if (stopped) return;
             await execute();
-            scheduleNext();
+            if (!stopped) scheduleNext();
         }, initialDelay);
 
         timersMap.set(id, startTimer);
@@ -446,6 +477,9 @@ class NetworkListenerService {
 
         console.log('[NetworkListener] Initializing listeners...');
         this.stopAll();
+        if (this._snmpLimitsCache) {
+            this._snmpLimitsCache.clear();
+        }
 
         try {
             // Fetch all equipment sources (authentications)
@@ -1287,23 +1321,49 @@ class NetworkListenerService {
         const doPoll = async () => {
             if (isPolling) return;
             isPolling = true;
+            const t0 = Date.now();
             console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
+            let t1 = t0;
+            let t2 = t0;
+            let t3 = t0;
             try {
-                // Ambil alarm limits dari DB untuk alat ini, agar threshold tidak hardcode di parser
+                // Ambil alarm limits dari cache lokal (TTL 5 menit) atau query DB dengan timeout 3 detik
                 let limitsMap = null;
-                try {
-                    const rawLimits = await this.equipmentService.db.getLimitationsByEquipment(equipt_id);
-                    if (Array.isArray(rawLimits) && rawLimits.length > 0) {
-                        // Ubah format array [{ parameter, warn_value, alarm_value }] ke { [parameter]: { warn_value, alarm_value } }
-                        limitsMap = {};
-                        for (const lim of rawLimits) {
-                            limitsMap[lim.parameter] = { warn_value: lim.warn_value, alarm_value: lim.alarm_value };
+                const cached = this._snmpLimitsCache ? this._snmpLimitsCache.get(equipt_id) : null;
+                const now = Date.now();
+                if (cached && (now - cached.cachedAt < 300000)) {
+                    limitsMap = cached.limitsMap;
+                } else {
+                    try {
+                        const timeoutPromise = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('getLimitationsByEquipment timeout (>3s)')), 3000)
+                        );
+                        const rawLimits = await Promise.race([
+                            this.equipmentService.db.getLimitationsByEquipment(equipt_id),
+                            timeoutPromise
+                        ]);
+
+                        if (Array.isArray(rawLimits) && rawLimits.length > 0) {
+                            limitsMap = {};
+                            for (const lim of rawLimits) {
+                                limitsMap[lim.parameter] = { warn_value: lim.warn_value, alarm_value: lim.alarm_value };
+                            }
+                        }
+                        if (this._snmpLimitsCache) {
+                            this._snmpLimitsCache.set(equipt_id, { limitsMap, cachedAt: now });
+                        }
+                    } catch (limErr) {
+                        // Jika timeout/gagal, pakai cache lama jika ada, jika tidak pakai null
+                        if (cached) {
+                            limitsMap = cached.limitsMap;
                         }
                     }
-                } catch (limErr) {
-                    // Jika gagal ambil limits, gunakan default — tidak perlu crash
                 }
-                const result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap });
+                t1 = Date.now();
+
+                const result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap, timeoutMs: 15000 });
+                t2 = Date.now();
+
                 const logLine = `[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error || 'none'}`;
                 if (String(result.status || '').toLowerCase() === 'disconnect') {
                     this._logThrottled('log', `snmp-system:disconnect:${id}`, logLine);
@@ -1316,7 +1376,17 @@ class NetworkListenerService {
                     source.parsing_id || 'snmp_system',
                     result.status || 'Disconnect'
                 );
+                t3 = Date.now();
+
+                const totalDuration = t3 - t0;
+                if (totalDuration > 20000) {
+                    const durLimits = t1 - t0;
+                    const durSnmp = t2 - t1;
+                    const durSave = t3 - t2;
+                    this._logThrottled('warn', `snmp-system:slow:${id}`, `[SLOW] ${name} limits=${durLimits}ms snmp=${durSnmp}ms save=${durSave}ms`, 60000);
+                }
             } catch (err) {
+                t2 = Date.now();
                 console.warn(`[SNMP System] Poll warning for ${name}:`, err.message);
                 try {
                     await this._handleLogOutput(
@@ -1326,6 +1396,15 @@ class NetworkListenerService {
                         'Disconnect'
                     );
                 } catch (hErr) { }
+                t3 = Date.now();
+
+                const totalDuration = t3 - t0;
+                if (totalDuration > 20000) {
+                    const durLimits = t1 - t0;
+                    const durSnmp = t2 - t1;
+                    const durSave = t3 - t2;
+                    this._logThrottled('warn', `snmp-system:slow:${id}`, `[SLOW] ${name} limits=${durLimits}ms snmp=${durSnmp}ms save=${durSave}ms`, 60000);
+                }
             } finally {
                 isPolling = false;
             }
@@ -2410,6 +2489,13 @@ class NetworkListenerService {
      */
     stopAll() {
         console.log('[NetworkListener] Stopping all listeners...');
+        if (this._pollerStops) {
+            for (const [id, stopFn] of this._pollerStops) {
+                try { stopFn(); } catch (e) { }
+            }
+            this._pollerStops.clear();
+        }
+
         for (const sourceId of this.activeListeners) {
             connectionManager.disconnect(sourceId);
         }

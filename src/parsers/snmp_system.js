@@ -225,6 +225,9 @@ async function pollSNMP(host, community = 'public', options = {}) {
     // Diteruskan dari network_listener.js saat memanggil pollSNMP.
     const limits = options.limits || null;
     const session = createSession(host, community, options);
+    if (typeof options.onSession === 'function') {
+        try { options.onSession(session); } catch (e) { }
+    }
     try {
         const oids1 = [OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation, OID.sysUpTime];
         const oids2 = [OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal, OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached];
@@ -422,7 +425,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
             temperature_sensors: temperatureSensors,
         };
 
-        session.close();
+        try { session.close(); } catch (e) { }
         const finalStructuredData = buildStructuredSystemData(rawData);
         lastKnownSystemData.set(host, finalStructuredData);
 
@@ -567,7 +570,15 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
                 }
             };
 
+            let activeSession = null;
+            let settled = false;
+
             const timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                if (activeSession) {
+                    try { activeSession.close(); } catch (e) { }
+                }
                 resolve({
                     success: false,
                     status: 'Disconnect',
@@ -577,18 +588,34 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
                 });
             }, effectiveTimeoutMs);
 
-            pollSNMP(host, community, snmpOptions).then(result => {
+            const pollOpts = {
+                ...snmpOptions,
+                onSession: (sess) => {
+                    activeSession = sess;
+                    if (typeof options.onSession === 'function') {
+                        try { options.onSession(sess); } catch (e) { }
+                    }
+                }
+            };
+
+            pollSNMP(host, community, pollOpts).then(result => {
                 clearTimeout(timer);
-                resolve(result);
+                if (!settled) {
+                    settled = true;
+                    resolve(result);
+                }
             }).catch(err => {
                 clearTimeout(timer);
-                resolve({
-                    success: false,
-                    status: 'Disconnect',
-                    error: err.message,
-                    data: timeoutStructuredFallback,
-                    timestamp: new Date().toISOString(),
-                });
+                if (!settled) {
+                    settled = true;
+                    resolve({
+                        success: false,
+                        status: 'Disconnect',
+                        error: err.message,
+                        data: timeoutStructuredFallback,
+                        timestamp: new Date().toISOString(),
+                    });
+                }
             });
         }, jitterMs); // Akhir dari blok Jitter Delay
     });
