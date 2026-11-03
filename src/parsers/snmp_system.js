@@ -153,7 +153,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [3000, 4000, 5000],
+        timeouts: [1500, 2500], // Cepat & responsif (total 4s per request jika host mati)
     });
 }
 function snmpGet(session, oid) {
@@ -178,7 +178,7 @@ function snmpGetAll(session, oids) {
 }
 function snmpWalk(session, oid) {
     return new Promise(resolve => {
-        session.getSubtree({ oid, combinedTimeout: 12000 }, (err, vbs) => {
+        session.getSubtree({ oid, combinedTimeout: 5000 }, (err, vbs) => {
             resolve(!err && vbs ? vbs : []);
         });
     });
@@ -488,7 +488,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 }
 
 // Wrapper dengan hard timeout — mencegah hang di Bun runtime
-async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 60000) {
+async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 25000) {
     if (typeof options === 'number') {
         timeoutMs = options;
         options = {};
