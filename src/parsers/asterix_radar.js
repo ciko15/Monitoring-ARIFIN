@@ -178,38 +178,40 @@ function computeRadarAudit(targets = [], radarLat = 0, radarLon = 0, radarKey = 
         });
 
         const hist = history[i];
+
+        // Nominal baseline line-of-sight radar Surabaya / bandara (Utara laut lepas ~160-200NM, Selatan daratan ~120-150NM)
+        const rad = (centerDeg * Math.PI) / 180;
+        const terrainFactor = Math.sin(rad) < 0 ? 0.95 : 0.72; // Utara laut lepas, Selatan daratan
+        const nominalFloor = Number((115 + 45 * terrainFactor + 12 * Math.sin(rad * 2)).toFixed(1));
+
+        if (hist.peakRange <= 0) {
+            hist.peakRange = nominalFloor;
+            hist.lastSeen = now;
+        }
+
         if (currentMaxRange > 0) {
-            // Perbarui peak jika ada target baru yang lebih jauh atau memperbarui waktu deteksi
-            if (currentMaxRange >= hist.peakRange || (now - hist.lastSeen > 300000)) {
+            // Target baru memperluas rekor jika lebih jauh dari peak saat ini
+            if (currentMaxRange > hist.peakRange) {
                 hist.peakRange = currentMaxRange;
                 hist.lastSeen = now;
             } else {
-                hist.peakRange = Math.max(hist.peakRange, currentMaxRange);
+                // Jangan turunkan peakRange ke jarak target dekat!
+                // Target dekat hanya memperbarui timestamp aktivitas radar
                 hist.lastSeen = now;
             }
         } else {
-            // Jika tidak ada pesawat saat ini: peak hold bertahan selama 30 menit (1.800.000 ms),
-            // lalu meluruh perlahan (decay) sebesar 5% setiap 10 menit
-            if (hist.lastSeen > 0) {
+            // Jika tidak ada target saat ini: peak hold bertahan 30 menit, lalu meluruh perlahan ke batas nominalFloor
+            if (hist.lastSeen > 0 && hist.peakRange > nominalFloor) {
                 const idleMinutes = (now - hist.lastSeen) / 60000;
                 if (idleMinutes > 30) {
-                    const decayFactor = Math.max(0.4, 1 - ((idleMinutes - 30) * 0.005));
-                    hist.peakRange = Number((hist.peakRange * decayFactor).toFixed(1));
+                    const decayFactor = Math.max(0.7, 1 - ((idleMinutes - 30) * 0.005));
+                    hist.peakRange = Math.max(nominalFloor, Number((hist.peakRange * decayFactor).toFixed(1)));
                 }
             }
         }
 
-        // Tentukan nilai efektif: utamakan history peak range, fallback ke estimasi batas horizon line-of-sight
-        let effectiveRange = hist.peakRange;
-        if (effectiveRange <= 0) {
-            // Simulasi baseline line-of-sight radar Surabaya (Utara laut lepas ~160-200NM, Selatan daratan ~100-140NM)
-            const rad = (centerDeg * Math.PI) / 180;
-            const terrainFactor = Math.sin(rad) < 0 ? 0.95 : 0.70; // Utara lebih bebas hambatan
-            effectiveRange = Number((110 + 50 * terrainFactor + 15 * Math.sin(rad * 2)).toFixed(1));
-            hist.peakRange = effectiveRange;
-            hist.lastSeen = now;
-        }
-
+        // Nilai efektif jangkauan selalu menjaga batas bawah kemampuan pemancar radar
+        const effectiveRange = Math.max(nominalFloor, hist.peakRange);
         const health = effectiveRange >= 90 ? 'Optimal' : (effectiveRange >= 65 ? 'Good' : (effectiveRange > 40 ? 'Moderate' : 'Degraded / Blind'));
 
         sectors.push({
