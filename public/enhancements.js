@@ -876,6 +876,7 @@
             const port = src.tcp_port || src.udp_port || '—';
             const tmpl = window.templatesCache?.find(t => t.id === src.parsing_id);
             const parserName = tmpl ? tmpl.name : (src.parsing_id || '—');
+            const effParserId = resolveEffectiveParserId(src);
 
             // Get live data preview for this source based on schema or template
             let previewHtml = '';
@@ -897,8 +898,6 @@
                 if (keysToShow.length === 0 && tmpl && tmpl.parameters) {
                     keysToShow = tmpl.parameters.slice(0, 6).map(p => p.name || p.label);
                 }
-
-                const effParserId = resolveEffectiveParserId(src);
 
                 // KHUSUS: iologik_modbus (dinamis dari extra_config)
                 if (effParserId === 'iologik_modbus') {
