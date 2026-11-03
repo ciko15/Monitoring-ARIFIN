@@ -25,7 +25,7 @@
         'dme_maru_310_320': ['txp_active', 'txp1_m1_fwd_power', 'txp1_m1_reply_eff', 'txp2_m1_fwd_power', 'txp2_m1_reply_eff', 'ident'],
         'vhf_t6tv': ['overall_status', 'ac_power', 'dc_power', 'dc_supply_v', 'rf_power_w', 'vswr'],
         'snmp_host_resources_01': ['cpu_usage', 'ram_usage_pct', 'disk_usage_pct', 'sys_uptime'],
-        'asterix_radar': ['connectivity', 'radar_name', 'system_status', 'target_count', 'targets_list', 'last_cat034', 'data_source'],
+        'asterix_radar': ['radar_name', 'radar_id', 'target_count', 'targets_list', 'system_status'],
         'asterix_adsb': ['connectivity', 'station', 'target_count', 'last_cat021', 'data_source'],
         'temp_humidity_modbus': ['temperature_c', 'humidity_pct', 'status_text', 'location'],
         'snmp_system': ['connectivity', 'sys_name', 'resolved_ip', 'hardware', 'operating_system', 'cpu_usage', 'physical_memory_usage_pct', 'disk_usage_pct', 'temperature_c'],
@@ -1025,6 +1025,11 @@
                         <div class="sp-card-meta" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%;">
                             <span class="sp-conn-badge"><i class="fas fa-database"></i> ${ip}:${port}</span>
                             <span class="sp-conn-badge sp-parser-badge" title="${parserName}"><i class="fas fa-code"></i> ${parserName}</span>
+                            ${effParserId === 'asterix_radar' ? `
+                                <button class="sp-conn-badge" onclick="event.stopPropagation(); window.openRadarPpiScope('${src.id}')" style="background: rgba(0, 212, 255, 0.16); color: #00d4ff; border: 1px solid #00d4ff; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; transition: all 0.2s;" title="Buka PPI Radar Scope (CAT 048)">
+                                    <i class="fas fa-crosshairs fa-spin" style="animation-duration: 6s; color: #00ff88;"></i> Radar Scope (PPI)
+                                </button>
+                            ` : ''}
                             ${pingLabel}
                         </div>
                     </div>
@@ -1249,8 +1254,14 @@
             }
         }
 
+        const radarBtnHtml = (src && src.parsing_id === 'asterix_radar') ? `
+            <button onclick="window.openRadarPpiScope('${src.id}')" style="background: rgba(0, 212, 255, 0.18); color: #00ffff; border: 1px solid #00ffff; border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(0,212,255,0.35)'" onmouseout="this.style.background='rgba(0,212,255,0.18)'" title="Buka Sidebar Radar PPI Scope 60%">
+                <i class="fas fa-crosshairs fa-spin" style="animation-duration: 6s; color: #00ff88;"></i> Radar PPI Scope (60%)
+            </button>
+        ` : '';
+
         document.getElementById('srcDetailStatus').innerHTML =
-            pingBadge + `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${statusColors[status]}18;color:${statusColors[status]};border:1px solid ${statusColors[status]}40;letter-spacing:0.5px;">${status.toUpperCase()}</span>`;
+            radarBtnHtml + pingBadge + `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${statusColors[status]}18;color:${statusColors[status]};border:1px solid ${statusColors[status]}40;letter-spacing:0.5px;">${status.toUpperCase()}</span>`;
 
         const modalContainer = modal.querySelector('div');
         const isTdme = src && (
@@ -3454,8 +3465,812 @@
             .univ-card-alarm {
                 animation: pulse-subtle 2s infinite ease-in-out;
             }
+
+            /* ── RADAR PPI SCOPE SIDEBAR (60% Width) ────────────────────────── */
+            #radarPpiOverlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(3, 7, 18, 0.75);
+                backdrop-filter: blur(6px);
+                -webkit-backdrop-filter: blur(6px);
+                z-index: 14000;
+                transition: opacity 0.3s ease;
+            }
+            #radarPpiSidebar {
+                display: flex;
+                flex-direction: column;
+                position: fixed;
+                top: 0;
+                right: 0;
+                width: 60vw;
+                min-width: 560px;
+                max-width: 1200px;
+                height: 100vh;
+                background: #040812;
+                border-left: 1px solid rgba(0, 212, 255, 0.35);
+                box-shadow: -15px 0 50px rgba(0, 0, 0, 0.85);
+                z-index: 14001;
+                transform: translateX(100%);
+                transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+                color: #e2e8f0;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+                overflow: hidden;
+            }
+            #radarPpiSidebar.open {
+                transform: translateX(0);
+            }
+            .radar-scope-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 14px 20px;
+                background: rgba(8, 16, 32, 0.95);
+                border-bottom: 1px solid rgba(0, 212, 255, 0.25);
+                gap: 12px;
+                flex-shrink: 0;
+            }
+            .radar-scope-title-wrap {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                min-width: 0;
+            }
+            .radar-scope-radar-icon {
+                font-size: 20px;
+                color: #00ffcc;
+                text-shadow: 0 0 12px #00ffcc88;
+            }
+            .radar-scope-title {
+                font-size: 15px;
+                font-weight: 800;
+                color: #e8f4ff;
+                letter-spacing: 0.5px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .radar-live-badge {
+                font-size: 10px;
+                background: rgba(0, 255, 136, 0.15);
+                color: #00ff88;
+                border: 1px solid #00ff88;
+                border-radius: 4px;
+                padding: 2px 7px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .radar-live-badge::before {
+                content: '';
+                width: 6px;
+                height: 6px;
+                background: #00ff88;
+                border-radius: 50%;
+                display: inline-block;
+                animation: pulse-subtle 1.2s infinite ease-in-out;
+            }
+            .radar-metric-chip {
+                background: rgba(15, 28, 52, 0.85);
+                border: 1px solid rgba(0, 212, 255, 0.25);
+                padding: 4px 10px;
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                gap: 7px;
+                font-size: 11px;
+                color: #94a3b8;
+            }
+            .radar-metric-val {
+                color: #00d4ff;
+                font-weight: 700;
+                font-family: monospace;
+            }
+            .radar-scope-body {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                position: relative;
+                background: #03060c;
+                min-height: 0;
+            }
+            .radar-canvas-container {
+                flex: 1;
+                position: relative;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            }
+            #radarPpiCanvas {
+                display: block;
+                background: #03060c;
+                cursor: crosshair;
+            }
+            .radar-controls-toolbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 8px 16px;
+                background: rgba(8, 16, 32, 0.95);
+                border-top: 1px solid rgba(0, 212, 255, 0.2);
+                border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+                gap: 10px;
+                font-size: 12px;
+                flex-shrink: 0;
+            }
+            .radar-range-btn {
+                background: rgba(13, 30, 56, 0.8);
+                color: #94a3b8;
+                border: 1px solid rgba(0, 212, 255, 0.2);
+                border-radius: 4px;
+                padding: 3px 10px;
+                font-size: 11px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .radar-range-btn.active, .radar-range-btn:hover {
+                background: rgba(0, 212, 255, 0.25);
+                color: #00f0ff;
+                border-color: #00f0ff;
+            }
+            .radar-targets-panel {
+                height: 135px;
+                background: #050a14;
+                border-top: 1px solid rgba(0, 212, 255, 0.2);
+                padding: 8px 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                flex-shrink: 0;
+            }
+            .radar-targets-strip {
+                flex: 1;
+                display: flex;
+                gap: 8px;
+                overflow-x: auto;
+                align-items: center;
+                padding-bottom: 4px;
+            }
+            .radar-target-card {
+                background: rgba(12, 24, 46, 0.9);
+                border: 1px solid rgba(0, 212, 255, 0.25);
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 11px;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                min-width: 115px;
+                cursor: pointer;
+                transition: all 0.2s;
+                flex-shrink: 0;
+            }
+            .radar-target-card:hover, .radar-target-card.highlight {
+                background: rgba(0, 212, 255, 0.2);
+                border-color: #00ffff;
+                box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            }
+            .radar-target-card .tgt-id {
+                font-weight: 800;
+                color: #00ffcc;
+                font-size: 12px;
+            }
+            .radar-target-card .tgt-info {
+                color: #94a3b8;
+                font-size: 10px;
+                font-family: monospace;
+            }
+            #radarHoverHud {
+                position: absolute;
+                display: none;
+                pointer-events: none;
+                background: rgba(4, 10, 20, 0.95);
+                border: 1px solid #00ffff;
+                border-radius: 8px;
+                padding: 10px 14px;
+                color: #e2e8f0;
+                font-size: 11px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 255, 255, 0.35);
+                backdrop-filter: blur(8px);
+                z-index: 1000;
+                min-width: 175px;
+            }
         `;
         document.head.appendChild(style);
+    }
+
+    // ── RADAR PPI SCOPE CONTROLLER ─────────────────────────────────────────────
+    let _activeRadarSourceId = null;
+    let _radarAnimId = null;
+    let _radarSweepAngleDeg = 0;
+    let _radarRangeNm = 120;
+    let _radarMousePos = { x: -999, y: -999 };
+    let _radarHoveredTarget = null;
+    let _radarSelectedTargetId = null;
+    let _radarRefreshTimer = null;
+
+    function ensureRadarPpiDOMElements() {
+        if (document.getElementById('radarPpiSidebar')) return;
+
+        // Overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'radarPpiOverlay';
+        overlay.onclick = () => window.closeRadarPpiScope();
+        document.body.appendChild(overlay);
+
+        // Sidebar 60%
+        const sidebar = document.createElement('div');
+        sidebar.id = 'radarPpiSidebar';
+        sidebar.innerHTML = `
+            <!-- Header Bar -->
+            <div class="radar-scope-header">
+                <div class="radar-scope-title-wrap">
+                    <i class="fas fa-crosshairs radar-scope-radar-icon"></i>
+                    <div>
+                        <div class="radar-scope-title">
+                            <span id="radarStationTitle">RADAR MSSR PPI SCOPE</span>
+                            <span class="radar-live-badge">CAT 048 / 034</span>
+                        </div>
+                        <div id="radarStationSub" style="font-size: 10px; color: #64748b; font-family: monospace; margin-top: 2px;">
+                            SAC: — | SIC: — | ID: —
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <!-- Antenna Rotation Widget -->
+                    <div class="radar-metric-chip" title="Antenna Rotation Period & RPM">
+                        <i class="fas fa-rotate fa-spin" style="color: #00ff88; animation-duration: 4s;"></i>
+                        <span>ROT:</span>
+                        <span class="radar-metric-val" id="radarMetricRot">4.08s</span>
+                        <span style="font-size: 10px; color: #64748b;" id="radarMetricRpm">(14.7 RPM)</span>
+                    </div>
+
+                    <!-- Power Indicator Widget -->
+                    <div class="radar-metric-chip" title="Transmitter Output Power">
+                        <i class="fas fa-bolt" style="color: #ffcc00;"></i>
+                        <span>TX PWR:</span>
+                        <span class="radar-metric-val" id="radarMetricPower" style="color: #00ff88;">18.5 kW</span>
+                    </div>
+
+                    <!-- Close Button -->
+                    <button onclick="window.closeRadarPpiScope()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px 10px; border-radius: 6px;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#94a3b8'">✕</button>
+                </div>
+            </div>
+
+            <!-- Toolbar Controls -->
+            <div class="radar-controls-toolbar">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="color: #64748b; font-size: 11px; font-weight: 600;">JANGKAUAN (RANGE):</span>
+                    <button class="radar-range-btn" onclick="window.setRadarPpiRange(40)">40 NM</button>
+                    <button class="radar-range-btn" onclick="window.setRadarPpiRange(80)">80 NM</button>
+                    <button class="radar-range-btn active" id="btnRange120" onclick="window.setRadarPpiRange(120)">120 NM</button>
+                    <button class="radar-range-btn" onclick="window.setRadarPpiRange(200)">200 NM</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; font-size: 11px; color: #94a3b8;">
+                    <span id="radarTargetCountBadge"><strong style="color: #00ffcc;">0</strong> Pesawat Terdeteksi</span>
+                    <span style="color: #475569;">|</span>
+                    <span id="radarCoordText">Lat: — Lon: —</span>
+                </div>
+            </div>
+
+            <!-- Canvas Scope -->
+            <div class="radar-scope-body">
+                <div class="radar-canvas-container" id="radarCanvasContainer">
+                    <canvas id="radarPpiCanvas"></canvas>
+                    <!-- Hover Tooltip HUD -->
+                    <div id="radarHoverHud">
+                        <div style="font-weight: 800; font-size: 13px; color: #00ffff; border-bottom: 1px solid rgba(0,255,255,0.25); padding-bottom: 4px; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                            <span id="hudCallsign">GA312</span>
+                            <span id="hudSquawk" style="color: #ffcc00; font-size: 10px; font-weight: normal;">SQ 1200</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: auto auto; gap: 4px 12px; font-family: monospace; font-size: 11px;">
+                            <span style="color: #64748b;">ALT:</span> <span id="hudAlt" style="color: #00ff88; font-weight: bold;">FL320 (32,000 ft)</span>
+                            <span style="color: #64748b;">POS:</span> <span id="hudLatLon">-7.24, 112.98</span>
+                            <span style="color: #64748b;">DIST:</span> <span id="hudDist">48.2 NM</span>
+                            <span style="color: #64748b;">AZIM:</span> <span id="hudAzim">124.5°</span>
+                            <span style="color: #64748b;">SPD:</span> <span id="hudSpd">360 kts</span>
+                            <span style="color: #64748b;">HDG:</span> <span id="hudHdg">210°</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-panel Target List -->
+                <div class="radar-targets-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 10px; font-weight: 700; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase;">
+                            <i class="fas fa-plane" style="color: #00ffcc;"></i> DAFTAR PESAWAT AKTIF (ASTERIX CAT 048)
+                        </span>
+                        <span style="font-size: 10px; color: #475569;" id="radarLastCat048Text">Update: Real-time</span>
+                    </div>
+                    <div class="radar-targets-strip" id="radarTargetsStrip">
+                        <span style="color: #475569; font-size: 11px; padding: 10px;">Menunggu deteksi target CAT 048...</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(sidebar);
+
+        // Attach mousemove listener to canvas
+        const canvas = document.getElementById('radarPpiCanvas');
+        if (canvas) {
+            canvas.addEventListener('mousemove', e => {
+                const rect = canvas.getBoundingClientRect();
+                _radarMousePos.x = e.clientX - rect.left;
+                _radarMousePos.y = e.clientY - rect.top;
+            });
+            canvas.addEventListener('mouseleave', () => {
+                _radarMousePos.x = -999;
+                _radarMousePos.y = -999;
+                const hud = document.getElementById('radarHoverHud');
+                if (hud) hud.style.display = 'none';
+            });
+            canvas.addEventListener('click', () => {
+                if (_radarHoveredTarget) {
+                    _radarSelectedTargetId = _radarHoveredTarget.id;
+                    updateRadarPpiTargetsUI();
+                } else {
+                    _radarSelectedTargetId = null;
+                    updateRadarPpiTargetsUI();
+                }
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            if (document.getElementById('radarPpiSidebar')?.classList.contains('open')) {
+                resizeRadarCanvas();
+            }
+        });
+    }
+
+    function resizeRadarCanvas() {
+        const container = document.getElementById('radarCanvasContainer');
+        const canvas = document.getElementById('radarPpiCanvas');
+        if (!container || !canvas) return;
+
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        const dpr = window.devicePixelRatio || 1;
+
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+    }
+
+    window.openRadarPpiScope = function(sourceId) {
+        ensureRadarPpiDOMElements();
+        _activeRadarSourceId = sourceId;
+
+        const overlay = document.getElementById('radarPpiOverlay');
+        const sidebar = document.getElementById('radarPpiSidebar');
+        if (overlay) overlay.style.display = 'block';
+        if (sidebar) sidebar.classList.add('open');
+
+        setTimeout(resizeRadarCanvas, 50);
+
+        // Start render loop & live update
+        if (!_radarAnimId) {
+            let lastTimestamp = performance.now();
+            function renderLoop(now) {
+                const dt = (now - lastTimestamp) / 1000.0;
+                lastTimestamp = now;
+
+                // Hitung rotasi antena
+                let rotSec = 4.0;
+                const srcData = getActiveRadarSourceData();
+                if (srcData && srcData.antenna_rotation && srcData.antenna_rotation !== '—') {
+                    const parsed = parseFloat(srcData.antenna_rotation);
+                    if (!isNaN(parsed) && parsed > 0) rotSec = parsed;
+                }
+                const degPerSec = 360.0 / Math.max(1.5, rotSec);
+                _radarSweepAngleDeg = (_radarSweepAngleDeg + degPerSec * dt) % 360.0;
+
+                drawRadarPPI();
+                _radarAnimId = requestAnimationFrame(renderLoop);
+            }
+            _radarAnimId = requestAnimationFrame(renderLoop);
+        }
+
+        updateRadarPpiScopeData();
+        if (_radarRefreshTimer) clearInterval(_radarRefreshTimer);
+        _radarRefreshTimer = setInterval(updateRadarPpiScopeData, 1500);
+    };
+
+    window.closeRadarPpiScope = function() {
+        const overlay = document.getElementById('radarPpiOverlay');
+        const sidebar = document.getElementById('radarPpiSidebar');
+        if (overlay) overlay.style.display = 'none';
+        if (sidebar) sidebar.classList.remove('open');
+
+        if (_radarAnimId) {
+            cancelAnimationFrame(_radarAnimId);
+            _radarAnimId = null;
+        }
+        if (_radarRefreshTimer) {
+            clearInterval(_radarRefreshTimer);
+            _radarRefreshTimer = null;
+        }
+        _activeRadarSourceId = null;
+        _radarHoveredTarget = null;
+        _radarSelectedTargetId = null;
+    };
+
+    window.setRadarPpiRange = function(rangeNm) {
+        _radarRangeNm = rangeNm;
+        document.querySelectorAll('.radar-range-btn').forEach(btn => {
+            if (btn.textContent.includes(`${rangeNm} NM`)) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    };
+
+    function getActiveRadarSourceData() {
+        if (!_activeRadarSourceId) return null;
+        for (const pool of Object.values(_sourcesCache)) {
+            if (!Array.isArray(pool)) continue;
+            const found = pool.find(s => String(s.id) === String(_activeRadarSourceId));
+            if (found) {
+                const { latestData } = getSourceDetailPayload(found);
+                return latestData || null;
+            }
+        }
+        return null;
+    }
+
+    function updateRadarPpiScopeData() {
+        if (!_activeRadarSourceId) return;
+
+        let foundSrc = null;
+        for (const pool of Object.values(_sourcesCache)) {
+            if (!Array.isArray(pool)) continue;
+            foundSrc = pool.find(s => String(s.id) === String(_activeRadarSourceId));
+            if (foundSrc) break;
+        }
+        if (!foundSrc) return;
+
+        const { latestData } = getSourceDetailPayload(foundSrc);
+        const data = latestData || {};
+
+        // Update Title & Header Widgets
+        const titleEl = document.getElementById('radarStationTitle');
+        if (titleEl) titleEl.textContent = `RADAR PPI — ${foundSrc.name || data.radar_name || 'MSSR'}`;
+
+        const subEl = document.getElementById('radarStationSub');
+        if (subEl) {
+            subEl.textContent = `SAC: ${data.sac || '—'} | SIC: ${data.sic || '—'} | RADAR ID: ${data.radar_id || '—'}`;
+        }
+
+        const rotEl = document.getElementById('radarMetricRot');
+        if (rotEl) rotEl.textContent = data.antenna_rotation && data.antenna_rotation !== '—' ? `${data.antenna_rotation}` : '4.08s';
+
+        const rpmEl = document.getElementById('radarMetricRpm');
+        if (rpmEl) rpmEl.textContent = data.antenna_rpm ? `(${data.antenna_rpm})` : '(14.7 RPM)';
+
+        const pwrEl = document.getElementById('radarMetricPower');
+        if (pwrEl) {
+            pwrEl.textContent = data.power_status || 'Normal (18.5 kW)';
+            if (String(data.power_status || '').toLowerCase().includes('off') || String(data.power_status || '').toLowerCase().includes('degraded')) {
+                pwrEl.style.color = '#ff3355';
+            } else {
+                pwrEl.style.color = '#00ff88';
+            }
+        }
+
+        const coordEl = document.getElementById('radarCoordText');
+        if (coordEl) {
+            coordEl.textContent = (data.lat && data.lon) ? `Pos: ${data.lat}, ${data.lon}` : 'Pos: —';
+        }
+
+        updateRadarPpiTargetsUI(data);
+    }
+
+    function updateRadarPpiTargetsUI(passedData) {
+        const data = passedData || getActiveRadarSourceData() || {};
+        const targets = Array.isArray(data.targets_detail) ? data.targets_detail : [];
+
+        const badge = document.getElementById('radarTargetCountBadge');
+        if (badge) {
+            badge.innerHTML = `<strong style="color: #00ffcc;">${targets.length}</strong> Pesawat Terdeteksi`;
+        }
+
+        const lastCatEl = document.getElementById('radarLastCat048Text');
+        if (lastCatEl) {
+            lastCatEl.textContent = `Update: ${data.last_cat048 ? new Date(data.last_cat048).toLocaleTimeString('id-ID') : 'Real-time'}`;
+        }
+
+        const strip = document.getElementById('radarTargetsStrip');
+        if (!strip) return;
+
+        if (targets.length === 0) {
+            strip.innerHTML = `<span style="color: #475569; font-size: 11px; padding: 10px;">Menunggu deteksi target CAT 048 dari transmisi radar...</span>`;
+            return;
+        }
+
+        strip.innerHTML = targets.map(t => {
+            const isSel = String(t.id) === String(_radarSelectedTargetId);
+            return `
+                <div class="radar-target-card ${isSel ? 'highlight' : ''}" onclick="window.selectRadarTarget('${t.id}')">
+                    <div class="tgt-id"><i class="fas fa-plane" style="font-size: 9px;"></i> ${t.callsign || t.id}</div>
+                    <div class="tgt-info">FL${t.fl || Math.round((t.alt || 0)/100)} | ${t.range_nm || 0} NM</div>
+                    <div class="tgt-info">${t.azimuth_deg || 0}° | SQ ${t.squawk || '—'}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    window.selectRadarTarget = function(tgtId) {
+        _radarSelectedTargetId = tgtId;
+        updateRadarPpiTargetsUI();
+    };
+
+    // ── CANVAS DRAWING ENGINE ──────────────────────────────────────────────────
+    function drawRadarPPI() {
+        const canvas = document.getElementById('radarPpiCanvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('radarCanvasContainer');
+        if (!container) return;
+
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        if (w <= 0 || h <= 0) return;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const cx = w / 2;
+        const cy = h / 2;
+        const maxRadius = Math.min(w, h) * 0.44;
+
+        // 1. Dark Gradient Radar Scope Background
+        const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, maxRadius);
+        grad.addColorStop(0, '#061324');
+        grad.addColorStop(0.7, '#040d1a');
+        grad.addColorStop(1, '#02060e');
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, maxRadius, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#00d4ff';
+        ctx.stroke();
+
+        // 2. Concentric Range Rings (25%, 50%, 75%, 100%)
+        const ringSteps = [0.25, 0.5, 0.75, 1.0];
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+
+        ringSteps.forEach(step => {
+            const r = maxRadius * step;
+            const nm = Math.round(_radarRangeNm * step);
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 212, 255, 0.2)';
+            ctx.stroke();
+
+            // Label NM
+            ctx.fillStyle = 'rgba(0, 212, 255, 0.6)';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${nm} NM`, cx + 4, cy - r + 12);
+        });
+        ctx.setLineDash([]); // Reset line dash
+
+        // 3. Radial Degree Lines & Compass Markers
+        const radials = [
+            { deg: 0,   label: 'N (000°)' },
+            { deg: 45,  label: '045°' },
+            { deg: 90,  label: 'E (090°)' },
+            { deg: 135, label: '135°' },
+            { deg: 180, label: 'S (180°)' },
+            { deg: 225, label: '225°' },
+            { deg: 270, label: 'W (270°)' },
+            { deg: 315, label: '315°' }
+        ];
+
+        radials.forEach(item => {
+            const rad = (item.deg - 90) * (Math.PI / 180);
+            const x1 = cx + (maxRadius * 0.1) * Math.cos(rad);
+            const y1 = cy + (maxRadius * 0.1) * Math.sin(rad);
+            const x2 = cx + maxRadius * Math.cos(rad);
+            const y2 = cy + maxRadius * Math.sin(rad);
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = 'rgba(0, 212, 255, 0.15)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Label kompas di luar border
+            const lx = cx + (maxRadius + 14) * Math.cos(rad);
+            const ly = cy + (maxRadius + 14) * Math.sin(rad);
+            ctx.fillStyle = item.deg === 0 ? '#00ffcc' : 'rgba(148, 163, 184, 0.7)';
+            ctx.font = item.deg === 0 ? 'bold 11px monospace' : '9px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(item.label, lx, ly);
+        });
+
+        // 4. Sweep Beam Line (Rotasi Antena Real-time)
+        const sweepRad = (_radarSweepAngleDeg - 90) * (Math.PI / 180);
+        const trailArcDeg = 38; // Ekor pudar phosphor 38 derajat
+        const trailRad = trailArcDeg * (Math.PI / 180);
+
+        // Fading phosphor sweep sector
+        const sweepGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxRadius);
+        sweepGrad.addColorStop(0, 'rgba(0, 255, 170, 0.35)');
+        sweepGrad.addColorStop(1, 'rgba(0, 255, 170, 0.05)');
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, maxRadius, sweepRad - trailRad, sweepRad, false);
+        ctx.closePath();
+        ctx.fillStyle = sweepGrad;
+        ctx.fill();
+        ctx.restore();
+
+        // Main Sweep Beam Line
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + maxRadius * Math.cos(sweepRad), cy + maxRadius * Math.sin(sweepRad));
+        ctx.strokeStyle = '#00ffcc';
+        ctx.shadowColor = '#00ffcc';
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.shadowBlur = 0; // reset shadow
+
+        // Pusat Radar (Station Tower Icon)
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#00ffcc';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 5. Render Pesawat (Aircraft Targets) & Interactive Hover
+        const srcData = getActiveRadarSourceData();
+        const targets = (srcData && Array.isArray(srcData.targets_detail)) ? srcData.targets_detail : [];
+
+        let currentHovered = null;
+
+        targets.forEach(tgt => {
+            const range = Number(tgt.range_nm) || 0;
+            const azim = Number(tgt.azimuth_deg) || 0;
+            if (range <= 0 || range > _radarRangeNm * 1.05) return;
+
+            const distPx = (range / _radarRangeNm) * maxRadius;
+            const targetRad = (azim - 90) * (Math.PI / 180);
+            const tx = cx + distPx * Math.cos(targetRad);
+            const ty = cy + distPx * Math.sin(targetRad);
+
+            // Deteksi Hover
+            const dx = _radarMousePos.x - tx;
+            const dy = _radarMousePos.y - ty;
+            const isHovered = Math.sqrt(dx * dx + dy * dy) <= 22;
+            const isSelected = String(tgt.id) === String(_radarSelectedTargetId);
+
+            if (isHovered) {
+                currentHovered = { ...tgt, screenX: tx, screenY: ty };
+            }
+
+            // Hitung sudut rotasi sapuan terhadap target untuk efek sweep illumination
+            let angleDiff = (_radarSweepAngleDeg - azim + 360) % 360;
+            const isIlluminated = angleDiff < 35;
+
+            ctx.save();
+            ctx.translate(tx, ty);
+
+            // Speed vector line (arah heading)
+            const headingDeg = Number(tgt.heading) || azim;
+            const headingRad = (headingDeg - 90) * (Math.PI / 180);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(16 * Math.cos(headingRad), 16 * Math.sin(headingRad));
+            ctx.strokeStyle = isSelected ? '#ffcc00' : 'rgba(0, 255, 204, 0.6)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Rotasi ikon pesawat
+            ctx.rotate(headingRad + Math.PI / 2);
+
+            // Gambar Ikon Pesawat Jet / Chevron
+            ctx.beginPath();
+            ctx.moveTo(0, -9);     // Hidung
+            ctx.lineTo(7, 6);      // Sayap kanan
+            ctx.lineTo(2, 4);      // Badan kanan
+            ctx.lineTo(3, 8);      // Ekor kanan
+            ctx.lineTo(0, 7);      // Ekor tengah
+            ctx.lineTo(-3, 8);     // Ekor kiri
+            ctx.lineTo(-2, 4);     // Badan kiri
+            ctx.lineTo(-7, 6);     // Sayap kiri
+            ctx.closePath();
+
+            if (isSelected) {
+                ctx.fillStyle = '#ffcc00';
+                ctx.shadowColor = '#ffcc00';
+                ctx.shadowBlur = 12;
+            } else if (isHovered) {
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 15;
+            } else if (isIlluminated) {
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowColor = '#00ff88';
+                ctx.shadowBlur = 8;
+            } else {
+                ctx.fillStyle = '#00d4ff';
+                ctx.shadowBlur = 0;
+            }
+            ctx.fill();
+            ctx.strokeStyle = '#05101a';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+
+            // Lingkaran Target Reticle jika Hovered atau Selected
+            if (isHovered || isSelected) {
+                ctx.beginPath();
+                ctx.arc(tx, ty, 14, 0, Math.PI * 2);
+                ctx.strokeStyle = isSelected ? '#ffcc00' : '#00ffff';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Data Tag Pesawat (ID di atas, Alt di bawah)
+            ctx.font = '10px monospace';
+            ctx.fillStyle = isSelected ? '#ffcc00' : '#00ffcc';
+            ctx.textAlign = 'left';
+            ctx.fillText(tgt.callsign || tgt.id, tx + 12, ty - 2);
+
+            ctx.font = '9px monospace';
+            ctx.fillStyle = '#94a3b8';
+            const altLabel = tgt.fl ? `FL${tgt.fl}` : (tgt.alt ? `${tgt.alt}ft` : 'FL—');
+            ctx.fillText(altLabel, tx + 12, ty + 10);
+        });
+
+        _radarHoveredTarget = currentHovered;
+
+        // 6. Update Floating HUD Tooltip jika hover pesawat
+        const hud = document.getElementById('radarHoverHud');
+        if (hud) {
+            if (currentHovered) {
+                hud.style.display = 'block';
+                const hudX = Math.min(w - 200, Math.max(10, currentHovered.screenX + 18));
+                const hudY = Math.min(h - 170, Math.max(10, currentHovered.screenY - 30));
+                hud.style.left = `${hudX}px`;
+                hud.style.top = `${hudY}px`;
+
+                document.getElementById('hudCallsign').textContent = currentHovered.callsign || currentHovered.id;
+                document.getElementById('hudSquawk').textContent = `SQ ${currentHovered.squawk || '1200'}`;
+                document.getElementById('hudAlt').textContent = currentHovered.fl ? `FL${currentHovered.fl} (${(currentHovered.fl * 100).toLocaleString()} ft)` : (currentHovered.alt ? `${currentHovered.alt.toLocaleString()} ft` : '—');
+                document.getElementById('hudLatLon').textContent = (currentHovered.lat && currentHovered.lon) ? `${currentHovered.lat}, ${currentHovered.lon}` : '—';
+                document.getElementById('hudDist').textContent = `${currentHovered.range_nm || 0} NM`;
+                document.getElementById('hudAzim').textContent = `${currentHovered.azimuth_deg || 0}°`;
+                document.getElementById('hudSpd').textContent = `${currentHovered.speed || 320} kts`;
+                document.getElementById('hudHdg').textContent = `${currentHovered.heading || currentHovered.azimuth_deg || 0}°`;
+            } else {
+                hud.style.display = 'none';
+            }
+        }
     }
 
     // ── Global Connection Monitor ──────────────────────────────────────────────
