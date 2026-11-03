@@ -3842,6 +3842,9 @@
                     <span id="radarTargetCountBadge" style="font-size: 11px; color: #94a3b8;"><strong style="color: #00ffcc;">0</strong> Pesawat</span>
                 </div>
                 <div id="radarAuditControlsRight" style="display: none; align-items: center; gap: 8px;">
+                    <button class="radar-tab-btn" onclick="window.openRefTxpConfigModal()" style="padding: 4px 10px; font-size: 11px; background: rgba(255, 170, 0, 0.15); border-color: #ffaa00; color: #ffcc00;">
+                        <i class="fas fa-sliders-h"></i> Kalibrasi Transponder Ref
+                    </button>
                     <span class="radar-live-badge" style="background: rgba(0, 212, 255, 0.15); color: #00d4ff; border-color: #00d4ff;">DIAGNOSTIK RF & ALIGNMENT</span>
                 </div>
             </div>
@@ -3985,6 +3988,39 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: KALIBRASI TRANSPONDER REFERENSI -->
+            <div id="radarRefModal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 14, 0.85); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+                <div style="background: #091322; border: 1px solid #00d4ff; border-radius: 8px; width: 380px; max-width: 90%; padding: 20px; box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid rgba(0, 212, 255, 0.2); padding-bottom: 8px;">
+                        <span style="font-weight: 700; color: #ffaa00; font-size: 13px;"><i class="fas fa-sliders-h"></i> Kalibrasi Transponder Referensi</span>
+                        <button onclick="window.closeRefTxpConfigModal()" style="background: transparent; border: none; color: #94a3b8; font-size: 14px; cursor: pointer;"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div style="font-size: 11px; color: #cbd5e1; margin-bottom: 14px; line-height: 1.5;">
+                        Masukkan koordinat patokan (*nominal baseline*) transponder acuan (Parrot / Site Monitor) di site radar ini:
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px; font-size: 11px;">
+                        <div>
+                            <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Target ID / Callsign / Squawk</label>
+                            <input type="text" id="cfgRefTargetId" placeholder="misal: REF-TXP atau 7000" style="width: 100%; box-sizing: border-box; background: #0f1e36; border: 1px solid rgba(0, 212, 255, 0.4); border-radius: 4px; padding: 6px 10px; color: #fff; font-family: monospace;">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Nominal Azimuth (°)</label>
+                                <input type="number" step="0.01" id="cfgRefAzimuth" placeholder="85.20" style="width: 100%; box-sizing: border-box; background: #0f1e36; border: 1px solid rgba(0, 212, 255, 0.4); border-radius: 4px; padding: 6px 10px; color: #00ffcc; font-family: monospace; font-weight: bold;">
+                            </div>
+                            <div>
+                                <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Nominal Range (NM)</label>
+                                <input type="number" step="0.01" id="cfgRefRange" placeholder="12.45" style="width: 100%; box-sizing: border-box; background: #0f1e36; border: 1px solid rgba(0, 212, 255, 0.4); border-radius: 4px; padding: 6px 10px; color: #00ffcc; font-family: monospace; font-weight: bold;">
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+                        <button onclick="window.closeRefTxpConfigModal()" style="padding: 6px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; color: #cbd5e1; font-size: 11px; cursor: pointer;">Batal</button>
+                        <button onclick="window.saveRefTxpConfig()" style="padding: 6px 14px; background: #ffaa00; border: none; border-radius: 4px; color: #02060e; font-weight: 700; font-size: 11px; cursor: pointer;"><i class="fas fa-check"></i> Simpan Acuan</button>
                     </div>
                 </div>
             </div>
@@ -4453,8 +4489,51 @@
             ctx.font = '9px monospace';
             ctx.fillStyle = '#94a3b8';
             const altLabel = tgt.fl ? `FL${tgt.fl}` : (tgt.alt ? `${tgt.alt}ft` : 'FL—');
-            ctx.fillText(altLabel, tx + 12, ty + 10);
         });
+
+        // 5b. Gambar Transponder Kalibrasi / Acuan Statis di PPI Scope
+        const refCfg = getSavedRefTxpConfig();
+        const refAzim = refCfg.azimuth;
+        const refDist = refCfg.range;
+        if (refDist <= _radarPpiRangeNm) {
+            const refRad = ((refAzim - 90) * Math.PI) / 180;
+            const refScale = maxRadius / _radarPpiRangeNm;
+            const rx = cx + Math.cos(refRad) * (refDist * refScale);
+            const ry = cy + Math.sin(refRad) * (refDist * refScale);
+
+            ctx.save();
+            ctx.translate(rx, ry);
+
+            // Diamond / Icon Tower Acuan
+            ctx.beginPath();
+            ctx.moveTo(0, -7);
+            ctx.lineTo(6, 0);
+            ctx.lineTo(0, 7);
+            ctx.lineTo(-6, 0);
+            ctx.closePath();
+            ctx.fillStyle = '#ffaa00';
+            ctx.shadowColor = '#ffaa00';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Ring pulsa statis
+            ctx.beginPath();
+            ctx.arc(0, 0, 11, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 170, 0, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+
+            // Label di samping pin
+            ctx.font = 'bold 9px monospace';
+            ctx.fillStyle = '#ffaa00';
+            ctx.textAlign = 'left';
+            ctx.fillText(`⛯ ${refCfg.targetId} (${refDist}NM)`, rx + 14, ry + 3);
+        }
 
         _radarHoveredTarget = currentHovered;
 
@@ -4481,6 +4560,70 @@
             }
         }
     }
+
+    // ── Transponder Kalibrasi Config Helpers ───────────────────────────────────
+    function getSavedRefTxpConfig() {
+        const defaultCfg = {
+            targetId: 'REF-TXP',
+            azimuth: 85.20,
+            range: 12.45
+        };
+        try {
+            const raw = localStorage.getItem('radar_ref_txp_config');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                return {
+                    targetId: parsed.targetId || defaultCfg.targetId,
+                    azimuth: parseFloat(parsed.azimuth) || defaultCfg.azimuth,
+                    range: parseFloat(parsed.range) || defaultCfg.range
+                };
+            }
+        } catch (e) {}
+        return defaultCfg;
+    }
+
+    window.openRefTxpConfigModal = function() {
+        const modal = document.getElementById('radarRefModal');
+        if (!modal) return;
+        const cfg = getSavedRefTxpConfig();
+        const inputId = document.getElementById('cfgRefTargetId');
+        const inputAz = document.getElementById('cfgRefAzimuth');
+        const inputRng = document.getElementById('cfgRefRange');
+        if (inputId) inputId.value = cfg.targetId;
+        if (inputAz) inputAz.value = cfg.azimuth;
+        if (inputRng) inputRng.value = cfg.range;
+        modal.style.display = 'flex';
+    };
+
+    window.closeRefTxpConfigModal = function() {
+        const modal = document.getElementById('radarRefModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.saveRefTxpConfig = function() {
+        const inputId = document.getElementById('cfgRefTargetId');
+        const inputAz = document.getElementById('cfgRefAzimuth');
+        const inputRng = document.getElementById('cfgRefRange');
+
+        const cfg = {
+            targetId: (inputId?.value || 'REF-TXP').trim().toUpperCase(),
+            azimuth: parseFloat(inputAz?.value) || 85.20,
+            range: parseFloat(inputRng?.value) || 12.45
+        };
+
+        try {
+            localStorage.setItem('radar_ref_txp_config', JSON.stringify(cfg));
+        } catch (e) {}
+
+        window.closeRefTxpConfigModal();
+
+        // Refresh UI & Redraw Canvas
+        const data = getActiveRadarSourceData() || {};
+        updateRadarAuditUI(data);
+        if (_currentRadarTab === 'audit') {
+            drawRadarCoveragePolar(data.audit_data || {});
+        }
+    };
 
     // ── RADAR AUDIT TAB & COVERAGE POLAR CHART ─────────────────────────────────
     let _currentRadarTab = 'ppi';
@@ -4547,14 +4690,22 @@
             tiltBadge.style.borderColor = isTiltWarn ? '#ff3355' : '#00d4ff';
         }
 
-        // 3. Transponder Referensi KPI
+        // 3. Transponder Referensi KPI (Berbasis Acuan Setting)
+        const refCfg = getSavedRefTxpConfig();
         const refObj = audit.reference_target || {};
         const refIdEl = document.getElementById('auditRefTargetId');
         const refAzimEl = document.getElementById('auditRefAzim');
         const refDistEl = document.getElementById('auditRefDist');
-        if (refIdEl) refIdEl.textContent = refObj.id || 'REF-TXP (P-Transponder)';
-        if (refAzimEl) refAzimEl.textContent = `${refObj.measured_azimuth || '085.20°'} (Drift: ${refObj.drift || '0.00°'})`;
-        if (refDistEl) refDistEl.textContent = `${refObj.measured_range || '12.45 NM'}`;
+
+        // Hitung drift terhadap acuan setting
+        const nomAz = refCfg.azimuth;
+        const measAz = parseFloat(refObj.measured_azimuth) || nomAz;
+        const calcDrift = (measAz - nomAz).toFixed(2);
+        const signDrift = calcDrift >= 0 ? `+${calcDrift}` : `${calcDrift}`;
+
+        if (refIdEl) refIdEl.textContent = `${refCfg.targetId} (Parrot Transponder)`;
+        if (refAzimEl) refAzimEl.textContent = `${measAz.toFixed(2)}° (Drift: ${signDrift}°) | Nom: ${nomAz.toFixed(2)}°`;
+        if (refDistEl) refDistEl.textContent = `${refObj.measured_range || (refCfg.range + ' NM')}`;
 
         // 4. Rata-rata Jangkauan KPI
         const avgEl = document.getElementById('auditAvgRange');
@@ -4671,38 +4822,54 @@
             ctx.stroke();
         });
 
-        // Transponder Reference Marker (Icon Tower Kalibrasi - Tidak Mengubah Warna Sektor)
-        const refAzim = 85.2;
-        const refDist = 12.45;
+        // Transponder Reference Marker (Icon Tower Kalibrasi - Menggunakan Nilai Acuan yang Disimpan)
+        const refCfg = getSavedRefTxpConfig();
+        const refAzim = refCfg.azimuth;
+        const refDist = refCfg.range;
         const refRad = ((refAzim - 90) * Math.PI) / 180;
         const refR = (refDist / maxRangeRef) * maxRadius;
         const refX = cx + Math.cos(refRad) * refR;
         const refY = cy + Math.sin(refRad) * refR;
 
-        // Gambar icon beacon / diamond kecil yang rapi
+        // Gambar icon diamond kalibrasi warna amber / emas mencolok
         ctx.save();
         ctx.translate(refX, refY);
 
-        // Lingkaran pulsing ring tipis
+        // Lingkaran pulsing ring
         ctx.beginPath();
-        ctx.arc(0, 0, 5, 0, Math.PI * 2);
-        ctx.strokeStyle = '#00d4ff';
-        ctx.lineWidth = 1;
+        ctx.arc(0, 0, 7, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.2;
         ctx.stroke();
 
-        // Titik center
+        // Titik center diamond
         ctx.beginPath();
-        ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = '#00d4ff';
+        ctx.moveTo(0, -4);
+        ctx.lineTo(4, 0);
+        ctx.lineTo(0, 4);
+        ctx.lineTo(-4, 0);
+        ctx.closePath();
+        ctx.fillStyle = '#ffaa00';
+        ctx.shadowColor = '#ffaa00';
+        ctx.shadowBlur = 8;
         ctx.fill();
 
         ctx.restore();
 
-        // Label teks rapi di sampingnya
-        ctx.font = 'bold 8px monospace';
-        ctx.fillStyle = '#00d4ff';
+        // Label teks kontras dengan background badge kecil agar tidak tertutup garis kisi
+        const labelText = `⛯ ${refCfg.targetId} (${refAzim}° / ${refDist}NM)`;
+        ctx.font = 'bold 9px monospace';
+        const txtWidth = ctx.measureText(labelText).width;
+
+        ctx.fillStyle = 'rgba(2, 6, 14, 0.85)';
+        ctx.fillRect(refX + 8, refY - 8, txtWidth + 6, 14);
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(refX + 8, refY - 8, txtWidth + 6, 14);
+
+        ctx.fillStyle = '#ffcc00';
         ctx.textAlign = 'left';
-        ctx.fillText('⛯ REF-TXP (12NM)', refX + 8, refY + 3);
+        ctx.fillText(labelText, refX + 11, refY + 3);
     }
 
     // ── Global Connection Monitor ──────────────────────────────────────────────
