@@ -4671,7 +4671,7 @@
             ctx.stroke();
         });
 
-        // Transponder Reference Marker pin
+        // Transponder Reference Marker (Icon Tower Kalibrasi - Tidak Mengubah Warna Sektor)
         const refAzim = 85.2;
         const refDist = 12.45;
         const refRad = ((refAzim - 90) * Math.PI) / 180;
@@ -4679,18 +4679,30 @@
         const refX = cx + Math.cos(refRad) * refR;
         const refY = cy + Math.sin(refRad) * refR;
 
+        // Gambar icon beacon / diamond kecil yang rapi
+        ctx.save();
+        ctx.translate(refX, refY);
+
+        // Lingkaran pulsing ring tipis
         ctx.beginPath();
-        ctx.arc(refX, refY, 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#ff00ff';
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#00d4ff';
+        ctx.lineWidth = 1;
         ctx.stroke();
 
-        ctx.font = '8px monospace';
-        ctx.fillStyle = '#ff00ff';
+        // Titik center
+        ctx.beginPath();
+        ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#00d4ff';
+        ctx.fill();
+
+        ctx.restore();
+
+        // Label teks rapi di sampingnya
+        ctx.font = 'bold 8px monospace';
+        ctx.fillStyle = '#00d4ff';
         ctx.textAlign = 'left';
-        ctx.fillText('REF-TXP', refX + 6, refY + 2);
+        ctx.fillText('⛯ REF-TXP (12NM)', refX + 8, refY + 3);
     }
 
     // ── Global Connection Monitor ──────────────────────────────────────────────
