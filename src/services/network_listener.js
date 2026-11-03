@@ -319,20 +319,25 @@ class NetworkListenerService {
             connectionType
         });
 
-        if (!decision.shouldEmit) {
-            if (decision.reason === 'disconnect-not-confirmed') {
-                this._logThrottled(
-                    'log',
-                    `status-gate:${decision.state.sourceKey}:pending-disconnect`,
-                    `[StatusGate] Pending disconnect for ${source.name} (${decision.state.failCount}/${this.statusGate.failCountToDisconnect})`,
-                    30000
-                );
-            }
+        let finalStatus = decision.status;
+        const isPendingDisconnect = decision.reason === 'disconnect-not-confirmed';
+
+        if (!decision.shouldEmit && !isPendingDisconnect) {
             return;
         }
 
-        let finalStatus = decision.status;
-        const isFrozen = decision.reason === 'disconnect-not-confirmed' || decision.reason === 'Frozen (Pending Disconnect)';
+        if (isPendingDisconnect) {
+            this._logThrottled(
+                'log',
+                `status-gate:${decision.state.sourceKey}:pending-disconnect`,
+                `[StatusGate] Pending disconnect for ${source.name} (${decision.state.failCount}/${this.statusGate.failCountToDisconnect}) - holding status: ${decision.status}`,
+                30000
+            );
+            // Tetap gunakan status sebelumnya (misal Normal) agar kartu di UI tidak berkedip merah
+            finalStatus = decision.status || 'Normal';
+        }
+
+        const isFrozen = isPendingDisconnect || decision.reason === 'Frozen (Pending Disconnect)';
 
         // LKGV (Last Known Good Value) & Dash Conversion
         if (!this._lkgvCache) this._lkgvCache = new Map();
