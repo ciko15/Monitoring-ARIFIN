@@ -13,8 +13,30 @@ const { exec } = require('child_process');
 
 const RAW_DEBUG = String(process.env.RAW_DEBUG || 'false').toLowerCase() === 'true';
 
-// Cache untuk ping agar tidak flood
+// Cache dan concurrency semaphore untuk ICMP Ping agar tidak membanjiri child process
 const _pingCache = new Map();
+const _pingInFlight = new Map(); // ip -> Promise<boolean>
+let _pingActiveCount = 0;
+const _pingQueue = [];
+
+function _acquirePingSlot() {
+    const maxConcurrent = parseInt(process.env.PING_MAX_CONCURRENT, 10) || 6;
+    if (_pingActiveCount < maxConcurrent) {
+        _pingActiveCount++;
+        return Promise.resolve();
+    }
+    return new Promise(resolve => _pingQueue.push(resolve));
+}
+
+function _releasePingSlot() {
+    if (_pingQueue.length > 0) {
+        const next = _pingQueue.shift();
+        next();
+    } else {
+        _pingActiveCount = Math.max(0, _pingActiveCount - 1);
+    }
+}
+
 async function checkIcmpPing(ip) {
     if (!ip) return false;
     ip = String(ip).trim();
@@ -24,35 +46,118 @@ async function checkIcmpPing(ip) {
         if (now - cached.time < 15000) return cached.result; // Cache 15 detik
     }
 
-    return new Promise(resolve => {
-        const { exec } = require('child_process');
-        const isWin = process.platform === 'win32';
-        const cmd = isWin ? `ping -n 1 -w 1500 ${ip}` : `ping -c 1 -W 2 ${ip}`;
+    if (_pingInFlight.has(ip)) {
+        return _pingInFlight.get(ip);
+    }
 
-        const child = exec(cmd, { windowsHide: true }, (err, stdout) => {
-            const out = (stdout || '').toLowerCase();
-            let isAlive = false;
-            if (isWin) {
-                isAlive = (out.includes('ttl=') || out.includes('reply from') || out.includes('balasan dari')) &&
-                    !out.includes('destination host unreachable') &&
-                    !out.includes('tujuan host tidak dapat dijangkau') &&
-                    !out.includes('request timed out') &&
-                    !out.includes('waktu habis') &&
-                    !out.includes('100% loss');
-            } else {
-                isAlive = !err && (out.includes('ttl=') || out.includes('bytes from') || out.includes('1 packets received') || out.includes('1 received'));
+    const pingPromise = (async () => {
+        await _acquirePingSlot();
+        try {
+            return await new Promise(resolve => {
+                let settled = false;
+                const isWin = process.platform === 'win32';
+                const cmd = isWin ? `ping -n 1 -w 1500 ${ip}` : `ping -c 1 -W 2 ${ip}`;
+
+                let child = null;
+                const killTimer = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    try { if (child) child.kill(); } catch (e) { }
+                    _pingCache.set(ip, { time: Date.now(), result: false });
+                    resolve(false);
+                }, 2500);
+
+                try {
+                    child = exec(cmd, { windowsHide: true }, (err, stdout) => {
+                        if (settled) return;
+                        settled = true;
+                        clearTimeout(killTimer);
+                        const out = (stdout || '').toLowerCase();
+                        let isAlive = false;
+                        if (isWin) {
+                            isAlive = (out.includes('ttl=') || out.includes('reply from') || out.includes('balasan dari')) &&
+                                !out.includes('destination host unreachable') &&
+                                !out.includes('tujuan host tidak dapat dijangkau') &&
+                                !out.includes('request timed out') &&
+                                !out.includes('waktu habis') &&
+                                !out.includes('100% loss');
+                        } else {
+                            isAlive = !err && (out.includes('ttl=') || out.includes('bytes from') || out.includes('1 packets received') || out.includes('1 received'));
+                        }
+
+                        _pingCache.set(ip, { time: Date.now(), result: isAlive });
+                        resolve(isAlive);
+                    });
+                } catch (execErr) {
+                    if (!settled) {
+                        settled = true;
+                        clearTimeout(killTimer);
+                        _pingCache.set(ip, { time: Date.now(), result: false });
+                        resolve(false);
+                    }
+                }
+            });
+        } finally {
+            _releasePingSlot();
+            _pingInFlight.delete(ip);
+        }
+    })();
+
+    _pingInFlight.set(ip, pingPromise);
+    return pingPromise;
+}
+
+// Event Loop Lag Monitor (Singleton / once)
+let _lagMonitorStarted = false;
+let _bootLogged = false;
+let _initCounter = 0;
+
+// Load counter: per parsing_id count per minute
+const _loadCounters = new Map();
+let _loadIntervalStarted = false;
+
+function _recordLoad(parsingId) {
+    const key = parsingId || 'unknown';
+    _loadCounters.set(key, (_loadCounters.get(key) || 0) + 1);
+    if (!_loadIntervalStarted) {
+        _loadIntervalStarted = true;
+        const loadTimer = setInterval(() => {
+            if (_loadCounters.size === 0) return;
+            const entries = [];
+            let total = 0;
+            for (const [k, v] of _loadCounters.entries()) {
+                entries.push(`${k}=${v}`);
+                total += v;
             }
+            _loadCounters.clear();
+            if (total > 0) {
+                console.log(`[LOAD] handleLogOutput/min: ${entries.join(', ')}`);
+            }
+        }, 60000);
+        if (typeof loadTimer.unref === 'function') loadTimer.unref();
+    }
+}
 
-            _pingCache.set(ip, { time: now, result: isAlive });
-            resolve(isAlive);
-        });
+// Concurrency semaphore specifically for SNMP System pollSNMP
+let _snmpActiveCount = 0;
+const _snmpQueue = [];
 
-        setTimeout(() => {
-            try { child.kill(); } catch (e) { }
-            _pingCache.set(ip, { time: now, result: false });
-            resolve(false);
-        }, 2500);
-    });
+function _acquireSnmpSlot() {
+    const maxConcurrent = parseInt(process.env.SNMP_MAX_CONCURRENT, 10) || 6;
+    if (_snmpActiveCount < maxConcurrent) {
+        _snmpActiveCount++;
+        return Promise.resolve();
+    }
+    return new Promise(resolve => _snmpQueue.push(resolve));
+}
+
+function _releaseSnmpSlot() {
+    if (_snmpQueue.length > 0) {
+        const next = _snmpQueue.shift();
+        next();
+    } else {
+        _snmpActiveCount = Math.max(0, _snmpActiveCount - 1);
+    }
 }
 
 class NetworkListenerService {
@@ -67,6 +172,35 @@ class NetworkListenerService {
         this.rawEventQueue = new RawEventQueue();
         this._pollerStops = new Map(); // id -> stop function for circuit breaker pollers
         this._snmpLimitsCache = new Map(); // equipt_id -> { limitsMap, cachedAt } (TTL 5 menit)
+        this._snmpEndpointOwners = new Map(); // "ip:port" -> { id, name }
+
+        // A2. Boot info (log sekali)
+        if (!_bootLogged) {
+            _bootLogged = true;
+            const isBun = typeof Bun !== 'undefined';
+            const runtimeName = isBun ? `bun ${Bun.version}` : `node ${process.version}`;
+            const pmId = process.env.pm_id || '-';
+            console.log(`[BOOT] pid=${process.pid} runtime=${runtimeName} pm_id=${pmId}`);
+        }
+
+        // A1. Event Loop Lag Monitor (guard agar jalan tepat 1x)
+        if (!_lagMonitorStarted) {
+            _lagMonitorStarted = true;
+            let lastCheck = Date.now();
+            const lagTimer = setInterval(() => {
+                const now = Date.now();
+                const lag = now - lastCheck - 1000;
+                lastCheck = now;
+                if (lag > 1500) {
+                    const mem = process.memoryUsage ? process.memoryUsage() : {};
+                    const rssMb = mem.rss ? (mem.rss / (1024 * 1024)).toFixed(1) : '-';
+                    const heapMb = mem.heapUsed ? (mem.heapUsed / (1024 * 1024)).toFixed(1) : '-';
+                    const activePollers = this._pollerStops ? this._pollerStops.size : 0;
+                    console.warn(`[LAG] event loop terblokir ~${lag}ms rss=${rssMb}MB heap=${heapMb}MB activePollers=${activePollers} pid=${process.pid}`);
+                }
+            }, 1000);
+            if (typeof lagTimer.unref === 'function') lagTimer.unref();
+        }
 
         // Note: fs.watchFile dihapus karena sekarang direload secara instan 
         // langsung dari trigger db.setConfigUpdateHook di server.ts 
@@ -202,6 +336,7 @@ class NetworkListenerService {
     }
 
     async _handleLogOutput(source, parsedData, connectionType, initialStatus) {
+        _recordLoad(source ? source.parsing_id : connectionType);
         const initialLower = String(initialStatus || '').toLowerCase();
         const isInitialDisconnect = initialLower === 'disconnect' || initialLower === 'error' || initialLower === 'offline';
         let statusToEvaluate = 'Normal';
@@ -474,11 +609,16 @@ class NetworkListenerService {
             return;
         }
         this._isInitializing = true;
+        _initCounter++;
+        console.log(`[NetworkListener] initialize #${_initCounter} (pid=${process.pid})`);
 
         console.log('[NetworkListener] Initializing listeners...');
         this.stopAll();
         if (this._snmpLimitsCache) {
             this._snmpLimitsCache.clear();
+        }
+        if (this._snmpEndpointOwners) {
+            this._snmpEndpointOwners.clear();
         }
 
         try {
@@ -1311,6 +1451,29 @@ class NetworkListenerService {
         const port = parseInt(snmp_port) || 161;
         const version = snmp_version || '2c';
 
+        if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
+
+        // A4. Deteksi start ganda
+        if (this._snmpSystemTimers.has(id)) {
+            console.warn(`[DUP-START] listener id=${id} name=${name} dipanggil lagi tanpa stopAll`);
+        }
+
+        const endpointKey = `${ip_address}:${port}`;
+        if (this._snmpEndpointOwners && this._snmpEndpointOwners.has(endpointKey)) {
+            const owner = this._snmpEndpointOwners.get(endpointKey);
+            if (owner.id !== id) {
+                console.warn(`[DUP-SOURCE] ${name} dan ${owner.name} memakai endpoint SNMP sama ${endpointKey}`);
+                // FASE D: Pengaman start ganda, GATED (default MATI)
+                const shouldSkip = String(process.env.SNMP_DEDUPE_SKIP || 'false').toLowerCase() === 'true';
+                if (shouldSkip) {
+                    console.warn(`[DUP-SOURCE] skipped starting duplicate listener for ${name} (${endpointKey})`);
+                    return;
+                }
+            }
+        } else if (this._snmpEndpointOwners) {
+            this._snmpEndpointOwners.set(endpointKey, { id, name });
+        }
+
         const parserFile = source.parsing_id === 'snmp_network_basic' ? 'snmp_network_basic' : 'snmp_system';
         const { pollSNMP } = require(`../parsers/${parserFile}`);
 
@@ -1361,7 +1524,15 @@ class NetworkListenerService {
                 }
                 t1 = Date.now();
 
-                const result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap, timeoutMs: 15000 });
+                // FASE C: Batasi concurrency pollSNMP + timeout via env (mulai SETELAH slot didapat)
+                const snmpTimeoutMs = parseInt(process.env.SNMP_POLL_TIMEOUT_MS, 10) || 30000;
+                await _acquireSnmpSlot();
+                let result = null;
+                try {
+                    result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap, timeoutMs: snmpTimeoutMs });
+                } finally {
+                    _releaseSnmpSlot();
+                }
                 t2 = Date.now();
 
                 const logLine = `[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error || 'none'}`;
@@ -1410,7 +1581,6 @@ class NetworkListenerService {
             }
         };
 
-        if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
         this._startCircuitBreakerPolling({
             id,
             name,
