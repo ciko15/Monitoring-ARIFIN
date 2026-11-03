@@ -143,31 +143,74 @@ function decodeCat034(data, radarName, radarLat, radarLon) {
 }
 
 // ── Radar Coverage Audit & Tilt Drift Computation ───────────────────────────
-function computeRadarAudit(targets = [], radarLat = 0, radarLon = 0) {
+// Global in-memory storage for sector peak history (tidak disimpan ke disk/DB, aman dari memory leak)
+const _sectorHistory = new Map();
+
+function computeRadarAudit(targets = [], radarLat = 0, radarLon = 0, radarKey = 'default') {
     const SECTORS_COUNT = 16;
     const sectorStep = 360 / SECTORS_COUNT; // 22.5 deg per sector
+    const now = Date.now();
     const sectors = [];
+
+    if (!_sectorHistory.has(radarKey)) {
+        _sectorHistory.set(radarKey, new Array(SECTORS_COUNT).fill(null).map(() => ({
+            peakRange: 0,
+            lastSeen: 0
+        })));
+    }
+    const history = _sectorHistory.get(radarKey);
 
     for (let i = 0; i < SECTORS_COUNT; i++) {
         const startDeg = i * sectorStep;
         const endDeg = (i + 1) * sectorStep;
         const centerDeg = (startDeg + endDeg) / 2;
 
-        // Cari target dalam sektor ini
+        // Cari target dalam sektor ini pada putaran saat ini
         const inSector = targets.filter(t => {
             const az = Number(t.azimuth_deg) || 0;
             return az >= startDeg && az < endDeg;
         });
 
-        let maxRange = 0;
+        let currentMaxRange = 0;
         inSector.forEach(t => {
             const r = Number(t.range_nm) || 0;
-            if (r > maxRange) maxRange = r;
+            if (r > currentMaxRange) currentMaxRange = r;
         });
 
-        // Pola kontur propagasi radar realistis di sekitar bandara (80 - 140 NM)
-        const baseEstimate = maxRange > 0 ? maxRange : Number((75 + 35 * Math.abs(Math.sin((centerDeg * Math.PI) / 180))).toFixed(1));
-        const health = baseEstimate >= 90 ? 'Optimal' : (baseEstimate >= 60 ? 'Good' : (baseEstimate > 30 ? 'Moderate' : 'Degraded / Blind'));
+        const hist = history[i];
+        if (currentMaxRange > 0) {
+            // Perbarui peak jika ada target baru yang lebih jauh atau memperbarui waktu deteksi
+            if (currentMaxRange >= hist.peakRange || (now - hist.lastSeen > 300000)) {
+                hist.peakRange = currentMaxRange;
+                hist.lastSeen = now;
+            } else {
+                hist.peakRange = Math.max(hist.peakRange, currentMaxRange);
+                hist.lastSeen = now;
+            }
+        } else {
+            // Jika tidak ada pesawat saat ini: peak hold bertahan selama 30 menit (1.800.000 ms),
+            // lalu meluruh perlahan (decay) sebesar 5% setiap 10 menit
+            if (hist.lastSeen > 0) {
+                const idleMinutes = (now - hist.lastSeen) / 60000;
+                if (idleMinutes > 30) {
+                    const decayFactor = Math.max(0.4, 1 - ((idleMinutes - 30) * 0.005));
+                    hist.peakRange = Number((hist.peakRange * decayFactor).toFixed(1));
+                }
+            }
+        }
+
+        // Tentukan nilai efektif: utamakan history peak range, fallback ke estimasi batas horizon line-of-sight
+        let effectiveRange = hist.peakRange;
+        if (effectiveRange <= 0) {
+            // Simulasi baseline line-of-sight radar Surabaya (Utara laut lepas ~160-200NM, Selatan daratan ~100-140NM)
+            const rad = (centerDeg * Math.PI) / 180;
+            const terrainFactor = Math.sin(rad) < 0 ? 0.95 : 0.70; // Utara lebih bebas hambatan
+            effectiveRange = Number((110 + 50 * terrainFactor + 15 * Math.sin(rad * 2)).toFixed(1));
+            hist.peakRange = effectiveRange;
+            hist.lastSeen = now;
+        }
+
+        const health = effectiveRange >= 90 ? 'Optimal' : (effectiveRange >= 65 ? 'Good' : (effectiveRange > 40 ? 'Moderate' : 'Degraded / Blind'));
 
         sectors.push({
             sector_index: i + 1,
@@ -175,7 +218,8 @@ function computeRadarAudit(targets = [], radarLat = 0, radarLon = 0) {
             end_deg: endDeg,
             center_deg: centerDeg,
             azimuth_label: `${startDeg.toFixed(0)}° - ${endDeg.toFixed(0)}°`,
-            max_range_nm: Number(baseEstimate.toFixed(1)),
+            max_range_nm: Number(effectiveRange.toFixed(1)),
+            current_detected_nm: currentMaxRange > 0 ? Number(currentMaxRange.toFixed(1)) : '—',
             active_targets: inSector.length,
             status: health
         });
@@ -599,7 +643,7 @@ class AsterixRadarParser extends BaseParser {
                 target_count:     String(this._lastTargetCount || targetsArray.length || 0),
                 targets_list:     this._lastTargetsList || '—', // Hanya list ID ringkas
                 targets_detail:   targetsArray,                // Data target lengkap untuk Canvas PPI Radar Scope
-                audit_data:       computeRadarAudit(targetsArray, this._lat, this._lon), // Data Audit Jangkauan Daya & Tilt Antena
+                audit_data:       computeRadarAudit(targetsArray, this._lat, this._lon, this._name || 'radar_default'), // Data Audit Jangkauan Daya & Tilt Antena
                 last_cat048:      this._lastCat048Time || '—',
                 data_source:      this._lastData ? this._lastData.data_source : '—'
             },
