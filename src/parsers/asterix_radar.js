@@ -582,7 +582,43 @@ class AsterixRadarParser extends BaseParser {
             const decodedTargets = decodeCat048(rawData, this._lat, this._lon);
             if (decodedTargets && decodedTargets.length > 0) {
                 for (const t of decodedTargets) {
-                    if (t.id && (t.range_nm !== null || t.lat !== null)) {
+                    if (!t || (t.range_nm === null && t.lat === null)) continue;
+
+                    // Plot Coalescing (Penggabungan Korelasi Sinyal):
+                    // Cek apakah sudah ada target pada koordinat polar yang sama (ΔR <= 0.3 NM, ΔAz <= 0.6°)
+                    let existingKey = null;
+                    for (const [key, extTgt] of this._recentTargets.entries()) {
+                        const dR = Math.abs((extTgt.range_nm || 0) - (t.range_nm || 0));
+                        let dAz = Math.abs((extTgt.azimuth_deg || 0) - (t.azimuth_deg || 0));
+                        if (dAz > 180) dAz = 360 - dAz;
+
+                        // Jika berada di titik koordinat radar yang sama (reply dari pesawat yang sama)
+                        if (dR <= 0.35 && dAz <= 0.6) {
+                            existingKey = key;
+                            break;
+                        }
+                    }
+
+                    if (existingKey) {
+                        const ext = this._recentTargets.get(existingKey);
+                        // Gabungkan data pelengkap (Mode 3/A Squawk atau Mode C Flight Level)
+                        if ((!ext.squawk || ext.squawk === '—') && t.squawk && t.squawk !== '—') {
+                            ext.squawk = t.squawk;
+                            if (ext.id.startsWith('TGT-')) ext.id = `SQ${t.squawk}`;
+                        }
+                        if ((ext.fl === null || ext.fl === undefined) && t.fl !== null && t.fl !== undefined) {
+                            ext.fl = t.fl;
+                            ext.alt = t.alt;
+                        }
+                        if (!ext.callsign && t.callsign) {
+                            ext.callsign = t.callsign;
+                            ext.id = t.callsign;
+                        }
+                        ext.last_seen = now;
+                        // Simpan kembali
+                        this._recentTargets.delete(existingKey);
+                        this._recentTargets.set(ext.id, ext);
+                    } else if (t.id) {
                         this._recentTargets.set(t.id, t);
                     }
                 }

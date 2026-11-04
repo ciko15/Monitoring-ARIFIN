@@ -1175,18 +1175,18 @@
             badge.innerHTML = `<strong style="color: #00ffcc;">${targets.length}</strong> Pesawat Terdeteksi`;
         }
 
-        // Counter Double Targets
-        let doubleCount = 0;
-        for (const isDup of doubleMap.values()) {
-            if (isDup) doubleCount++;
-        }
+        // Hitung Berapa Pesawat / Skenario yang Terduplikasi (Cluster Target Dobel / Tripel)
+        // 2 atau 3 target dari 1 pesawat dihitung sebagai 1 kasus anomali pesawat
+        const report = Array.isArray(_lastDuplicateAuditReport) ? _lastDuplicateAuditReport : [];
+        const anomalousPlaneCount = report.length;
+
         const doubleBadge = document.getElementById('radarDoubleSummaryBadge');
         const doubleText = document.getElementById('radarDoubleCountText');
         const doubleNotice = document.getElementById('radarDoubleNotice');
         if (doubleBadge && doubleText) {
-            if (doubleCount > 0) {
+            if (anomalousPlaneCount > 0) {
                 doubleBadge.style.display = 'inline-flex';
-                doubleText.textContent = `${doubleCount} Target Dobel Terdeteksi`;
+                doubleText.textContent = `${anomalousPlaneCount} Pesawat Terduplikasi (Split/Echo)`;
                 if (doubleNotice) doubleNotice.style.display = 'inline';
             } else {
                 doubleBadge.style.display = 'none';
