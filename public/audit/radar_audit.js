@@ -512,14 +512,6 @@
                     <button class="radar-tab-btn" id="radarTabBtnAudit" onclick="window.switchRadarTab('audit')">
                         <i class="fas fa-chart-pie"></i> Audit Jangkauan & Tilt Antena
                     </button>
-                    <!-- Toggle Peta -->
-                    <button class="radar-tab-btn" id="radarToggleMapBtn" onclick="window.toggleRadarMap()" style="border-color: #00ffcc; color: #00ffcc;">
-                        <i class="fas fa-map"></i> Peta: <span id="radarMapStateText">AKTIF</span>
-                    </button>
-                    <!-- Mode Terang / Gelap Peta -->
-                    <button class="radar-tab-btn" id="radarMapThemeBtn" onclick="window.toggleRadarMapTheme()" style="border-color: #38bdf8; color: #38bdf8;" title="Ganti mode peta Terang / Gelap">
-                        <i class="fas fa-sun"></i> Mode: <span id="radarMapThemeText">TERANG</span>
-                    </button>
                 </div>
                 <div id="radarPpiControlsRight" style="display: flex; align-items: center; gap: 12px;">
                     <div style="display: flex; align-items: center; gap: 4px;">
@@ -749,9 +741,20 @@
                 }
             });
 
-            // 1. Mouse Wheel Zoom (Scroll Wheel / Trackpad Scroll)
+            // 1. Mouse Wheel Zoom (Scroll Wheel / Trackpad Pinch Gesture pada Mac)
             canvas.addEventListener('wheel', e => {
                 e.preventDefault();
+                // Pada Mac Trackpad, gesture cubit (pinch to zoom) mengirim event wheel dengan e.ctrlKey = true
+                if (e.ctrlKey) {
+                    // Smooth continuous pinch zoom
+                    const factor = e.deltaY < 0 ? 0.94 : 1.06;
+                    let targetRange = Math.round(_radarRangeNm * factor);
+                    targetRange = Math.max(15, Math.min(300, targetRange));
+                    window.setRadarPpiRange(targetRange);
+                    return;
+                }
+
+                // Scroll wheel biasa (discrete steps)
                 const delta = e.deltaY;
                 const ranges = [20, 40, 60, 80, 100, 120, 160, 200, 250];
                 let currentIdx = ranges.findIndex(r => r >= _radarRangeNm);
@@ -770,7 +773,21 @@
                 }
             }, { passive: false });
 
-            // 2. Touch Events: Cubit / Pinch to Zoom (Dua jari di layar sentuh / tablet / HP / touch monitor)
+            // 2. Drag / Pan Map Menggunakan Mouse atau Trackpad Drag
+            let _isDraggingMap = false;
+            let _dragStartPos = { x: 0, y: 0 };
+
+            canvas.addEventListener('mousedown', e => {
+                // Drag peta dengan tombol kiri (jika bukan klik target)
+                _isDraggingMap = true;
+                _dragStartPos = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('mouseup', () => {
+                _isDraggingMap = false;
+            });
+
+            // 3. Touch Events: Cubit / Pinch to Zoom (Dua jari di layar sentuh / trackpad)
             let _initialPinchDist = null;
             let _initialRangeNm = _radarRangeNm;
 
@@ -782,6 +799,8 @@
                     _initialPinchDist = Math.hypot(dx, dy);
                     _initialRangeNm = _radarRangeNm;
                 } else if (e.touches.length === 1) {
+                    _isDraggingMap = true;
+                    _dragStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                     const rect = canvas.getBoundingClientRect();
                     _radarMousePos.x = e.touches[0].clientX - rect.left;
                     _radarMousePos.y = e.touches[0].clientY - rect.top;
@@ -796,12 +815,18 @@
                     const currentDist = Math.hypot(dx, dy);
                     const scale = currentDist / _initialPinchDist;
 
-                    // Jika dicubit merapat (scale < 1) -> Zoom Out (jarak membesar)
-                    // Jika dicubit merenggang (scale > 1) -> Zoom In (jarak mengecil)
+                    // Buka cubitan (scale > 1) -> Zoom In (jarak NM mengecil)
+                    // Rapatkan cubitan (scale < 1) -> Zoom Out (jarak NM membesar)
                     let newRange = Math.round(_initialRangeNm / scale);
-                    newRange = Math.max(15, Math.min(250, newRange));
+                    newRange = Math.max(15, Math.min(300, newRange));
                     window.setRadarPpiRange(newRange);
-                } else if (e.touches.length === 1) {
+                } else if (e.touches.length === 1 && _isDraggingMap && _radarMap) {
+                    const dx = e.touches[0].clientX - _dragStartPos.x;
+                    const dy = e.touches[0].clientY - _dragStartPos.y;
+                    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                        _radarMap.panBy([-dx, -dy], { animate: false });
+                        _dragStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    }
                     const rect = canvas.getBoundingClientRect();
                     _radarMousePos.x = e.touches[0].clientX - rect.left;
                     _radarMousePos.y = e.touches[0].clientY - rect.top;
@@ -811,6 +836,9 @@
             canvas.addEventListener('touchend', e => {
                 if (e.touches.length < 2) {
                     _initialPinchDist = null;
+                }
+                if (e.touches.length === 0) {
+                    _isDraggingMap = false;
                 }
             });
         }
@@ -859,8 +887,8 @@
                 zoom: zoom,
                 zoomControl: false,
                 attributionControl: false,
-                dragging: false,
-                scrollWheelZoom: false,
+                dragging: true, // Bisa geser-geser peta bebas dengan drag mouse / trackpad
+                scrollWheelZoom: false, // Zoom dikendalikan via zoom in / zoom out PPI scope
                 doubleClickZoom: false,
                 boxZoom: false,
                 keyboard: false
@@ -870,12 +898,23 @@
                 subdomains: ['a', 'b', 'c'],
                 maxZoom: 19
             }).addTo(_radarMap);
+
+            // Re-render target saat peta digeser
+            _radarMap.on('move', () => {
+                if (typeof drawRadarPPI === 'function') drawRadarPPI();
+            });
+            _radarMap.on('moveend', () => {
+                if (typeof drawRadarPPI === 'function') drawRadarPPI();
+            });
         } else {
-            _radarMap.setView([_lastRadarCoords.lat, _lastRadarCoords.lon], zoom, { animate: false });
+            // Update zoom jika range berubah drastis tanpa reset center jika user sedang menggeser peta
+            if (rangeNm) {
+                _radarMap.setZoom(zoom, { animate: false });
+            }
             _radarMap.invalidateSize();
         }
 
-        container.style.opacity = _isMapEnabled ? '0.88' : '0.0';
+        container.style.opacity = '0.90';
     }
 
     window.toggleRadarMap = function () {
@@ -1250,8 +1289,20 @@
 
         ctx.clearRect(0, 0, w, h);
 
-        const cx = w / 2;
-        const cy = h / 2;
+        let cx = w / 2;
+        let cy = h / 2;
+
+        // Jika peta Leaflet aktif dan valid, ambil titik proyeksi stasiun radar di layar
+        if (_radarMap && _lastRadarCoords && _lastRadarCoords.lat) {
+            try {
+                const pt = _radarMap.latLngToContainerPoint([_lastRadarCoords.lat, _lastRadarCoords.lon]);
+                if (pt && !isNaN(pt.x) && !isNaN(pt.y)) {
+                    cx = pt.x;
+                    cy = pt.y;
+                }
+            } catch (e) { }
+        }
+
         const maxRadius = Math.min(w, h) * 0.44;
 
         // 1. Radar PPI Circle Scope
@@ -1391,7 +1442,7 @@
         targets.forEach(tgt => {
             let range = Number(tgt.range_nm) || 0;
             let azim = Number(tgt.azimuth_deg) || 0;
-            if (range <= 0 || range > _radarRangeNm * 1.05) return;
+            if (range <= 0) return; // Tetap tampilkan semua data target yang terdeteksi, tidak memfilter batas jarak
 
             // Jika target ini adalah double target / bertumpuk di titik yang sama,
             // berikan mikro-offset radial & sudut agar kedua target sama-sama terlihat jelas dan berdampingan
