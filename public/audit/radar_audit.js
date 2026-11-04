@@ -647,7 +647,7 @@
         `;
         document.body.appendChild(sidebar);
 
-        // Attach mouse events to canvas
+        // Attach mouse & touch events to canvas (Termasuk Cubit / Pinch Zoom dan Scroll Wheel Zoom)
         const canvas = document.getElementById('radarPpiCanvas');
         if (canvas) {
             canvas.addEventListener('mousemove', e => {
@@ -670,6 +670,71 @@
                     updateRadarPpiTargetsUI();
                 }
             });
+
+            // 1. Mouse Wheel Zoom (Scroll Wheel / Trackpad Scroll)
+            canvas.addEventListener('wheel', e => {
+                e.preventDefault();
+                const delta = e.deltaY;
+                const ranges = [20, 40, 60, 80, 100, 120, 160, 200, 250];
+                let currentIdx = ranges.findIndex(r => r >= _radarRangeNm);
+                if (currentIdx === -1) currentIdx = ranges.length - 1;
+
+                if (delta > 0) {
+                    // Zoom Out (Range bertambah)
+                    if (currentIdx < ranges.length - 1) {
+                        window.setRadarPpiRange(ranges[currentIdx + 1]);
+                    }
+                } else if (delta < 0) {
+                    // Zoom In (Range berkurang)
+                    if (currentIdx > 0) {
+                        window.setRadarPpiRange(ranges[currentIdx - 1]);
+                    }
+                }
+            }, { passive: false });
+
+            // 2. Touch Events: Cubit / Pinch to Zoom (Dua jari di layar sentuh / tablet / HP / touch monitor)
+            let _initialPinchDist = null;
+            let _initialRangeNm = _radarRangeNm;
+
+            canvas.addEventListener('touchstart', e => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    _initialPinchDist = Math.hypot(dx, dy);
+                    _initialRangeNm = _radarRangeNm;
+                } else if (e.touches.length === 1) {
+                    const rect = canvas.getBoundingClientRect();
+                    _radarMousePos.x = e.touches[0].clientX - rect.left;
+                    _radarMousePos.y = e.touches[0].clientY - rect.top;
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', e => {
+                if (e.touches.length === 2 && _initialPinchDist) {
+                    e.preventDefault();
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const currentDist = Math.hypot(dx, dy);
+                    const scale = currentDist / _initialPinchDist;
+
+                    // Jika dicubit merapat (scale < 1) -> Zoom Out (jarak membesar)
+                    // Jika dicubit merenggang (scale > 1) -> Zoom In (jarak mengecil)
+                    let newRange = Math.round(_initialRangeNm / scale);
+                    newRange = Math.max(15, Math.min(250, newRange));
+                    window.setRadarPpiRange(newRange);
+                } else if (e.touches.length === 1) {
+                    const rect = canvas.getBoundingClientRect();
+                    _radarMousePos.x = e.touches[0].clientX - rect.left;
+                    _radarMousePos.y = e.touches[0].clientY - rect.top;
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', e => {
+                if (e.touches.length < 2) {
+                    _initialPinchDist = null;
+                }
+            });
         }
 
         window.addEventListener('resize', () => {
@@ -682,10 +747,10 @@
     // ── LEAFLET MAP CONTROLLER UNTUK PPI ──────────────────────────────────────
     function getTileLayerUrl(theme) {
         if (theme === 'dark') {
-            return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            return 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}.png';
         }
-        // Mode Terang (CartoDB Positron - Peta Terang Elegan, Kontur, Pulau, Kota Jelas)
-        return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+        // Mode Terang: OpenStreetMap Standard (Gratis 100%, tanpa API key watermark, jernih & detail)
+        return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     }
 
     function initOrUpdateRadarMap(lat, lon, rangeNm) {
@@ -701,9 +766,9 @@
         _lastRadarCoords = { lat: parseFloat(lat), lon: parseFloat(lon) };
 
         // Konversi range (NM) ke perkiraan Leaflet Zoom level
-        // 40 NM ~ zoom 9; 80 NM ~ zoom 8; 120 NM ~ zoom 7; 200 NM ~ zoom 6
         let zoom = 7;
-        if (rangeNm <= 45) zoom = 9;
+        if (rangeNm <= 25) zoom = 10;
+        else if (rangeNm <= 45) zoom = 9;
         else if (rangeNm <= 85) zoom = 8;
         else if (rangeNm <= 140) zoom = 7;
         else zoom = 6;
@@ -722,7 +787,7 @@
             });
 
             _radarTileLayer = L.tileLayer(getTileLayerUrl(_mapTheme), {
-                subdomains: 'abcd',
+                subdomains: ['a', 'b', 'c'],
                 maxZoom: 19
             }).addTo(_radarMap);
         } else {
@@ -748,7 +813,7 @@
         if (_radarMap && _radarTileLayer) {
             _radarMap.removeLayer(_radarTileLayer);
             _radarTileLayer = L.tileLayer(getTileLayerUrl(_mapTheme), {
-                subdomains: 'abcd',
+                subdomains: ['a', 'b', 'c'],
                 maxZoom: 19
             }).addTo(_radarMap);
         }
@@ -1226,17 +1291,44 @@
         const targets = (srcData && Array.isArray(srcData.targets_detail)) ? srcData.targets_detail : [];
         const doubleMap = detectDuplicateTargets(targets);
 
+        // Petakan indeks target yang berada di koordinat/polar yang sama agar tidak saling menumpuk 100%
+        const posClusterMap = new Map();
+        targets.forEach(t => {
+            const r = Math.round((Number(t.range_nm) || 0) * 10) / 10;
+            const a = Math.round((Number(t.azimuth_deg) || 0) * 10) / 10;
+            const key = `${r}_${a}`;
+            if (!posClusterMap.has(key)) posClusterMap.set(key, []);
+            posClusterMap.get(key).push(t);
+        });
+
         let currentHovered = null;
 
         targets.forEach(tgt => {
-            const range = Number(tgt.range_nm) || 0;
-            const azim = Number(tgt.azimuth_deg) || 0;
+            let range = Number(tgt.range_nm) || 0;
+            let azim = Number(tgt.azimuth_deg) || 0;
             if (range <= 0 || range > _radarRangeNm * 1.05) return;
+
+            // Jika target ini adalah double target / bertumpuk di titik yang sama,
+            // berikan mikro-offset radial & sudut agar kedua target sama-sama terlihat jelas dan berdampingan
+            const clusterKey = `${Math.round(range * 10) / 10}_${Math.round(azim * 10) / 10}`;
+            const cluster = posClusterMap.get(clusterKey) || [];
+            let offsetPxX = 0;
+            let offsetPxY = 0;
+            let tagOffsetY = 0;
+
+            if (cluster.length > 1) {
+                const idxInCluster = cluster.indexOf(tgt);
+                // Geser posisi ikon 12px ke arah berlawanan untuk target ganda
+                const angleOffset = (idxInCluster === 0 ? -1 : 1) * (Math.PI / 4);
+                offsetPxX = Math.cos(angleOffset) * (idxInCluster * 14);
+                offsetPxY = Math.sin(angleOffset) * (idxInCluster * 14);
+                tagOffsetY = (idxInCluster === 0 ? -12 : 12);
+            }
 
             const distPx = (range / _radarRangeNm) * maxRadius;
             const targetRad = (azim - 90) * (Math.PI / 180);
-            const tx = cx + distPx * Math.cos(targetRad);
-            const ty = cy + distPx * Math.sin(targetRad);
+            const tx = cx + distPx * Math.cos(targetRad) + offsetPxX;
+            const ty = cy + distPx * Math.sin(targetRad) + offsetPxY;
 
             // Deteksi Hover
             const dx = _radarMousePos.x - tx;
@@ -1344,12 +1436,12 @@
             ctx.fillStyle = isDouble ? '#ff5555' : (isSelected ? '#ffcc00' : (_mapTheme === 'light' ? '#0f172a' : '#00ffcc'));
             ctx.textAlign = 'left';
             const tagLabel = isDouble ? `⚠ ${tgt.callsign || tgt.id} [DBL]` : (tgt.callsign || tgt.id);
-            ctx.fillText(tagLabel, tx + 12, ty - 2);
+            ctx.fillText(tagLabel, tx + 12, ty - 2 + tagOffsetY);
 
             ctx.font = '9px monospace';
             ctx.fillStyle = isDouble ? '#fca5a5' : (_mapTheme === 'light' ? '#334155' : '#94a3b8');
             const altLabel = tgt.fl ? `FL${tgt.fl}` : (tgt.alt ? `${tgt.alt}ft` : 'FL—');
-            ctx.fillText(`${altLabel} · SQ${tgt.squawk || '—'}`, tx + 12, ty + 10);
+            ctx.fillText(`${altLabel} · SQ${tgt.squawk || '—'}`, tx + 12, ty + 10 + tagOffsetY);
         });
 
         // 5b. Gambar Transponder Kalibrasi / Acuan Statis di PPI Scope
