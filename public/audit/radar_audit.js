@@ -24,6 +24,24 @@
     let _mapTheme = 'light'; // Default 'light' (peta terang) sesuai permintaan
     let _lastRadarCoords = { lat: -4.5284, lon: 136.8860 }; // Default Timika (atau dinamik dari sumber data)
     let _isIslsFilterEnabled = false; // Fitur ISLS / Anti-Multipath Filter (Default: NONAKTIF)
+    let _radarTargetTrafficFilter = 'all'; // 'all', 'inbound' (incoming), 'outbound' (outgoing)
+
+    // Deteksi Arah Lalu Lintas Pesawat: Incoming (Mendekati radar) vs Outgoing (Menjauhi radar)
+    function getTargetTrafficDirection(tgt, radarLat, radarLon) {
+        const azim = Number(tgt.azimuth_deg) || 0;
+        let hdg = Number(tgt.heading);
+        if (isNaN(hdg)) hdg = azim;
+
+        // Azimuth adalah arah dari stasiun radar ke pesawat (0 - 360).
+        // Arah lurus menuju stasiun radar (radial inbound) adalah (azim + 180) % 360.
+        // Jika heading pesawat berdeviasi < 90 derajat dari radial inbound, maka pesawat INBOUND (Mendekat).
+        // Sebaliknya, jika deviasinya > 90 derajat (menjauh dari radar), maka pesawat OUTBOUND (Menjauh).
+        const radialInbound = (azim + 180) % 360;
+        let diff = Math.abs(hdg - radialInbound);
+        if (diff > 180) diff = 360 - diff;
+
+        return diff <= 90 ? 'inbound' : 'outbound';
+    }
 
     // Formula Geodetik Standar WGS84 (Great Circle / Rhumb Line)
     function calculatePolarToLatLon(radarLat, radarLon, rangeNm, azimuthDeg) {
@@ -566,10 +584,19 @@
 
                     <!-- Sub-panel Target List -->
                     <div class="radar-targets-panel">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 10px; font-weight: 700; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase;">
-                                <i class="fas fa-plane" style="color: #00ffcc;"></i> DAFTAR PESAWAT AKTIF (ASTERIX CAT 048) — <span id="radarDoubleNotice" style="color: #ff5555; display: none;">TARGET BERTUMPUK / MERAH = GANDA (DUPLICATE)</span>
-                            </span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 10px; font-weight: 700; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase;">
+                                    <i class="fas fa-plane" style="color: #00ffcc;"></i> DAFTAR PESAWAT (CAT 048)
+                                </span>
+                                <!-- Filter Incoming / Outgoing -->
+                                <div style="display: inline-flex; background: rgba(15, 28, 52, 0.9); border: 1px solid rgba(0, 212, 255, 0.25); border-radius: 4px; padding: 2px; gap: 2px;">
+                                    <button id="btnTrafficAll" onclick="window.setRadarTrafficFilter('all')" class="radar-range-btn active" style="padding: 2px 8px; font-size: 10px;">Semua (<span id="countTrafficAll">0</span>)</button>
+                                    <button id="btnTrafficInbound" onclick="window.setRadarTrafficFilter('inbound')" class="radar-range-btn" style="padding: 2px 8px; font-size: 10px; color: #38bdf8;">📥 Incoming (<span id="countTrafficIn">0</span>)</button>
+                                    <button id="btnTrafficOutbound" onclick="window.setRadarTrafficFilter('outbound')" class="radar-range-btn" style="padding: 2px 8px; font-size: 10px; color: #f59e0b;">📤 Outgoing (<span id="countTrafficOut">0</span>)</button>
+                                </div>
+                                <span id="radarDoubleNotice" style="color: #ff5555; font-size: 10px; font-weight: 700; display: none;">TARGET BERTUMPUK / MERAH = GANDA (DUPLICATE)</span>
+                            </div>
                             <span style="font-size: 10px; color: #475569;" id="radarLastCat048Text">Update: Real-time</span>
                         </div>
                         <div class="radar-targets-strip" id="radarTargetsStrip">
@@ -645,8 +672,8 @@
             </div>
 
             <!-- MODAL: KALIBRASI TRANSPONDER REFERENSI -->
-            <div id="radarRefModal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 14, 0.85); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-                <div style="background: #091322; border: 1px solid #00d4ff; border-radius: 8px; width: 380px; max-width: 90%; padding: 20px; box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);">
+            <div id="radarRefModal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 14, 0.35); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(1.5px);">
+                <div style="background: rgba(9, 19, 34, 0.95); border: 1px solid #00d4ff; border-radius: 8px; width: 380px; max-width: 90%; padding: 20px; box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid rgba(0, 212, 255, 0.2); padding-bottom: 8px;">
                         <span style="font-weight: 700; color: #ffaa00; font-size: 13px;"><i class="fas fa-sliders-h"></i> Kalibrasi Transponder Referensi</span>
                         <button onclick="window.closeRefTxpConfigModal()" style="background: transparent; border: none; color: #94a3b8; font-size: 14px; cursor: pointer;"><i class="fas fa-times"></i></button>
@@ -685,8 +712,8 @@
             </div>
 
             <!-- MODAL: AUDIT ANOMALI TARGET DOBEL & SARAN PERBAIKAN TEKNIS -->
-            <div id="radarDuplicateAuditModal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 14, 0.88); z-index: 10001; align-items: center; justify-content: center; backdrop-filter: blur(6px); padding: 20px; box-sizing: border-box;">
-                <div style="background: #091322; border: 1px solid #ef4444; border-radius: 10px; width: 850px; max-width: 95%; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 15px 45px rgba(239, 68, 68, 0.35); overflow: hidden;">
+            <div id="radarDuplicateAuditModal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 14, 0.35); z-index: 10001; align-items: center; justify-content: center; backdrop-filter: blur(1.5px); padding: 20px; box-sizing: border-box;">
+                <div style="background: rgba(9, 19, 34, 0.95); border: 1px solid #ef4444; border-radius: 10px; width: 850px; max-width: 95%; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 15px 45px rgba(239, 68, 68, 0.4); overflow: hidden;">
                     <!-- Header Modal -->
                     <div style="padding: 14px 20px; background: rgba(239, 68, 68, 0.12); border-bottom: 1px solid rgba(239, 68, 68, 0.3); display: flex; justify-content: space-between; align-items: center;">
                         <div style="display: flex; align-items: center; gap: 10px;">
@@ -735,7 +762,11 @@
                 const hud = document.getElementById('radarHoverHud');
                 if (hud) hud.style.display = 'none';
             });
-            canvas.addEventListener('click', () => {
+            canvas.addEventListener('click', e => {
+                if (_hasDraggedMap) {
+                    _hasDraggedMap = false;
+                    return;
+                }
                 if (_radarHoveredTarget) {
                     _radarSelectedTargetId = _radarHoveredTarget.id;
                     updateRadarPpiTargetsUI();
@@ -777,18 +808,39 @@
                 }
             }, { passive: false });
 
-            // 2. Drag / Pan Map Menggunakan Mouse atau Trackpad Drag
+            // 2. Drag / Pan Map Menggunakan Shift + Drag Mouse / Trackpad
             let _isDraggingMap = false;
             let _dragStartPos = { x: 0, y: 0 };
+            let _hasDraggedMap = false;
 
             canvas.addEventListener('mousedown', e => {
-                // Drag peta dengan tombol kiri (jika bukan klik target)
-                _isDraggingMap = true;
-                _dragStartPos = { x: e.clientX, y: e.clientY };
+                // Bisa geser maps dengan menahan tombol Shift + drag mouse, atau klik tombol tengah
+                if (e.shiftKey || e.button === 1) {
+                    _isDraggingMap = true;
+                    _hasDraggedMap = false;
+                    _dragStartPos = { x: e.clientX, y: e.clientY };
+                    canvas.style.cursor = 'grab';
+                }
+            });
+
+            window.addEventListener('mousemove', e => {
+                if (_isDraggingMap && _radarMap) {
+                    const dx = e.clientX - _dragStartPos.x;
+                    const dy = e.clientY - _dragStartPos.y;
+                    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                        _hasDraggedMap = true;
+                        canvas.style.cursor = 'grabbing';
+                        _radarMap.panBy([-dx, -dy], { animate: false });
+                        _dragStartPos = { x: e.clientX, y: e.clientY };
+                    }
+                }
             });
 
             window.addEventListener('mouseup', () => {
-                _isDraggingMap = false;
+                if (_isDraggingMap) {
+                    _isDraggingMap = false;
+                    canvas.style.cursor = 'default';
+                }
             });
 
             // 3. Touch Events: Cubit / Pinch to Zoom (Dua jari di layar sentuh / trackpad)
@@ -863,7 +915,7 @@
         return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     }
 
-    function initOrUpdateRadarMap(lat, lon, rangeNm) {
+    function initOrUpdateRadarMap(lat, lon, rangeNm, forceCenter = false) {
         if (typeof L === 'undefined') return;
         const container = document.getElementById('radarMapUnderlay');
         if (!container) return;
@@ -893,8 +945,8 @@
                 zoom: zoom,
                 zoomControl: false,
                 attributionControl: false,
-                dragging: true, // Bisa geser-geser peta bebas dengan drag mouse / trackpad
-                scrollWheelZoom: false, // Zoom dikendalikan via zoom in / zoom out PPI scope
+                dragging: true,
+                scrollWheelZoom: false,
                 doubleClickZoom: false,
                 boxZoom: false,
                 keyboard: false
@@ -913,8 +965,10 @@
                 if (typeof drawRadarPPI === 'function') drawRadarPPI();
             });
         } else {
-            // Update zoom jika range berubah drastis tanpa reset center jika user sedang menggeser peta
-            if (rangeNm) {
+            // Jika forceCenter aktif (misal saat klik tombol Range), reset peta tepat ke center stasiun radar!
+            if (forceCenter) {
+                _radarMap.setView([_lastRadarCoords.lat, _lastRadarCoords.lon], zoom, { animate: true });
+            } else if (rangeNm) {
                 _radarMap.setZoom(zoom, { animate: false });
             }
             _radarMap.invalidateSize();
@@ -1202,7 +1256,8 @@
             }
         });
         const data = getActiveRadarSourceData() || {};
-        initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm);
+        // Klik Range akan otomatis me-reset & me-recenter posisi peta tepat ke stasiun radar!
+        initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm, true);
     };
 
     function updateRadarPpiScopeData() {
@@ -1313,17 +1368,42 @@
             lastCatEl.textContent = `Update: ${data.last_cat048 ? new Date(data.last_cat048).toLocaleTimeString('id-ID') : 'Real-time'}`;
         }
 
+        // Hitung pembagian arah lalu lintas: Incoming vs Outgoing
+        let inCount = 0;
+        let outCount = 0;
+        visibleTargets.forEach(t => {
+            const dir = getTargetTrafficDirection(t, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            if (dir === 'inbound') inCount++;
+            else outCount++;
+        });
+
+        const cntAll = document.getElementById('countTrafficAll');
+        const cntIn = document.getElementById('countTrafficIn');
+        const cntOut = document.getElementById('countTrafficOut');
+        if (cntAll) cntAll.textContent = visibleTargets.length;
+        if (cntIn) cntIn.textContent = inCount;
+        if (cntOut) cntOut.textContent = outCount;
+
+        // Terapkan filter jika user memilih Incoming atau Outgoing
+        const filteredTargets = visibleTargets.filter(t => {
+            if (_radarTargetTrafficFilter === 'all') return true;
+            const dir = getTargetTrafficDirection(t, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            return dir === _radarTargetTrafficFilter;
+        });
+
         const strip = document.getElementById('radarTargetsStrip');
         if (!strip) return;
 
-        if (visibleTargets.length === 0) {
-            strip.innerHTML = `<span style="color: #475569; font-size: 11px; padding: 10px;">Menunggu deteksi target CAT 048 dari transmisi radar...</span>`;
+        if (filteredTargets.length === 0) {
+            strip.innerHTML = `<span style="color: #475569; font-size: 11px; padding: 10px;">Tidak ada target pada kategori ${(_radarTargetTrafficFilter === 'inbound' ? 'INCOMING' : (_radarTargetTrafficFilter === 'outbound' ? 'OUTGOING' : 'terpilih'))}.</span>`;
             return;
         }
 
-        strip.innerHTML = visibleTargets.map(t => {
+        strip.innerHTML = filteredTargets.map(t => {
             const isSel = String(t.id) === String(_radarSelectedTargetId);
             const isDouble = effectiveDoubleMap.get(String(t.id)) === true;
+            const dir = getTargetTrafficDirection(t, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            const isInbound = dir === 'inbound';
             let cLat = parseFloat(t.lat);
             let cLon = parseFloat(t.lon);
             if (isNaN(cLat) || isNaN(cLon) || (Math.abs(cLat) < 0.0001 && Math.abs(cLon) < 0.0001)) {
@@ -1332,9 +1412,14 @@
                 cLon = geo.lon;
             }
             return `
-                <div class="radar-target-card ${isSel ? 'highlight' : ''} ${isDouble ? 'is-double' : ''}" onclick="window.selectRadarTarget('${t.id}')">
+                <div class="radar-target-card ${isSel ? 'highlight' : ''} ${isDouble ? 'is-double' : ''}" onclick="window.selectRadarTarget('${t.id}')" style="border-left: 3px solid ${isInbound ? '#38bdf8' : '#f59e0b'};">
                     <div class="tgt-id">
-                        <span><i class="fas fa-plane" style="font-size: 9px;"></i> ${t.callsign || t.id}</span>
+                        <span style="display: flex; align-items: center; gap: 4px;">
+                            <span style="font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 3px; background: ${isInbound ? 'rgba(56, 189, 248, 0.2)' : 'rgba(245, 158, 11, 0.2)'}; color: ${isInbound ? '#38bdf8' : '#f59e0b'};">
+                                ${isInbound ? '📥 IN' : '📤 OUT'}
+                            </span>
+                            ${t.callsign || t.id}
+                        </span>
                         ${isDouble ? '<span style="font-size: 8px; background: #ef4444; color: #fff; padding: 1px 4px; border-radius: 3px;">DOUBLE</span>' : ''}
                     </div>
                     <div class="tgt-info">FL${t.fl || Math.round((t.alt || 0) / 100)} | ${t.range_nm || 0} NM (${t.azimuth_deg || 0}°)</div>
@@ -1343,6 +1428,20 @@
             `;
         }).join('');
     }
+
+    window.setRadarTrafficFilter = function (filterType) {
+        _radarTargetTrafficFilter = filterType;
+        const btnAll = document.getElementById('btnTrafficAll');
+        const btnIn = document.getElementById('btnTrafficInbound');
+        const btnOut = document.getElementById('btnTrafficOutbound');
+
+        if (btnAll) btnAll.classList.toggle('active', filterType === 'all');
+        if (btnIn) btnIn.classList.toggle('active', filterType === 'inbound');
+        if (btnOut) btnOut.classList.toggle('active', filterType === 'outbound');
+
+        updateRadarPpiTargetsUI();
+        drawRadarPPI();
+    };
 
     window.selectRadarTarget = function (tgtId) {
         _radarSelectedTargetId = tgtId;
@@ -1671,10 +1770,14 @@
             }
 
             // Data Tag Pesawat (ID di atas, Alt di bawah)
+            const targetDir = getTargetTrafficDirection(tgt, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            const isTargetInbound = targetDir === 'inbound';
+            const dirIcon = isTargetInbound ? '📥' : '📤';
+
             ctx.font = '10px monospace';
-            ctx.fillStyle = isDouble ? '#ff5555' : (isSelected ? '#ffcc00' : (_mapTheme === 'light' ? '#0f172a' : '#00ffcc'));
+            ctx.fillStyle = isDouble ? '#ff5555' : (isSelected ? '#ffcc00' : (_mapTheme === 'light' ? (isTargetInbound ? '#0369a1' : '#b45309') : (isTargetInbound ? '#38bdf8' : '#f59e0b')));
             ctx.textAlign = 'left';
-            const tagLabel = isDouble ? `⚠ ${tgt.callsign || tgt.id} [DBL]` : (tgt.callsign || tgt.id);
+            const tagLabel = isDouble ? `⚠ ${tgt.callsign || tgt.id} [DBL]` : `${dirIcon} ${tgt.callsign || tgt.id}`;
             ctx.fillText(tagLabel, tx + 12, ty - 2 + tagOffsetY);
 
             ctx.font = '9px monospace';
@@ -1772,8 +1875,10 @@
                         hudStatus.textContent = 'Parrot Site Monitor';
                         hudStatus.style.color = '#ffaa00';
                     } else {
-                        hudStatus.textContent = 'Normal Single Plot';
-                        hudStatus.style.color = '#00ff88';
+                        const hDir = getTargetTrafficDirection(currentHovered, _lastRadarCoords.lat, _lastRadarCoords.lon);
+                        const isIn = hDir === 'inbound';
+                        hudStatus.textContent = isIn ? '📥 INCOMING (Mendekat)' : '📤 OUTGOING (Menjauh)';
+                        hudStatus.style.color = isIn ? '#38bdf8' : '#f59e0b';
                     }
                 }
 
