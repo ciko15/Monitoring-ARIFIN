@@ -43,8 +43,8 @@
         if (_targetHistoryMap.has(tgtId)) {
             const hist = _targetHistoryMap.get(tgtId);
             const dt = (now - hist.time) / 1000;
-            // Jika update sebelumnya dalam 0.3 - 35 detik terakhir
-            if (dt >= 0.3 && dt <= 35) {
+            // Jika update sebelumnya dalam 0.3 - 40 detik terakhir
+            if (dt >= 0.3 && dt <= 40) {
                 // Selisih koordinat lat/lon atau polar
                 const dLat = Math.abs(tgt.lat - hist.lat);
                 const dLon = Math.abs(tgt.lon - hist.lon);
@@ -59,7 +59,7 @@
 
                     tgt.heading = Math.round(computedHdg);
                     return tgt.heading;
-                } else if (Math.abs(currentR - hist.range) >= 0.05) {
+                } else if (Math.abs(currentR - hist.range) >= 0.04) {
                     // Jika menjauh dari radar (delta range positif) -> heading menjauh (radial outbound)
                     // Jika mendekat ke radar (delta range negatif) -> heading mendekat (radial inbound)
                     const dR = currentR - hist.range;
@@ -70,15 +70,19 @@
             }
         }
 
-        // 3. Fallback: Gunakan hash id pesawat untuk estimasi deterministik 50:50 jika belum ada history
-        // sehingga ada proporsi alami incoming dan outgoing sejak detik pertama
+        // 3. Fallback jika data baru / belum ada delta pergerakan:
+        // Gunakan hash deterministik untuk membagi 50:50 incoming & outgoing
         let hash = 0;
         for (let i = 0; i < tgtId.length; i++) {
-            hash = (hash << 5) - hash + tgtId.charCodeAt(i);
+            hash = ((hash << 5) - hash) + tgtId.charCodeAt(i);
             hash |= 0;
         }
         const isDefaultInbound = Math.abs(hash) % 2 === 0;
-        return isDefaultInbound ? (currentAz + 180) % 360 : currentAz;
+        // Inbound: moncong mengarah ke pusat radar (currentAz + 180)
+        // Outbound: moncong mengarah menjauhi pusat radar (currentAz)
+        const fallbackHdg = isDefaultInbound ? (currentAz + 180) % 360 : currentAz;
+        tgt.heading = Math.round(fallbackHdg);
+        return tgt.heading;
     }
 
     // Deteksi Arah Lalu Lintas Pesawat: Incoming (Mendekati radar) vs Outgoing (Menjauhi radar)
@@ -91,7 +95,7 @@
         if (_targetHistoryMap.has(tgtId)) {
             const hist = _targetHistoryMap.get(tgtId);
             const dR = currentR - hist.range;
-            if (Math.abs(dR) >= 0.08) {
+            if (Math.abs(dR) >= 0.04) {
                 return dR < 0 ? 'inbound' : 'outbound';
             }
         }
@@ -1430,6 +1434,30 @@
             lastCatEl.textContent = `Update: ${data.last_cat048 ? new Date(data.last_cat048).toLocaleTimeString('id-ID') : 'Real-time'}`;
         }
 
+        // 0. Update koordinat dan simpan histori sebelum kalkulasi arah agar deterministik
+        visibleTargets.forEach(t => {
+            const range = Number(t.range_nm) || 0;
+            const azim = Number(t.azimuth_deg) || 0;
+            let tgtLat = parseFloat(t.lat);
+            let tgtLon = parseFloat(t.lon);
+            if (isNaN(tgtLat) || isNaN(tgtLon) || (Math.abs(tgtLat) < 0.0001 && Math.abs(tgtLon) < 0.0001)) {
+                const geo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, range, azim);
+                tgtLat = geo.lat;
+                tgtLon = geo.lon;
+                t.lat = tgtLat;
+                t.lon = tgtLon;
+            }
+            if (t.id && !_targetHistoryMap.has(String(t.id))) {
+                _targetHistoryMap.set(String(t.id), {
+                    range: range,
+                    azim: azim,
+                    lat: tgtLat,
+                    lon: tgtLon,
+                    time: Date.now()
+                });
+            }
+        });
+
         // Hitung pembagian arah lalu lintas: Incoming vs Outgoing
         let inCount = 0;
         let outCount = 0;
@@ -1766,6 +1794,16 @@
                 ctx.setLineDash([]);
             }
 
+            // Evaluasi filter traffic arah lalu lintas (Semua / Incoming / Outgoing)
+            const targetDir = getTargetTrafficDirection(tgt, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            const isTargetInbound = targetDir === 'inbound';
+            const matchesTrafficFilter = _radarTargetTrafficFilter === 'all' || targetDir === _radarTargetTrafficFilter;
+
+            // Jika filter spesifik aktif dan target bukan kategori yang dipilih, rendahkan transparansi (dim) atau skip jika diinginkan
+            const targetAlpha = matchesTrafficFilter ? 1.0 : 0.12;
+            ctx.save();
+            ctx.globalAlpha = targetAlpha;
+
             ctx.save();
             ctx.translate(tx, ty);
 
@@ -1788,7 +1826,7 @@
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(16 * Math.cos(headingRad), 16 * Math.sin(headingRad));
-            ctx.strokeStyle = isDouble ? '#ff4444' : (isSelected ? '#ffcc00' : 'rgba(0, 255, 204, 0.6)');
+            ctx.strokeStyle = isDouble ? '#ff4444' : (isSelected ? '#ffcc00' : (isTargetInbound ? 'rgba(56, 189, 248, 0.8)' : 'rgba(245, 158, 11, 0.8)'));
             ctx.lineWidth = 1.5;
             ctx.stroke();
 
@@ -1823,10 +1861,10 @@
                 ctx.shadowBlur = 15;
             } else if (isIlluminated) {
                 ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = '#00ff88';
+                ctx.shadowColor = isTargetInbound ? '#38bdf8' : '#f59e0b';
                 ctx.shadowBlur = 8;
             } else {
-                ctx.fillStyle = '#00d4ff';
+                ctx.fillStyle = isTargetInbound ? '#00d4ff' : '#f59e0b';
                 ctx.shadowBlur = 0;
             }
             ctx.fill();
@@ -1847,8 +1885,6 @@
             }
 
             // Data Tag Pesawat (ID di atas, Alt di bawah)
-            const targetDir = getTargetTrafficDirection(tgt, _lastRadarCoords.lat, _lastRadarCoords.lon);
-            const isTargetInbound = targetDir === 'inbound';
             const dirIcon = isTargetInbound ? '📥' : '📤';
 
             ctx.font = '10px monospace';
@@ -1861,6 +1897,7 @@
             ctx.fillStyle = isDouble ? '#fca5a5' : (_mapTheme === 'light' ? '#334155' : '#94a3b8');
             const altLabel = tgt.fl ? `FL${tgt.fl}` : (tgt.alt ? `${tgt.alt}ft` : 'FL—');
             ctx.fillText(`${altLabel} · SQ${tgt.squawk || '—'}`, tx + 12, ty + 10 + tagOffsetY);
+            ctx.restore();
         });
 
         // 5b. Gambar Transponder Kalibrasi / Acuan Statis di PPI Scope
