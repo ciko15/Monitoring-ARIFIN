@@ -877,12 +877,14 @@
         }
         _lastRadarCoords = { lat: pLat, lon: pLon };
 
-        // Konversi range (NM) ke perkiraan Leaflet Zoom level
+        // Konversi range (NM) ke Leaflet Zoom level yang proporsional dengan viewport PPI Scope
+        // 1 NM ~ 1.852 km. Pada ketinggian layar ~600-900px, jangkauan 200 NM (~370 km radius = 740 km diameter)
+        // membutuhkan Zoom 7 agar muat secara proporsional dan tidak melebar ke seluruh pulau.
         let zoom = 7;
-        if (rangeNm <= 25) zoom = 10;
-        else if (rangeNm <= 45) zoom = 9;
-        else if (rangeNm <= 85) zoom = 8;
-        else if (rangeNm <= 140) zoom = 7;
+        if (rangeNm <= 30) zoom = 10;
+        else if (rangeNm <= 60) zoom = 9;
+        else if (rangeNm <= 110) zoom = 8;
+        else if (rangeNm <= 220) zoom = 7;
         else zoom = 6;
 
         if (!_radarMap) {
@@ -1364,8 +1366,10 @@
 
         let cx = w / 2;
         let cy = h / 2;
+        let maxRadius = Math.min(w, h) * 0.44;
 
         // Jika peta Leaflet aktif dan valid, ambil titik proyeksi stasiun radar di layar
+        // dan sinkronkan maxRadius secara presisi dengan skala mil laut (NM) pada peta bumi Leaflet!
         if (_radarMap && _lastRadarCoords && _lastRadarCoords.lat) {
             try {
                 const pt = _radarMap.latLngToContainerPoint([_lastRadarCoords.lat, _lastRadarCoords.lon]);
@@ -1373,10 +1377,20 @@
                     cx = pt.x;
                     cy = pt.y;
                 }
+
+                // Hitung titik geografis pada jarak _radarRangeNm ke arah timur
+                // 1 derajat bujur di khatulistiwa ~ 60 NM (1 NM = 1 menit busur)
+                const latRad = (_lastRadarCoords.lat * Math.PI) / 180;
+                const dLon = _radarRangeNm / (60 * Math.cos(latRad));
+                const edgePt = _radarMap.latLngToContainerPoint([_lastRadarCoords.lat, _lastRadarCoords.lon + dLon]);
+                if (edgePt && !isNaN(edgePt.x)) {
+                    const geoRadiusPx = Math.abs(edgePt.x - cx);
+                    if (geoRadiusPx > 20) {
+                        maxRadius = geoRadiusPx;
+                    }
+                }
             } catch (e) { }
         }
-
-        const maxRadius = Math.min(w, h) * 0.44;
 
         // 1. Radar PPI Circle Scope
         ctx.beginPath();
