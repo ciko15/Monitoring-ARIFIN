@@ -22,10 +22,101 @@
     let _radarTileLayer = null;
     let _isMapEnabled = true; // Default aktif dengan latar belakang peta
     let _mapTheme = 'light'; // Default 'light' (peta terang)
-    let _lastRadarCoords = { lat: -4.5284, lon: 136.8860 }; // Default Timika (atau dinamik dari sumber data)
+    let _lastRadarCoords = { lat: -2.5721, lon: 140.5148 }; // Default Sentani (akan di-update dinamis dari branch profile / stasiun)
+    let _branchProfileCoords = null; // Koordinat branch profile aktif dari server
     let _isIslsFilterEnabled = false; // Fitur ISLS / Anti-Multipath Filter (Default: NONAKTIF)
     let _radarTargetTrafficFilter = 'all'; // 'all', 'inbound' (incoming), 'outbound' (outgoing)
     let _targetHistoryMap = new Map(); // Histori posisi [lat, lon, range, azim, time] untuk kalkulasi heading & track
+
+    // ── Katalog Stasiun Radar MSSR Indonesia (SAC / SIC) ───────────────────────────
+    const RADAR_STATIONS_MAP = {
+        '32/163': { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
+        '50/8':   { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
+        '50/008': { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
+        '32/153': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
+        '32/15':  { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
+        '32/015': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
+        '32/160': { name: 'Biak',      lat: -1.1874, lon: 136.1085 },
+        '32/154': { name: 'Merauke',   lat: -8.5204, lon: 140.4183 },
+        '32/143': { name: 'Sorong',    lat: -0.9255, lon: 131.1215 },
+        '32/169': { name: 'Nabire',    lat: -3.3683, lon: 135.4969 },
+        '32/164': { name: 'Wamena',    lat: -4.0988, lon: 138.9515 },
+        '32/179': { name: 'Manokwari', lat: -0.8920, lon: 134.0500 },
+        '32/180': { name: 'Kaimana',   lat: -3.6450, lon: 133.7430 },
+        '32/157': { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
+        '31/1':   { name: 'Jakarta',   lat: -6.1256, lon: 106.6559 },
+        '31/001': { name: 'Jakarta',   lat: -6.1256, lon: 106.6559 },
+        '31/2':   { name: 'Cengkareng',lat: -6.1256, lon: 106.6559 },
+        '32/1':   { name: 'Makassar',  lat: -5.0616, lon: 119.5540 },
+        '32/001': { name: 'Makassar',  lat: -5.0616, lon: 119.5540 },
+        '32/2':   { name: 'Bali',      lat: -8.7482, lon: 115.1672 },
+        '32/002': { name: 'Bali',      lat: -8.7482, lon: 115.1672 },
+        '31/10':  { name: 'Medan',     lat: 3.6422,  lon: 98.8853 },
+        '31/010': { name: 'Medan',     lat: 3.6422,  lon: 98.8853 },
+        '31/20':  { name: 'Palembang', lat: -2.8986, lon: 104.7003 },
+        '32/20':  { name: 'Balikpapan',lat: -1.2683, lon: 116.8944 }
+    };
+
+    // Ambil profil bandara cabang secara asinkron agar otomatis menyesuaikan dengan lokasi aktif
+    function fetchBranchProfileCoords() {
+        if (_branchProfileCoords) return Promise.resolve(_branchProfileCoords);
+        return fetch('/api/config/branch-profile', { headers: window.getAuthHeaders ? window.getAuthHeaders() : {} })
+            .then(res => res.ok ? res.json() : null)
+            .then(profile => {
+                if (profile && profile.lat && profile.lng) {
+                    _branchProfileCoords = {
+                        lat: parseFloat(profile.lat),
+                        lon: parseFloat(profile.lng),
+                        name: profile.airportName || profile.siteId || 'Station'
+                    };
+                    if (_lastRadarCoords && Math.abs(_lastRadarCoords.lat - (-4.5284)) < 0.001) {
+                        _lastRadarCoords = { lat: _branchProfileCoords.lat, lon: _branchProfileCoords.lon };
+                    }
+                    return _branchProfileCoords;
+                }
+                return null;
+            }).catch(() => null);
+    }
+    fetchBranchProfileCoords();
+
+    // Resolusi otomatis koordinat stasiun radar (Prioritas: data.lat -> SAC/SIC -> Branch Profile -> Timika/Sentani)
+    function resolveRadarStationCoords(data) {
+        if (data) {
+            let lat = parseFloat(data.lat);
+            let lon = parseFloat(data.lon);
+            if (!isNaN(lat) && !isNaN(lon) && (Math.abs(lat) > 0.0001 || Math.abs(lon) > 0.0001)) {
+                return { lat, lon };
+            }
+
+            // Lookup SAC / SIC
+            if (data.sac !== undefined && data.sic !== undefined && data.sac !== null && data.sic !== null) {
+                const k1 = `${data.sac}/${data.sic}`;
+                const k2 = `${data.sac}/${String(data.sic).padStart(3, '0')}`;
+                if (RADAR_STATIONS_MAP[k1]) return RADAR_STATIONS_MAP[k1];
+                if (RADAR_STATIONS_MAP[k2]) return RADAR_STATIONS_MAP[k2];
+            }
+
+            // Lookup Nama Stasiun
+            const rName = String(data.radar_name || '').toLowerCase();
+            for (const st of Object.values(RADAR_STATIONS_MAP)) {
+                if (rName.includes(st.name.toLowerCase())) {
+                    return st;
+                }
+            }
+        }
+
+        // Branch Profile aktif dari bandara saat ini
+        if (_branchProfileCoords && !isNaN(_branchProfileCoords.lat)) {
+            return _branchProfileCoords;
+        }
+
+        // Koordinat terakhir yang tersimpan atau default Sentani
+        if (_lastRadarCoords && Math.abs(_lastRadarCoords.lat) > 0.0001) {
+            return _lastRadarCoords;
+        }
+
+        return { lat: -2.5721, lon: 140.5148 };
+    }
 
     // Hitung Heading / Arah Moncong Pesawat yang Akurat (0 - 360°)
     function getTargetHeading(tgt, radarLat, radarLon) {
@@ -114,14 +205,9 @@
         let rLat = parseFloat(radarLat);
         let rLon = parseFloat(radarLon);
         if (isNaN(rLat) || isNaN(rLon) || (Math.abs(rLat) < 0.0001 && Math.abs(rLon) < 0.0001)) {
-            // Gunakan koordinat aktif radar atau fallback ke Timika (-4.5284, 136.8860)
-            if (_lastRadarCoords && Math.abs(_lastRadarCoords.lat) > 0.0001) {
-                rLat = _lastRadarCoords.lat;
-                rLon = _lastRadarCoords.lon;
-            } else {
-                rLat = -4.5284;
-                rLon = 136.8860;
-            }
+            const st = resolveRadarStationCoords();
+            rLat = st.lat;
+            rLon = st.lon;
         }
         const lat1 = (rLat * Math.PI) / 180;
         const lon1 = (rLon * Math.PI) / 180;
@@ -352,6 +438,76 @@
                 backdrop-filter: blur(8px);
                 z-index: 1000;
                 min-width: 185px;
+            }
+            /* Right Detail Sidebar untuk Target Terpilih */
+            #radarTargetDetailSidebar {
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 330px;
+                max-width: 85vw;
+                background: rgba(5, 12, 26, 0.96);
+                border-left: 1px solid rgba(0, 212, 255, 0.35);
+                box-shadow: -10px 0 35px rgba(0, 0, 0, 0.85);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                z-index: 1050;
+                display: flex;
+                flex-direction: column;
+                transform: translateX(100%);
+                transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+                color: #e2e8f0;
+                pointer-events: auto;
+            }
+            #radarTargetDetailSidebar.open {
+                transform: translateX(0);
+            }
+            .radar-sidebar-header {
+                padding: 14px 16px;
+                background: rgba(10, 22, 44, 0.95);
+                border-bottom: 1px solid rgba(0, 212, 255, 0.25);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .radar-sidebar-body {
+                flex: 1;
+                overflow-y: auto;
+                padding: 16px;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+            }
+            .radar-detail-group {
+                background: rgba(12, 24, 48, 0.7);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 8px;
+                padding: 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .radar-detail-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 11px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+                padding-bottom: 6px;
+            }
+            .radar-detail-row:last-child {
+                border-bottom: none;
+                padding-bottom: 0;
+            }
+            .radar-detail-lbl {
+                color: #94a3b8;
+                font-weight: 600;
+            }
+            .radar-detail-val {
+                color: #e2e8f0;
+                font-family: monospace;
+                font-weight: 700;
             }
             .radar-targets-panel {
                 height: 140px;
@@ -644,6 +800,77 @@
                                 <span style="color: #64748b;">AZIM:</span> <span id="hudAzim">124.5°</span>
                                 <span style="color: #64748b;">SPD:</span> <span id="hudSpd">360 kts</span>
                                 <span style="color: #64748b;">HDG:</span> <span id="hudHdg">210°</span>
+                            </div>
+                        </div>
+
+                        <!-- Sidebar Detail Target Pesawat Terpilih (Sisi Kanan) -->
+                        <div id="radarTargetDetailSidebar">
+                            <div class="radar-sidebar-header">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span id="sbTargetDirectionBadge" style="font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(56,189,248,0.2); color: #38bdf8;">📥 INBOUND</span>
+                                    <span id="sbTargetCallsign" style="font-size: 15px; font-weight: 800; color: #00ffcc; letter-spacing: 0.5px;">—</span>
+                                </div>
+                                <button onclick="window.selectRadarTarget(null)" title="Tutup Detail" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; font-size: 14px; cursor: pointer; padding: 2px 8px; border-radius: 4px;">✕</button>
+                            </div>
+                            <div class="radar-sidebar-body">
+                                <!-- Status Target -->
+                                <div class="radar-detail-group">
+                                    <div style="font-size: 10px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">IDENTIFIKASI TRANSPONDER</div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Mode 3/A Squawk:</span>
+                                        <span class="radar-detail-val" id="sbTargetSquawk" style="color: #ffcc00; font-size: 13px;">—</span>
+                                    </div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">ICAO 24-bit Address:</span>
+                                        <span class="radar-detail-val" id="sbTargetAddress" style="color: #a78bfa;">—</span>
+                                    </div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Integritas Sinyal:</span>
+                                        <span class="radar-detail-val" id="sbTargetIntegrity" style="color: #00ff88;">Normal Single Plot</span>
+                                    </div>
+                                </div>
+
+                                <!-- Posisi & Vektor Navigasi -->
+                                <div class="radar-detail-group">
+                                    <div style="font-size: 10px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">VEKTOR & KETINGGIAN</div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Flight Level (FL):</span>
+                                        <span class="radar-detail-val" id="sbTargetFL" style="color: #38bdf8; font-size: 13px;">—</span>
+                                    </div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Altitude:</span>
+                                        <span class="radar-detail-val" id="sbTargetAlt">—</span>
+                                    </div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Ground Speed:</span>
+                                        <span class="radar-detail-val" id="sbTargetSpeed">—</span>
+                                    </div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Heading (Arah):</span>
+                                        <span class="radar-detail-val" id="sbTargetHeading">—</span>
+                                    </div>
+                                </div>
+
+                                <!-- Jarak & Koordinat terhadap Radar -->
+                                <div class="radar-detail-group">
+                                    <div style="font-size: 10px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">POSISI DARI STASIUN RADAR</div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Jarak Slant/Ground:</span>
+                                        <span class="radar-detail-val" id="sbTargetDistance" style="color: #00ffcc;">—</span>
+                                    </div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Azimuth Sudut:</span>
+                                        <span class="radar-detail-val" id="sbTargetAzimuth" style="color: #00ffcc;">—</span>
+                                    </div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Koordinat WGS84:</span>
+                                        <span class="radar-detail-val" id="sbTargetCoords" style="color: #f1f5f9; font-size: 10px;">—</span>
+                                    </div>
+                                    <div class="radar-detail-row">
+                                        <span class="radar-detail-lbl">Stasiun Acuan:</span>
+                                        <span class="radar-detail-val" id="sbTargetStationRef" style="color: #94a3b8;">—</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -989,9 +1216,9 @@
         let pLat = parseFloat(lat);
         let pLon = parseFloat(lon);
         if (isNaN(pLat) || isNaN(pLon) || (Math.abs(pLat) < 0.0001 && Math.abs(pLon) < 0.0001)) {
-            // Default ke koordinat Timika (-4.5284, 136.8860) jika data belum terisi atau 0.000
-            pLat = -4.5284;
-            pLon = 136.8860;
+            const st = resolveRadarStationCoords(getActiveRadarSourceData());
+            pLat = st.lat;
+            pLon = st.lon;
         }
         _lastRadarCoords = { lat: pLat, lon: pLon };
 
@@ -1331,7 +1558,7 @@
         if (!data) return;
 
         // Pastikan Map Leaflet selalu tersinkronisasi ke stasiun radar yang tepat
-        if (!_radarMap || (data.lat && Math.abs(parseFloat(data.lat)) > 0.0001)) {
+        if (!_radarMap || (data.lat && Math.abs(parseFloat(data.lat)) > 0.0001) || (data.sac && data.sic)) {
             initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm);
         }
 
@@ -1517,6 +1744,14 @@
                 </div>
             `;
         }).join('');
+
+        // Jika target sedang dipilih dan sidebar terbuka, perbarui data realtime-nya
+        if (_radarSelectedTargetId) {
+            const currentSel = visibleTargets.find(t => String(t.id) === String(_radarSelectedTargetId));
+            if (currentSel) {
+                updateRadarTargetDetailSidebar(currentSel);
+            }
+        }
     }
 
     window.setRadarTrafficFilter = function (filterType) {
@@ -1533,9 +1768,139 @@
         drawRadarPPI();
     };
 
+    function updateRadarTargetDetailSidebar(target) {
+        const sidebar = document.getElementById('radarTargetDetailSidebar');
+        if (!sidebar) return;
+
+        if (!target) {
+            sidebar.classList.remove('open');
+            return;
+        }
+
+        const data = getActiveRadarSourceData() || {};
+        const stCoords = resolveRadarStationCoords(data);
+        const report = Array.isArray(_lastDuplicateAuditReport) ? _lastDuplicateAuditReport : [];
+        const isDouble = report.some(r => String(r.targetA?.id) === String(target.id) || String(r.targetB?.id) === String(target.id));
+        const dir = getTargetTrafficDirection(target, stCoords.lat, stCoords.lon);
+        const isInbound = dir === 'inbound';
+        const headingDeg = getTargetHeading(target, stCoords.lat, stCoords.lon);
+
+        let cLat = parseFloat(target.lat);
+        let cLon = parseFloat(target.lon);
+        if (isNaN(cLat) || isNaN(cLon) || (Math.abs(cLat) < 0.0001 && Math.abs(cLon) < 0.0001)) {
+            const geo = calculatePolarToLatLon(stCoords.lat, stCoords.lon, target.range_nm || 0, target.azimuth_deg || 0);
+            cLat = geo.lat;
+            cLon = geo.lon;
+        }
+
+        // Header
+        const badge = document.getElementById('sbTargetDirectionBadge');
+        if (badge) {
+            badge.textContent = isInbound ? '📥 INBOUND' : '📤 OUTBOUND';
+            badge.style.background = isInbound ? 'rgba(56, 189, 248, 0.25)' : 'rgba(245, 158, 11, 0.25)';
+            badge.style.color = isInbound ? '#38bdf8' : '#f59e0b';
+        }
+
+        const csEl = document.getElementById('sbTargetCallsign');
+        if (csEl) csEl.textContent = target.callsign || target.id || 'TARGET';
+
+        // Identifikasi
+        const sqEl = document.getElementById('sbTargetSquawk');
+        if (sqEl) sqEl.textContent = target.squawk ? `SQ ${target.squawk}` : '—';
+
+        const addrEl = document.getElementById('sbTargetAddress');
+        if (addrEl) addrEl.textContent = target.address ? `0x${String(target.address).toUpperCase()}` : (target.target_address ? `0x${target.target_address}` : '—');
+
+        const integEl = document.getElementById('sbTargetIntegrity');
+        if (integEl) {
+            if (isDouble) {
+                integEl.textContent = '⚠ Anomali: Duplicate / Split Plot';
+                integEl.style.color = '#ef4444';
+            } else {
+                integEl.textContent = '✓ Valid Single Track';
+                integEl.style.color = '#00ff88';
+            }
+        }
+
+        // Vektor & Ketinggian
+        const flEl = document.getElementById('sbTargetFL');
+        if (flEl) flEl.textContent = target.fl !== null && target.fl !== undefined ? `FL ${target.fl}` : (target.alt ? `FL ${Math.round(target.alt / 100)}` : 'FL —');
+
+        const altEl = document.getElementById('sbTargetAlt');
+        if (altEl) {
+            const feet = target.alt ? Number(target.alt) : (target.fl ? Number(target.fl) * 100 : null);
+            if (feet !== null) {
+                const meters = Math.round(feet * 0.3048);
+                altEl.textContent = `${feet.toLocaleString()} ft (${meters.toLocaleString()} m)`;
+            } else {
+                altEl.textContent = '—';
+            }
+        }
+
+        const spdEl = document.getElementById('sbTargetSpeed');
+        if (spdEl) {
+            const spd = target.speed || target.ground_speed || 0;
+            const kmh = Math.round(spd * 1.852);
+            spdEl.textContent = spd > 0 ? `${spd} kts (${kmh} km/h)` : '—';
+        }
+
+        const hdgEl = document.getElementById('sbTargetHeading');
+        if (hdgEl) {
+            let cardinal = 'N';
+            if (headingDeg >= 337.5 || headingDeg < 22.5) cardinal = 'N';
+            else if (headingDeg < 67.5) cardinal = 'NE';
+            else if (headingDeg < 112.5) cardinal = 'E';
+            else if (headingDeg < 157.5) cardinal = 'SE';
+            else if (headingDeg < 202.5) cardinal = 'S';
+            else if (headingDeg < 247.5) cardinal = 'SW';
+            else if (headingDeg < 292.5) cardinal = 'W';
+            else cardinal = 'NW';
+            hdgEl.textContent = `${headingDeg}° (${cardinal})`;
+        }
+
+        // Posisi dari Radar
+        const distEl = document.getElementById('sbTargetDistance');
+        if (distEl) {
+            const rNm = Number(target.range_nm) || 0;
+            const rKm = (rNm * 1.852).toFixed(1);
+            distEl.textContent = `${rNm.toFixed(2)} NM (${rKm} km)`;
+        }
+
+        const azEl = document.getElementById('sbTargetAzimuth');
+        if (azEl) {
+            const az = Number(target.azimuth_deg) || 0;
+            azEl.textContent = `${az.toFixed(2)}°`;
+        }
+
+        const coordsEl = document.getElementById('sbTargetCoords');
+        if (coordsEl) {
+            coordsEl.textContent = `${cLat.toFixed(5)}, ${cLon.toFixed(5)}`;
+        }
+
+        const stRefEl = document.getElementById('sbTargetStationRef');
+        if (stRefEl) {
+            stRefEl.textContent = `${stCoords.name || data.radar_name || 'Radar Station'} (${stCoords.lat.toFixed(4)}, ${stCoords.lon.toFixed(4)})`;
+        }
+
+        sidebar.classList.add('open');
+    }
+
     window.selectRadarTarget = function (tgtId) {
         _radarSelectedTargetId = tgtId;
         updateRadarPpiTargetsUI();
+
+        if (tgtId) {
+            const data = getActiveRadarSourceData() || {};
+            const targets = Array.isArray(data.targets_detail) ? data.targets_detail : [];
+            const target = targets.find(t => String(t.id) === String(tgtId));
+            if (target) {
+                updateRadarTargetDetailSidebar(target);
+            }
+        } else {
+            updateRadarTargetDetailSidebar(null);
+        }
+
+        drawRadarPPI();
     };
 
     // ── CANVAS DRAWING ENGINE (DENGAN DETEKSI VISUAL DOUBLE TARGET) ────────────
@@ -1874,10 +2239,48 @@
             ctx.restore();
 
             // Lingkaran Target Reticle jika Hovered atau Selected
-            if (isHovered || isSelected) {
+            if (isSelected) {
+                // High-visibility animated dual reticle for Selected Target
+                const pulseTime = Date.now() / 300;
+                const pulseR = 18 + Math.sin(pulseTime) * 3;
+
+                // Outer pulsing golden ring
+                ctx.beginPath();
+                ctx.arc(tx, ty, pulseR, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ffcc00';
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#ffcc00';
+                ctx.shadowBlur = 12;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // Inner static cyan ring
+                ctx.beginPath();
+                ctx.arc(tx, ty, 11, 0, Math.PI * 2);
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 4 Tactical corner crosshairs
+                const chLen = 6;
+                ctx.strokeStyle = '#ffcc00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                // Top
+                ctx.moveTo(tx, ty - pulseR - chLen); ctx.lineTo(tx, ty - pulseR);
+                // Bottom
+                ctx.moveTo(tx, ty + pulseR); ctx.lineTo(tx, ty + pulseR + chLen);
+                // Left
+                ctx.moveTo(tx - pulseR - chLen, ty); ctx.lineTo(tx - pulseR, ty);
+                // Right
+                ctx.moveTo(tx + pulseR, ty); ctx.lineTo(tx + pulseR + chLen, ty);
+                ctx.stroke();
+            } else if (isHovered) {
                 ctx.beginPath();
                 ctx.arc(tx, ty, 14, 0, Math.PI * 2);
-                ctx.strokeStyle = isDouble ? '#ff3344' : (isSelected ? '#ffcc00' : '#00ffff');
+                ctx.strokeStyle = isDouble ? '#ff3344' : '#00ffff';
                 ctx.lineWidth = 1.5;
                 ctx.setLineDash([4, 4]);
                 ctx.stroke();
@@ -1887,16 +2290,17 @@
             // Data Tag Pesawat (ID di atas, Alt di bawah)
             const dirIcon = isTargetInbound ? '📥' : '📤';
 
-            ctx.font = '10px monospace';
+            ctx.font = isSelected ? 'bold 11px monospace' : '10px monospace';
             ctx.fillStyle = isDouble ? '#ff5555' : (isSelected ? '#ffcc00' : (_mapTheme === 'light' ? (isTargetInbound ? '#0369a1' : '#b45309') : (isTargetInbound ? '#38bdf8' : '#f59e0b')));
             ctx.textAlign = 'left';
-            const tagLabel = isDouble ? `⚠ ${tgt.callsign || tgt.id} [DBL]` : `${dirIcon} ${tgt.callsign || tgt.id}`;
-            ctx.fillText(tagLabel, tx + 12, ty - 2 + tagOffsetY);
+            const tagLabel = isDouble ? `⚠ ${tgt.callsign || tgt.id} [DBL]` : (isSelected ? `🎯 ${dirIcon} ${tgt.callsign || tgt.id}` : `${dirIcon} ${tgt.callsign || tgt.id}`);
+            const textX = tx + (isSelected ? 24 : 12);
+            ctx.fillText(tagLabel, textX, ty - 2 + tagOffsetY);
 
-            ctx.font = '9px monospace';
-            ctx.fillStyle = isDouble ? '#fca5a5' : (_mapTheme === 'light' ? '#334155' : '#94a3b8');
+            ctx.font = isSelected ? 'bold 10px monospace' : '9px monospace';
+            ctx.fillStyle = isDouble ? '#fca5a5' : (isSelected ? '#fef08a' : (_mapTheme === 'light' ? '#334155' : '#94a3b8'));
             const altLabel = tgt.fl ? `FL${tgt.fl}` : (tgt.alt ? `${tgt.alt}ft` : 'FL—');
-            ctx.fillText(`${altLabel} · SQ${tgt.squawk || '—'}`, tx + 12, ty + 10 + tagOffsetY);
+            ctx.fillText(`${altLabel} · SQ${tgt.squawk || '—'}`, textX, ty + 10 + tagOffsetY);
             ctx.restore();
         });
 

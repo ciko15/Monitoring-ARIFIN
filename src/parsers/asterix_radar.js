@@ -22,6 +22,8 @@ const RADAR_STATIONS = {
     '32/15':  { name: 'Timika',    lat: -4.5284,  lon: 136.8860 }, // Transponder 2 Timika (SAC 32 / SIC 15)
     '32/015': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
     '32/163': { name: 'Sentani',   lat: -2.5721,  lon: 140.5148 },
+    '50/8':   { name: 'Sentani',   lat: -2.5721,  lon: 140.5148 }, // Source Radar Sentani / Papua (SAC 50 / SIC 8)
+    '50/008': { name: 'Sentani',   lat: -2.5721,  lon: 140.5148 },
     '32/160': { name: 'Biak',      lat: -1.1874,  lon: 136.1085 },
     '32/154': { name: 'Merauke',   lat: -8.5204,  lon: 140.4183 },
     '32/143': { name: 'Sorong',    lat: -0.9255,  lon: 131.1215 },
