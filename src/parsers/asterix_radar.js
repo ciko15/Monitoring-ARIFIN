@@ -480,8 +480,15 @@ class AsterixRadarParser extends BaseParser {
     constructor(opts = {}) {
         super(opts);
         this._name      = opts.name     || opts.location || 'Unknown';
-        this._lat       = parseFloat(opts.lat) || 0;
-        this._lon       = parseFloat(opts.lon) || 0;
+        let parsedLat = parseFloat(opts.lat);
+        let parsedLon = parseFloat(opts.lon);
+        // Jika tidak disetel atau bernilai 0 (Null Island), default ke lokasi stasiun radar Timika (-4.5284, 136.8860)
+        if (isNaN(parsedLat) || isNaN(parsedLon) || (Math.abs(parsedLat) < 0.0001 && Math.abs(parsedLon) < 0.0001)) {
+            parsedLat = -4.5284;
+            parsedLon = 136.8860;
+        }
+        this._lat       = parsedLat;
+        this._lon       = parsedLon;
         this._timeout   = parseInt(opts.timeout_ms) || TIMEOUT_MS;
 
         this._lastData  = null;

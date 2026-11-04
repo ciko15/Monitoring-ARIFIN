@@ -26,9 +26,18 @@
 
     // Formula Geodetik Standar WGS84 (Great Circle / Rhumb Line)
     function calculatePolarToLatLon(radarLat, radarLon, rangeNm, azimuthDeg) {
-        if (!radarLat || !radarLon) return { lat: 0, lon: 0 };
-        const rLat = Number(radarLat);
-        const rLon = Number(radarLon);
+        let rLat = parseFloat(radarLat);
+        let rLon = parseFloat(radarLon);
+        if (isNaN(rLat) || isNaN(rLon) || (Math.abs(rLat) < 0.0001 && Math.abs(rLon) < 0.0001)) {
+            // Gunakan koordinat aktif radar atau fallback ke Timika (-4.5284, 136.8860)
+            if (_lastRadarCoords && Math.abs(_lastRadarCoords.lat) > 0.0001) {
+                rLat = _lastRadarCoords.lat;
+                rLon = _lastRadarCoords.lon;
+            } else {
+                rLat = -4.5284;
+                rLon = 136.8860;
+            }
+        }
         const lat1 = (rLat * Math.PI) / 180;
         const lon1 = (rLon * Math.PI) / 180;
         const brng = (Number(azimuthDeg) * Math.PI) / 180;
@@ -758,12 +767,14 @@
         const container = document.getElementById('radarMapUnderlay');
         if (!container) return;
 
-        if (!lat || !lon || isNaN(lat) || isNaN(lon) || (lat === 0 && lon === 0)) {
-            // Default ke koordinat Timika (-4.5284, 136.8860) jika data belum terisi
-            lat = -4.5284;
-            lon = 136.8860;
+        let pLat = parseFloat(lat);
+        let pLon = parseFloat(lon);
+        if (isNaN(pLat) || isNaN(pLon) || (Math.abs(pLat) < 0.0001 && Math.abs(pLon) < 0.0001)) {
+            // Default ke koordinat Timika (-4.5284, 136.8860) jika data belum terisi atau 0.000
+            pLat = -4.5284;
+            pLon = 136.8860;
         }
-        _lastRadarCoords = { lat: parseFloat(lat), lon: parseFloat(lon) };
+        _lastRadarCoords = { lat: pLat, lon: pLon };
 
         // Konversi range (NM) ke perkiraan Leaflet Zoom level
         let zoom = 7;
@@ -1051,6 +1062,11 @@
         const { src, data } = findRadarSourceAndData(_activeRadarSourceId);
         if (!data) return;
 
+        // Pastikan Map Leaflet selalu tersinkronisasi ke stasiun radar yang tepat
+        if (!_radarMap || (data.lat && Math.abs(parseFloat(data.lat)) > 0.0001)) {
+            initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm);
+        }
+
         // Update Title & Header Widgets
         const titleEl = document.getElementById('radarStationTitle');
         if (titleEl) titleEl.textContent = `RADAR PPI — ${(src && src.name) || data.radar_name || 'MSSR'}`;
@@ -1125,9 +1141,9 @@
         strip.innerHTML = targets.map(t => {
             const isSel = String(t.id) === String(_radarSelectedTargetId);
             const isDouble = doubleMap.get(String(t.id)) === true;
-            let cLat = t.lat;
-            let cLon = t.lon;
-            if (!cLat || !cLon || isNaN(cLat) || isNaN(cLon) || (cLat === 0 && cLon === 0)) {
+            let cLat = parseFloat(t.lat);
+            let cLon = parseFloat(t.lon);
+            if (isNaN(cLat) || isNaN(cLon) || (Math.abs(cLat) < 0.0001 && Math.abs(cLon) < 0.0001)) {
                 const geo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, t.range_nm || 0, t.azimuth_deg || 0);
                 cLat = geo.lat;
                 cLon = geo.lon;
@@ -1338,9 +1354,9 @@
             const isDouble = doubleMap.get(String(tgt.id)) === true;
 
             // Hitung koordinat geografis presisi (WGS84) jika belum ada dari sensor
-            let tgtLat = tgt.lat;
-            let tgtLon = tgt.lon;
-            if (!tgtLat || !tgtLon || isNaN(tgtLat) || isNaN(tgtLon) || (tgtLat === 0 && tgtLon === 0)) {
+            let tgtLat = parseFloat(tgt.lat);
+            let tgtLon = parseFloat(tgt.lon);
+            if (isNaN(tgtLat) || isNaN(tgtLon) || (Math.abs(tgtLat) < 0.0001 && Math.abs(tgtLon) < 0.0001)) {
                 const geo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, range, azim);
                 tgtLat = geo.lat;
                 tgtLon = geo.lon;
