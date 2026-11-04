@@ -425,14 +425,14 @@
         if (isNaN(numVal)) return '#ffffff';
 
         const hasAlarm = (limit.min_alarm_limit != null && limit.min_alarm_limit !== '') ||
-                         (limit.max_alarm_limit != null && limit.max_alarm_limit !== '') ||
-                         (limit.alv != null && limit.alv !== '') ||
-                         (limit.ahv != null && limit.ahv !== '');
+            (limit.max_alarm_limit != null && limit.max_alarm_limit !== '') ||
+            (limit.alv != null && limit.alv !== '') ||
+            (limit.ahv != null && limit.ahv !== '');
 
         const hasWarn = (limit.min_warning_limit != null && limit.min_warning_limit !== '') ||
-                        (limit.max_warning_limit != null && limit.max_warning_limit !== '') ||
-                        (limit.wlv != null && limit.wlv !== '') ||
-                        (limit.whv != null && limit.whv !== '');
+            (limit.max_warning_limit != null && limit.max_warning_limit !== '') ||
+            (limit.wlv != null && limit.wlv !== '') ||
+            (limit.whv != null && limit.whv !== '');
 
         // JIKA TIDAK ADA BATAS ALARM ATAU WARNING YANG DIATUR: TETAP PUTIH!
         if (!hasAlarm && !hasWarn) return '#ffffff';
@@ -634,16 +634,16 @@
         // Cache persistent untuk modal agar jika ada reconnect sesaat, telemetry tidak mendadak hilang jadi '-'
         if (!window._modalTelemetryLkgv) window._modalTelemetryLkgv = new Map();
         const isThalesIls = effParserId === 'ils_llz_thales421' || effParserId === 'ils_gp_thales421' ||
-                            src?.parsing_id === 'ils_llz_thales421' || src?.parsing_id === 'ils_gp_thales421';
+            src?.parsing_id === 'ils_llz_thales421' || src?.parsing_id === 'ils_gp_thales421';
         const isIlsMophienSrc = !isThalesIls && (
-                                effParserId === 'ils_mophien_llz' || effParserId === 'ils_mophien_gp' || effParserId === 'dme_mophien_tdme' ||
-                                src?.parsing_id === 'ils_mophien_llz' || src?.parsing_id === 'ils_mophien_gp' || src?.parsing_id === 'dme_mophien_tdme' ||
-                                (src?.name && (src.name.toLowerCase().includes('mophien') || src.name.toLowerCase().includes('juanda') || (src.name.toLowerCase().includes('localizer') && !src.name.toLowerCase().includes('thales')))) ||
-                                (src?.ip_address && (String(src.ip_address).includes('10.62.3.20') || String(src.ip_address).includes('10.62.3.10') || String(src.ip_address).includes('10.62.3.30'))));
-                         
+            effParserId === 'ils_mophien_llz' || effParserId === 'ils_mophien_gp' || effParserId === 'dme_mophien_tdme' ||
+            src?.parsing_id === 'ils_mophien_llz' || src?.parsing_id === 'ils_mophien_gp' || src?.parsing_id === 'dme_mophien_tdme' ||
+            (src?.name && (src.name.toLowerCase().includes('mophien') || src.name.toLowerCase().includes('juanda') || (src.name.toLowerCase().includes('localizer') && !src.name.toLowerCase().includes('thales')))) ||
+            (src?.ip_address && (String(src.ip_address).includes('10.62.3.20') || String(src.ip_address).includes('10.62.3.10') || String(src.ip_address).includes('10.62.3.30'))));
+
         const modalCacheKey = src?.id || src?.ip_address || src?.name || 'ils_active';
         const hasValidLlzData = latestData && (latestData.cl_channel || latestData.ds_channel || latestData.system_params || latestData.pulse_params || latestData.station_ident || latestData.cl_ddm !== undefined);
-        
+
         if (isIlsMophienSrc) {
             if (hasValidLlzData) {
                 window._modalTelemetryLkgv.set(modalCacheKey, JSON.parse(JSON.stringify(latestData)));
@@ -841,7 +841,7 @@
                         renderSourcePanel(sources, body, equipmentId);
                     }
                 }
-            } catch (err) {}
+            } catch (err) { }
         }, 3000);
     }
 
@@ -1183,7 +1183,7 @@
 
     function showDetailModal(src, data, eqSup) {
         if (typeof loadLimitations === 'function') {
-            loadLimitations().catch(() => {});
+            loadLimitations().catch(() => { });
         }
         let modal = document.getElementById('dataSourceDetailModal');
         if (!modal) { createDetailModal(); modal = document.getElementById('dataSourceDetailModal'); }
@@ -1231,7 +1231,7 @@
         } else if (src && src.ip_address) {
             const badgeId = `ping_badge_${src.id}`;
             pingBadge = `<span id="${badgeId}" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(148,163,184,0.2);display:inline-flex;align-items:center;gap:5px;"><i class="fas fa-spinner fa-spin"></i> Ping...</span>`;
-            
+
             const cleanIp = String(src.ip_address || '').trim().replace(/^https?:\/\//i, '').split('/')[0].split(':')[0].trim();
             if (cleanIp && /^\d{1,3}(\.\d{1,3}){3}$/.test(cleanIp)) {
                 fetch('/api/equipment/ping', {
@@ -1239,19 +1239,19 @@
                     headers: { 'Content-Type': 'application/json', ...(window.getAuthHeaders ? window.getAuthHeaders() : {}) },
                     body: JSON.stringify({ ip: cleanIp })
                 })
-                .then(res => res.json())
-                .then(res => {
-                    const badgeEl = document.getElementById(badgeId);
-                    if (!badgeEl) return;
-                    const isAlive = res.success || res.status === 'online';
-                    const pc = isAlive ? '#00ff88' : '#ff3355';
-                    const icon = isAlive ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
-                    badgeEl.style.background = isAlive ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,85,0.1)';
-                    badgeEl.style.color = pc;
-                    badgeEl.style.borderColor = isAlive ? 'rgba(0,255,136,0.25)' : 'rgba(255,51,85,0.25)';
-                    badgeEl.innerHTML = `${icon} Ping: ${isAlive ? 'Normal' : 'Gagal'}`;
-                })
-                .catch(() => {});
+                    .then(res => res.json())
+                    .then(res => {
+                        const badgeEl = document.getElementById(badgeId);
+                        if (!badgeEl) return;
+                        const isAlive = res.success || res.status === 'online';
+                        const pc = isAlive ? '#00ff88' : '#ff3355';
+                        const icon = isAlive ? '<i class="fas fa-network-wired"></i>' : '<i class="fas fa-plug-circle-xmark"></i>';
+                        badgeEl.style.background = isAlive ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,85,0.1)';
+                        badgeEl.style.color = pc;
+                        badgeEl.style.borderColor = isAlive ? 'rgba(0,255,136,0.25)' : 'rgba(255,51,85,0.25)';
+                        badgeEl.innerHTML = `${icon} Ping: ${isAlive ? 'Normal' : 'Gagal'}`;
+                    })
+                    .catch(() => { });
             } else {
                 pingBadge = '';
             }
@@ -1277,7 +1277,7 @@
             src?.parsing_id === 'ils_llz_thales421' || src?.parsing_id === 'ils_gp_thales421' ||
             src?.parsing_id === 'ils_llz_normac' || src?.parsing_id === 'ils_gp_normac' ||
             (data && (data._parsing_id === 'ils_llz_thales421' || data._parsing_id === 'ils_gp_thales421' ||
-                      data._parsing_id === 'ils_llz_normac' || data._parsing_id === 'ils_gp_normac'))
+                data._parsing_id === 'ils_llz_normac' || data._parsing_id === 'ils_gp_normac'))
         );
         const isIlsMophien = src && !isTdme && !isThalesOrNormac && (
             src.parsing_id === 'ils_mophien_llz' || src.parsing_id === 'ils_mophien_gp' ||
@@ -1399,8 +1399,8 @@
         };
 
         const isGp = data.equipment_type === 'GLIDE_PATH' ||
-                     (src?.parsing_id && src.parsing_id.includes('gp')) ||
-                     (src?.name && (src.name.toLowerCase().includes('glide') || src.name.toLowerCase().includes('gp')));
+            (src?.parsing_id && src.parsing_id.includes('gp')) ||
+            (src?.name && (src.name.toLowerCase().includes('glide') || src.name.toLowerCase().includes('gp')));
 
         const activeParser = isGp ? 'ils_mophien_gp' : 'ils_mophien_llz';
         const targetSup = supCategory || (isGp ? 'ILS-GP' : 'ILS-LLZ');
@@ -1959,7 +1959,7 @@
         const targetSup = supCategory || (src && (src.category || src.sup_category)) || '';
         // Daftar key atau properti internal/array yang TIDAK boleh masuk ke grid kartu utama
         const IGNORED_ROOT_KEYS = new Set([
-            'raw', 'timestamp', 'triggeredparams', 'alarms', 'warnings', 
+            'raw', 'timestamp', 'triggeredparams', 'alarms', 'warnings',
             '_amv_txs_rows', '_amv_rxs_rows', '_bit_esc_rows', '_radio_rows',
             'temperature_sensors'
         ]);
@@ -1999,7 +1999,7 @@
                 Object.entries(val).forEach(([subK, subV]) => {
                     const subLower = subK.toLowerCase();
                     if (subK.startsWith('_') || subK.endsWith('_unit') || IGNORED_ROOT_KEYS.has(subLower) || Array.isArray(subV) || isMetricPlaceholder(subV)) return;
-                    
+
                     // Support 2-level nesting (misal: cl_channel.mon1.ddm => Mon1 Ddm)
                     if (typeof subV === 'object' && subV !== null && !Array.isArray(subV)) {
                         Object.entries(subV).forEach(([deepK, deepV]) => {
@@ -2202,48 +2202,48 @@
                 <div style="font-size:11px;font-weight:700;color:#00d4ff;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.08);">${sec.title}</div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px">
                     ${sec.params.map(([label, val, cls]) => {
-                        let limColor = getLimitColor(supCategory, label, val, parserId);
-                        if (sec.title === 'Connection Error') {
-                            limColor = cls || '#ff3355';
-                        }
+            let limColor = getLimitColor(supCategory, label, val, parserId);
+            if (sec.title === 'Connection Error') {
+                limColor = cls || '#ff3355';
+            }
 
-                        let finalColor = '#ffffff';
-                        let isAlarm = false;
-                        let isWarning = false;
-                        let isNormalLimit = false;
+            let finalColor = '#ffffff';
+            let isAlarm = false;
+            let isWarning = false;
+            let isNormalLimit = false;
 
-                        if (limColor === '#ff3355') {
-                            finalColor = '#ff3355';
-                            isAlarm = true;
-                        } else if (limColor === '#ffcc00') {
-                            finalColor = '#ffcc00';
-                            isWarning = true;
-                        } else if (limColor === '#00ff88') {
-                            finalColor = '#00ff88';
-                            isNormalLimit = true;
-                        }
+            if (limColor === '#ff3355') {
+                finalColor = '#ff3355';
+                isAlarm = true;
+            } else if (limColor === '#ffcc00') {
+                finalColor = '#ffcc00';
+                isWarning = true;
+            } else if (limColor === '#00ff88') {
+                finalColor = '#00ff88';
+                isNormalLimit = true;
+            }
 
-                        const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
-                        const cardBorder = isAlarm 
-                            ? '1px solid rgba(255, 51, 85, 0.5)' 
-                            : isWarning 
-                            ? '1px solid rgba(255, 204, 0, 0.5)' 
-                            : isNormalLimit 
-                            ? '1px solid rgba(0, 255, 136, 0.35)' 
-                            : '1px solid #0d2a45';
-                        const cardBg = isAlarm 
-                            ? 'rgba(255, 51, 85, 0.1)' 
-                            : isWarning 
-                            ? 'rgba(255, 204, 0, 0.1)' 
-                            : isNormalLimit 
-                            ? 'rgba(0, 255, 136, 0.06)' 
-                            : '#0f1e35';
+            const labelColor = isAlarm ? '#ff3355' : isWarning ? '#ffcc00' : isNormalLimit ? '#00ff88' : '#7a9eb8';
+            const cardBorder = isAlarm
+                ? '1px solid rgba(255, 51, 85, 0.5)'
+                : isWarning
+                    ? '1px solid rgba(255, 204, 0, 0.5)'
+                    : isNormalLimit
+                        ? '1px solid rgba(0, 255, 136, 0.35)'
+                        : '1px solid #0d2a45';
+            const cardBg = isAlarm
+                ? 'rgba(255, 51, 85, 0.1)'
+                : isWarning
+                    ? 'rgba(255, 204, 0, 0.1)'
+                    : isNormalLimit
+                        ? 'rgba(0, 255, 136, 0.06)'
+                        : '#0f1e35';
 
-                        const displayVal = (val === null || val === undefined || val === '' || val === '-' || val === '—') ? '—' : val;
-                        const isRadarClickable = (parserId === 'asterix_radar' || parserId === 'asterix_adsb') && (label.toLowerCase().includes('target') || label.toLowerCase().includes('antenna') || label.toLowerCase().includes('radar id'));
-                        const clickableAttr = isRadarClickable ? `onclick="window.openRadarPpiScope(window._activeSourceDetail ? window._activeSourceDetail.id : null)" style="background:${isRadarClickable ? 'rgba(0,212,255,0.12)' : cardBg};border:${isRadarClickable ? '1px solid #00d4ff' : cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;cursor:pointer;" title="Klik untuk membuka Sidebar Radar PPI Scope (60%)"` : `style="background:${cardBg};border:${cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;"`;
+            const displayVal = (val === null || val === undefined || val === '' || val === '-' || val === '—') ? '—' : val;
+            const isRadarClickable = (parserId === 'asterix_radar' || parserId === 'asterix_adsb') && (label.toLowerCase().includes('target') || label.toLowerCase().includes('antenna') || label.toLowerCase().includes('radar id'));
+            const clickableAttr = isRadarClickable ? `onclick="window.openRadarPpiScope(window._activeSourceDetail ? window._activeSourceDetail.id : null)" style="background:${isRadarClickable ? 'rgba(0,212,255,0.12)' : cardBg};border:${isRadarClickable ? '1px solid #00d4ff' : cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;cursor:pointer;" title="Klik untuk membuka Sidebar Radar PPI Scope (60%)"` : `style="background:${cardBg};border:${cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;"`;
 
-                        return `
+            return `
                         <div ${clickableAttr}>
                             <div style="font-size:10px;color:${isRadarClickable ? '#00ffff' : labelColor};letter-spacing:0.5px;margin-bottom:4px;font-weight:${(isAlarm || isWarning || isNormalLimit || isRadarClickable) ? '700' : '500'};overflow-wrap:anywhere;display:flex;justify-content:space-between;align-items:center;">
                                 <span>${label}</span>
@@ -2251,7 +2251,7 @@
                             </div>
                             <div style="font-size:13px;font-weight:700;color:${isRadarClickable ? '#00ffcc' : finalColor};overflow-wrap:anywhere;">${displayVal}</div>
                         </div>`;
-                    }).join('')}
+        }).join('')}
                 </div>
             </div>`).join('');
     }
@@ -3467,297 +3467,7 @@
                 animation: pulse-subtle 2s infinite ease-in-out;
             }
 
-            /* ── RADAR PPI SCOPE SIDEBAR (60% Width) ────────────────────────── */
-            #radarPpiOverlay {
-                display: none;
-                position: fixed;
-                inset: 0;
-                background: rgba(3, 7, 18, 0.75);
-                backdrop-filter: blur(6px);
-                -webkit-backdrop-filter: blur(6px);
-                z-index: 14000;
-                transition: opacity 0.3s ease;
-            }
-            #radarPpiSidebar {
-                display: flex;
-                flex-direction: column;
-                position: fixed;
-                top: 0;
-                right: 0;
-                width: 60vw;
-                min-width: 560px;
-                max-width: 1200px;
-                height: 100vh;
-                background: #040812;
-                border-left: 1px solid rgba(0, 212, 255, 0.35);
-                box-shadow: -15px 0 50px rgba(0, 0, 0, 0.85);
-                z-index: 14001;
-                transform: translateX(100%);
-                transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-                color: #e2e8f0;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-                overflow: hidden;
-            }
-            #radarPpiSidebar.open {
-                transform: translateX(0);
-            }
-            .radar-scope-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 14px 20px;
-                background: rgba(8, 16, 32, 0.95);
-                border-bottom: 1px solid rgba(0, 212, 255, 0.25);
-                gap: 12px;
-                flex-shrink: 0;
-            }
-            .radar-scope-title-wrap {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                min-width: 0;
-            }
-            .radar-scope-radar-icon {
-                font-size: 20px;
-                color: #00ffcc;
-                text-shadow: 0 0 12px #00ffcc88;
-            }
-            .radar-scope-title {
-                font-size: 15px;
-                font-weight: 800;
-                color: #e8f4ff;
-                letter-spacing: 0.5px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            .radar-live-badge {
-                font-size: 10px;
-                background: rgba(0, 255, 136, 0.15);
-                color: #00ff88;
-                border: 1px solid #00ff88;
-                border-radius: 4px;
-                padding: 2px 7px;
-                font-weight: 700;
-                letter-spacing: 0.5px;
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-            }
-            .radar-live-badge::before {
-                content: '';
-                width: 6px;
-                height: 6px;
-                background: #00ff88;
-                border-radius: 50%;
-                display: inline-block;
-                animation: pulse-subtle 1.2s infinite ease-in-out;
-            }
-            .radar-metric-chip {
-                background: rgba(15, 28, 52, 0.85);
-                border: 1px solid rgba(0, 212, 255, 0.25);
-                padding: 4px 10px;
-                border-radius: 6px;
-                display: flex;
-                align-items: center;
-                gap: 7px;
-                font-size: 11px;
-                color: #94a3b8;
-            }
-            .radar-metric-val {
-                color: #00d4ff;
-                font-weight: 700;
-                font-family: monospace;
-            }
-            .radar-scope-body {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                position: relative;
-                background: #03060c;
-                min-height: 0;
-            }
-            .radar-canvas-container {
-                flex: 1;
-                position: relative;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                overflow: hidden;
-            }
-            #radarPpiCanvas {
-                display: block;
-                background: #03060c;
-                cursor: crosshair;
-            }
-            .radar-controls-toolbar {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 8px 16px;
-                background: rgba(8, 16, 32, 0.95);
-                border-top: 1px solid rgba(0, 212, 255, 0.2);
-                border-bottom: 1px solid rgba(0, 212, 255, 0.2);
-                gap: 10px;
-                font-size: 12px;
-                flex-shrink: 0;
-            }
-            .radar-range-btn {
-                background: rgba(13, 30, 56, 0.8);
-                color: #94a3b8;
-                border: 1px solid rgba(0, 212, 255, 0.2);
-                border-radius: 4px;
-                padding: 3px 10px;
-                font-size: 11px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-            }
-            .radar-range-btn.active, .radar-range-btn:hover {
-                background: rgba(0, 212, 255, 0.25);
-                color: #00f0ff;
-                border-color: #00f0ff;
-            }
-            .radar-tab-btn {
-                background: rgba(13, 27, 48, 0.85);
-                color: #94a3b8;
-                border: 1px solid rgba(0, 212, 255, 0.25);
-                border-radius: 5px;
-                padding: 4px 12px;
-                font-size: 11px;
-                font-weight: 700;
-                cursor: pointer;
-                transition: all 0.2s;
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-            }
-            .radar-tab-btn.active, .radar-tab-btn:hover {
-                background: rgba(0, 212, 255, 0.25);
-                color: #00ffff;
-                border-color: #00ffff;
-                box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
-            }
-            .radar-audit-container {
-                flex: 1;
-                overflow-y: auto;
-                padding: 14px 18px;
-                display: flex;
-                flex-direction: column;
-                gap: 14px;
-                background: #030712;
-            }
-            .radar-audit-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-                gap: 10px;
-            }
-            .radar-audit-card {
-                background: rgba(10, 20, 38, 0.9);
-                border: 1px solid rgba(0, 212, 255, 0.22);
-                border-radius: 8px;
-                padding: 12px 14px;
-                display: flex;
-                flex-direction: column;
-                gap: 5px;
-            }
-            .radar-audit-card-title {
-                font-size: 11px;
-                font-weight: 700;
-                color: #7a9eb8;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            .radar-audit-val-huge {
-                font-size: 20px;
-                font-weight: 800;
-                color: #00ff88;
-                font-family: monospace;
-            }
-            .radar-audit-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 11px;
-                text-align: left;
-            }
-            .radar-audit-table th {
-                background: rgba(15, 30, 58, 0.9);
-                color: #00d4ff;
-                padding: 8px 10px;
-                border-bottom: 1px solid rgba(0, 212, 255, 0.3);
-                font-weight: 700;
-            }
-            .radar-audit-table td {
-                padding: 7px 10px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-                color: #cbd5e1;
-                font-family: monospace;
-            }
-            .radar-targets-panel {
-                height: 135px;
-                background: #050a14;
-                border-top: 1px solid rgba(0, 212, 255, 0.2);
-                padding: 8px 14px;
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-                flex-shrink: 0;
-            }
-            .radar-targets-strip {
-                flex: 1;
-                display: flex;
-                gap: 8px;
-                overflow-x: auto;
-                align-items: center;
-                padding-bottom: 4px;
-            }
-            .radar-target-card {
-                background: rgba(12, 24, 46, 0.9);
-                border: 1px solid rgba(0, 212, 255, 0.25);
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-size: 11px;
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
-                min-width: 115px;
-                cursor: pointer;
-                transition: all 0.2s;
-                flex-shrink: 0;
-            }
-            .radar-target-card:hover, .radar-target-card.highlight {
-                background: rgba(0, 212, 255, 0.2);
-                border-color: #00ffff;
-                box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-            }
-            .radar-target-card .tgt-id {
-                font-weight: 800;
-                color: #00ffcc;
-                font-size: 12px;
-            }
-            .radar-target-card .tgt-info {
-                color: #94a3b8;
-                font-size: 10px;
-                font-family: monospace;
-            }
-            #radarHoverHud {
-                position: absolute;
-                display: none;
-                pointer-events: none;
-                background: rgba(4, 10, 20, 0.95);
-                border: 1px solid #00ffff;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #e2e8f0;
-                font-size: 11px;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 255, 255, 0.35);
-                backdrop-filter: blur(8px);
-                z-index: 1000;
-                min-width: 175px;
-            }
+            /* Radar Scope CSS dipindahkan ke public/audit/radar_audit.js */
         `;
         document.head.appendChild(style);
     }
@@ -3802,6 +3512,10 @@
         waitForGrid(() => {
             observeGrid();
         });
+        // Expose helpers for external modules (seperti modul public/audit/radar_audit.js)
+        window._sourcesCache = _sourcesCache;
+        window.getSourceDetailPayload = getSourceDetailPayload;
+        window.resolveSourceData = resolveSourceData;
     }
 
     if (document.readyState === 'loading') {
@@ -3809,5 +3523,4 @@
     } else {
         init();
     }
-
 })();

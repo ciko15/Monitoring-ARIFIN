@@ -21,7 +21,30 @@
     let _radarMap = null;
     let _radarTileLayer = null;
     let _isMapEnabled = true; // Default aktif dengan latar belakang peta
-    let _lastRadarCoords = { lat: -4.528, lon: 136.886 }; // Default Timika (atau dinamik dari sumber data)
+    let _mapTheme = 'light'; // Default 'light' (peta terang) sesuai permintaan
+    let _lastRadarCoords = { lat: -4.5284, lon: 136.8860 }; // Default Timika (atau dinamik dari sumber data)
+
+    // Formula Geodetik Standar WGS84 (Great Circle / Rhumb Line)
+    function calculatePolarToLatLon(radarLat, radarLon, rangeNm, azimuthDeg) {
+        if (!radarLat || !radarLon) return { lat: 0, lon: 0 };
+        const rLat = Number(radarLat);
+        const rLon = Number(radarLon);
+        const lat1 = (rLat * Math.PI) / 180;
+        const lon1 = (rLon * Math.PI) / 180;
+        const brng = (Number(azimuthDeg) * Math.PI) / 180;
+        const distRad = (Number(rangeNm) * 1.852) / 6371.0; // Radius Bumi ~6371 km
+
+        const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distRad) + Math.cos(lat1) * Math.sin(distRad) * Math.cos(brng));
+        const lon2 = lon1 + Math.atan2(
+            Math.sin(brng) * Math.sin(distRad) * Math.cos(lat1),
+            Math.cos(distRad) - Math.sin(lat1) * Math.sin(lat2)
+        );
+
+        return {
+            lat: Number(((lat2 * 180) / Math.PI).toFixed(5)),
+            lon: Number(((lon2 * 180) / Math.PI).toFixed(5))
+        };
+    }
 
     function addAuditRadarStyles() {
         if (document.getElementById('auditRadarStyles')) return;
@@ -31,33 +54,46 @@
             /* ── AUDIT RADAR PPI SCOPE (FULLSCREEN 100vw x 100vh) ─────────────── */
             #radarPpiOverlay {
                 display: none;
-                position: fixed;
-                inset: 0;
-                background: rgba(2, 6, 14, 0.88);
-                backdrop-filter: blur(8px);
-                -webkit-backdrop-filter: blur(8px);
-                z-index: 14000;
-                transition: opacity 0.3s ease;
+                position: fixed !important;
+                inset: 0 !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background: rgba(2, 6, 14, 0.88) !important;
+                backdrop-filter: blur(8px) !important;
+                -webkit-backdrop-filter: blur(8px) !important;
+                z-index: 99990 !important;
+                transition: opacity 0.3s ease !important;
             }
             #radarPpiSidebar {
-                display: flex;
-                flex-direction: column;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                background: #030712;
-                box-shadow: 0 0 60px rgba(0, 0, 0, 0.95);
-                z-index: 14001;
-                transform: translateY(-100%);
-                transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-                color: #e2e8f0;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-                overflow: hidden;
+                display: flex !important;
+                flex-direction: column !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                max-width: 100vw !important;
+                min-width: 100vw !important;
+                max-height: 100vh !important;
+                min-height: 100vh !important;
+                background: #030712 !important;
+                box-shadow: 0 0 60px rgba(0, 0, 0, 0.95) !important;
+                z-index: 99999 !important;
+                transform: translateY(-100%) !important;
+                transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+                color: #e2e8f0 !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif !important;
+                overflow: hidden !important;
+                margin: 0 !important;
+                border: none !important;
+                border-radius: 0 !important;
             }
             #radarPpiSidebar.open {
-                transform: translateY(0);
+                transform: translateY(0) !important;
             }
             .radar-scope-header {
                 display: flex;
@@ -437,6 +473,10 @@
                     <button class="radar-tab-btn" id="radarToggleMapBtn" onclick="window.toggleRadarMap()" style="border-color: #00ffcc; color: #00ffcc;">
                         <i class="fas fa-map"></i> Peta: <span id="radarMapStateText">AKTIF</span>
                     </button>
+                    <!-- Mode Terang / Gelap Peta -->
+                    <button class="radar-tab-btn" id="radarMapThemeBtn" onclick="window.toggleRadarMapTheme()" style="border-color: #38bdf8; color: #38bdf8;" title="Ganti mode peta Terang / Gelap">
+                        <i class="fas fa-sun"></i> Mode: <span id="radarMapThemeText">TERANG</span>
+                    </button>
                 </div>
                 <div id="radarPpiControlsRight" style="display: flex; align-items: center; gap: 12px;">
                     <div style="display: flex; align-items: center; gap: 4px;">
@@ -640,13 +680,21 @@
     }
 
     // ── LEAFLET MAP CONTROLLER UNTUK PPI ──────────────────────────────────────
+    function getTileLayerUrl(theme) {
+        if (theme === 'dark') {
+            return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+        }
+        // Mode Terang (CartoDB Positron - Peta Terang Elegan, Kontur, Pulau, Kota Jelas)
+        return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    }
+
     function initOrUpdateRadarMap(lat, lon, rangeNm) {
         if (typeof L === 'undefined') return;
         const container = document.getElementById('radarMapUnderlay');
         if (!container) return;
 
         if (!lat || !lon || isNaN(lat) || isNaN(lon) || (lat === 0 && lon === 0)) {
-            // Default ke koordinat Timika (-4.528, 136.886) jika data belum terisi
+            // Default ke koordinat Timika (-4.5284, 136.8860) jika data belum terisi
             lat = -4.5284;
             lon = 136.8860;
         }
@@ -673,8 +721,7 @@
                 keyboard: false
             });
 
-            // Dark CartoDB Map (Estetis, tidak silau, kontras tinggi dengan garis radar)
-            _radarTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            _radarTileLayer = L.tileLayer(getTileLayerUrl(_mapTheme), {
                 subdomains: 'abcd',
                 maxZoom: 19
             }).addTo(_radarMap);
@@ -683,7 +730,7 @@
             _radarMap.invalidateSize();
         }
 
-        container.style.opacity = _isMapEnabled ? '0.75' : '0.0';
+        container.style.opacity = _isMapEnabled ? '0.88' : '0.0';
     }
 
     window.toggleRadarMap = function () {
@@ -691,7 +738,20 @@
         const stateText = document.getElementById('radarMapStateText');
         const container = document.getElementById('radarMapUnderlay');
         if (stateText) stateText.textContent = _isMapEnabled ? 'AKTIF' : 'NONAKTIF';
-        if (container) container.style.opacity = _isMapEnabled ? '0.75' : '0.0';
+        if (container) container.style.opacity = _isMapEnabled ? '0.88' : '0.0';
+    };
+
+    window.toggleRadarMapTheme = function () {
+        _mapTheme = _mapTheme === 'light' ? 'dark' : 'light';
+        const themeText = document.getElementById('radarMapThemeText');
+        if (themeText) themeText.textContent = _mapTheme === 'light' ? 'TERANG' : 'GELAP';
+        if (_radarMap && _radarTileLayer) {
+            _radarMap.removeLayer(_radarTileLayer);
+            _radarTileLayer = L.tileLayer(getTileLayerUrl(_mapTheme), {
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(_radarMap);
+        }
     };
 
     function resizeRadarCanvas() {
@@ -717,21 +777,88 @@
     }
 
     // ── DATA ACCESS HELPERS ────────────────────────────────────────────────────
-    function getActiveRadarSourceData() {
-        if (!_activeRadarSourceId) return null;
+    function findRadarSourceAndData(sourceId) {
+        let src = null;
+        let data = null;
+
+        // 1. Cek dari window._sourcesCache jika sourceId cocok
         if (window._sourcesCache) {
             for (const pool of Object.values(window._sourcesCache)) {
                 if (!Array.isArray(pool)) continue;
-                const found = pool.find(s => String(s.id) === String(_activeRadarSourceId));
-                if (found) {
-                    const payload = typeof window.getSourceDetailPayload === 'function' 
-                        ? window.getSourceDetailPayload(found) 
-                        : (found.payload || found);
-                    return payload.latestData || payload.data || null;
+                if (sourceId) {
+                    const found = pool.find(s => String(s.id) === String(sourceId));
+                    if (found) {
+                        src = found;
+                        const payload = typeof window.getSourceDetailPayload === 'function' 
+                            ? window.getSourceDetailPayload(found) 
+                            : (found.payload || found);
+                        data = payload.latestData || payload.data || null;
+                        break;
+                    }
+                }
+                // Jika sourceId null/belum ketemu, cari yang parsing_id-nya radar/adsb
+                if (!src) {
+                    const radarCandidate = pool.find(s => s.parsing_id === 'asterix_radar' || s.parsing_id === 'asterix_adsb');
+                    if (radarCandidate) {
+                        src = radarCandidate;
+                        const payload = typeof window.getSourceDetailPayload === 'function' 
+                            ? window.getSourceDetailPayload(radarCandidate) 
+                            : (radarCandidate.payload || radarCandidate);
+                        data = payload.latestData || payload.data || null;
+                    }
                 }
             }
         }
-        return null;
+
+        // 2. Cek dari window.equipmentDataCache
+        if ((!data || !data.targets_detail) && Array.isArray(window.equipmentDataCache)) {
+            for (const eq of window.equipmentDataCache) {
+                if (!eq) continue;
+                // Cek apakah eq memiliki source yang cocok
+                if (Array.isArray(eq.sources)) {
+                    const matchSrc = sourceId 
+                        ? eq.sources.find(s => String(s.id) === String(sourceId))
+                        : eq.sources.find(s => s.parsing_id === 'asterix_radar' || s.parsing_id === 'asterix_adsb');
+                    if (matchSrc) {
+                        if (!src) src = matchSrc;
+                        if (typeof window.resolveSourceData === 'function') {
+                            const resData = window.resolveSourceData(eq, matchSrc);
+                            if (resData) data = resData;
+                        }
+                    }
+                }
+                // Cek langsung di lastData
+                if (eq.lastData && typeof eq.lastData === 'object') {
+                    for (const [key, val] of Object.entries(eq.lastData)) {
+                        if (val && (val.targets_detail || val.targets_list || val.radar_name || val.sac)) {
+                            if (!src) src = { id: sourceId || eq.id, name: key, equipt_id: eq.id, parsing_id: 'asterix_radar' };
+                            if (!data || (val.targets_detail && (!data.targets_detail || val.targets_detail.length > 0))) {
+                                data = val;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Cek dari window._activeSourceDetail
+        if ((!data || !data.targets_detail) && window._activeSourceDetail) {
+            const activeSrc = window._activeSourceDetail;
+            if (!src) src = activeSrc;
+            const payload = typeof window.getSourceDetailPayload === 'function'
+                ? window.getSourceDetailPayload(activeSrc)
+                : (activeSrc.payload || activeSrc);
+            if (payload && (payload.latestData || payload.data)) {
+                data = payload.latestData || payload.data;
+            }
+        }
+
+        return { src, data };
+    }
+
+    function getActiveRadarSourceData() {
+        const { data } = findRadarSourceAndData(_activeRadarSourceId);
+        return data || null;
     }
 
     function getSavedRefTxpConfig(sourceId = null) {
@@ -766,12 +893,9 @@
         if (!sourceId && window._activeSourceDetail) {
             sourceId = window._activeSourceDetail.id;
         }
-        if (!sourceId && window._sourcesCache) {
-            for (const pool of Object.values(window._sourcesCache)) {
-                if (!Array.isArray(pool)) continue;
-                const found = pool.find(s => s.parsing_id === 'asterix_radar' || s.parsing_id === 'asterix_adsb');
-                if (found) { sourceId = found.id; break; }
-            }
+        if (!sourceId) {
+            const resolved = findRadarSourceAndData(null);
+            if (resolved.src) sourceId = resolved.src.id;
         }
         _activeRadarSourceId = sourceId;
 
@@ -811,6 +935,19 @@
         updateRadarPpiScopeData();
         if (_radarRefreshTimer) clearInterval(_radarRefreshTimer);
         _radarRefreshTimer = setInterval(updateRadarPpiScopeData, 1500);
+
+        // Fetch equipment data secara langsung untuk menyegarkan cache
+        const { src } = findRadarSourceAndData(_activeRadarSourceId);
+        if (src && src.equipt_id) {
+            fetch(`/api/equipment/${src.equipt_id}`, { headers: window.getAuthHeaders ? window.getAuthHeaders() : {} })
+                .then(r => r.ok ? r.json() : null)
+                .then(eqData => {
+                    if (eqData && typeof window.updateEquipmentCacheEntry === 'function') {
+                        window.updateEquipmentCacheEntry(eqData);
+                    }
+                    updateRadarPpiScopeData();
+                }).catch(() => { });
+        }
     };
 
     window.closeRadarPpiScope = function () {
@@ -846,26 +983,12 @@
     };
 
     function updateRadarPpiScopeData() {
-        if (!_activeRadarSourceId) return;
-
-        let foundSrc = null;
-        if (window._sourcesCache) {
-            for (const pool of Object.values(window._sourcesCache)) {
-                if (!Array.isArray(pool)) continue;
-                foundSrc = pool.find(s => String(s.id) === String(_activeRadarSourceId));
-                if (foundSrc) break;
-            }
-        }
-        if (!foundSrc) return;
-
-        const payload = typeof window.getSourceDetailPayload === 'function' 
-            ? window.getSourceDetailPayload(foundSrc) 
-            : (foundSrc.payload || foundSrc);
-        const data = payload.latestData || payload.data || {};
+        const { src, data } = findRadarSourceAndData(_activeRadarSourceId);
+        if (!data) return;
 
         // Update Title & Header Widgets
         const titleEl = document.getElementById('radarStationTitle');
-        if (titleEl) titleEl.textContent = `RADAR PPI — ${foundSrc.name || data.radar_name || 'MSSR'}`;
+        if (titleEl) titleEl.textContent = `RADAR PPI — ${(src && src.name) || data.radar_name || 'MSSR'}`;
 
         const subEl = document.getElementById('radarStationSub');
         if (subEl) {
@@ -937,14 +1060,21 @@
         strip.innerHTML = targets.map(t => {
             const isSel = String(t.id) === String(_radarSelectedTargetId);
             const isDouble = doubleMap.get(String(t.id)) === true;
+            let cLat = t.lat;
+            let cLon = t.lon;
+            if (!cLat || !cLon || isNaN(cLat) || isNaN(cLon) || (cLat === 0 && cLon === 0)) {
+                const geo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, t.range_nm || 0, t.azimuth_deg || 0);
+                cLat = geo.lat;
+                cLon = geo.lon;
+            }
             return `
                 <div class="radar-target-card ${isSel ? 'highlight' : ''} ${isDouble ? 'is-double' : ''}" onclick="window.selectRadarTarget('${t.id}')">
                     <div class="tgt-id">
                         <span><i class="fas fa-plane" style="font-size: 9px;"></i> ${t.callsign || t.id}</span>
                         ${isDouble ? '<span style="font-size: 8px; background: #ef4444; color: #fff; padding: 1px 4px; border-radius: 3px;">DOUBLE</span>' : ''}
                     </div>
-                    <div class="tgt-info">FL${t.fl || Math.round((t.alt || 0) / 100)} | ${t.range_nm || 0} NM</div>
-                    <div class="tgt-info">${t.azimuth_deg || 0}° | SQ ${t.squawk || '—'}</div>
+                    <div class="tgt-info">FL${t.fl || Math.round((t.alt || 0) / 100)} | ${t.range_nm || 0} NM (${t.azimuth_deg || 0}°)</div>
+                    <div class="tgt-info" style="color: #38bdf8;">📍 ${cLat.toFixed(3)}, ${cLon.toFixed(3)}</div>
                 </div>
             `;
         }).join('');
@@ -974,7 +1104,7 @@
         const cy = h / 2;
         const maxRadius = Math.min(w, h) * 0.44;
 
-        // 1. Radar PPI Circle Scope (Jika Peta aktif, gunakan dark transparent glass)
+        // 1. Radar PPI Circle Scope
         ctx.beginPath();
         ctx.arc(cx, cy, maxRadius, 0, Math.PI * 2);
         if (!_isMapEnabled) {
@@ -983,13 +1113,17 @@
             grad.addColorStop(0.7, '#040d1a');
             grad.addColorStop(1, '#02060e');
             ctx.fillStyle = grad;
+        } else if (_mapTheme === 'light') {
+            // Semi-transparan ringan untuk mode Peta Terang (terang jernih, kontur dan kota sangat jelas)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
         } else {
-            ctx.fillStyle = 'rgba(3, 7, 18, 0.42)'; // Semi-transparan agar peta terlihat jelas
+            // Semi-transparan untuk mode Peta Gelap
+            ctx.fillStyle = 'rgba(3, 7, 18, 0.42)';
         }
         ctx.fill();
 
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = '#00d4ff';
+        ctx.lineWidth = _mapTheme === 'light' ? 2 : 1.5;
+        ctx.strokeStyle = _mapTheme === 'light' ? '#0284c7' : '#00d4ff';
         ctx.stroke();
 
         // 2. Concentric Range Rings (25%, 50%, 75%, 100%)
@@ -1111,8 +1245,19 @@
             const isSelected = String(tgt.id) === String(_radarSelectedTargetId);
             const isDouble = doubleMap.get(String(tgt.id)) === true;
 
+            // Hitung koordinat geografis presisi (WGS84) jika belum ada dari sensor
+            let tgtLat = tgt.lat;
+            let tgtLon = tgt.lon;
+            if (!tgtLat || !tgtLon || isNaN(tgtLat) || isNaN(tgtLon) || (tgtLat === 0 && tgtLon === 0)) {
+                const geo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, range, azim);
+                tgtLat = geo.lat;
+                tgtLon = geo.lon;
+                tgt.lat = tgtLat;
+                tgt.lon = tgtLon;
+            }
+
             if (isHovered) {
-                currentHovered = { ...tgt, screenX: tx, screenY: ty, isDouble };
+                currentHovered = { ...tgt, lat: tgtLat, lon: tgtLon, screenX: tx, screenY: ty, isDouble };
             }
 
             let angleDiff = (_radarSweepAngleDeg - azim + 360) % 360;
@@ -1196,13 +1341,13 @@
 
             // Data Tag Pesawat (ID di atas, Alt di bawah)
             ctx.font = '10px monospace';
-            ctx.fillStyle = isDouble ? '#ff5555' : (isSelected ? '#ffcc00' : '#00ffcc');
+            ctx.fillStyle = isDouble ? '#ff5555' : (isSelected ? '#ffcc00' : (_mapTheme === 'light' ? '#0f172a' : '#00ffcc'));
             ctx.textAlign = 'left';
             const tagLabel = isDouble ? `⚠ ${tgt.callsign || tgt.id} [DBL]` : (tgt.callsign || tgt.id);
             ctx.fillText(tagLabel, tx + 12, ty - 2);
 
             ctx.font = '9px monospace';
-            ctx.fillStyle = isDouble ? '#fca5a5' : '#94a3b8';
+            ctx.fillStyle = isDouble ? '#fca5a5' : (_mapTheme === 'light' ? '#334155' : '#94a3b8');
             const altLabel = tgt.fl ? `FL${tgt.fl}` : (tgt.alt ? `${tgt.alt}ft` : 'FL—');
             ctx.fillText(`${altLabel} · SQ${tgt.squawk || '—'}`, tx + 12, ty + 10);
         });
@@ -1221,6 +1366,8 @@
             const rdy = _radarMousePos.y - ry;
             const isRefHovered = Math.sqrt(rdx * rdx + rdy * rdy) <= 18;
 
+            const refGeo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, refDist, refAzim);
+
             if (isRefHovered) {
                 currentHovered = {
                     id: refCfg.targetId,
@@ -1229,8 +1376,8 @@
                     address: refCfg.address || '8A0001',
                     fl: 1,
                     alt: 85,
-                    lat: 'Site Ground Ref',
-                    lon: 'Permanent Tower',
+                    lat: refGeo.lat,
+                    lon: refGeo.lon,
                     range_nm: refDist,
                     azimuth_deg: refAzim,
                     speed: 0,
