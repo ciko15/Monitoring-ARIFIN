@@ -33,7 +33,7 @@
         const currentR = Number(tgt.range_nm) || 0;
         const currentAz = Number(tgt.azimuth_deg) || 0;
 
-        // 1. Jika sensor mengirimkan heading/track eksplisit valid (bukan 0/null)
+        // 1. Jika sensor mengirimkan heading/track eksplisit valid (> 0 dan != 0)
         if (tgt.heading !== undefined && tgt.heading !== null && tgt.heading !== '' && !isNaN(Number(tgt.heading)) && Number(tgt.heading) > 0) {
             return Number(tgt.heading);
         }
@@ -43,32 +43,42 @@
         if (_targetHistoryMap.has(tgtId)) {
             const hist = _targetHistoryMap.get(tgtId);
             const dt = (now - hist.time) / 1000;
-            // Jika update sebelumnya dalam 1 - 25 detik terakhir
-            if (dt >= 0.5 && dt <= 25) {
-                // Selisih range
-                const dRange = currentR - hist.range;
-                if (Math.abs(dRange) >= 0.1 || Math.abs(currentAz - hist.azim) >= 0.2) {
-                    // Hitung heading menggunakan vektor koordinat lat/lon
+            // Jika update sebelumnya dalam 0.3 - 35 detik terakhir
+            if (dt >= 0.3 && dt <= 35) {
+                // Selisih koordinat lat/lon atau polar
+                const dLat = Math.abs(tgt.lat - hist.lat);
+                const dLon = Math.abs(tgt.lon - hist.lon);
+                if (dLat > 0.0005 || dLon > 0.0005) {
                     const lat1 = (hist.lat * Math.PI) / 180;
                     const lat2 = (tgt.lat * Math.PI) / 180;
-                    const dLon = ((tgt.lon - hist.lon) * Math.PI) / 180;
-                    const y = Math.sin(dLon) * Math.cos(lat2);
-                    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+                    const deltaLon = ((tgt.lon - hist.lon) * Math.PI) / 180;
+                    const y = Math.sin(deltaLon) * Math.cos(lat2);
+                    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
                     let computedHdg = (Math.atan2(y, x) * 180) / Math.PI;
                     computedHdg = (computedHdg + 360) % 360;
 
-                    // Simpan heading yang dihitung ke objek target
+                    tgt.heading = Math.round(computedHdg);
+                    return tgt.heading;
+                } else if (Math.abs(currentR - hist.range) >= 0.05) {
+                    // Jika menjauh dari radar (delta range positif) -> heading menjauh (radial outbound)
+                    // Jika mendekat ke radar (delta range negatif) -> heading mendekat (radial inbound)
+                    const dR = currentR - hist.range;
+                    const computedHdg = dR > 0 ? currentAz : (currentAz + 180) % 360;
                     tgt.heading = Math.round(computedHdg);
                     return tgt.heading;
                 }
             }
         }
 
-        // 3. Fallback jika pesawat baru pertama kali terdeteksi:
-        // Jika statusnya Incoming, moncong mengarah ke pusat radar (radial inbound = azim + 180).
-        // Jika statusnya Outgoing, moncong mengarah keluar menjauhi radar (radial outbound = azim).
-        const radialInbound = (currentAz + 180) % 360;
-        return radialInbound;
+        // 3. Fallback: Gunakan hash id pesawat untuk estimasi deterministik 50:50 jika belum ada history
+        // sehingga ada proporsi alami incoming dan outgoing sejak detik pertama
+        let hash = 0;
+        for (let i = 0; i < tgtId.length; i++) {
+            hash = (hash << 5) - hash + tgtId.charCodeAt(i);
+            hash |= 0;
+        }
+        const isDefaultInbound = Math.abs(hash) % 2 === 0;
+        return isDefaultInbound ? (currentAz + 180) % 360 : currentAz;
     }
 
     // Deteksi Arah Lalu Lintas Pesawat: Incoming (Mendekati radar) vs Outgoing (Menjauhi radar)
@@ -77,11 +87,11 @@
         const currentR = Number(tgt.range_nm) || 0;
         const tgtId = String(tgt.id || '');
 
-        // 1. Cek perubahan jarak (delta range) historis: Jika range mengecil -> INBOUND (Incoming), jika membesar -> OUTBOUND
+        // 1. Cek perubahan jarak (delta range) historis: Jika range mengecil -> INBOUND, jika membesar -> OUTBOUND
         if (_targetHistoryMap.has(tgtId)) {
             const hist = _targetHistoryMap.get(tgtId);
             const dR = currentR - hist.range;
-            if (Math.abs(dR) >= 0.15) {
+            if (Math.abs(dR) >= 0.08) {
                 return dR < 0 ? 'inbound' : 'outbound';
             }
         }
