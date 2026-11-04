@@ -21,6 +21,7 @@
     let _radarMap = null;
     let _radarTileLayer = null;
     let _isMapEnabled = true; // Default aktif dengan latar belakang peta
+    let _mapTheme = 'light'; // Default 'light' (peta terang)
     let _lastRadarCoords = { lat: -4.5284, lon: 136.8860 }; // Default Timika (atau dinamik dari sumber data)
     let _isIslsFilterEnabled = false; // Fitur ISLS / Anti-Multipath Filter (Default: NONAKTIF)
     let _radarTargetTrafficFilter = 'all'; // 'all', 'inbound' (incoming), 'outbound' (outgoing)
