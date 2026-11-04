@@ -21,9 +21,9 @@ const RADAR_STATIONS = {
     '32/153': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
     '32/15':  { name: 'Timika',    lat: -4.5284,  lon: 136.8860 }, // Transponder 2 Timika (SAC 32 / SIC 15)
     '32/015': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
+    '50/8':   { name: 'Timika',    lat: -4.5284,  lon: 136.8860 }, // Source Radar Timika (SAC 50 / SIC 8)
+    '50/008': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
     '32/163': { name: 'Sentani',   lat: -2.5721,  lon: 140.5148 },
-    '50/8':   { name: 'Sentani',   lat: -2.5721,  lon: 140.5148 }, // Source Radar Sentani / Papua (SAC 50 / SIC 8)
-    '50/008': { name: 'Sentani',   lat: -2.5721,  lon: 140.5148 },
     '32/160': { name: 'Biak',      lat: -1.1874,  lon: 136.1085 },
     '32/154': { name: 'Merauke',   lat: -8.5204,  lon: 140.4183 },
     '32/143': { name: 'Sorong',    lat: -0.9255,  lon: 131.1215 },
@@ -169,15 +169,48 @@ function decodeCat034(data, radarName, radarLat, radarLon) {
                     ext = (data[offset] & 0x01) !== 0;
                     offset += 1;
                 }
-            } else if (item === 9) {
-                // I034/070 - Message Volume (Variable)
-                let ext = true;
-                while (ext && offset < data.length) {
-                    ext = (data[offset] & 0x01) !== 0;
-                    offset += 1;
+            } else if (item === 8) {
+                // I034/070 - Message Count Values (Repetitive: 1 byte REP + REP * 2 bytes)
+                if (offset < data.length) {
+                    const rep = data[offset];
+                    offset += 1 + (rep * 2);
                 }
-            } else if (item === 10 || item === 11 || item === 12) {
-                // Collimation Error, Generic Polar Window, 3D-Radar Altimeter (Variable)
+            } else if (item === 9) {
+                // I034/100 - Generic Polar Window (Fixed 8 bytes)
+                offset += 8;
+            } else if (item === 10) {
+                // I034/110 - Data Filter (Fixed 1 byte)
+                offset += 1;
+            } else if (item === 11) {
+                // I034/120 - 3D-Position of Data Source (Fixed 8 bytes: Height 2 bytes, Lat 3 bytes, Lon 3 bytes)
+                if (offset + 8 <= data.length) {
+                    // Height (2 bytes signed, LSB = 1 m)
+                    let hgtRaw = (data[offset] << 8) | data[offset + 1];
+                    if (hgtRaw & 0x8000) hgtRaw -= 0x10000;
+                    result.antenna_height_m = hgtRaw;
+
+                    // Latitude (3 bytes signed, LSB = 180 / 2^23 deg)
+                    let latRaw = (data[offset + 2] << 16) | (data[offset + 3] << 8) | data[offset + 4];
+                    if (latRaw & 0x800000) latRaw -= 0x1000000;
+                    const cat34Lat = Number(((latRaw * 180) / Math.pow(2, 23)).toFixed(5));
+
+                    // Longitude (3 bytes signed, LSB = 180 / 2^23 deg)
+                    let lonRaw = (data[offset + 5] << 16) | (data[offset + 6] << 8) | data[offset + 7];
+                    if (lonRaw & 0x800000) lonRaw -= 0x1000000;
+                    const cat34Lon = Number(((lonRaw * 180) / Math.pow(2, 23)).toFixed(5));
+
+                    if (Math.abs(cat34Lat) > 0.0001 || Math.abs(cat34Lon) > 0.0001) {
+                        result.lat = cat34Lat;
+                        result.lon = cat34Lon;
+                        result.has_cat34_pos = true;
+                    }
+                    offset += 8;
+                }
+            } else if (item === 12) {
+                // I034/090 - Collimation Error (Fixed 2 bytes)
+                offset += 2;
+            } else {
+                // Extended/Special fields fallback
                 let ext = true;
                 while (ext && offset < data.length) {
                     ext = (data[offset] & 0x01) !== 0;
@@ -664,8 +697,13 @@ class AsterixRadarParser extends BaseParser {
             }
         }
 
-        // Auto-update koordinat jika paket CAT034 membawa SAC/SIC stasiun lain dan tidak ada koordinat manual
-        if (!this._hasFixedCoord && decoded.sac !== null && decoded.sic !== null) {
+        // 1. Prioritas Utama: Update koordinat radar langsung dari paket CAT034 (I034/120 3D Position)
+        if (decoded.has_cat34_pos && decoded.lat && decoded.lon) {
+            this._lat = decoded.lat;
+            this._lon = decoded.lon;
+            this._hasFixedCoord = true;
+        } else if (!this._hasFixedCoord && decoded.sac !== null && decoded.sic !== null) {
+            // 2. Jika tidak ada I034/120, lookup dari SAC/SIC radar
             const st = resolveRadarCoordinates(this._name, decoded.sac, decoded.sic);
             if (st && (Math.abs(st.lat - this._lat) > 0.001 || Math.abs(st.lon - this._lon) > 0.001)) {
                 this._lat = st.lat;

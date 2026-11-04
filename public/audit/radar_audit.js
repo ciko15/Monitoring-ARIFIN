@@ -22,7 +22,7 @@
     let _radarTileLayer = null;
     let _isMapEnabled = true; // Default aktif dengan latar belakang peta
     let _mapTheme = 'light'; // Default 'light' (peta terang)
-    let _lastRadarCoords = { lat: -2.5721, lon: 140.5148 }; // Default Sentani (akan di-update dinamis dari branch profile / stasiun)
+    let _lastRadarCoords = { lat: -4.5284, lon: 136.8860 }; // Default Timika (akan di-update dinamis langsung dari ASTERIX CAT034)
     let _branchProfileCoords = null; // Koordinat branch profile aktif dari server
     let _isIslsFilterEnabled = false; // Fitur ISLS / Anti-Multipath Filter (Default: NONAKTIF)
     let _radarTargetTrafficFilter = 'all'; // 'all', 'inbound' (incoming), 'outbound' (outgoing)
@@ -30,12 +30,12 @@
 
     // ── Katalog Stasiun Radar MSSR Indonesia (SAC / SIC) ───────────────────────────
     const RADAR_STATIONS_MAP = {
-        '32/163': { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
-        '50/8':   { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
-        '50/008': { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
         '32/153': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
         '32/15':  { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
         '32/015': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
+        '50/8':   { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
+        '50/008': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
+        '32/163': { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
         '32/160': { name: 'Biak',      lat: -1.1874, lon: 136.1085 },
         '32/154': { name: 'Merauke',   lat: -8.5204, lon: 140.4183 },
         '32/143': { name: 'Sorong',    lat: -0.9255, lon: 131.1215 },
@@ -77,18 +77,22 @@
                 return null;
             }).catch(() => null);
     }
-    fetchBranchProfileCoords();
-
-    // Resolusi otomatis koordinat stasiun radar (Prioritas: data.lat -> SAC/SIC -> Branch Profile -> Timika/Sentani)
+    // Resolusi otomatis koordinat stasiun radar:
+    // Prioritas 1: data.lat & data.lon (Eksplisit dari ASTERIX CAT 034 I034/120 atau sensor)
+    // Prioritas 2: SAC/SIC dari paket CAT 034 (I034/010)
+    // Prioritas 3: Nama stasiun radar (jika ada nama bandara/stasiun)
+    // Prioritas 4: Profil bandara cabang aktif
+    // Fallback default: Timika (-4.5284, 136.8860)
     function resolveRadarStationCoords(data) {
         if (data) {
             let lat = parseFloat(data.lat);
             let lon = parseFloat(data.lon);
+            // 1. Koordinat langsung dari ASTERIX CAT 034 (I034/120) atau metadata stasiun
             if (!isNaN(lat) && !isNaN(lon) && (Math.abs(lat) > 0.0001 || Math.abs(lon) > 0.0001)) {
-                return { lat, lon };
+                return { lat, lon, name: data.radar_name || 'Radar Station (CAT034)' };
             }
 
-            // Lookup SAC / SIC
+            // 2. Lookup SAC / SIC dari paket CAT 034 (I034/010)
             if (data.sac !== undefined && data.sic !== undefined && data.sac !== null && data.sic !== null) {
                 const k1 = `${data.sac}/${data.sic}`;
                 const k2 = `${data.sac}/${String(data.sic).padStart(3, '0')}`;
@@ -96,26 +100,24 @@
                 if (RADAR_STATIONS_MAP[k2]) return RADAR_STATIONS_MAP[k2];
             }
 
-            // Lookup Nama Stasiun
+            // 3. Lookup Nama Stasiun jika membawa nama lokasi
             const rName = String(data.radar_name || '').toLowerCase();
-            for (const st of Object.values(RADAR_STATIONS_MAP)) {
-                if (rName.includes(st.name.toLowerCase())) {
-                    return st;
+            if (rName && rName !== 'unknown' && rName !== 'mssr') {
+                for (const st of Object.values(RADAR_STATIONS_MAP)) {
+                    if (rName.includes(st.name.toLowerCase())) {
+                        return st;
+                    }
                 }
             }
         }
 
-        // Branch Profile aktif dari bandara saat ini
-        if (_branchProfileCoords && !isNaN(_branchProfileCoords.lat)) {
+        // 4. Profil bandara cabang aktif (jika valid)
+        if (_branchProfileCoords && !isNaN(_branchProfileCoords.lat) && (Math.abs(_branchProfileCoords.lat) > 0.0001)) {
             return _branchProfileCoords;
         }
 
-        // Koordinat terakhir yang tersimpan atau default Sentani
-        if (_lastRadarCoords && Math.abs(_lastRadarCoords.lat) > 0.0001) {
-            return _lastRadarCoords;
-        }
-
-        return { lat: -2.5721, lon: 140.5148 };
+        // 5. Fallback ke Timika (-4.5284, 136.8860)
+        return { lat: -4.5284, lon: 136.8860, name: 'Timika' };
     }
 
     // Hitung Heading / Arah Moncong Pesawat yang Akurat (0 - 360°)
