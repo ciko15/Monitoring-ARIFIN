@@ -15,6 +15,54 @@ const BaseParser = require('./base');
 
 const TIMEOUT_MS = 5000; // 5 detik tanpa data = disconnect
 
+// ── Katalog Stasiun Radar MSSR Indonesia (SAC / SIC & Koordinat Geografis) ────
+const RADAR_STATIONS = {
+    // Papua & Sekitarnya (SAC 32)
+    '32/153': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
+    '32/15':  { name: 'Timika',    lat: -4.5284,  lon: 136.8860 }, // Transponder 2 Timika (SAC 32 / SIC 15)
+    '32/015': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
+    '32/163': { name: 'Sentani',   lat: -2.5721,  lon: 140.5148 },
+    '32/160': { name: 'Biak',      lat: -1.1874,  lon: 136.1085 },
+    '32/154': { name: 'Merauke',   lat: -8.5204,  lon: 140.4183 },
+    '32/143': { name: 'Sorong',    lat: -0.9255,  lon: 131.1215 },
+    '32/169': { name: 'Nabire',    lat: -3.3683,  lon: 135.4969 },
+    '32/164': { name: 'Wamena',    lat: -4.0988,  lon: 138.9515 },
+    '32/179': { name: 'Manokwari', lat: -0.8920,  lon: 134.0500 },
+    '32/180': { name: 'Kaimana',   lat: -3.6450,  lon: 133.7430 },
+    // Pulau Lainnya (Surabaya, Jakarta, Makassar, Denpasar, Medan, dll)
+    '32/157': { name: 'Surabaya',  lat: -7.3798,  lon: 112.7874 },
+    '31/1':   { name: 'Jakarta',   lat: -6.1256,  lon: 106.6559 },
+    '31/001': { name: 'Jakarta',   lat: -6.1256,  lon: 106.6559 },
+    '31/2':   { name: 'Cengkareng',lat: -6.1256,  lon: 106.6559 },
+    '32/1':   { name: 'Makassar',  lat: -5.0616,  lon: 119.5540 },
+    '32/001': { name: 'Makassar',  lat: -5.0616,  lon: 119.5540 },
+    '32/2':   { name: 'Bali',      lat: -8.7482,  lon: 115.1672 },
+    '32/002': { name: 'Bali',      lat: -8.7482,  lon: 115.1672 },
+    '31/10':  { name: 'Medan',     lat: 3.6422,   lon: 98.8853 },
+    '31/010': { name: 'Medan',     lat: 3.6422,   lon: 98.8853 },
+    '31/20':  { name: 'Palembang', lat: -2.8986,  lon: 104.7003 },
+    '32/20':  { name: 'Balikpapan',lat: -1.2683,  lon: 116.8944 }
+};
+
+// Fungsi pembantu untuk lookup koordinat radar berdasarkan nama atau SAC/SIC
+function resolveRadarCoordinates(nameOrKey, sac, sic) {
+    if (sac !== undefined && sic !== undefined && sac !== null && sic !== null) {
+        const key1 = `${sac}/${sic}`;
+        const key2 = `${sac}/${String(sic).padStart(3, '0')}`;
+        if (RADAR_STATIONS[key1]) return RADAR_STATIONS[key1];
+        if (RADAR_STATIONS[key2]) return RADAR_STATIONS[key2];
+    }
+    if (typeof nameOrKey === 'string') {
+        const lower = nameOrKey.toLowerCase();
+        for (const [key, station] of Object.entries(RADAR_STATIONS)) {
+            if (lower.includes(station.name.toLowerCase())) {
+                return station;
+            }
+        }
+    }
+    return null;
+}
+
 // ── CAT034 Decoder ────────────────────────────────────────────────────────────
 function decodeCat034(data, radarName, radarLat, radarLon) {
     try {
@@ -482,13 +530,22 @@ class AsterixRadarParser extends BaseParser {
         this._name      = opts.name     || opts.location || 'Unknown';
         let parsedLat = parseFloat(opts.lat);
         let parsedLon = parseFloat(opts.lon);
-        // Jika tidak disetel atau bernilai 0 (Null Island), default ke lokasi stasiun radar Timika (-4.5284, 136.8860)
+        
+        // 1. Coba cari dari nama stasiun atau SAC/SIC di opts
         if (isNaN(parsedLat) || isNaN(parsedLon) || (Math.abs(parsedLat) < 0.0001 && Math.abs(parsedLon) < 0.0001)) {
-            parsedLat = -4.5284;
-            parsedLon = 136.8860;
+            const resolved = resolveRadarCoordinates(this._name, opts.sac, opts.sic);
+            if (resolved) {
+                parsedLat = resolved.lat;
+                parsedLon = resolved.lon;
+            } else {
+                // Fallback dinamis: Timika (-4.5284, 136.8860)
+                parsedLat = -4.5284;
+                parsedLon = 136.8860;
+            }
         }
         this._lat       = parsedLat;
         this._lon       = parsedLon;
+        this._hasFixedCoord = !isNaN(parseFloat(opts.lat)) && Math.abs(parseFloat(opts.lat)) > 0.0001;
         this._timeout   = parseInt(opts.timeout_ms) || TIMEOUT_MS;
 
         this._lastData  = null;
@@ -595,6 +652,16 @@ class AsterixRadarParser extends BaseParser {
             if (decoded.system_config === '—') {
                 decoded.system_config = this._lastData.system_config;
                 decoded.system_status = this._lastData.system_status;
+            }
+        }
+
+        // Auto-update koordinat jika paket CAT034 membawa SAC/SIC stasiun lain dan tidak ada koordinat manual
+        if (!this._hasFixedCoord && decoded.sac !== null && decoded.sic !== null) {
+            const st = resolveRadarCoordinates(this._name, decoded.sac, decoded.sic);
+            if (st && (Math.abs(st.lat - this._lat) > 0.001 || Math.abs(st.lon - this._lon) > 0.001)) {
+                this._lat = st.lat;
+                this._lon = st.lon;
+                if (!this._name || this._name === 'Unknown') this._name = st.name;
             }
         }
 
