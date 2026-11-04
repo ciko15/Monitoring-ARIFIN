@@ -23,6 +23,7 @@
     let _isMapEnabled = true; // Default aktif dengan latar belakang peta
     let _mapTheme = 'light'; // Default 'light' (peta terang) sesuai permintaan
     let _lastRadarCoords = { lat: -4.5284, lon: 136.8860 }; // Default Timika (atau dinamik dari sumber data)
+    let _isIslsFilterEnabled = false; // Fitur ISLS / Anti-Multipath Filter (Default: NONAKTIF)
 
     // Formula Geodetik Standar WGS84 (Great Circle / Rhumb Line)
     function calculatePolarToLatLon(radarLat, radarLon, rangeNm, azimuthDeg) {
@@ -512,6 +513,9 @@
                     <button class="radar-tab-btn" id="radarTabBtnAudit" onclick="window.switchRadarTab('audit')">
                         <i class="fas fa-chart-pie"></i> Audit Jangkauan & Tilt Antena
                     </button>
+                    <button class="radar-tab-btn" id="radarToggleIslsBtn" onclick="window.toggleRadarIslsFilter()" title="Simulasi Interrogation Side-Lobe Suppression (ISLS) & Anti-Multipath Filter" style="border-color: rgba(148, 163, 184, 0.4); color: #94a3b8;">
+                        <i class="fas fa-shield-alt"></i> Filter ISLS: <span id="radarIslsStateText" style="font-weight: 700; color: #cbd5e1;">NONAKTIF</span>
+                    </button>
                 </div>
                 <div id="radarPpiControlsRight" style="display: flex; align-items: center; gap: 12px;">
                     <div style="display: flex; align-items: center; gap: 4px;">
@@ -938,6 +942,39 @@
         }
     };
 
+    window.toggleRadarIslsFilter = function () {
+        _isIslsFilterEnabled = !_isIslsFilterEnabled;
+        const btn = document.getElementById('radarToggleIslsBtn');
+        const stateText = document.getElementById('radarIslsStateText');
+
+        if (_isIslsFilterEnabled) {
+            if (btn) {
+                btn.style.borderColor = '#00ff88';
+                btn.style.color = '#00ff88';
+                btn.style.background = 'rgba(0, 255, 136, 0.15)';
+                btn.style.boxShadow = '0 0 10px rgba(0, 255, 136, 0.3)';
+            }
+            if (stateText) {
+                stateText.textContent = 'AKTIF (Filter Suppressed)';
+                stateText.style.color = '#00ff88';
+            }
+        } else {
+            if (btn) {
+                btn.style.borderColor = 'rgba(148, 163, 184, 0.4)';
+                btn.style.color = '#94a3b8';
+                btn.style.background = 'rgba(15, 30, 58, 0.6)';
+                btn.style.boxShadow = 'none';
+            }
+            if (stateText) {
+                stateText.textContent = 'NONAKTIF';
+                stateText.style.color = '#cbd5e1';
+            }
+        }
+
+        updateRadarPpiTargetsUI();
+        drawRadarPPI();
+    };
+
     function resizeRadarCanvas() {
         const container = document.getElementById('radarCanvasContainer');
         const canvas = document.getElementById('radarPpiCanvas');
@@ -1206,18 +1243,35 @@
 
     function updateRadarPpiTargetsUI(passedData) {
         const data = passedData || getActiveRadarSourceData() || {};
-        const targets = Array.isArray(data.targets_detail) ? data.targets_detail : [];
-        const doubleMap = detectDuplicateTargets(targets);
+        let targets = Array.isArray(data.targets_detail) ? data.targets_detail : [];
+        const rawDoubleMap = detectDuplicateTargets(targets);
+        const report = Array.isArray(_lastDuplicateAuditReport) ? _lastDuplicateAuditReport : [];
+
+        // Himpunan ID target sekunder/hantu (Target B) yang ditekan jika filter ISLS diaktifkan
+        const islsSuppressedIds = new Set();
+        if (_isIslsFilterEnabled && report.length > 0) {
+            report.forEach(r => {
+                if (r.targetB && r.targetB.id) {
+                    islsSuppressedIds.add(String(r.targetB.id));
+                }
+            });
+        }
+
+        const visibleTargets = _isIslsFilterEnabled 
+            ? targets.filter(t => !islsSuppressedIds.has(String(t.id)))
+            : targets;
+
+        const effectiveDoubleMap = _isIslsFilterEnabled ? new Map() : rawDoubleMap;
+        const anomalousPlaneCount = _isIslsFilterEnabled ? 0 : report.length;
 
         const badge = document.getElementById('radarTargetCountBadge');
         if (badge) {
-            badge.innerHTML = `<strong style="color: #00ffcc;">${targets.length}</strong> Pesawat Terdeteksi`;
+            if (_isIslsFilterEnabled && islsSuppressedIds.size > 0) {
+                badge.innerHTML = `<strong style="color: #00ffcc;">${visibleTargets.length}</strong> Pesawat Terdeteksi <span style="font-size: 10px; color: #00ff88; margin-left: 4px;">(${islsSuppressedIds.size} Echo Ditekan ISLS)</span>`;
+            } else {
+                badge.innerHTML = `<strong style="color: #00ffcc;">${visibleTargets.length}</strong> Pesawat Terdeteksi`;
+            }
         }
-
-        // Hitung Berapa Pesawat / Skenario yang Terduplikasi (Cluster Target Dobel / Tripel)
-        // 2 atau 3 target dari 1 pesawat dihitung sebagai 1 kasus anomali pesawat
-        const report = Array.isArray(_lastDuplicateAuditReport) ? _lastDuplicateAuditReport : [];
-        const anomalousPlaneCount = report.length;
 
         const doubleBadge = document.getElementById('radarDoubleSummaryBadge');
         const doubleText = document.getElementById('radarDoubleCountText');
@@ -1225,8 +1279,27 @@
         if (doubleBadge && doubleText) {
             if (anomalousPlaneCount > 0) {
                 doubleBadge.style.display = 'inline-flex';
+                doubleBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                doubleBadge.style.borderColor = '#ef4444';
+                doubleBadge.style.color = '#ff5555';
                 doubleText.textContent = `${anomalousPlaneCount} Pesawat Terduplikasi (Split/Echo)`;
-                if (doubleNotice) doubleNotice.style.display = 'inline';
+                if (doubleNotice) {
+                    doubleNotice.style.display = 'inline';
+                    doubleNotice.textContent = 'TARGET BERTUMPUK / MERAH = GANDA (DUPLICATE)';
+                    doubleNotice.style.color = '#ff5555';
+                }
+            } else if (_isIslsFilterEnabled && report.length > 0) {
+                // Tampilkan info bahwa ISLS sedang menekan target ganda tersebut
+                doubleBadge.style.display = 'inline-flex';
+                doubleBadge.style.background = 'rgba(0, 255, 136, 0.15)';
+                doubleBadge.style.borderColor = '#00ff88';
+                doubleBadge.style.color = '#00ff88';
+                doubleText.textContent = `ISLS Aktif: ${report.length} Echo Ditekan (Single Plot)`;
+                if (doubleNotice) {
+                    doubleNotice.style.display = 'inline';
+                    doubleNotice.textContent = 'FILTER ISLS AKTIF: GHOST ECHO & SECONDARY PULSE DITEKAN';
+                    doubleNotice.style.color = '#00ff88';
+                }
             } else {
                 doubleBadge.style.display = 'none';
                 if (doubleNotice) doubleNotice.style.display = 'none';
@@ -1241,14 +1314,14 @@
         const strip = document.getElementById('radarTargetsStrip');
         if (!strip) return;
 
-        if (targets.length === 0) {
+        if (visibleTargets.length === 0) {
             strip.innerHTML = `<span style="color: #475569; font-size: 11px; padding: 10px;">Menunggu deteksi target CAT 048 dari transmisi radar...</span>`;
             return;
         }
 
-        strip.innerHTML = targets.map(t => {
+        strip.innerHTML = visibleTargets.map(t => {
             const isSel = String(t.id) === String(_radarSelectedTargetId);
-            const isDouble = doubleMap.get(String(t.id)) === true;
+            const isDouble = effectiveDoubleMap.get(String(t.id)) === true;
             let cLat = parseFloat(t.lat);
             let cLon = parseFloat(t.lon);
             if (isNaN(cLat) || isNaN(cLon) || (Math.abs(cLat) < 0.0001 && Math.abs(cLon) < 0.0001)) {
@@ -1424,12 +1497,28 @@
 
         // 5. Render Pesawat (Aircraft Targets) & Visualisasi Double Target
         const srcData = getActiveRadarSourceData();
-        const targets = (srcData && Array.isArray(srcData.targets_detail)) ? srcData.targets_detail : [];
-        const doubleMap = detectDuplicateTargets(targets);
+        let targets = (srcData && Array.isArray(srcData.targets_detail)) ? srcData.targets_detail : [];
+        const rawDoubleMap = detectDuplicateTargets(targets);
+        const report = Array.isArray(_lastDuplicateAuditReport) ? _lastDuplicateAuditReport : [];
+
+        // Himpunan ID target sekunder/hantu (Target B) yang ditekan jika filter ISLS diaktifkan
+        const islsSuppressedIds = new Set();
+        if (_isIslsFilterEnabled && report.length > 0) {
+            report.forEach(r => {
+                if (r.targetB && r.targetB.id) {
+                    islsSuppressedIds.add(String(r.targetB.id));
+                }
+            });
+        }
+
+        const visibleTargets = _isIslsFilterEnabled
+            ? targets.filter(t => !islsSuppressedIds.has(String(t.id)))
+            : targets;
+        const doubleMap = _isIslsFilterEnabled ? new Map() : rawDoubleMap;
 
         // Petakan indeks target yang berada di koordinat/polar yang sama agar tidak saling menumpuk 100%
         const posClusterMap = new Map();
-        targets.forEach(t => {
+        visibleTargets.forEach(t => {
             const r = Math.round((Number(t.range_nm) || 0) * 10) / 10;
             const a = Math.round((Number(t.azimuth_deg) || 0) * 10) / 10;
             const key = `${r}_${a}`;
@@ -1439,7 +1528,7 @@
 
         let currentHovered = null;
 
-        targets.forEach(tgt => {
+        visibleTargets.forEach(tgt => {
             let range = Number(tgt.range_nm) || 0;
             let azim = Number(tgt.azimuth_deg) || 0;
             if (range <= 0) return; // Tetap tampilkan semua data target yang terdeteksi, tidak memfilter batas jarak
@@ -1696,6 +1785,30 @@
             } else {
                 hud.style.display = 'none';
             }
+        }
+
+        // 7. Visual Banner on Canvas saat Mode ISLS Aktif
+        if (_isIslsFilterEnabled) {
+            ctx.save();
+            const bannerTxt = '🛡 ISLS & ANTI-MULTIPATH FILTER: AKTIF (ECHO DITEKAN)';
+            ctx.font = 'bold 11px monospace';
+            const bWidth = ctx.measureText(bannerTxt).width;
+            const bX = 16;
+            const bY = 24;
+
+            ctx.fillStyle = 'rgba(6, 78, 59, 0.85)';
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(bX, bY - 14, bWidth + 24, 22, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#34d399';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(bannerTxt, bX + 12, bY - 3);
+            ctx.restore();
         }
     }
 
@@ -2025,8 +2138,37 @@
         }
 
         if (listEl) {
+            let islsBannerHtml = '';
+            if (_isIslsFilterEnabled) {
+                islsBannerHtml = `
+                    <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-shield-alt" style="color: #34d399; font-size: 20px;"></i>
+                            <div>
+                                <div style="color: #34d399; font-weight: 800; font-size: 12px;">SIMULASI FILTER ISLS: AKTIF</div>
+                                <div style="color: #cbd5e1; font-size: 11px;">Target pantulan sekunder (multipath echo) ditekan pada tampilan PPI scope. Kasus di bawah menunjukkan anomali mentah pada transmisi receiver.</div>
+                            </div>
+                        </div>
+                        <button onclick="window.toggleRadarIslsFilter(); window.openRadarDuplicateAuditModal();" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #ff8888; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Matikan Filter</button>
+                    </div>
+                `;
+            } else {
+                islsBannerHtml = `
+                    <div style="background: rgba(15, 28, 52, 0.85); border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-shield-alt" style="color: #64748b; font-size: 20px;"></i>
+                            <div>
+                                <div style="color: #94a3b8; font-weight: 800; font-size: 12px;">SIMULASI FILTER ISLS: NONAKTIF (DEFAULT RAW STREAM)</div>
+                                <div style="color: #cbd5e1; font-size: 11px;">Aktifkan untuk melihat bagaimana ISLS / RDP Screening menekan target hantu (ghost target) ini.</div>
+                            </div>
+                        </div>
+                        <button onclick="window.toggleRadarIslsFilter(); window.openRadarDuplicateAuditModal();" style="background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; color: #00ff88; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Aktifkan ISLS</button>
+                    </div>
+                `;
+            }
+
             if (report.length === 0) {
-                listEl.innerHTML = `
+                listEl.innerHTML = islsBannerHtml + `
                     <div style="text-align: center; color: #64748b; padding: 40px 20px; font-size: 13px;">
                         <i class="fas fa-check-circle" style="color: #00ff88; font-size: 32px; margin-bottom: 12px; display: block;"></i>
                         Tidak terdeteksi target ganda atau plot splitting pada transmisi ASTERIX saat ini.<br>
@@ -2034,7 +2176,7 @@
                     </div>
                 `;
             } else {
-                listEl.innerHTML = report.map((item, idx) => {
+                listEl.innerHTML = islsBannerHtml + report.map((item, idx) => {
                     const tA = item.targetA;
                     const tB = item.targetB;
                     return `
