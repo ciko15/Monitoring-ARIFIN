@@ -138,6 +138,51 @@ function _recordLoad(parsingId) {
     }
 }
 
+// FASE 0b - Profil Sampling (1 dari 200 panggilan)
+let _profileCounter = 0;
+const _profileStats = new Map(); // parsing_id -> { count, parse: [], limits: [], eval: [], clone: [], save: [] }
+let _profileIntervalStarted = false;
+
+function _recordProfileSample(parsingId, metrics) {
+    if (String(process.env.PROFILE_ENABLED || 'true').toLowerCase() === 'false') return;
+    const key = parsingId || 'unknown';
+    if (!_profileStats.has(key)) {
+        _profileStats.set(key, { count: 0, parse: [], limits: [], eval: [], clone: [], save: [] });
+    }
+    const stat = _profileStats.get(key);
+    stat.count++;
+    if (metrics.parse !== undefined) stat.parse.push(metrics.parse);
+    if (metrics.limits !== undefined) stat.limits.push(metrics.limits);
+    if (metrics.eval !== undefined) stat.eval.push(metrics.eval);
+    if (metrics.clone !== undefined) stat.clone.push(metrics.clone);
+    if (metrics.save !== undefined) stat.save.push(metrics.save);
+
+    if (!_profileIntervalStarted) {
+        _profileIntervalStarted = true;
+        const pTimer = setInterval(() => {
+            if (_profileStats.size === 0) return;
+            const mem = process.memoryUsage ? process.memoryUsage() : {};
+            const rssMb = mem.rss ? (mem.rss / (1024 * 1024)).toFixed(1) : '-';
+            const heapMb = mem.heapUsed ? (mem.heapUsed / (1024 * 1024)).toFixed(1) : '-';
+
+            const calc = (arr) => {
+                if (!arr || arr.length === 0) return '0.0/0.0';
+                const avg = (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
+                const max = Math.max(...arr).toFixed(1);
+                return `${avg}/${max}`;
+            };
+
+            for (const [pid, s] of _profileStats.entries()) {
+                if (s.count > 0) {
+                    console.log(`[PROFILE] ${pid} n=${s.count} parse=${calc(s.parse)}ms limits=${calc(s.limits)}ms eval=${calc(s.eval)}ms clone=${calc(s.clone)}ms save=${calc(s.save)}ms rss=${rssMb}MB heap=${heapMb}MB`);
+                }
+            }
+            _profileStats.clear();
+        }, 60000);
+        if (typeof pTimer.unref === 'function') pTimer.unref();
+    }
+}
+
 // Concurrency semaphore specifically for SNMP System pollSNMP
 let _snmpActiveCount = 0;
 const _snmpQueue = [];
@@ -174,6 +219,11 @@ class NetworkListenerService {
         this._snmpLimitsCache = new Map(); // equipt_id -> { limitsMap, cachedAt } (TTL 5 menit)
         this._snmpEndpointOwners = new Map(); // "ip:port" -> { id, name }
 
+        // FASE 1 - Streaming Output Throttler State
+        this._streamThrottleState = new Map(); // source.id -> { lastEmitAt, lastStatus, pending, inFlight, timer, stopped, counters: { in, out, dropped, bypass } }
+        this._streamThrottleTimers = new Map(); // source.id -> setTimeout
+        this._streamThrottleIntervalStarted = false;
+
         // A2. Boot info (log sekali)
         if (!_bootLogged) {
             _bootLogged = true;
@@ -205,6 +255,189 @@ class NetworkListenerService {
         // Note: fs.watchFile dihapus karena sekarang direload secara instan 
         // langsung dari trigger db.setConfigUpdateHook di server.ts 
         // (Windows fs.watchFile sering lambat/tidak jalan)
+    }
+
+    _getStreamThrottleConfig(parsingId) {
+        const enabled = String(process.env.STREAM_THROTTLE_ENABLED || 'true').toLowerCase() !== 'false';
+        if (!enabled) return { enabled: false, windowMs: 1000 };
+
+        const rawIds = process.env.STREAM_THROTTLE_IDS || '';
+        const allowlist = rawIds.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const pid = String(parsingId || '').trim().toLowerCase();
+        const isAllowed = allowlist.includes(pid);
+        if (!isAllowed) return { enabled: false, windowMs: 1000 };
+
+        const envKey = `STREAM_THROTTLE_MS_${pid.toUpperCase()}`;
+        const customMs = parseInt(process.env[envKey], 10);
+        const globalMs = parseInt(process.env.STREAM_THROTTLE_MS, 10);
+        const windowMs = (!isNaN(customMs) && customMs > 0) ? customMs : ((!isNaN(globalMs) && globalMs > 0) ? globalMs : 1000);
+
+        return { enabled: true, windowMs };
+    }
+
+    _mergeStreamData(oldData, newData) {
+        if (!oldData) return newData;
+        if (!newData) return oldData;
+        const mergedData = { ...(oldData.data || {}), ...(newData.data || {}) };
+
+        let alarms = undefined;
+        if (Array.isArray(oldData.alarms) || Array.isArray(newData.alarms)) {
+            alarms = Array.from(new Set([...(oldData.alarms || []), ...(newData.alarms || [])]));
+        }
+
+        let warnings = undefined;
+        if (Array.isArray(oldData.warnings) || Array.isArray(newData.warnings)) {
+            warnings = Array.from(new Set([...(oldData.warnings || []), ...(newData.warnings || [])]));
+        }
+
+        return {
+            ...oldData,
+            ...newData,
+            data: mergedData,
+            ...(alarms !== undefined ? { alarms } : {}),
+            ...(warnings !== undefined ? { warnings } : {})
+        };
+    }
+
+    _emitStreamThrottled(source, logData, connectionType, status) {
+        const parsingId = source ? source.parsing_id : connectionType;
+        const config = this._getStreamThrottleConfig(parsingId);
+
+        // Jika throttle dimatikan atau parsingId tidak masuk allowlist, teruskan langsung
+        if (!config.enabled) {
+            this._handleLogOutput(source, logData, connectionType, status).catch(err => {
+                this._logThrottled('error', `stream-emit:err:${source ? source.id : 'unknown'}`, `[StreamThrottle] Error: ${err.message}`, 15000);
+            });
+            return;
+        }
+
+        const sourceId = source ? source.id : (connectionType || 'unknown');
+        if (!this._streamThrottleState) this._streamThrottleState = new Map();
+        if (!this._streamThrottleTimers) this._streamThrottleTimers = new Map();
+
+        let state = this._streamThrottleState.get(sourceId);
+        if (!state) {
+            state = {
+                source,
+                connectionType,
+                lastEmitAt: 0,
+                lastStatus: null,
+                pending: null,
+                inFlight: false,
+                stopped: false,
+                counters: { in: 0, out: 0, dropped: 0, bypass: 0 }
+            };
+            this._streamThrottleState.set(sourceId, state);
+
+            if (!this._streamThrottleIntervalStarted) {
+                this._streamThrottleIntervalStarted = true;
+                const throttleLogTimer = setInterval(() => {
+                    if (!this._streamThrottleState || this._streamThrottleState.size === 0) return;
+                    for (const [sId, st] of this._streamThrottleState.entries()) {
+                        const c = st.counters;
+                        if (c.in > 0) {
+                            const pId = st.source ? st.source.parsing_id : st.connectionType;
+                            const sName = st.source ? st.source.name : sId;
+                            console.log(`[THROTTLE] ${pId}/${sName} in=${c.in} out=${c.out} dropped=${c.dropped} bypass=${c.bypass}`);
+                            c.in = 0; c.out = 0; c.dropped = 0; c.bypass = 0;
+                        }
+                    }
+                }, 60000);
+                if (typeof throttleLogTimer.unref === 'function') throttleLogTimer.unref();
+            }
+        }
+
+        state.counters.in++;
+        const now = Date.now();
+        const hasAlarms = (Array.isArray(logData.alarms) && logData.alarms.length > 0) ||
+            (logData.data && Array.isArray(logData.data.alarms) && logData.data.alarms.length > 0);
+        const hasWarnings = (Array.isArray(logData.warnings) && logData.warnings.length > 0) ||
+            (logData.data && Array.isArray(logData.data.warnings) && logData.data.warnings.length > 0);
+
+        // Aturan BYPASS (diteruskan segera, tidak pernah dibuang)
+        const isFirstCall = state.lastStatus === null;
+        const isStatusChanged = !isFirstCall && status !== state.lastStatus;
+        const isNonNormal = status && status.toLowerCase() !== 'normal';
+        const isBypass = isFirstCall || isStatusChanged || isNonNormal || hasAlarms || hasWarnings;
+
+        const invokeLogOutput = (targetData, targetStatus, isBypassCall) => {
+            if (state.stopped) return;
+            state.inFlight = true;
+            state.lastEmitAt = Date.now();
+            state.lastStatus = targetStatus;
+            state.counters.out++;
+            if (isBypassCall) state.counters.bypass++;
+
+            this._handleLogOutput(source, targetData, connectionType, targetStatus)
+                .catch(err => {
+                    this._logThrottled('error', `stream-emit:err:${sourceId}`, `[StreamThrottle] flush error ${source ? source.name : sourceId}: ${err.message}`, 15000);
+                })
+                .finally(() => {
+                    state.inFlight = false;
+                    if (state.stopped) return;
+                    // Jika ada pending yang menunggu (misal bypass tertahan atau trailing update)
+                    if (state.pending) {
+                        const nextPending = state.pending;
+                        state.pending = null;
+                        if (this._streamThrottleTimers.has(sourceId)) {
+                            clearTimeout(this._streamThrottleTimers.get(sourceId));
+                            this._streamThrottleTimers.delete(sourceId);
+                        }
+                        invokeLogOutput(nextPending.logData, nextPending.status, nextPending.isBypass);
+                    }
+                });
+        };
+
+        if (isBypass) {
+            if (state.inFlight) {
+                // Jangan kirim paralel, antrekan sebagai pending prioritas
+                state.pending = { logData, status, isBypass: true };
+            } else {
+                state.pending = null;
+                if (this._streamThrottleTimers.has(sourceId)) {
+                    clearTimeout(this._streamThrottleTimers.get(sourceId));
+                    this._streamThrottleTimers.delete(sourceId);
+                }
+                invokeLogOutput(logData, status, true);
+            }
+            return;
+        }
+
+        // Perilaku Throttled Normal
+        const elapsed = now - state.lastEmitAt;
+        if (elapsed >= config.windowMs && !state.inFlight) {
+            // Leading edge
+            state.pending = null;
+            if (this._streamThrottleTimers.has(sourceId)) {
+                clearTimeout(this._streamThrottleTimers.get(sourceId));
+                this._streamThrottleTimers.delete(sourceId);
+            }
+            invokeLogOutput(logData, status, false);
+        } else {
+            // Di dalam jendela throttle: merge atau update pending
+            state.counters.dropped++;
+            if (state.pending) {
+                state.pending.logData = this._mergeStreamData(state.pending.logData, logData);
+                state.pending.status = status;
+            } else {
+                state.pending = { logData, status, isBypass: false };
+            }
+
+            // Jadwalkan SATU trailing flush jika belum ada timer
+            if (!this._streamThrottleTimers.has(sourceId)) {
+                const delay = Math.max(10, config.windowMs - elapsed);
+                const timer = setTimeout(() => {
+                    this._streamThrottleTimers.delete(sourceId);
+                    if (state.stopped || !state.pending) return;
+                    if (!state.inFlight) {
+                        const toFlush = state.pending;
+                        state.pending = null;
+                        invokeLogOutput(toFlush.logData, toFlush.status, toFlush.isBypass);
+                    }
+                }, delay);
+                this._streamThrottleTimers.set(sourceId, timer);
+            }
+        }
     }
 
     _shouldLogParseWarning(sourceId, errorKey, throttleMs = 15000) {
@@ -337,6 +570,10 @@ class NetworkListenerService {
 
     async _handleLogOutput(source, parsedData, connectionType, initialStatus) {
         _recordLoad(source ? source.parsing_id : connectionType);
+        const shouldProfile = (_profileCounter++ % 200 === 0) &&
+            String(process.env.PROFILE_ENABLED || 'true').toLowerCase() !== 'false';
+        const profMetrics = shouldProfile ? { limits: 0, eval: 0, clone: 0, save: 0 } : null;
+
         const initialLower = String(initialStatus || '').toLowerCase();
         const isInitialDisconnect = initialLower === 'disconnect' || initialLower === 'error' || initialLower === 'offline';
         let statusToEvaluate = 'Normal';
@@ -364,7 +601,11 @@ class NetworkListenerService {
         } else if (source.equipt_id && parsedData && parsedData.data) {
             // Dynamic Limitation Threshold Evaluation
             try {
+                const tLimStart = shouldProfile ? performance.now() : 0;
                 const limits = await this.equipmentService.db.getLimitationsByEquipment(source.equipt_id, source.parsing_id);
+                if (shouldProfile) profMetrics.limits = performance.now() - tLimStart;
+
+                const tEvalStart = shouldProfile ? performance.now() : 0;
                 if (Array.isArray(limits) && limits.length > 0) {
                     const aliasMap = {
                         'suhu': ['temperature', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp'],
@@ -474,6 +715,7 @@ class NetworkListenerService {
                         }
                     }
                 }
+                if (shouldProfile) profMetrics.eval = performance.now() - tEvalStart;
             } catch (evalErr) {
                 // non-fatal
             }
@@ -513,10 +755,12 @@ class NetworkListenerService {
             // Jika sedang dibekukan (karena aslinya Disconnect tapi belum 2 menit), 
             // JANGAN simpan data kosong/putus-putus dari parser ke cache.
             // Sebaliknya, kembalikan data asli dari cache agar UI tetap melihat angka terakhir.
+            const tCloneStart = shouldProfile ? performance.now() : 0;
             const prevData = this._lkgvCache.get(source.id);
             if (prevData && parsedData) {
                 parsedData.data = JSON.parse(JSON.stringify(prevData));
             }
+            if (shouldProfile) profMetrics.clone += (performance.now() - tCloneStart);
         } else if (!isDisconnect && parsedData && parsedData.data) {
             // Jika bisa connect SNMP/API dan bukan Offline murni, berarti secara logika network normal. 
             // Tapi jika Offline (karena SNMP gagal tapi Ping sukses), kita sudah isi ping_status di atas.
@@ -525,7 +769,9 @@ class NetworkListenerService {
             }
             // Simpan data terakhir yang SUKSES BENERAN ke dalam cache (Hanya jika Normal/Warning)
             if (finalStatus === 'Normal' || finalStatus === 'Warning' || finalStatus === 'Alarm') {
+                const tCloneStart = shouldProfile ? performance.now() : 0;
                 this._lkgvCache.set(source.id, JSON.parse(JSON.stringify(parsedData.data)));
+                if (shouldProfile) profMetrics.clone += (performance.now() - tCloneStart);
             }
         }
 
@@ -573,12 +819,17 @@ class NetworkListenerService {
             if (dataToSave.data.equipment) dataToSave.data.equipment = source.name;
         }
 
+        const tSaveStart = shouldProfile ? performance.now() : 0;
         await this.equipmentService.saveToLogs(
             source.equipt_id,
             dataToSave,
             connectionType,
             finalStatus
         );
+        if (shouldProfile) {
+            profMetrics.save = performance.now() - tSaveStart;
+            _recordProfileSample(source ? source.parsing_id : connectionType, profMetrics);
+        }
     }
 
     async _enqueueRawEvent(source, rawData) {
@@ -1036,7 +1287,7 @@ class NetworkListenerService {
 
             socket.on('data', async (chunk) => {
                 if (moduleName === 'ils_mophien_llz') {
-                    console.log(`[LLZ-TCP] Received ${chunk.length} bytes from ${name}: ${chunk.slice(0, 32).toString('hex')}...`);
+                    this._logThrottled('log', `llz:tcp:rx:${id}`, `[LLZ-TCP] Received ${chunk.length} bytes from ${name}: ${chunk.slice(0, 32).toString('hex')}...`, 15000);
                 }
 
                 // Alirkan chunk mentah langsung ke parser & handler log/WebSocket
@@ -1857,12 +2108,23 @@ class NetworkListenerService {
                     const result = entry.parser.parse(msg);
                     if (!result) continue;
                     try {
-                        await this._handleLogOutput(
-                            entry.source,
-                            { data: result.data, source: entry.source.name, _ip: rinfo.address },
-                            entry.parserId,
-                            result.status || 'Disconnect'
-                        );
+                        const logData = { data: result.data, source: entry.source.name, _ip: rinfo.address };
+                        const astCfg = this._getStreamThrottleConfig(entry.parserId);
+                        if (astCfg.enabled) {
+                            this._emitStreamThrottled(
+                                entry.source,
+                                logData,
+                                entry.parserId,
+                                result.status || 'Disconnect'
+                            );
+                        } else {
+                            await this._handleLogOutput(
+                                entry.source,
+                                logData,
+                                entry.parserId,
+                                result.status || 'Disconnect'
+                            );
+                        }
                     } catch (err) {
                         console.error(`[Asterix] saveToLogs error ${entry.source.name}:`, err.message);
                     }
@@ -2626,19 +2888,29 @@ class NetworkListenerService {
                 return;
             }
 
-            // Save to logs
+            // Save to logs (Throttled for streaming allowlist, direct for others)
             const logData = {
                 ...(parsedResult.success ? parsedResult : { success: false, data: { raw: rawData.toString('hex') }, error: 'Parsing failed or no parser' }),
                 source: name, // Set the source name (e.g., "TX 1")
                 _ip: source.ip_address || 'unknown' // For FileLogger
             };
 
-            await this._handleLogOutput(
-                source,
-                logData,
-                source.parsing_id || 'raw',
-                parsedResult.status || 'Normal'
-            );
+            const streamCfg = this._getStreamThrottleConfig(source.parsing_id);
+            if (streamCfg.enabled) {
+                this._emitStreamThrottled(
+                    source,
+                    logData,
+                    source.parsing_id || 'raw',
+                    parsedResult.status || 'Normal'
+                );
+            } else {
+                await this._handleLogOutput(
+                    source,
+                    logData,
+                    source.parsing_id || 'raw',
+                    parsedResult.status || 'Normal'
+                );
+            }
 
             if (parsedResult.success) {
                 const mode = parsedResult.data && parsedResult.data._mode ? parsedResult.data._mode : 'PASSIVE';
@@ -2708,6 +2980,21 @@ class NetworkListenerService {
                 try { collector.stop(); } catch (e) { }
             }
             this._t6tvSnmpCollectors.clear();
+        }
+
+        // Clean up stream throttle timers and state
+        if (this._streamThrottleTimers) {
+            for (const [id, timer] of this._streamThrottleTimers) {
+                clearTimeout(timer);
+            }
+            this._streamThrottleTimers.clear();
+        }
+        if (this._streamThrottleState) {
+            for (const [id, state] of this._streamThrottleState) {
+                state.stopped = true;
+                state.pending = null;
+            }
+            this._streamThrottleState.clear();
         }
 
         // CLEAR PARSERS SO THEY ARE RE-INSTANTIATED WITH NEW CONFIG!
