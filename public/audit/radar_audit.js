@@ -372,9 +372,12 @@
      * 1. Squawk sama persis (dan bukan '—' / bukan '1200' / bukan '7000') ATAU
      * 2. Jarak berdekatan (selisih range <= 1.2 NM & selisih azimuth <= 1.2°)
      */
+    let _lastDuplicateAuditReport = []; // Menyimpan laporan audit lengkap target dobel
+
     function detectDuplicateTargets(targets = []) {
         const doubleMap = new Map(); // id -> boolean
         const count = targets.length;
+        const report = [];
 
         for (let i = 0; i < count; i++) {
             const a = targets[i];
@@ -382,6 +385,7 @@
             const aSq = String(a.squawk || '').trim();
             const aR = Number(a.range_nm) || 0;
             const aAz = Number(a.azimuth_deg) || 0;
+            const aFl = a.fl || (a.alt ? Math.round(a.alt / 100) : 0);
 
             for (let j = i + 1; j < count; j++) {
                 const b = targets[j];
@@ -389,29 +393,63 @@
                 const bSq = String(b.squawk || '').trim();
                 const bR = Number(b.range_nm) || 0;
                 const bAz = Number(b.azimuth_deg) || 0;
+                const bFl = b.fl || (b.alt ? Math.round(b.alt / 100) : 0);
 
                 let isDup = false;
+                let reason = '';
+                let category = '';
+                let probableCause = '';
+                let recommendation = '';
 
-                // Kriteria 1: Squawk khusus identik
-                if (aSq && bSq && aSq !== '—' && aSq !== '1200' && aSq !== '7000' && aSq === bSq) {
-                    isDup = true;
-                }
-
-                // Kriteria 2: Proksimitas Polar
                 const dR = Math.abs(aR - bR);
                 let dAz = Math.abs(aAz - bAz);
                 if (dAz > 180) dAz = 360 - dAz;
+                const dFl = Math.abs(aFl - bFl);
 
-                if (dR <= 1.2 && dAz <= 1.2 && aR > 0 && bR > 0) {
+                // Kriteria 1: Squawk khusus identik
+                const sameSquawk = aSq && bSq && aSq !== '—' && aSq !== '1200' && aSq !== '7000' && aSq === bSq;
+                
+                // Kriteria 2: Proksimitas Polar Sempit (<= 1.5 NM dan <= 1.5 deg)
+                const closePolar = dR <= 1.5 && dAz <= 1.5 && aR > 0 && bR > 0;
+
+                if (sameSquawk && closePolar) {
                     isDup = true;
+                    category = 'PLOT SPLIT (AZIMUTH / RANGE)';
+                    reason = `Squawk sama (SQ ${aSq}), selisih jarak hanya ${dR.toFixed(2)} NM dan sudut ${dAz.toFixed(2)}°`;
+                    probableCause = 'Plot Extractor / RDP gagal menggabungkan (coalescing) reply pulse, atau kurva Monopulse Off-Boresight Azimuth (OBA) mengalami fase drift.';
+                    recommendation = 'Periksa parameter Runlength / Azimuth Coalescing Window di RDP, dan lakukan kalibrasi kurva OBA Monopulse Receiver (Sigma & Delta channel).';
+                } else if (sameSquawk && dR > 1.5) {
+                    isDup = true;
+                    category = 'MULTIPATH REFLECTION (GHOST TARGET)';
+                    reason = `Squawk sama (SQ ${aSq}) tapi jarak terpaut ${dR.toFixed(1)} NM (Azim Δ${dAz.toFixed(1)}°)`;
+                    probableCause = 'Pantulan sinyal 1030/1090 MHz dari lereng pegunungan/struktur darat di sekitar radar, memunculkan echo sekunder.';
+                    recommendation = 'Aktifkan Reflection Screening Map pada RDP di azimuth lereng gunung, atau verifikasi pulsa P2 ISLS.';
+                } else if (closePolar) {
+                    isDup = true;
+                    category = 'CO-LOCATED OVERLAPPING PLOT';
+                    reason = `Jarak sangat berdekatan: ΔRange ${dR.toFixed(2)} NM, ΔAzimuth ${dAz.toFixed(2)}° (Altitude Δ${dFl} FL)`;
+                    probableCause = 'Dua target berada dalam volume ruang udara yang sama atau transponder mengalami interferensi garbling.';
+                    recommendation = 'Pantau de-garbling filter receiver radar dan verifikasi dengan data ADS-B CAT 021.';
                 }
 
                 if (isDup) {
                     doubleMap.set(aId, true);
                     doubleMap.set(bId, true);
+                    report.push({
+                        targetA: a,
+                        targetB: b,
+                        category,
+                        reason,
+                        probableCause,
+                        recommendation,
+                        deltaRange: dR.toFixed(2),
+                        deltaAzim: dAz.toFixed(2),
+                        deltaFl: dFl
+                    });
                 }
             }
         }
+        _lastDuplicateAuditReport = report;
         return doubleMap;
     }
 
@@ -438,9 +476,9 @@
                         <div class="radar-scope-title">
                             <span id="radarStationTitle">RADAR MSSR PPI SCOPE</span>
                             <span class="radar-live-badge">CAT 048 / 034</span>
-                            <span id="radarDoubleSummaryBadge" style="display:none; font-size:10px; background:rgba(239,68,68,0.2); color:#ff5555; border:1px solid #ef4444; border-radius:4px; padding:2px 7px; font-weight:700;">
-                                <i class="fas fa-exclamation-triangle"></i> <span id="radarDoubleCountText">0 Double</span>
-                            </span>
+                            <button id="radarDoubleSummaryBadge" onclick="window.openRadarDuplicateAuditModal()" title="Klik untuk melihat Diagnosa Anomali & Rekomendasi Solusi Target Dobel" style="display:none; cursor:pointer; font-size:10px; background:rgba(239,68,68,0.2); color:#ff5555; border:1px solid #ef4444; border-radius:4px; padding:2px 8px; font-weight:700; align-items:center; gap:5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.4)';" onmouseout="this.style.background='rgba(239,68,68,0.2)';">
+                                <i class="fas fa-exclamation-triangle"></i> <span id="radarDoubleCountText">0 Target Dobel</span> <span style="font-size:9px; background:#ef4444; color:#fff; border-radius:3px; padding:0 4px; margin-left:3px;">Audit & Solusi 🔍</span>
+                            </button>
                         </div>
                         <div id="radarStationSub" style="font-size: 11px; color: #64748b; font-family: monospace; margin-top: 2px;">
                             SAC: — | SIC: — | ID: —
@@ -650,6 +688,41 @@
                     <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
                         <button onclick="window.closeRefTxpConfigModal()" style="padding: 6px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; color: #cbd5e1; font-size: 11px; cursor: pointer;">Batal</button>
                         <button onclick="window.saveRefTxpConfig()" style="padding: 6px 14px; background: #ffaa00; border: none; border-radius: 4px; color: #02060e; font-weight: 700; font-size: 11px; cursor: pointer;"><i class="fas fa-check"></i> Simpan Acuan</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: AUDIT ANOMALI TARGET DOBEL & SARAN PERBAIKAN TEKNIS -->
+            <div id="radarDuplicateAuditModal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 14, 0.88); z-index: 10001; align-items: center; justify-content: center; backdrop-filter: blur(6px); padding: 20px; box-sizing: border-box;">
+                <div style="background: #091322; border: 1px solid #ef4444; border-radius: 10px; width: 850px; max-width: 95%; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 15px 45px rgba(239, 68, 68, 0.35); overflow: hidden;">
+                    <!-- Header Modal -->
+                    <div style="padding: 14px 20px; background: rgba(239, 68, 68, 0.12); border-bottom: 1px solid rgba(239, 68, 68, 0.3); display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-microchip" style="color: #ef4444; font-size: 18px;"></i>
+                            <div>
+                                <span style="font-weight: 800; color: #fecaca; font-size: 14px; letter-spacing: 0.5px;">AUDIT TARGET DOBEL & ESTIMASI MASALAH RADAR</span>
+                                <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Analisis Ekstraktor Pulsa, Monopulse OBA, & Refleksi Multipath Sinyal MSSR</div>
+                            </div>
+                        </div>
+                        <button onclick="window.closeRadarDuplicateAuditModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; font-size: 16px; cursor: pointer; padding: 4px 10px; border-radius: 6px;">✕</button>
+                    </div>
+
+                    <!-- Ringkasan Cepat / Quick Triage -->
+                    <div style="padding: 12px 20px; background: rgba(15, 23, 42, 0.8); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 20px; align-items: center; font-size: 11px; flex-wrap: wrap;">
+                        <span style="color: #94a3b8;">Total Pasangan Duplikat: <strong id="modalDupTotalCount" style="color: #ef4444; font-size: 13px;">0</strong></span>
+                        <span style="color: #94a3b8;">Status Ekstraktor RDP: <strong id="modalDupRdpStatus" style="color: #ffaa00;">Waspada Split</strong></span>
+                        <span style="color: #94a3b8;">Saran Prioritas: <strong id="modalDupPriorityTip" style="color: #38bdf8;">Kalibrasi Kanal Monopulse / Tuning Split Window</strong></span>
+                    </div>
+
+                    <!-- Konten Scrollable: Daftar Kasus & Rekomendasi -->
+                    <div style="flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;" id="radarDuplicateAuditList">
+                        <!-- Disuntikkan secara dinamis -->
+                    </div>
+
+                    <!-- Footer Modal -->
+                    <div style="padding: 12px 20px; background: rgba(10, 18, 32, 0.95); border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                        <span style="color: #64748b;">Ref Standard: ICAO Annex 10 Vol IV & Eurocontrol ASTERIX Part 9 (CAT 048)</span>
+                        <button onclick="window.closeRadarDuplicateAuditModal()" style="padding: 6px 16px; background: #ef4444; border: none; border-radius: 6px; color: #fff; font-weight: 700; font-size: 11px; cursor: pointer;">Tutup Diagnosa</button>
                     </div>
                 </div>
             </div>
@@ -1855,6 +1928,121 @@
         if (_currentRadarTab === 'audit') {
             drawRadarCoveragePolar(data.audit_data || {});
         }
+    };
+
+    // ── MODAL DIAGNOSA TARGET DOBEL & SARAN PERBAIKAN ──────────────────────────
+    window.openRadarDuplicateAuditModal = function () {
+        const modal = document.getElementById('radarDuplicateAuditModal');
+        if (!modal) return;
+
+        const countEl = document.getElementById('modalDupTotalCount');
+        const rdpStatusEl = document.getElementById('modalDupRdpStatus');
+        const tipEl = document.getElementById('modalDupPriorityTip');
+        const listEl = document.getElementById('radarDuplicateAuditList');
+
+        const report = Array.isArray(_lastDuplicateAuditReport) ? _lastDuplicateAuditReport : [];
+
+        if (countEl) countEl.textContent = `${report.length} Pasangan`;
+
+        let hasSplit = false;
+        let hasReflection = false;
+        report.forEach(r => {
+            if (r.category.includes('SPLIT')) hasSplit = true;
+            if (r.category.includes('REFLECTION')) hasReflection = true;
+        });
+
+        if (rdpStatusEl) {
+            if (hasSplit && hasReflection) {
+                rdpStatusEl.textContent = 'Kombinasi Split & Multipath';
+                rdpStatusEl.style.color = '#ef4444';
+            } else if (hasSplit) {
+                rdpStatusEl.textContent = 'Anomali Plot Splitting / Monopulse OBA';
+                rdpStatusEl.style.color = '#ef4444';
+            } else if (hasReflection) {
+                rdpStatusEl.textContent = 'Multipath Echo Terdeteksi';
+                rdpStatusEl.style.color = '#ffaa00';
+            } else {
+                rdpStatusEl.textContent = 'Normal Single Plot';
+                rdpStatusEl.style.color = '#00ff88';
+            }
+        }
+
+        if (tipEl) {
+            if (hasSplit) {
+                tipEl.textContent = 'Kalibrasi Kurva OBA Receiver Monopulse & Tuning Coalescing Window RDP';
+            } else if (hasReflection) {
+                tipEl.textContent = 'Periksa Reflection Screening Map & Daya Pancar P2 ISLS Antena';
+            } else {
+                tipEl.textContent = 'Sistem Ekstraktor dalam Kondisi Standar';
+            }
+        }
+
+        if (listEl) {
+            if (report.length === 0) {
+                listEl.innerHTML = `
+                    <div style="text-align: center; color: #64748b; padding: 40px 20px; font-size: 13px;">
+                        <i class="fas fa-check-circle" style="color: #00ff88; font-size: 32px; margin-bottom: 12px; display: block;"></i>
+                        Tidak terdeteksi target ganda atau plot splitting pada transmisi ASTERIX saat ini.<br>
+                        <span style="font-size: 11px; color: #475569;">Radar beroperasi secara normal (single track per target).</span>
+                    </div>
+                `;
+            } else {
+                listEl.innerHTML = report.map((item, idx) => {
+                    const tA = item.targetA;
+                    const tB = item.targetB;
+                    return `
+                        <div style="background: rgba(15, 28, 52, 0.85); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; padding: 14px 16px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; margin-bottom: 10px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="background: #ef4444; color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">KASUS #${idx + 1}</span>
+                                    <span style="font-weight: 800; color: #ff8888; font-size: 12px;">${item.category}</span>
+                                </div>
+                                <span style="font-size: 11px; color: #94a3b8; font-family: monospace;">ΔRange: <strong style="color: #00ffff;">${item.deltaRange} NM</strong> | ΔAzim: <strong style="color: #00ffff;">${item.deltaAzim}°</strong> | ΔAlt: <strong style="color: #ffcc00;">FL${item.deltaFl}</strong></span>
+                            </div>
+
+                            <!-- Target Pair Info -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; font-size: 11px; font-family: monospace;">
+                                <div style="background: rgba(8, 16, 32, 0.6); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #00d4ff;">
+                                    <div style="color: #00d4ff; font-weight: bold; margin-bottom: 4px;">TARGET 1: ${tA.callsign || tA.id}</div>
+                                    <div style="color: #cbd5e1;">Squawk: <strong style="color: #ffcc00;">SQ ${tA.squawk || '—'}</strong> | FL${tA.fl || '—'}</div>
+                                    <div style="color: #94a3b8;">Polar: ${tA.range_nm || 0} NM (${tA.azimuth_deg || 0}°)</div>
+                                    <div style="color: #64748b; font-size: 10px;">Pos: ${tA.lat || '—'}, ${tA.lon || '—'}</div>
+                                </div>
+                                <div style="background: rgba(8, 16, 32, 0.6); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #ff5555;">
+                                    <div style="color: #ff8888; font-weight: bold; margin-bottom: 4px;">TARGET 2 (DOBEL): ${tB.callsign || tB.id}</div>
+                                    <div style="color: #cbd5e1;">Squawk: <strong style="color: #ffcc00;">SQ ${tB.squawk || '—'}</strong> | FL${tB.fl || '—'}</div>
+                                    <div style="color: #94a3b8;">Polar: ${tB.range_nm || 0} NM (${tB.azimuth_deg || 0}°)</div>
+                                    <div style="color: #64748b; font-size: 10px;">Pos: ${tB.lat || '—'}, ${tB.lon || '—'}</div>
+                                </div>
+                            </div>
+
+                            <!-- Diagnosis & Suggestions -->
+                            <div style="background: rgba(2, 6, 14, 0.5); padding: 10px 12px; border-radius: 6px; display: flex; flex-direction: column; gap: 6px; font-size: 11px;">
+                                <div>
+                                    <span style="color: #ffcc00; font-weight: bold;"><i class="fas fa-stethoscope"></i> Indikasi:</span>
+                                    <span style="color: #e2e8f0; margin-left: 4px;">${item.reason}</span>
+                                </div>
+                                <div>
+                                    <span style="color: #f87171; font-weight: bold;"><i class="fas fa-wrench"></i> Estimasi Masalah:</span>
+                                    <span style="color: #cbd5e1; margin-left: 4px;">${item.probableCause}</span>
+                                </div>
+                                <div>
+                                    <span style="color: #4ade80; font-weight: bold;"><i class="fas fa-lightbulb"></i> Saran Tindakan Teknisi:</span>
+                                    <span style="color: #f0fdf4; margin-left: 4px;">${item.recommendation}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        modal.style.display = 'flex';
+    };
+
+    window.closeRadarDuplicateAuditModal = function () {
+        const modal = document.getElementById('radarDuplicateAuditModal');
+        if (modal) modal.style.display = 'none';
     };
 
     // Auto-init styles on load
