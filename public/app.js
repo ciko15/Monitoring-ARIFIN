@@ -679,10 +679,16 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       astDiv.style.display = 'block';
       if (document.getElementById('asterixSac')) document.getElementById('asterixSac').value = editSource.sac !== undefined ? editSource.sac : '';
       if (document.getElementById('asterixSic')) document.getElementById('asterixSic').value = editSource.sic !== undefined ? editSource.sic : '';
+      const srcLat = editSource.lat !== undefined && editSource.lat !== null ? editSource.lat : (extra.lat !== undefined ? extra.lat : '');
+      const srcLon = editSource.lon !== undefined && editSource.lon !== null ? editSource.lon : (editSource.lng !== undefined && editSource.lng !== null ? editSource.lng : (extra.lon !== undefined ? extra.lon : (extra.lng !== undefined ? extra.lng : '')));
+      if (document.getElementById('asterixLat')) document.getElementById('asterixLat').value = srcLat;
+      if (document.getElementById('asterixLon')) document.getElementById('asterixLon').value = srcLon;
     } else if (astDiv) {
       astDiv.style.display = 'none';
       if (document.getElementById('asterixSac')) document.getElementById('asterixSac').value = '';
       if (document.getElementById('asterixSic')) document.getElementById('asterixSic').value = '';
+      if (document.getElementById('asterixLat')) document.getElementById('asterixLat').value = '';
+      if (document.getElementById('asterixLon')) document.getElementById('asterixLon').value = '';
     }
 
     // Populate T6TV extra fields if editing
@@ -1018,10 +1024,12 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       ...(templateSelect.value === 'vhf_marc_rse' ? { marc_ports: getMarcPortsFromCheckboxes() } : {}),
       ...(templateSelect.value === 'vhf_marc_rse' ? { poll_interval: 30 } : {}),
       
-      // ASTERIX SAC & SIC
+      // ASTERIX SAC, SIC & Coordinates
       ...((templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar') ? {
           sac: document.getElementById('asterixSac') && document.getElementById('asterixSac').value ? parseInt(document.getElementById('asterixSac').value, 10) : 0,
           sic: document.getElementById('asterixSic') && document.getElementById('asterixSic').value ? parseInt(document.getElementById('asterixSic').value, 10) : 0,
+          lat: document.getElementById('asterixLat') && document.getElementById('asterixLat').value !== '' ? parseFloat(document.getElementById('asterixLat').value) : null,
+          lon: document.getElementById('asterixLon') && document.getElementById('asterixLon').value !== '' ? parseFloat(document.getElementById('asterixLon').value) : null,
           protocol: 'udp'
       } : {}),
 

@@ -30,11 +30,12 @@
 
     // ── Katalog Stasiun Radar MSSR Indonesia (SAC / SIC) ───────────────────────────
     const RADAR_STATIONS_MAP = {
+        '50/8':   { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
+        '50/008': { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
+        '32/157': { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
         '32/153': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
         '32/15':  { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
         '32/015': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
-        '50/8':   { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
-        '50/008': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
         '32/163': { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
         '32/160': { name: 'Biak',      lat: -1.1874, lon: 136.1085 },
         '32/154': { name: 'Merauke',   lat: -8.5204, lon: 140.4183 },
@@ -77,22 +78,36 @@
                 return null;
             }).catch(() => null);
     }
-    // Resolusi otomatis koordinat stasiun radar:
-    // Prioritas 1: data.lat & data.lon (Eksplisit dari ASTERIX CAT 034 I034/120 atau sensor)
-    // Prioritas 2: SAC/SIC dari paket CAT 034 (I034/010)
-    // Prioritas 3: Nama stasiun radar (jika ada nama bandara/stasiun)
-    // Prioritas 4: Profil bandara cabang aktif
-    // Fallback default: Timika (-4.5284, 136.8860)
+    fetchBranchProfileCoords();
+
+    // Resolusi otomatis koordinat stasiun radar (Rantai Prioritas):
+    // 1. data.lat & data.lon dari konfigurasi Data Source (input user di form config)
+    // 2. Profil koordinat bandara aktif (_branchProfileCoords / branch_profile.json)
+    // 3. Lookup tabel SAC / SIC (I034/010)
+    // 4. Default fallback aman (Surabaya)
     function resolveRadarStationCoords(data) {
+        // 1. Koordinat spesifik dari konfigurasi Data Source (jika diinput user di UI & valid)
         if (data) {
             let lat = parseFloat(data.lat);
-            let lon = parseFloat(data.lon);
-            // 1. Koordinat langsung dari ASTERIX CAT 034 (I034/120) atau metadata stasiun
+            let lon = parseFloat(data.lon !== undefined && data.lon !== null ? data.lon : data.lng);
             if (!isNaN(lat) && !isNaN(lon) && (Math.abs(lat) > 0.0001 || Math.abs(lon) > 0.0001)) {
-                return { lat, lon, name: data.radar_name || 'Radar Station (CAT034)' };
+                if (lat >= -12.0 && lat <= 7.0 && lon >= 94.0 && lon <= 142.0) {
+                    return { lat, lon, name: data.radar_name || 'Radar Station (Source Config)' };
+                }
             }
+        }
 
-            // 2. Lookup SAC / SIC dari paket CAT 034 (I034/010)
+        // 2. Profil koordinat bandara aktif dari branch_profile.json (jika data source tidak mengisi lat/lon)
+        if (_branchProfileCoords && !isNaN(_branchProfileCoords.lat)) {
+            const bLat = parseFloat(_branchProfileCoords.lat);
+            const bLon = parseFloat(_branchProfileCoords.lon);
+            if (bLat >= -12.0 && bLat <= 7.0 && bLon >= 94.0 && bLon <= 142.0) {
+                return _branchProfileCoords;
+            }
+        }
+
+        // 3. Prioritas berikutnya: Lookup SAC / SIC dari header paket CAT 034 (I034/010)
+        if (data) {
             if (data.sac !== undefined && data.sic !== undefined && data.sac !== null && data.sic !== null) {
                 const k1 = `${data.sac}/${data.sic}`;
                 const k2 = `${data.sac}/${String(data.sic).padStart(3, '0')}`;
@@ -100,7 +115,7 @@
                 if (RADAR_STATIONS_MAP[k2]) return RADAR_STATIONS_MAP[k2];
             }
 
-            // 3. Lookup Nama Stasiun jika membawa nama lokasi
+            // Lookup Nama Stasiun jika membawa nama lokasi
             const rName = String(data.radar_name || '').toLowerCase();
             if (rName && rName !== 'unknown' && rName !== 'mssr') {
                 for (const st of Object.values(RADAR_STATIONS_MAP)) {
@@ -111,13 +126,8 @@
             }
         }
 
-        // 4. Profil bandara cabang aktif (jika valid)
-        if (_branchProfileCoords && !isNaN(_branchProfileCoords.lat) && (Math.abs(_branchProfileCoords.lat) > 0.0001)) {
-            return _branchProfileCoords;
-        }
-
-        // 5. Fallback ke Timika (-4.5284, 136.8860)
-        return { lat: -4.5284, lon: 136.8860, name: 'Timika' };
+        // 4. Default aman stasiun radar di Indonesia jika semua kosong
+        return { lat: -7.3798, lon: 112.7874, name: 'Surabaya' };
     }
 
     // Hitung Heading / Arah Moncong Pesawat yang Akurat (0 - 360°)

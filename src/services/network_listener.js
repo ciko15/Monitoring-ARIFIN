@@ -2071,18 +2071,41 @@ class NetworkListenerService {
             }
         }
 
+        // ── Resolusi Koordinat Radar ─────────────────────────────────────────────
+        // Prioritas: (1) lat/lon dari konfigurasi data source  →  (2) koordinat
+        // bandara aktif dari branch_profile.json  →  (3) default 0.
+        // Ini memastikan radar selalu terpusat di lokasi yang benar tanpa perlu
+        // hardcode, cukup isi lat/lon di halaman konfigurasi data source.
+        const srcLat = parseFloat(lat || extraCfg.lat || 0);
+        const srcLon = parseFloat(lon || extraCfg.lon || extraCfg.lng || 0);
+        const hasSourceCoords = !isNaN(srcLat) && !isNaN(srcLon) && (Math.abs(srcLat) > 0.001 || Math.abs(srcLon) > 0.001);
+
         const ParserClass = require('../parsers/' + parserId);
+
+        // Buat parser dulu dengan koordinat yang diketahui (sumber atau 0)
         const parser = new ParserClass({
             equipt_id,
             name: location || name,
-            lat: lat || 0,
-            lon: lon || 0,
+            lat: hasSourceCoords ? srcLat : 0,
+            lon: hasSourceCoords ? srcLon : 0,
             sac: sac || 0,
             sic: sic || 0,
             multicast_ip: mcastIp,
             multicast_port: multicast_port || port,
             timeout_ms: timeout_ms || 5000,
         });
+
+        // Jika koordinat data source kosong, ambil dari branch_profile (bandara aktif)
+        if (!hasSourceCoords) {
+            db.getBranchProfile().then(profile => {
+                const bLat = parseFloat(profile && profile.lat);
+                const bLon = parseFloat(profile && (profile.lng || profile.lon));
+                if (!isNaN(bLat) && !isNaN(bLon) && (Math.abs(bLat) > 0.001 || Math.abs(bLon) > 0.001)) {
+                    parser.setFallbackCoords(bLat, bLon, profile.airportName || profile.siteId || 'Airport');
+                    console.log(`[Asterix] ${location || name}: koordinat dari branch_profile → lat=${bLat} lon=${bLon}`);
+                }
+            }).catch(() => {});
+        }
 
         if (!this._asterixSockets) this._asterixSockets = new Map();
         if (!this._asterixParsers) this._asterixParsers = new Map();

@@ -469,6 +469,19 @@
                     style="width:100%; box-sizing:border-box;">
                 </div>
               </div>
+              <div style="display:flex; gap:10px; margin-top:8px;">
+                <div style="flex:1;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Latitude (Opsional)</label>
+                  <input type="number" step="any" id="asterixLat" placeholder="Contoh: -7.3798 (Kosong = default bandara)"
+                    style="width:100%; box-sizing:border-box;">
+                </div>
+                <div style="flex:1;">
+                  <label style="font-size:10px; color:#a0b4c4; margin-bottom:4px; display:block;">Longitude (Opsional)</label>
+                  <input type="number" step="any" id="asterixLon" placeholder="Contoh: 112.7874 (Kosong = default bandara)"
+                    style="width:100%; box-sizing:border-box;">
+                </div>
+              </div>
+              <div style="font-size:9px; color:#7a9ab5; margin-top:4px;">* Jika Latitude/Longitude dikosongkan, koordinat akan otomatis menggunakan koordinat bandara aktif.</div>
             </div>
 
             <!-- PM5350 Modbus Extra Fields — shown only when template = pm5350_modbus -->
@@ -2338,7 +2351,7 @@
   <script src="app.js?v=34"></script>
   <script src="enhancements.js?v=46"></script>
   <!-- Modul Audit Peralatan Navigasi / Surveillance -->
-  <script src="audit/radar_audit.js?v=19"></script>
+  <script src="audit/radar_audit.js?v=21"></script>
   <script src="cabang-app.js?v=7"></script>
   <script src="snmp-tools.js"></script>
 

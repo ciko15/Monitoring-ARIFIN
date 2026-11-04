@@ -18,11 +18,11 @@ const TIMEOUT_MS = 5000; // 5 detik tanpa data = disconnect
 // ── Katalog Stasiun Radar MSSR Indonesia (SAC / SIC & Koordinat Geografis) ────
 const RADAR_STATIONS = {
     // Papua & Sekitarnya (SAC 32)
+    '50/8':   { name: 'Surabaya',  lat: -7.3798,  lon: 112.7874 }, // MSSR Surabaya Juanda (SAC 50 / SIC 8)
+    '50/008': { name: 'Surabaya',  lat: -7.3798,  lon: 112.7874 },
     '32/153': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
     '32/15':  { name: 'Timika',    lat: -4.5284,  lon: 136.8860 }, // Transponder 2 Timika (SAC 32 / SIC 15)
     '32/015': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
-    '50/8':   { name: 'Timika',    lat: -4.5284,  lon: 136.8860 }, // Source Radar Timika (SAC 50 / SIC 8)
-    '50/008': { name: 'Timika',    lat: -4.5284,  lon: 136.8860 },
     '32/163': { name: 'Sentani',   lat: -2.5721,  lon: 140.5148 },
     '32/160': { name: 'Biak',      lat: -1.1874,  lon: 136.1085 },
     '32/154': { name: 'Merauke',   lat: -8.5204,  lon: 140.4183 },
@@ -568,19 +568,25 @@ class AsterixRadarParser extends BaseParser {
         
         // 1. Coba cari dari nama stasiun atau SAC/SIC di opts
         if (isNaN(parsedLat) || isNaN(parsedLon) || (Math.abs(parsedLat) < 0.0001 && Math.abs(parsedLon) < 0.0001)) {
+            // Coba lookup berdasarkan nama / SAC+SIC dari RADAR_STATIONS
             const resolved = resolveRadarCoordinates(this._name, opts.sac, opts.sic);
             if (resolved) {
                 parsedLat = resolved.lat;
                 parsedLon = resolved.lon;
+                this._coordSource = 'sac_sic_lookup';
             } else {
-                // Fallback dinamis: Timika (-4.5284, 136.8860)
-                parsedLat = -4.5284;
-                parsedLon = 136.8860;
+                // Koordinat belum diketahui — akan diisi oleh setFallbackCoords()
+                // setelah network_listener membaca branch_profile.json
+                parsedLat = 0;
+                parsedLon = 0;
+                this._coordSource = 'pending';
             }
+        } else {
+            this._coordSource = 'datasource_config';
         }
         this._lat       = parsedLat;
         this._lon       = parsedLon;
-        this._hasFixedCoord = !isNaN(parseFloat(opts.lat)) && Math.abs(parseFloat(opts.lat)) > 0.0001;
+        this._hasFixedCoord = this._coordSource === 'datasource_config';
         this._timeout   = parseInt(opts.timeout_ms) || TIMEOUT_MS;
 
         this._lastData  = null;
@@ -592,6 +598,28 @@ class AsterixRadarParser extends BaseParser {
         this._lastTargetsList = '';
         this._recentTargets = new Map();
         this._lastCat048Time = null;
+    }
+
+    /**
+     * Dipanggil oleh network_listener untuk menyuntikkan koordinat bandara aktif
+     * sebagai fallback jika data source tidak memiliki lat/lon sendiri.
+     * Hanya berlaku jika koordinat saat ini masih 0 / belum terset.
+     * @param {number} lat  - Latitude bandara dari branch_profile.json
+     * @param {number} lon  - Longitude bandara dari branch_profile.json
+     * @param {string} name - Nama bandara/stasiun (opsional)
+     */
+    setFallbackCoords(lat, lon, name) {
+        // Hanya terapkan jika belum ada koordinat valid (dari config atau SAC/SIC)
+        if (this._hasFixedCoord || this._coordSource === 'sac_sic_lookup') return;
+        const fLat = parseFloat(lat);
+        const fLon = parseFloat(lon);
+        if (isNaN(fLat) || isNaN(fLon) || (Math.abs(fLat) < 0.001 && Math.abs(fLon) < 0.001)) return;
+        this._lat = fLat;
+        this._lon = fLon;
+        this._coordSource = 'branch_profile';
+        if (name && (!this._name || this._name === 'Unknown')) {
+            this._name = name;
+        }
     }
 
     /**
@@ -697,20 +725,32 @@ class AsterixRadarParser extends BaseParser {
             }
         }
 
-        // 1. Prioritas Utama: Update koordinat radar langsung dari paket CAT034 (I034/120 3D Position)
-        if (decoded.has_cat34_pos && decoded.lat && decoded.lon) {
-            this._lat = decoded.lat;
-            this._lon = decoded.lon;
-            this._hasFixedCoord = true;
-        } else if (!this._hasFixedCoord && decoded.sac !== null && decoded.sic !== null) {
-            // 2. Jika tidak ada I034/120, lookup dari SAC/SIC radar
-            const st = resolveRadarCoordinates(this._name, decoded.sac, decoded.sic);
-            if (st && (Math.abs(st.lat - this._lat) > 0.001 || Math.abs(st.lon - this._lon) > 0.001)) {
-                this._lat = st.lat;
-                this._lon = st.lon;
-                if (!this._name || this._name === 'Unknown') this._name = st.name;
+        // ── Resolusi Koordinat saat runtime (dari ASTERIX CAT034) ─────────────────
+        // Prioritas: datasource_config (terkunci) > SAC/SIC lookup > I034/120 > branch_profile
+        // Koordinat dari konfigurasi data source tidak akan ditimpa oleh apapun.
+        if (this._coordSource !== 'datasource_config') {
+            // Cek koordinat dari SAC/SIC paket CAT034 (I034/010)
+            let resolvedBySacSic = null;
+            if (decoded.sac !== null && decoded.sic !== null) {
+                resolvedBySacSic = resolveRadarCoordinates(this._name, decoded.sac, decoded.sic);
             }
+
+            if (resolvedBySacSic) {
+                this._lat = resolvedBySacSic.lat;
+                this._lon = resolvedBySacSic.lon;
+                this._name = resolvedBySacSic.name;
+                this._coordSource = 'sac_sic_lookup';
+            } else if (decoded.has_cat34_pos && decoded.lat && decoded.lon &&
+                       decoded.lat >= -12.0 && decoded.lat <= 7.0 && decoded.lon >= 94.0 && decoded.lon <= 142.0) {
+                // Gunakan I034/120 jika berada dalam batas geografis Indonesia yang valid
+                this._lat = decoded.lat;
+                this._lon = decoded.lon;
+                this._coordSource = 'i034_120';
+            }
+            // Jika coordSource masih 'pending' atau 'branch_profile', biarkan
+            // nilai dari setFallbackCoords() tetap terpakai
         }
+
 
         this._lastData  = decoded;
         this._connected = true;
