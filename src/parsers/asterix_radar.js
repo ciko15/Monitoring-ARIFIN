@@ -578,50 +578,21 @@ class AsterixRadarParser extends BaseParser {
             const now = Date.now();
             if (!this._recentTargets) this._recentTargets = new Map();
 
-            // 1. Coba decode format standar ASTERIX CAT048
+            // 1. Decode format baku dan presisi ASTERIX CAT048 (Murni dari Plot Extractor radar)
             const decodedTargets = decodeCat048(rawData, this._lat, this._lon);
             if (decodedTargets && decodedTargets.length > 0) {
                 for (const t of decodedTargets) {
-                    this._recentTargets.set(t.id, t);
-                }
-            }
-
-            // 2. Heuristic scan ICAO Address (0x8Axxxx) untuk memastikan tidak ada target yang terlewat
-            const totalLength = (rawData[1] << 8) | rawData[2];
-            for (let i = 3; i < Math.min(rawData.length, totalLength) - 2; i++) {
-                if (rawData[i] === 0x8A) {
-                    const hex = (rawData[i].toString(16) + 
-                                 rawData[i+1].toString(16).padStart(2, '0') + 
-                                 rawData[i+2].toString(16).padStart(2, '0')).toUpperCase();
-                    if (!this._recentTargets.has(hex)) {
-                        // Generate posisi teratur di sekitar radar jika koordinat polar tidak terdeteksi
-                        const angle = ((parseInt(hex.slice(-3), 16) || 100) * 137.5) % 360;
-                        const dist = 15 + (((parseInt(hex.slice(-2), 16) || 50) * 1.7) % 75);
-                        const coords = (this._lat && this._lon) ? polarToLatLon(this._lat, this._lon, dist, angle) : { lat: 0, lon: 0 };
-                        const altFt = 10000 + (((parseInt(hex.slice(-2), 16) || 20) * 450) % 28000);
-
-                        this._recentTargets.set(hex, {
-                            id: hex,
-                            callsign: hex,
-                            range_nm: Number(dist.toFixed(1)),
-                            azimuth_deg: Number(angle.toFixed(1)),
-                            lat: coords.lat,
-                            lon: coords.lon,
-                            alt: altFt,
-                            fl: Math.round(altFt / 100),
-                            squawk: '1200',
-                            speed: 280 + (altFt > 20000 ? 140 : 0),
-                            heading: Math.round((angle + 90) % 360),
-                            last_seen: now
-                        });
+                    if (t.id && (t.range_nm !== null || t.lat !== null)) {
+                        this._recentTargets.set(t.id, t);
                     }
                 }
             }
 
-            // Bersihkan target yang lebih lama dari 35 detik (sliding window rotasi antena ~6-8 putaran)
+            // 2. Bersihkan target yang lebih lama dari 10 detik (sinkron dengan 2-3 putaran antena fisik ~4s)
+            // agar target yang sudah lewat atau false plot temporer segera hilang, sama seperti layar radar asli
             for (const [id, t] of this._recentTargets.entries()) {
                 const ts = t.last_seen || 0;
-                if (now - ts > 35000) {
+                if (now - ts > 10000) {
                     this._recentTargets.delete(id);
                 }
             }

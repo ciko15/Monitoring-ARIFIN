@@ -406,30 +406,26 @@
                 if (dAz > 180) dAz = 360 - dAz;
                 const dFl = Math.abs(aFl - bFl);
 
-                // Kriteria 1: Squawk khusus identik
+                // Kriteria Standar Radar Display untuk Target Dobel / Split:
+                // 1. Squawk Khusus Identik (bukan VFR 1200 / 7000 / kosong) DAN jarak berdekatan (< 1.2 NM & < 1.2°)
                 const sameSquawk = aSq && bSq && aSq !== '—' && aSq !== '1200' && aSq !== '7000' && aSq === bSq;
                 
-                // Kriteria 2: Proksimitas Polar Sempit (<= 1.5 NM dan <= 1.5 deg)
-                const closePolar = dR <= 1.5 && dAz <= 1.5 && aR > 0 && bR > 0;
+                // 2. Proksimitas Polar Sangat Ketat (Satu beam width radar ~1.5°, selisih range sangat kecil < 0.8 NM)
+                const isPhysicalSplit = sameSquawk && dR <= 0.8 && dAz <= 1.2 && aR > 0 && bR > 0;
+                const isPhysicalMultipath = sameSquawk && dR > 0.8 && dR <= 4.0 && dAz <= 3.0 && aR > 0 && bR > 0;
 
-                if (sameSquawk && closePolar) {
+                if (isPhysicalSplit) {
                     isDup = true;
                     category = 'PLOT SPLIT (AZIMUTH / RANGE)';
-                    reason = `Squawk sama (SQ ${aSq}), selisih jarak hanya ${dR.toFixed(2)} NM dan sudut ${dAz.toFixed(2)}°`;
+                    reason = `Squawk sama persis (SQ ${aSq}), selisih jarak sangat tipis ${dR.toFixed(2)} NM dan sudut ${dAz.toFixed(2)}°`;
                     probableCause = 'Plot Extractor / RDP gagal menggabungkan (coalescing) reply pulse, atau kurva Monopulse Off-Boresight Azimuth (OBA) mengalami fase drift.';
                     recommendation = 'Periksa parameter Runlength / Azimuth Coalescing Window di RDP, dan lakukan kalibrasi kurva OBA Monopulse Receiver (Sigma & Delta channel).';
-                } else if (sameSquawk && dR > 1.5) {
+                } else if (isPhysicalMultipath) {
                     isDup = true;
                     category = 'MULTIPATH REFLECTION (GHOST TARGET)';
-                    reason = `Squawk sama (SQ ${aSq}) tapi jarak terpaut ${dR.toFixed(1)} NM (Azim Δ${dAz.toFixed(1)}°)`;
+                    reason = `Squawk sama persis (SQ ${aSq}) dengan selisih jarak ${dR.toFixed(1)} NM (Azim Δ${dAz.toFixed(1)}°)`;
                     probableCause = 'Pantulan sinyal 1030/1090 MHz dari lereng pegunungan/struktur darat di sekitar radar, memunculkan echo sekunder.';
                     recommendation = 'Aktifkan Reflection Screening Map pada RDP di azimuth lereng gunung, atau verifikasi pulsa P2 ISLS.';
-                } else if (closePolar) {
-                    isDup = true;
-                    category = 'CO-LOCATED OVERLAPPING PLOT';
-                    reason = `Jarak sangat berdekatan: ΔRange ${dR.toFixed(2)} NM, ΔAzimuth ${dAz.toFixed(2)}° (Altitude Δ${dFl} FL)`;
-                    probableCause = 'Dua target berada dalam volume ruang udara yang sama atau transponder mengalami interferensi garbling.';
-                    recommendation = 'Pantau de-garbling filter receiver radar dan verifikasi dengan data ADS-B CAT 021.';
                 }
 
                 if (isDup) {
