@@ -21,21 +21,72 @@
     let _radarMap = null;
     let _radarTileLayer = null;
     let _isMapEnabled = true; // Default aktif dengan latar belakang peta
-    let _mapTheme = 'light'; // Default 'light' (peta terang) sesuai permintaan
     let _lastRadarCoords = { lat: -4.5284, lon: 136.8860 }; // Default Timika (atau dinamik dari sumber data)
     let _isIslsFilterEnabled = false; // Fitur ISLS / Anti-Multipath Filter (Default: NONAKTIF)
     let _radarTargetTrafficFilter = 'all'; // 'all', 'inbound' (incoming), 'outbound' (outgoing)
+    let _targetHistoryMap = new Map(); // Histori posisi [lat, lon, range, azim, time] untuk kalkulasi heading & track
+
+    // Hitung Heading / Arah Moncong Pesawat yang Akurat (0 - 360°)
+    function getTargetHeading(tgt, radarLat, radarLon) {
+        const tgtId = String(tgt.id || '');
+        const currentR = Number(tgt.range_nm) || 0;
+        const currentAz = Number(tgt.azimuth_deg) || 0;
+
+        // 1. Jika sensor mengirimkan heading/track eksplisit valid (bukan 0/null)
+        if (tgt.heading !== undefined && tgt.heading !== null && tgt.heading !== '' && !isNaN(Number(tgt.heading)) && Number(tgt.heading) > 0) {
+            return Number(tgt.heading);
+        }
+
+        // 2. Kalkulasi heading dari pergerakan historis (track vector antara sapuan antena radar)
+        const now = Date.now();
+        if (_targetHistoryMap.has(tgtId)) {
+            const hist = _targetHistoryMap.get(tgtId);
+            const dt = (now - hist.time) / 1000;
+            // Jika update sebelumnya dalam 1 - 25 detik terakhir
+            if (dt >= 0.5 && dt <= 25) {
+                // Selisih range
+                const dRange = currentR - hist.range;
+                if (Math.abs(dRange) >= 0.1 || Math.abs(currentAz - hist.azim) >= 0.2) {
+                    // Hitung heading menggunakan vektor koordinat lat/lon
+                    const lat1 = (hist.lat * Math.PI) / 180;
+                    const lat2 = (tgt.lat * Math.PI) / 180;
+                    const dLon = ((tgt.lon - hist.lon) * Math.PI) / 180;
+                    const y = Math.sin(dLon) * Math.cos(lat2);
+                    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+                    let computedHdg = (Math.atan2(y, x) * 180) / Math.PI;
+                    computedHdg = (computedHdg + 360) % 360;
+
+                    // Simpan heading yang dihitung ke objek target
+                    tgt.heading = Math.round(computedHdg);
+                    return tgt.heading;
+                }
+            }
+        }
+
+        // 3. Fallback jika pesawat baru pertama kali terdeteksi:
+        // Jika statusnya Incoming, moncong mengarah ke pusat radar (radial inbound = azim + 180).
+        // Jika statusnya Outgoing, moncong mengarah keluar menjauhi radar (radial outbound = azim).
+        const radialInbound = (currentAz + 180) % 360;
+        return radialInbound;
+    }
 
     // Deteksi Arah Lalu Lintas Pesawat: Incoming (Mendekati radar) vs Outgoing (Menjauhi radar)
     function getTargetTrafficDirection(tgt, radarLat, radarLon) {
         const azim = Number(tgt.azimuth_deg) || 0;
-        let hdg = Number(tgt.heading);
-        if (isNaN(hdg)) hdg = azim;
+        const currentR = Number(tgt.range_nm) || 0;
+        const tgtId = String(tgt.id || '');
 
-        // Azimuth adalah arah dari stasiun radar ke pesawat (0 - 360).
-        // Arah lurus menuju stasiun radar (radial inbound) adalah (azim + 180) % 360.
-        // Jika heading pesawat berdeviasi < 90 derajat dari radial inbound, maka pesawat INBOUND (Mendekat).
-        // Sebaliknya, jika deviasinya > 90 derajat (menjauh dari radar), maka pesawat OUTBOUND (Menjauh).
+        // 1. Cek perubahan jarak (delta range) historis: Jika range mengecil -> INBOUND (Incoming), jika membesar -> OUTBOUND
+        if (_targetHistoryMap.has(tgtId)) {
+            const hist = _targetHistoryMap.get(tgtId);
+            const dR = currentR - hist.range;
+            if (Math.abs(dR) >= 0.15) {
+                return dR < 0 ? 'inbound' : 'outbound';
+            }
+        }
+
+        // 2. Evaluasi berdasarkan heading
+        let hdg = getTargetHeading(tgt, radarLat, radarLon);
         const radialInbound = (azim + 180) % 360;
         let diff = Math.abs(hdg - radialInbound);
         if (diff > 180) diff = 360 - diff;
@@ -781,15 +832,15 @@
                 e.preventDefault();
                 // Pada Mac Trackpad, gesture cubit (pinch to zoom) mengirim event wheel dengan e.ctrlKey = true
                 if (e.ctrlKey) {
-                    // Smooth continuous pinch zoom
+                    // Smooth continuous pinch zoom (pertahankan posisi center pan terakhir: autoRecenter = false)
                     const factor = e.deltaY < 0 ? 0.94 : 1.06;
                     let targetRange = Math.round(_radarRangeNm * factor);
                     targetRange = Math.max(15, Math.min(300, targetRange));
-                    window.setRadarPpiRange(targetRange);
+                    window.setRadarPpiRange(targetRange, false);
                     return;
                 }
 
-                // Scroll wheel biasa (discrete steps)
+                // Scroll wheel biasa (discrete steps, pertahankan posisi pan: autoRecenter = false)
                 const delta = e.deltaY;
                 const ranges = [20, 40, 60, 80, 100, 120, 160, 200, 250];
                 let currentIdx = ranges.findIndex(r => r >= _radarRangeNm);
@@ -798,12 +849,12 @@
                 if (delta > 0) {
                     // Zoom Out (Range bertambah)
                     if (currentIdx < ranges.length - 1) {
-                        window.setRadarPpiRange(ranges[currentIdx + 1]);
+                        window.setRadarPpiRange(ranges[currentIdx + 1], false);
                     }
                 } else if (delta < 0) {
                     // Zoom In (Range berkurang)
                     if (currentIdx > 0) {
-                        window.setRadarPpiRange(ranges[currentIdx - 1]);
+                        window.setRadarPpiRange(ranges[currentIdx - 1], false);
                     }
                 }
             }, { passive: false });
@@ -871,11 +922,11 @@
                     const currentDist = Math.hypot(dx, dy);
                     const scale = currentDist / _initialPinchDist;
 
-                    // Buka cubitan (scale > 1) -> Zoom In (jarak NM mengecil)
-                    // Rapatkan cubitan (scale < 1) -> Zoom Out (jarak NM membesar)
+                    // Buka cubitan (scale > 1) -> Zoom In (jarak NM mengecil, pertahankan posisi pan: autoRecenter = false)
+                    // Rapatkan cubitan (scale < 1) -> Zoom Out (jarak NM membesar, pertahankan posisi pan: autoRecenter = false)
                     let newRange = Math.round(_initialRangeNm / scale);
                     newRange = Math.max(15, Math.min(300, newRange));
-                    window.setRadarPpiRange(newRange);
+                    window.setRadarPpiRange(newRange, false);
                 } else if (e.touches.length === 1 && _isDraggingMap && _radarMap) {
                     const dx = e.touches[0].clientX - _dragStartPos.x;
                     const dy = e.touches[0].clientY - _dragStartPos.y;
@@ -1246,7 +1297,7 @@
         _radarSelectedTargetId = null;
     };
 
-    window.setRadarPpiRange = function (rangeNm) {
+    window.setRadarPpiRange = function (rangeNm, autoRecenter = true) {
         _radarRangeNm = rangeNm;
         document.querySelectorAll('.radar-range-btn').forEach(btn => {
             if (btn.textContent.includes(`${rangeNm} NM`)) {
@@ -1256,8 +1307,8 @@
             }
         });
         const data = getActiveRadarSourceData() || {};
-        // Klik Range akan otomatis me-reset & me-recenter posisi peta tepat ke stasiun radar!
-        initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm, true);
+        // autoRecenter: true saat tombol Range diklik (kembali ke tengah radar), false saat scroll/pinch gesture (tetap di posisi pan terakhir)
+        initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm, autoRecenter);
     };
 
     function updateRadarPpiScopeData() {
@@ -1707,9 +1758,22 @@
             ctx.save();
             ctx.translate(tx, ty);
 
-            // Heading speed vector line
-            const headingDeg = Number(tgt.heading) || azim;
+            // Hitung heading akurat dan orientasi moncong pesawat
+            const headingDeg = getTargetHeading(tgt, _lastRadarCoords.lat, _lastRadarCoords.lon);
             const headingRad = (headingDeg - 90) * (Math.PI / 180);
+
+            // Simpan posisi terbaru ke _targetHistoryMap untuk kalkulasi track sapuan berikutnya
+            if (tgt.id) {
+                _targetHistoryMap.set(String(tgt.id), {
+                    range: range,
+                    azim: azim,
+                    lat: tgtLat,
+                    lon: tgtLon,
+                    time: Date.now()
+                });
+            }
+
+            // Heading speed vector line (menunjuk ke arah pergerakan pesawat)
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(16 * Math.cos(headingRad), 16 * Math.sin(headingRad));
@@ -1717,7 +1781,9 @@
             ctx.lineWidth = 1.5;
             ctx.stroke();
 
-            // Rotasi ikon pesawat
+            // Rotasi moncong pesawat jet agar tepat menghadap ke arah heading pergerakan
+            // Canvas standard 0 rad adalah ke kanan (+X / 090°). Model pesawat digambar dengan hidung ke atas (-Y / 000°).
+            // Maka rotasi canvas ke sudut heading adalah (headingRad + Math.PI / 2).
             ctx.rotate(headingRad + Math.PI / 2);
 
             // Gambar Ikon Pesawat Jet
