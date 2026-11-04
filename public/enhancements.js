@@ -978,14 +978,11 @@
                         const badgeStyle = (isAlarm || isWarning || isNormalLimit)
                             ? `background: ${isAlarm ? 'rgba(255,51,85,0.12)' : isWarning ? 'rgba(255,204,0,0.12)' : 'rgba(0,255,136,0.08)'}; border: 1px solid ${isAlarm ? 'rgba(255,51,85,0.4)' : isWarning ? 'rgba(255,204,0,0.4)' : 'rgba(0,255,136,0.3)'}; border-radius: 4px; padding: 2px 5px;`
                             : '';
-                        const isRadarTargetClickable = effParserId === 'asterix_radar' && (k === 'targets_list' || k === 'target_count' || k === 'radar_id');
-                        const radarItemAttr = isRadarTargetClickable ? `onclick="event.stopPropagation(); window.openRadarPpiScope('${src.id}')" style="cursor: pointer; background: rgba(0,212,255,0.12); border: 1px solid #00d4ff; border-radius: 4px; padding: 3px 6px; transition: all 0.2s;" title="Klik untuk membuka Radar PPI Scope (60%)"` : (badgeStyle ? `style="${badgeStyle}"` : '');
-
-                        return `<div class="sp-card-preview-point" ${radarItemAttr}>
-                                <span class="sp-preview-label" style="color:${isRadarTargetClickable ? '#00ffff' : labelColor};font-weight:${(isAlarm || isWarning || isNormalLimit || isRadarTargetClickable) ? 'bold' : 'normal'}" title="${label}">
-                                    ${isRadarTargetClickable ? '<i class="fas fa-crosshairs fa-spin" style="animation-duration:6s; color:#00ff88; margin-right:3px;"></i> ' : ''}${label}
+                        return `<div class="sp-card-preview-point" ${badgeStyle ? `style="${badgeStyle}"` : ''}>
+                                <span class="sp-preview-label" style="color:${labelColor};font-weight:${(isAlarm || isWarning || isNormalLimit) ? 'bold' : 'normal'}" title="${label}">
+                                    ${label}
                                 </span>
-                                <span class="sp-preview-value" style="color:${isRadarTargetClickable ? '#00ffcc' : valColor}">${val}${unit}</span>
+                                <span class="sp-preview-value" style="color:${valColor}">${val}${unit}</span>
                             </div>`;
                     }).join('')}
                     </div>`;
@@ -2240,16 +2237,13 @@
                         : '#0f1e35';
 
             const displayVal = (val === null || val === undefined || val === '' || val === '-' || val === '—') ? '—' : val;
-            const isRadarClickable = (parserId === 'asterix_radar' || parserId === 'asterix_adsb') && (label.toLowerCase().includes('target') || label.toLowerCase().includes('antenna') || label.toLowerCase().includes('radar id'));
-            const clickableAttr = isRadarClickable ? `onclick="window.openRadarPpiScope(window._activeSourceDetail ? window._activeSourceDetail.id : null)" style="background:${isRadarClickable ? 'rgba(0,212,255,0.12)' : cardBg};border:${isRadarClickable ? '1px solid #00d4ff' : cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;cursor:pointer;" title="Klik untuk membuka Sidebar Radar PPI Scope (60%)"` : `style="background:${cardBg};border:${cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;"`;
 
             return `
-                        <div ${clickableAttr}>
-                            <div style="font-size:10px;color:${isRadarClickable ? '#00ffff' : labelColor};letter-spacing:0.5px;margin-bottom:4px;font-weight:${(isAlarm || isWarning || isNormalLimit || isRadarClickable) ? '700' : '500'};overflow-wrap:anywhere;display:flex;justify-content:space-between;align-items:center;">
-                                <span>${label}</span>
-                                ${isRadarClickable ? '<span style="font-size:9px;color:#00ff88;background:rgba(0,255,136,0.15);padding:1px 5px;border-radius:3px;"><i class="fas fa-crosshairs"></i> Buka Scope</span>' : ''}
+                        <div style="background:${cardBg};border:${cardBorder};border-radius:6px;padding:9px 12px;transition:all 0.2s ease;min-width:0;">
+                            <div style="font-size:10px;color:${labelColor};letter-spacing:0.5px;margin-bottom:4px;font-weight:${(isAlarm || isWarning || isNormalLimit) ? '700' : '500'};overflow-wrap:anywhere;">
+                                ${label}
                             </div>
-                            <div style="font-size:13px;font-weight:700;color:${isRadarClickable ? '#00ffcc' : finalColor};overflow-wrap:anywhere;">${displayVal}</div>
+                            <div style="font-size:13px;font-weight:700;color:${finalColor};overflow-wrap:anywhere;">${displayVal}</div>
                         </div>`;
         }).join('')}
                 </div>
@@ -2893,15 +2887,15 @@
             sections.push({
                 title: 'STATUS RADAR MSSR (CAT 048 / 034)', params: [
                     ['Konektivitas', data.connectivity || '—', cc],
-                    ['Nama Radar', data.radar_name || '—', '#00d4ff'],
-                    ['Radar ID', data.radar_id || '—', '#e8f4ff'],
-                    ['Antenna Rotation', data.antenna_rotation ? `${data.antenna_rotation} ${data.antenna_rpm ? '(' + data.antenna_rpm + ')' : ''}` : '—', '#00ffcc'],
-                    ['Power Output', data.power_status || 'Normal (18.5 kW)', '#00ff88'],
+                    ['Nama Radar', data.radar_name || '—', '#ffffff'],
+                    ['Radar ID', data.radar_id || '—', '#ffffff'],
+                    ['Antenna Rotation', data.antenna_rotation ? `${data.antenna_rotation} ${data.antenna_rpm ? '(' + data.antenna_rpm + ')' : ''}` : '—', '#ffffff'],
+                    ['Power Output', data.power_status || 'Normal (18.5 kW)', '#ffffff'],
                     ['System Status', data.system_status || 'Normal', getLimitColor(supCategory || 'RADAR', 'System Status', data.system_status, parserId)],
-                    ['Target Terdeteksi', data.target_count || '0', '#00d4ff'],
-                    ['Target List (ID)', data.targets_list || '—', '#e8f4ff'],
-                    ['Waktu Deteksi CAT048', data.last_cat048 ? new Date(data.last_cat048).toLocaleTimeString('id-ID') : (data.last_cat048 || '—'), '#5a8aaa'],
-                    ['Koordinat Stasiun', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', '#5a8aaa'],
+                    ['Target Terdeteksi', data.target_count || '0', '#ffffff'],
+                    ['Target List (ID)', data.targets_list || '—', '#ffffff'],
+                    ['Waktu Deteksi CAT048', data.last_cat048 ? new Date(data.last_cat048).toLocaleTimeString('id-ID') : (data.last_cat048 || '—'), '#ffffff'],
+                    ['Koordinat Stasiun', data.lat && data.lon ? `${data.lat}, ${data.lon}` : '—', '#ffffff'],
                 ]
             });
 

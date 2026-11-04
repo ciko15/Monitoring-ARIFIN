@@ -28,6 +28,11 @@
     let _radarTargetTrafficFilter = 'all'; // 'all', 'inbound' (incoming), 'outbound' (outgoing)
     let _targetHistoryMap = new Map(); // Histori posisi [lat, lon, range, azim, time] untuk kalkulasi heading & track
 
+    // Electronic Bearing and Range Line (EBRL / Ruler Distance Measurement Tool)
+    let _isRulerMode = false;
+    let _rulerPointA = null; // { x, y, lat, lon, label }
+    let _rulerPointB = null; // { x, y, lat, lon, label }
+
     // ── Katalog Stasiun Radar MSSR Indonesia (SAC / SIC) ───────────────────────────
     const RADAR_STATIONS_MAP = {
         '50/8':   { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
@@ -235,6 +240,36 @@
         return {
             lat: Number(((lat2 * 180) / Math.PI).toFixed(5)),
             lon: Number(((lon2 * 180) / Math.PI).toFixed(5))
+        };
+    }
+
+    // Hitung jarak Geodetik Great-Circle (Haversine) dan Arah Azimuth (Bearing) antara 2 titik WGS84
+    function calculateGeoDistanceAndBearing(lat1, lon1, lat2, lon2) {
+        const R_km = 6371.0;
+        const phi1 = (lat1 * Math.PI) / 180;
+        const phi2 = (lat2 * Math.PI) / 180;
+        const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+        const deltaLam = ((lon2 - lon1) * Math.PI) / 180;
+
+        // Haversine formula
+        const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+                  Math.cos(phi1) * Math.cos(phi2) *
+                  Math.sin(deltaLam / 2) * Math.sin(deltaLam / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distKm = R_km * c;
+        const distNm = distKm / 1.852;
+
+        // Bearing / Azimuth (0 - 360°)
+        const y = Math.sin(deltaLam) * Math.cos(phi2);
+        const x = Math.cos(phi1) * Math.sin(phi2) -
+                  Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLam);
+        let brng = (Math.atan2(y, x) * 180) / Math.PI;
+        brng = (brng + 360) % 360;
+
+        return {
+            distNm: Number(distNm.toFixed(2)),
+            distKm: Number(distKm.toFixed(2)),
+            bearing: Number(brng.toFixed(1))
         };
     }
 
@@ -768,6 +803,9 @@
                     <button class="radar-tab-btn" id="radarToggleIslsBtn" onclick="window.toggleRadarIslsFilter()" title="Simulasi Interrogation Side-Lobe Suppression (ISLS) & Anti-Multipath Filter" style="border-color: rgba(148, 163, 184, 0.4); color: #94a3b8;">
                         <i class="fas fa-shield-alt"></i> Filter ISLS: <span id="radarIslsStateText" style="font-weight: 700; color: #cbd5e1;">NONAKTIF</span>
                     </button>
+                    <button class="radar-tab-btn" id="radarRulerBtn" onclick="window.toggleRadarRuler()" title="Alat Pengukur Jarak & Arah Antara 2 Titik / Pesawat (Shortcut: M atau D)" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+                        <i class="fas fa-ruler-combined"></i> Ukur Jarak: <span id="radarRulerStateText" style="font-weight: 700; color: #cbd5e1;">OFF</span>
+                    </button>
                 </div>
                 <div id="radarPpiControlsRight" style="display: flex; align-items: center; gap: 12px;">
                     <div style="display: flex; align-items: center; gap: 4px;">
@@ -1072,12 +1110,99 @@
                     _hasDraggedMap = false;
                     return;
                 }
+
+                // Jika sedang dalam Mode Ukur Jarak (EBRL / Ruler)
+                if (_isRulerMode) {
+                    const rect = canvas.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+
+                    // Tentukan koordinat lat/lon dari titik klik
+                    let ptLat = null, ptLon = null, ptLabel = '';
+                    if (_radarHoveredTarget) {
+                        ptLat = parseFloat(_radarHoveredTarget.lat);
+                        ptLon = parseFloat(_radarHoveredTarget.lon);
+                        ptLabel = _radarHoveredTarget.callsign || _radarHoveredTarget.id;
+                    } else if (_radarMap) {
+                        try {
+                            const latLng = _radarMap.containerPointToLatLng([clickX, clickY]);
+                            ptLat = latLng.lat;
+                            ptLon = latLng.lng;
+                            ptLabel = `${ptLat.toFixed(2)}, ${ptLon.toFixed(2)}`;
+                        } catch (err) {}
+                    }
+
+                    if (!_rulerPointA) {
+                        _rulerPointA = {
+                            x: clickX,
+                            y: clickY,
+                            lat: ptLat,
+                            lon: ptLon,
+                            label: ptLabel || 'Titik A'
+                        };
+                        _rulerPointB = null;
+                        const stateText = document.getElementById('radarRulerStateText');
+                        if (stateText) {
+                            stateText.textContent = `Titik 1: ${_rulerPointA.label} (Klik Titik 2)`;
+                            stateText.style.color = '#ffcc00';
+                        }
+                    } else if (!_rulerPointB) {
+                        _rulerPointB = {
+                            x: clickX,
+                            y: clickY,
+                            lat: ptLat,
+                            lon: ptLon,
+                            label: ptLabel || 'Titik B'
+                        };
+                        const stateText = document.getElementById('radarRulerStateText');
+                        if (stateText) {
+                            stateText.textContent = 'SELESAI (Klik lagi untuk ukur baru)';
+                            stateText.style.color = '#00ff88';
+                        }
+                    } else {
+                        // Jika sudah ada A dan B, klik berikutnya mereset ke Titik 1 baru
+                        _rulerPointA = {
+                            x: clickX,
+                            y: clickY,
+                            lat: ptLat,
+                            lon: ptLon,
+                            label: ptLabel || 'Titik A'
+                        };
+                        _rulerPointB = null;
+                        const stateText = document.getElementById('radarRulerStateText');
+                        if (stateText) {
+                            stateText.textContent = `Titik 1: ${_rulerPointA.label} (Klik Titik 2)`;
+                            stateText.style.color = '#ffcc00';
+                        }
+                    }
+                    drawRadarPPI();
+                    return;
+                }
+
                 if (_radarHoveredTarget) {
                     _radarSelectedTargetId = _radarHoveredTarget.id;
                     updateRadarPpiTargetsUI();
                 } else {
                     _radarSelectedTargetId = null;
                     updateRadarPpiTargetsUI();
+                }
+            });
+
+            // Keyboard shortcut untuk alat ukur jarak (M / D / Escape)
+            window.addEventListener('keydown', e => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                const overlay = document.getElementById('radarPpiOverlay');
+                if (!overlay || overlay.style.display !== 'block') return;
+
+                if (e.key === 'm' || e.key === 'M' || e.key === 'd' || e.key === 'D') {
+                    e.preventDefault();
+                    window.toggleRadarRuler();
+                } else if (e.key === 'Escape') {
+                    if (_rulerPointA || _rulerPointB) {
+                        window.clearRadarRuler();
+                    } else if (_isRulerMode) {
+                        window.toggleRadarRuler();
+                    }
                 }
             });
 
@@ -1333,6 +1458,56 @@
         }
 
         updateRadarPpiTargetsUI();
+        drawRadarPPI();
+    };
+
+    window.toggleRadarRuler = function () {
+        _isRulerMode = !_isRulerMode;
+        const btn = document.getElementById('radarRulerBtn');
+        const stateText = document.getElementById('radarRulerStateText');
+
+        if (_isRulerMode) {
+            _rulerPointA = null;
+            _rulerPointB = null;
+            if (btn) {
+                btn.style.borderColor = '#00f0ff';
+                btn.style.color = '#00f0ff';
+                btn.style.background = 'rgba(0, 240, 255, 0.2)';
+                btn.style.boxShadow = '0 0 12px rgba(0, 240, 255, 0.4)';
+            }
+            if (stateText) {
+                stateText.textContent = 'AKTIF (Klik Titik 1)';
+                stateText.style.color = '#00f0ff';
+            }
+            const canvas = document.getElementById('radarPpiCanvas');
+            if (canvas) canvas.style.cursor = 'crosshair';
+        } else {
+            _rulerPointA = null;
+            _rulerPointB = null;
+            if (btn) {
+                btn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+                btn.style.color = '#38bdf8';
+                btn.style.background = 'rgba(15, 30, 58, 0.6)';
+                btn.style.boxShadow = 'none';
+            }
+            if (stateText) {
+                stateText.textContent = 'OFF';
+                stateText.style.color = '#cbd5e1';
+            }
+            const canvas = document.getElementById('radarPpiCanvas');
+            if (canvas) canvas.style.cursor = 'default';
+        }
+        drawRadarPPI();
+    };
+
+    window.clearRadarRuler = function () {
+        _rulerPointA = null;
+        _rulerPointB = null;
+        const stateText = document.getElementById('radarRulerStateText');
+        if (stateText && _isRulerMode) {
+            stateText.textContent = 'AKTIF (Klik Titik 1)';
+            stateText.style.color = '#00f0ff';
+        }
         drawRadarPPI();
     };
 
@@ -2457,6 +2632,212 @@
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             ctx.fillText(bannerTxt, bX + 12, bY - 3);
+            ctx.restore();
+        }
+
+        // 8. Electronic Bearing & Range Line (EBRL / Ruler Distance Measurement Tool)
+        if (_isRulerMode || _rulerPointA || _rulerPointB) {
+            ctx.save();
+
+            // SINKRONKAN POSISI SCREEN DENGAN PETA (Agar saat peta digeser / pan, garis tetap melekat pada koordinat bumi)
+            let p1Screen = null;
+            if (_rulerPointA) {
+                if (_radarMap && _rulerPointA.lat && _rulerPointA.lon) {
+                    try {
+                        const pt = _radarMap.latLngToContainerPoint([_rulerPointA.lat, _rulerPointA.lon]);
+                        p1Screen = { x: pt.x, y: pt.y };
+                    } catch (e) {
+                        p1Screen = { x: _rulerPointA.x, y: _rulerPointA.y };
+                    }
+                } else {
+                    p1Screen = { x: _rulerPointA.x, y: _rulerPointA.y };
+                }
+            }
+
+            let p2Screen = null;
+            let p2Lat = null, p2Lon = null, p2Label = '';
+            if (_rulerPointB) {
+                if (_radarMap && _rulerPointB.lat && _rulerPointB.lon) {
+                    try {
+                        const pt = _radarMap.latLngToContainerPoint([_rulerPointB.lat, _rulerPointB.lon]);
+                        p2Screen = { x: pt.x, y: pt.y };
+                    } catch (e) {
+                        p2Screen = { x: _rulerPointB.x, y: _rulerPointB.y };
+                    }
+                } else {
+                    p2Screen = { x: _rulerPointB.x, y: _rulerPointB.y };
+                }
+                p2Lat = _rulerPointB.lat;
+                p2Lon = _rulerPointB.lon;
+                p2Label = _rulerPointB.label;
+            } else if (_isRulerMode && _rulerPointA && _radarMousePos.x > 0 && _radarMousePos.y > 0) {
+                // Posisi live mouse saat sedang membentangkan garis ukur ke Titik 2
+                p2Screen = { x: _radarMousePos.x, y: _radarMousePos.y };
+                if (_radarHoveredTarget) {
+                    p2Lat = parseFloat(_radarHoveredTarget.lat);
+                    p2Lon = parseFloat(_radarHoveredTarget.lon);
+                    p2Label = _radarHoveredTarget.callsign || _radarHoveredTarget.id;
+                } else if (_radarMap) {
+                    try {
+                        const latLng = _radarMap.containerPointToLatLng([_radarMousePos.x, _radarMousePos.y]);
+                        p2Lat = latLng.lat;
+                        p2Lon = latLng.lng;
+                        p2Label = `${p2Lat.toFixed(2)}, ${p2Lon.toFixed(2)}`;
+                    } catch (e) {}
+                }
+            }
+
+            // Gambar Garis Ukur & Badge Jarak Realtime
+            if (p1Screen && p2Screen) {
+                // Garis ukur glowing cyan/gold
+                ctx.beginPath();
+                ctx.moveTo(p1Screen.x, p1Screen.y);
+                ctx.lineTo(p2Screen.x, p2Screen.y);
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 2.2;
+                ctx.setLineDash([6, 4]);
+                ctx.shadowColor = '#00f0ff';
+                ctx.shadowBlur = 10;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.shadowBlur = 0;
+
+                // Hitung Jarak & Azimuth
+                let distNm = 0, distKm = 0, bearing = 0;
+                if (_rulerPointA.lat && _rulerPointA.lon && p2Lat && p2Lon) {
+                    const geo = calculateGeoDistanceAndBearing(_rulerPointA.lat, _rulerPointA.lon, p2Lat, p2Lon);
+                    distNm = geo.distNm;
+                    distKm = geo.distKm;
+                    bearing = geo.bearing;
+                } else {
+                    // Fallback hitung rasio pixel terhadap maxRadius
+                    const dx = p2Screen.x - p1Screen.x;
+                    const dy = p2Screen.y - p1Screen.y;
+                    const pxDist = Math.hypot(dx, dy);
+                    distNm = Number(((pxDist / maxRadius) * _radarRangeNm).toFixed(2));
+                    distKm = Number((distNm * 1.852).toFixed(2));
+                    bearing = Math.round((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360);
+                }
+
+                // Gambar Badge Informasi Jarak Tepat di Tengah Garis
+                const midX = (p1Screen.x + p2Screen.x) / 2;
+                const midY = (p1Screen.y + p2Screen.y) / 2;
+
+                const textLine1 = `📏 ${distNm} NM (${distKm} km)`;
+                const textLine2 = `🧭 Azim: ${bearing}° | Dari ${_rulerPointA.label || 'T1'} ke ${p2Label || 'T2'}`;
+
+                ctx.font = 'bold 12px monospace';
+                const w1 = ctx.measureText(textLine1).width;
+                ctx.font = '10px monospace';
+                const w2 = ctx.measureText(textLine2).width;
+                const badgeW = Math.max(w1, w2) + 24;
+                const badgeH = 44;
+
+                ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = 'rgba(0, 240, 255, 0.6)';
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.roundRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH, 6);
+                ctx.fill();
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // Teks baris 1: Jarak
+                ctx.fillStyle = '#00f0ff';
+                ctx.font = 'bold 12px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(textLine1, midX, midY - 8);
+
+                // Teks baris 2: Azimuth / Keterangan
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = '10px monospace';
+                ctx.fillText(textLine2, midX, midY + 11);
+            }
+
+            // Gambar Titik 1 (Target Marker A - Lingkaran Kuning Pulsing)
+            if (p1Screen) {
+                ctx.beginPath();
+                ctx.arc(p1Screen.x, p1Screen.y, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffcc00';
+                ctx.shadowColor = '#ffcc00';
+                ctx.shadowBlur = 14;
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(p1Screen.x, p1Screen.y, 14, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ffcc00';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.shadowBlur = 0;
+
+                ctx.font = 'bold 11px monospace';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'left';
+                ctx.fillText(`① ${_rulerPointA.label || 'Titik 1'}`, p1Screen.x + 12, p1Screen.y - 10);
+            }
+
+            // Gambar Titik 2 jika sudah fix diklik
+            if (_rulerPointB && p2Screen) {
+                ctx.beginPath();
+                ctx.arc(p2Screen.x, p2Screen.y, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#00ff88';
+                ctx.shadowColor = '#00ff88';
+                ctx.shadowBlur = 14;
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(p2Screen.x, p2Screen.y, 14, 0, Math.PI * 2);
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.shadowBlur = 0;
+
+                ctx.font = 'bold 11px monospace';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'left';
+                ctx.fillText(`② ${_rulerPointB.label || 'Titik 2'}`, p2Screen.x + 12, p2Screen.y - 10);
+            }
+
+            // Floating Helper Banner di Kiri Bawah saat Mode Ukur Aktif
+            if (_isRulerMode) {
+                const guideTxt = !_rulerPointA 
+                    ? '📏 MODE UKUR JARAK: Klik Titik 1 (Pesawat / Koordinat Peta)' 
+                    : (!_rulerPointB 
+                        ? '📏 MODE UKUR JARAK: Klik Titik 2 (Tujuan / Pesawat Lain) [ESC: Batal]' 
+                        : '📏 UKUR JARAK SELESAI: Klik lagi untuk ukur baru [ESC: Hapus]');
+                
+                ctx.font = 'bold 11px monospace';
+                const gw = ctx.measureText(guideTxt).width;
+                const gx = 16;
+                const gy = h - 28;
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.roundRect(gx, gy - 14, gw + 24, 26, 4);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#00f0ff';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(guideTxt, gx + 12, gy);
+            }
+
             ctx.restore();
         }
     }
