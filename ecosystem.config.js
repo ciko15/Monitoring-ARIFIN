@@ -34,7 +34,10 @@ const stabilityEnv = {
   COLLECTOR_START_BATCH_SIZE: process.env.COLLECTOR_START_BATCH_SIZE || 10,
   COLLECTOR_START_BATCH_DELAY_MS: process.env.COLLECTOR_START_BATCH_DELAY_MS || 3000,
   LOG_THROTTLE_MS: process.env.LOG_THROTTLE_MS || 60000,
-  RAW_DEBUG: process.env.RAW_DEBUG || 'false'
+  RAW_DEBUG: process.env.RAW_DEBUG || 'false',
+  STREAM_THROTTLE_ENABLED: process.env.STREAM_THROTTLE_ENABLED || 'true',
+  STREAM_THROTTLE_IDS: process.env.STREAM_THROTTLE_IDS || 'asterix_radar,asterix_adsb,dme_maru_310_320,ils_mophien_llz,ils_mophien_gp,dme_mophien_tdme',
+  STREAM_THROTTLE_MS: process.env.STREAM_THROTTLE_MS || '1000'
 };
 
 module.exports = {
