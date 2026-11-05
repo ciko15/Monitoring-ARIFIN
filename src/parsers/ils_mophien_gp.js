@@ -70,14 +70,39 @@ class IlsMophienGpParser extends BaseParser {
             rf: { course: null, clr: null, sep: null }
         };
 
+        const activeTx = Number(opts.active_tx || opts.activeTx || 2);
+        const isTx1Active = activeTx === 1;
+
         this._systemState = {
             service_status: 'NORMAL',
-            tx1: { state: 'NORMAL', role: 'MAIN', load: 'ANT' },
-            tx2: { state: 'NORMAL', role: 'STANDBY', load: 'DUMMY' }
+            active_tx: isTx1Active ? 'TX1' : 'TX2',
+            tx1: {
+                state: 'NORMAL',
+                role: isTx1Active ? 'MAIN' : 'STANDBY',
+                load: isTx1Active ? 'ANT' : 'DUMMY',
+                status_text: isTx1Active ? 'TX1: MAIN (ON ANT)' : 'TX1: STANDBY (DUMMY LOAD)'
+            },
+            tx2: {
+                state: 'NORMAL',
+                role: !isTx1Active ? 'MAIN' : 'STANDBY',
+                load: !isTx1Active ? 'ANT' : 'DUMMY',
+                status_text: !isTx1Active ? 'TX2: MAIN (ON ANT)' : 'TX2: STANDBY (DUMMY LOAD)'
+            }
         };
 
         this._cachedRows = new Map();
         this._lastMeasurements = [];
+    }
+
+    setActiveTx(txNum) {
+        const isTx1Active = Number(txNum) === 1;
+        this._systemState.active_tx = isTx1Active ? 'TX1' : 'TX2';
+        this._systemState.tx1.role = isTx1Active ? 'MAIN' : 'STANDBY';
+        this._systemState.tx1.load = isTx1Active ? 'ANT' : 'DUMMY';
+        this._systemState.tx1.status_text = isTx1Active ? 'TX1: MAIN (ON ANT)' : 'TX1: STANDBY (DUMMY LOAD)';
+        this._systemState.tx2.role = !isTx1Active ? 'MAIN' : 'STANDBY';
+        this._systemState.tx2.load = !isTx1Active ? 'ANT' : 'DUMMY';
+        this._systemState.tx2.status_text = !isTx1Active ? 'TX2: MAIN (ON ANT)' : 'TX2: STANDBY (DUMMY LOAD)';
     }
 
     reset() {
@@ -440,8 +465,9 @@ class IlsMophienGpParser extends BaseParser {
                 overall_status: 'Normal',
                 service_status: this._systemState.service_status || 'NORMAL',
                 frequency: this._frequency !== '—' ? this._frequency : '334.70 MHz',
-                tx1: { ...this._systemState.tx1, state: 'NORMAL', role: 'MAIN', load: 'ANT' },
-                tx2: { ...this._systemState.tx2, state: 'NORMAL', role: 'STANDBY', load: 'DUMMY' },
+                active_tx: this._systemState.active_tx || 'TX2',
+                tx1: { ...this._systemState.tx1 },
+                tx2: { ...this._systemState.tx2 },
 
                 // CL / On Path Channel
                 cl_channel: {

@@ -69,14 +69,37 @@ class DmeMophienTdmeParser extends BaseParser {
             power: { rf_disp: null, peak_power: null, vswr: null, effective_radiated: null }
         };
 
+        const activeTx = Number(opts.active_tx || opts.activeTx || 2);
+        const isTxp1Active = activeTx === 1;
+
         this._systemState = {
             service_status: 'NORMAL',
-            txp1: { state: 'MAIN', role: 'ON ANTENNA' },
-            txp2: { state: 'STANDBY', role: 'STANDBY' }
+            active_tx: isTxp1Active ? 'TXP1' : 'TXP2',
+            txp1: {
+                state: isTxp1Active ? 'MAIN' : 'STANDBY',
+                role: isTxp1Active ? 'ON ANTENNA' : 'STANDBY',
+                status_text: isTxp1Active ? 'TXP1 (ANT)' : 'TXP1 (STANDBY)'
+            },
+            txp2: {
+                state: !isTxp1Active ? 'MAIN' : 'STANDBY',
+                role: !isTxp1Active ? 'ON ANTENNA' : 'STANDBY',
+                status_text: !isTxp1Active ? 'TXP2 (ANT)' : 'TXP2 (STANDBY)'
+            }
         };
 
         this._cachedRows = new Map();
         this._lastMeasurements = [];
+    }
+
+    setActiveTx(txNum) {
+        const isTxp1Active = Number(txNum) === 1;
+        this._systemState.active_tx = isTxp1Active ? 'TXP1' : 'TXP2';
+        this._systemState.txp1.state = isTxp1Active ? 'MAIN' : 'STANDBY';
+        this._systemState.txp1.role = isTxp1Active ? 'ON ANTENNA' : 'STANDBY';
+        this._systemState.txp1.status_text = isTxp1Active ? 'TXP1 (ANT)' : 'TXP1 (STANDBY)';
+        this._systemState.txp2.state = !isTxp1Active ? 'MAIN' : 'STANDBY';
+        this._systemState.txp2.role = !isTxp1Active ? 'ON ANTENNA' : 'STANDBY';
+        this._systemState.txp2.status_text = !isTxp1Active ? 'TXP2 (ANT)' : 'TXP2 (STANDBY)';
     }
 
     reset() {
@@ -351,6 +374,7 @@ class DmeMophienTdmeParser extends BaseParser {
                 overall_status: 'Normal',
                 service_status: this._systemState.service_status || 'NORMAL',
                 frequency: this._frequency,
+                active_tx: this._systemState.active_tx || 'TXP2',
                 txp1: { ...this._systemState.txp1 },
                 txp2: { ...this._systemState.txp2 },
 

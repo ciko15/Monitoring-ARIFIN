@@ -1569,13 +1569,16 @@
         const serviceBg = isDisconnected ? 'rgba(58,90,122,0.2)' : (isAlarmService ? 'rgba(255,51,85,0.15)' : (isWarnService ? 'rgba(255,204,0,0.15)' : 'rgba(0,255,136,0.15)'));
         const serviceBorder = isDisconnected ? 'rgba(58,90,122,0.4)' : (isAlarmService ? '#ff3355' : (isWarnService ? '#ffcc00' : '#00ff88'));
 
-        const tx1Color = isDisconnected ? '#64748b' : '#00ff88';
-        const tx1Bg = isDisconnected ? 'rgba(100,116,139,0.15)' : 'rgba(0,255,136,0.12)';
-        const tx1Border = isDisconnected ? 'rgba(100,116,139,0.3)' : 'rgba(0,255,136,0.4)';
+        const isTx1Active = data.tx1?.role === 'MAIN' || data.tx1?.load === 'ANT' || data.active_tx === 'TX1';
+        const isTx2Active = data.tx2?.role === 'MAIN' || data.tx2?.load === 'ANT' || data.active_tx === 'TX2';
 
-        const tx2Color = isDisconnected ? '#64748b' : '#ffcc00';
-        const tx2Bg = isDisconnected ? 'rgba(100,116,139,0.15)' : 'rgba(255,204,0,0.12)';
-        const tx2Border = isDisconnected ? 'rgba(100,116,139,0.3)' : 'rgba(255,204,0,0.4)';
+        const tx1Color = isDisconnected ? '#64748b' : (isTx1Active ? '#00ff88' : '#8baac8');
+        const tx1Bg = isDisconnected ? 'rgba(100,116,139,0.15)' : (isTx1Active ? 'rgba(0,255,136,0.18)' : 'rgba(139,170,200,0.1)');
+        const tx1Border = isDisconnected ? 'rgba(100,116,139,0.3)' : (isTx1Active ? 'rgba(0,255,136,0.5)' : 'rgba(139,170,200,0.3)');
+
+        const tx2Color = isDisconnected ? '#64748b' : (isTx2Active ? '#00ff88' : '#8baac8');
+        const tx2Bg = isDisconnected ? 'rgba(100,116,139,0.15)' : (isTx2Active ? 'rgba(0,255,136,0.18)' : 'rgba(139,170,200,0.1)');
+        const tx2Border = isDisconnected ? 'rgba(100,116,139,0.3)' : (isTx2Active ? 'rgba(0,255,136,0.5)' : 'rgba(139,170,200,0.3)');
 
         return `
         <div style="display:flex; flex-direction:column; gap:0;">
@@ -1621,8 +1624,8 @@
                         <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Frequency & TX State</span>
                         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                             <span style="font-size:12px; font-weight:700; color:#ffffff; font-family:'Roboto Mono',monospace;">${freq}</span>
-                            <span style="font-size:9px; font-weight:700; color:${tx1Color}; background:${tx1Bg}; border:1px solid ${tx1Border}; padding:1px 5px; border-radius:3px;" title="${tx1Text}">TX1</span>
-                            <span style="font-size:9px; font-weight:700; color:${tx2Color}; background:${tx2Bg}; border:1px solid ${tx2Border}; padding:1px 5px; border-radius:3px;" title="${tx2Text}">TX2</span>
+                            <span style="font-size:9px; font-weight:700; color:${tx1Color}; background:${tx1Bg}; border:1px solid ${tx1Border}; padding:1px 6px; border-radius:3px;" title="${tx1Text}">${isTx1Active ? '<i class=\"fas fa-satellite-dish\" style=\"margin-right:3px;\"></i>' : ''}TX1 ${isTx1Active ? '(MAIN/ANT)' : '(STBY)'}</span>
+                            <span style="font-size:9px; font-weight:700; color:${tx2Color}; background:${tx2Bg}; border:1px solid ${tx2Border}; padding:1px 6px; border-radius:3px;" title="${tx2Text}">${isTx2Active ? '<i class=\"fas fa-satellite-dish\" style=\"margin-right:3px;\"></i>' : ''}TX2 ${isTx2Active ? '(MAIN/ANT)' : '(STBY)'}</span>
                         </div>
                     </div>
                 </div>
@@ -1797,8 +1800,21 @@
                     <div style="display:flex; flex-direction:column; min-width:0;">
                         <span style="font-size:10px; color:#7a9eb8; font-weight:600; text-transform:uppercase;">TXP Status</span>
                         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                            <span style="font-size:12px; font-weight:700; color:#ffffff; font-family:'Roboto Mono',monospace;">TXP1 (ANT)</span>
-                            <span style="font-size:9px; font-weight:700; color:#00ff88; background:rgba(0,255,136,0.15); border:1px solid rgba(0,255,136,0.4); padding:1px 5px; border-radius:3px;">MAIN</span>
+                            ${(() => {
+                                const isTxp1Active = data.txp1?.state === 'MAIN' || data.txp1?.role?.includes('ANT') || data.active_tx === 'TXP1';
+                                const isTxp2Active = data.txp2?.state === 'MAIN' || data.txp2?.role?.includes('ANT') || data.active_tx === 'TXP2';
+                                const txp1Color = isTxp1Active ? '#00ff88' : '#8baac8';
+                                const txp1Bg = isTxp1Active ? 'rgba(0,255,136,0.18)' : 'rgba(139,170,200,0.1)';
+                                const txp1Border = isTxp1Active ? 'rgba(0,255,136,0.5)' : 'rgba(139,170,200,0.3)';
+                                const txp2Color = isTxp2Active ? '#00ff88' : '#8baac8';
+                                const txp2Bg = isTxp2Active ? 'rgba(0,255,136,0.18)' : 'rgba(139,170,200,0.1)';
+                                const txp2Border = isTxp2Active ? 'rgba(0,255,136,0.5)' : 'rgba(139,170,200,0.3)';
+
+                                return `
+                                    <span style="font-size:9px; font-weight:700; color:${txp1Color}; background:${txp1Bg}; border:1px solid ${txp1Border}; padding:1px 6px; border-radius:3px;">${isTxp1Active ? '<i class=\"fas fa-satellite-dish\" style=\"margin-right:3px;\"></i>' : ''}TXP1 ${isTxp1Active ? '(MAIN/ANT)' : '(STBY)'}</span>
+                                    <span style="font-size:9px; font-weight:700; color:${txp2Color}; background:${txp2Bg}; border:1px solid ${txp2Border}; padding:1px 6px; border-radius:3px;">${isTxp2Active ? '<i class=\"fas fa-satellite-dish\" style=\"margin-right:3px;\"></i>' : ''}TXP2 ${isTxp2Active ? '(MAIN/ANT)' : '(STBY)'}</span>
+                                `;
+                            })()}
                         </div>
                     </div>
                 </div>

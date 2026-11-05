@@ -1439,9 +1439,17 @@ class NetworkListenerService {
         const { id, equipt_id, ip_address, tcp_port, parsing_id, name } = source;
         const port = parseInt(tcp_port) || 38317;
 
+        let extraCfg = {};
+        if (source.extra_config) {
+            try {
+                extraCfg = typeof source.extra_config === 'string' ? JSON.parse(source.extra_config) : source.extra_config;
+            } catch (e) { }
+        }
+        const activeTxCfg = source.active_tx || extraCfg.active_tx || extraCfg.activeTx;
+
         let moduleName = this._getParserModule(parsing_id);
         const ParserModule = require('../parsers/' + moduleName);
-        const parser = new ParserModule({ equipt_id });
+        const parser = new ParserModule({ equipt_id, active_tx: activeTxCfg, ...extraCfg });
 
         const iface = source.network_interface || 'eth3';
         console.log(`[LLZ-SNIFFER] Initializing passive packet sniffer for ${name} on interface ${iface} (port ${port}, host ${ip_address})...`);
