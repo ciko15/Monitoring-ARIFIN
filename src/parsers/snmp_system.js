@@ -154,7 +154,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [1500, 2500], // Cepat & responsif (total 4s per request jika host mati)
+        timeouts: [2500, 3500], // Toleran terhadap latency LAN/VLAN bandara
     });
 }
 function snmpGet(session, oid) {
@@ -164,10 +164,19 @@ function snmpGet(session, oid) {
         });
     });
 }
-function snmpGetAll(session, oids) {
+async function snmpGetAll(session, oids) {
     return new Promise(resolve => {
-        session.getAll({ oids }, (err, vbs) => {
-            if (err || !vbs) return resolve(oids.map(() => null));
+        session.getAll({ oids }, async (err, vbs) => {
+            if (err || !vbs || vbs.length === 0) {
+                // Fallback: Jika batch getAll ditolak Windows agent (noSuchName / packet error),
+                // lakukan GET individual paralel agar OID yang didukung tetap terbaca
+                try {
+                    const fallbackResults = await Promise.all(oids.map(oid => snmpGet(session, oid)));
+                    return resolve(fallbackResults);
+                } catch (e) {
+                    return resolve(oids.map(() => null));
+                }
+            }
             const result = oids.map(oid => {
                 const oidStr = oid.join('.');
                 const match = vbs.find(vb => vb.oid.join('.') === oidStr);

@@ -600,7 +600,15 @@ class NetworkListenerService {
                 parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
 
                 if (isPingable) {
-                    statusToEvaluate = 'Offline';
+                    // Jika ping ICMP hidup (perangkat PC/server masih online), tetapi ada fluktuasi paket SNMP sesaat,
+                    // jangan langsung jatuhkan ke Offline jika ini perangkat SNMP dengan cache LKGV yang aktif.
+                    const isSnmpParser = source.parsing_id === 'snmp_system' || source.parsing_id === 'snmp_network_basic';
+                    const hasCachedData = this._lkgvCache && this._lkgvCache.has(source.id);
+                    if (isSnmpParser && hasCachedData) {
+                        statusToEvaluate = 'Warning'; // Beri status Warning sementara (kuning) bukan Offline (abu-abu/mati)
+                    } else {
+                        statusToEvaluate = 'Offline';
+                    }
                 } else {
                     statusToEvaluate = 'Disconnect';
                 }
