@@ -211,6 +211,15 @@ class NetworkListenerService {
             const runtimeName = isBun ? `bun ${Bun.version}` : `node ${process.version}`;
             const pmId = process.env.pm_id || '-';
             console.log(`[BOOT] pid=${process.pid} runtime=${runtimeName} pm_id=${pmId}`);
+
+            const throttleEnabled = String(process.env.STREAM_THROTTLE_ENABLED || 'true').toLowerCase() !== 'false';
+            const DEFAULT_STREAM_THROTTLE_IDS = 'asterix_radar,asterix_adsb,dme_maru_310_320,ils_mophien_llz,ils_mophien_gp,dme_mophien_tdme';
+            const throttleIds = (process.env.STREAM_THROTTLE_IDS !== undefined && process.env.STREAM_THROTTLE_IDS !== '')
+                ? process.env.STREAM_THROTTLE_IDS
+                : DEFAULT_STREAM_THROTTLE_IDS;
+            const globalMs = parseInt(process.env.STREAM_THROTTLE_MS, 10);
+            const throttleWindowMs = (!isNaN(globalMs) && globalMs > 0) ? globalMs : 1000;
+            console.log(`[StreamThrottle] enabled=${throttleEnabled} ids=${throttleIds} windowMs=${throttleWindowMs}`);
         }
 
         // A1. Event Loop Lag Monitor (guard agar jalan tepat 1x)
@@ -241,7 +250,10 @@ class NetworkListenerService {
         const enabled = String(process.env.STREAM_THROTTLE_ENABLED || 'true').toLowerCase() !== 'false';
         if (!enabled) return { enabled: false, windowMs: 1000 };
 
-        const rawIds = process.env.STREAM_THROTTLE_IDS || '';
+        const DEFAULT_STREAM_THROTTLE_IDS = 'asterix_radar,asterix_adsb,dme_maru_310_320,ils_mophien_llz,ils_mophien_gp,dme_mophien_tdme';
+        const rawIds = (process.env.STREAM_THROTTLE_IDS !== undefined && process.env.STREAM_THROTTLE_IDS !== '')
+            ? process.env.STREAM_THROTTLE_IDS
+            : DEFAULT_STREAM_THROTTLE_IDS;
         const allowlist = rawIds.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
         const pid = String(parsingId || '').trim().toLowerCase();
         const isAllowed = allowlist.includes(pid);
@@ -363,7 +375,25 @@ class NetworkListenerService {
                             clearTimeout(this._streamThrottleTimers.get(sourceId));
                             this._streamThrottleTimers.delete(sourceId);
                         }
-                        invokeLogOutput(nextPending.logData, nextPending.status, nextPending.isBypass);
+                        
+                        const timeSinceLast = Date.now() - state.lastEmitAt;
+                        if (nextPending.isBypass || timeSinceLast >= config.windowMs) {
+                            invokeLogOutput(nextPending.logData, nextPending.status, nextPending.isBypass);
+                        } else {
+                            // Belum lewat windowMs, jadwalkan timer agar tidak memanggil ganda per window
+                            state.pending = nextPending;
+                            const delay = Math.max(10, config.windowMs - timeSinceLast);
+                            const timer = setTimeout(() => {
+                                this._streamThrottleTimers.delete(sourceId);
+                                if (state.stopped || !state.pending) return;
+                                if (!state.inFlight) {
+                                    const toFlush = state.pending;
+                                    state.pending = null;
+                                    invokeLogOutput(toFlush.logData, toFlush.status, toFlush.isBypass);
+                                }
+                            }, delay);
+                            this._streamThrottleTimers.set(sourceId, timer);
+                        }
                     }
                 });
         };
@@ -371,7 +401,15 @@ class NetworkListenerService {
         if (isBypass) {
             if (state.inFlight) {
                 // Jangan kirim paralel, antrekan sebagai pending prioritas
-                state.pending = { logData, status, isBypass: true };
+                if (state.pending) {
+                    state.pending = {
+                        logData: this._mergeStreamData(state.pending.logData, logData),
+                        status: status || state.pending.status,
+                        isBypass: true
+                    };
+                } else {
+                    state.pending = { logData, status, isBypass: true };
+                }
             } else {
                 state.pending = null;
                 if (this._streamThrottleTimers.has(sourceId)) {
