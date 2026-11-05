@@ -1070,14 +1070,12 @@ class NetworkListenerService {
             const scheduleReconnect = () => {
                 if (stopped || reconnectTimer) return;
                 retryCount = Math.min(retryCount + 1, 6);
-                // Backoff eksponensial (10s, 20s, 30s, ... max 60s) agar tidak membebani CPU / RAM PC
-                const baseDelay = Math.min(60000, 10000 * retryCount);
-                const retryDelayMs = baseDelay + Math.floor(Math.random() * 5000);
-                this._logThrottled('warn', `modbus:reconnect:${id}`, `[NetworkListener] ${moduleName} scheduling reconnect for ${source.name} in ${Math.round(retryDelayMs / 1000)}s...`, 20000);
+                // Jeda 60s - 120s saat perangkat offline agar tidak membebani event loop dan CPU
+                const retryDelayMs = 60000 + (retryCount * 10000) + Math.floor(Math.random() * 5000);
+                this._logThrottled('warn', `modbus:reconnect:${id}`, `[NetworkListener] ${moduleName} scheduling reconnect for ${source.name} in ${Math.round(retryDelayMs / 1000)}s...`, 30000);
                 reconnectTimer = setTimeout(() => {
                     reconnectTimer = null;
                     if (!stopped) {
-                        console.log(`[NetworkListener] Auto-reconnecting ${moduleName} for ${source.name}...`);
                         connect();
                     }
                 }, retryDelayMs);
