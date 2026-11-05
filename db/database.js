@@ -175,6 +175,78 @@ async function readJson(filePath, defaultValue = []) {
   return defaultValue;
 }
 
+async function readJsonShared(filePath, defaultValue = []) {
+  const maxAttempts = 3;
+
+  try {
+    const stats = await fs.promises.stat(filePath).catch(() => null);
+    if (!stats) {
+      if (defaultValue !== null) await writeJson(filePath, defaultValue);
+      return defaultValue;
+    }
+
+    const cached = jsonCache.get(filePath);
+    if (cached && cached.mtimeMs === stats.mtimeMs) {
+      return cached.data;
+    }
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const data = await fs.promises.readFile(filePath, 'utf8');
+        const parsed = JSON.parse(data);
+        jsonCache.set(filePath, { mtimeMs: stats.mtimeMs, data: parsed });
+        return parsed;
+      } catch (err) {
+        const isTruncatedJson = err instanceof SyntaxError && (/Unexpected end of JSON input/.test(err.message) || /JSON Parse error/.test(err.message));
+        if (isTruncatedJson && attempt < maxAttempts) {
+          await sleep(25 * attempt);
+          continue;
+        }
+        if (cached) {
+          return cached.data;
+        }
+        throw err;
+      }
+    }
+  } catch (err) {
+    const cached = jsonCache.get(filePath);
+    if (cached) {
+      return cached.data;
+    }
+    console.error(`Error reading JSON (shared) from ${filePath}:`, err.message || err);
+    return defaultValue;
+  }
+
+  return defaultValue;
+}
+
+// Index Map id -> equipment (dibangun ulang hanya saat mtime file EQUIPMENT_CONFIG_PATH berubah)
+let _equipmentIndexCache = {
+  mtimeMs: 0,
+  indexMap: new Map()
+};
+
+async function getEquipmentBaseById(id) {
+  const stats = await fs.promises.stat(EQUIPMENT_CONFIG_PATH).catch(() => null);
+  const currentMtime = stats ? stats.mtimeMs : 0;
+  if (!_equipmentIndexCache.indexMap || _equipmentIndexCache.mtimeMs !== currentMtime) {
+    const list = await readJsonShared(EQUIPMENT_CONFIG_PATH, []);
+    const newMap = new Map();
+    if (Array.isArray(list)) {
+      for (const item of list) {
+        if (item && item.id !== undefined) {
+          newMap.set(String(item.id), item);
+        }
+      }
+    }
+    _equipmentIndexCache = {
+      mtimeMs: currentMtime,
+      indexMap: newMap
+    };
+  }
+  return _equipmentIndexCache.indexMap.get(String(id)) || null;
+}
+
 let onConfigUpdated = null;
 function setConfigUpdateHook(hook) {
   onConfigUpdated = hook;
@@ -841,11 +913,11 @@ async function getEquipmentStatsSummary() {
 async function getEquipmentById(id) {
   await syncEquipmentLogsFromDisk();
 
-  const list = await readJson(EQUIPMENT_CONFIG_PATH);
-  const item = list.find(e => String(e.id) === String(id));
-  if (!item) return null;
+  const baseItem = await getEquipmentBaseById(id);
+  if (!baseItem) return null;
+  const item = { ...baseItem };
 
-  const allSources = await readJson(AUTH_CONFIG_PATH);
+  const allSources = await readJsonShared(AUTH_CONFIG_PATH, []);
   const configSources = allSources.filter(s => String(s.equipt_id) === String(id));
 
   const latestLogs = getLatestLogsBySource(id);
@@ -1209,11 +1281,11 @@ async function getLimitationsByEquipment(equipmentId, specificParsingId = null) 
   const equipment = await getEquipmentById(equipmentId);
   if (!equipment) return [];
 
-  const data = await getAllLimitations();
+  const data = await readJsonShared(LIMITATION_CONFIG_PATH, []);
   const targetSup = String(equipment.sup_category || '').toLowerCase();
   
   // Ambil parsing_id yang terhubung ke equipment ini
-  const allSources = await readJson(AUTH_CONFIG_PATH);
+  const allSources = await readJsonShared(AUTH_CONFIG_PATH, []);
   const equipmentSources = allSources.filter(s => String(s.equipt_id) === String(equipmentId));
   let activeParsingIds = equipmentSources.map(s => String(s.parsing_id || '').toLowerCase()).filter(Boolean);
   if (specificParsingId) {
@@ -1449,7 +1521,9 @@ async function createEquipmentLog(data) {
   const log = { ...data, id: Date.now(), logged_at: data.logged_at || new Date().toISOString() };
 
   if (data.source === 'TX 1 APP' || data.equipment_name === 'VHF Primary APP') {
-    console.log('[DB-DEBUG] createEquipmentLog called for TX 1 APP! Data:', JSON.stringify(log));
+    if (process.env.DB_DEBUG === 'true') {
+      console.log('[DB-DEBUG] createEquipmentLog called for TX 1 APP! Data:', JSON.stringify(log));
+    }
   }
 
   // [STATELESS FORWARDER MODE]
@@ -1587,6 +1661,7 @@ module.exports = {
   readBranchProfile,
   writeAirportConfig,
   readJson,
+  readJsonShared,
   writeJson,
   setConfigUpdateHook,
 
