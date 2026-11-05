@@ -263,9 +263,11 @@ async function pollSNMP(host, community = 'public', options = {}) {
         }
 
         const walkOids = [OID.hrStorageType, OID.hrStorageSize, OID.hrStorageUsed, OID.hrStorageAlloc];
-        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.all(
-            walkOids.map(oid => snmpWalk(session, oid))
-        );
+        const storageTimeout = new Promise(resolve => setTimeout(() => resolve([[], [], [], []]), 8000));
+        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.race([
+            Promise.all(walkOids.map(oid => snmpWalk(session, oid))),
+            storageTimeout
+        ]);
 
         // Build index maps
         // NOTE: hrStorageType value dikembalikan snmp-native sebagai Array OID

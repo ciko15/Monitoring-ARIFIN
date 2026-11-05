@@ -1101,9 +1101,13 @@ class NetworkListenerService {
                 this._handleLogOutput(source, { data: fallbackData, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
             };
 
+            let retryCount = 0;
             const scheduleReconnect = () => {
                 if (stopped || reconnectTimer) return;
-                const retryDelayMs = 8000 + Math.floor(Math.random() * 4000);
+                retryCount = Math.min(retryCount + 1, 6);
+                // Backoff eksponensial (10s, 20s, 30s, ... max 60s) agar tidak membebani CPU / RAM PC
+                const baseDelay = Math.min(60000, 10000 * retryCount);
+                const retryDelayMs = baseDelay + Math.floor(Math.random() * 5000);
                 this._logThrottled('warn', `modbus:reconnect:${id}`, `[NetworkListener] ${moduleName} scheduling reconnect for ${source.name} in ${Math.round(retryDelayMs / 1000)}s...`, 20000);
                 reconnectTimer = setTimeout(() => {
                     reconnectTimer = null;
@@ -1793,8 +1797,8 @@ class NetworkListenerService {
                 console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
                 let result = null;
                 try {
-                    // Timeout per perangkat: default 12 detik (cukup untuk LAN/WAN bandara, mencegah hang)
-                    const snmpTimeoutMs = parseInt(process.env.SNMP_POLL_TIMEOUT_MS, 10) || 12000;
+                    // Timeout per perangkat: default 30 detik (cukup untuk SNMP walk CPU, Storage, RAM di ATC system/workstation)
+                    const snmpTimeoutMs = parseInt(process.env.SNMP_POLL_TIMEOUT_MS, 10) || 30000;
                     result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap, timeoutMs: snmpTimeoutMs });
                 } finally {
                     _releaseSnmpSlot();
