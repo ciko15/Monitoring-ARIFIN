@@ -183,34 +183,7 @@ function _recordProfileSample(parsingId, metrics) {
     }
 }
 
-// Concurrency semaphore specifically for SNMP System pollSNMP
-// Default ditingkatkan ke 100 agar mampu menampung puluhan hingga ratusan perangkat PC/Switch
-// secara paralel tanpa tertahan antrean (Queue Starvation).
-let _snmpActiveCount = 0;
-const _snmpQueue = [];
 
-function _acquireSnmpSlot() {
-    // Default 500 concurrent (atau unlimited jika SNMP_MAX_CONCURRENT=0),
-    // memastikan ratusan hingga ribuan perangkat dapat dipolling secara paralel tanpa antrean (queue starvation).
-    const maxConcurrent = process.env.SNMP_MAX_CONCURRENT !== undefined 
-        ? parseInt(process.env.SNMP_MAX_CONCURRENT, 10) 
-        : 500;
-
-    if (maxConcurrent <= 0 || _snmpActiveCount < maxConcurrent) {
-        _snmpActiveCount++;
-        return Promise.resolve();
-    }
-    return new Promise(resolve => _snmpQueue.push(resolve));
-}
-
-function _releaseSnmpSlot() {
-    if (_snmpQueue.length > 0) {
-        const next = _snmpQueue.shift();
-        next();
-    } else {
-        _snmpActiveCount = Math.max(0, _snmpActiveCount - 1);
-    }
-}
 
 class NetworkListenerService {
     constructor() {
@@ -600,15 +573,7 @@ class NetworkListenerService {
                 parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
 
                 if (isPingable) {
-                    // Jika ping ICMP hidup (perangkat PC/server masih online), tetapi ada fluktuasi paket SNMP sesaat,
-                    // jangan langsung jatuhkan ke Offline jika ini perangkat SNMP dengan cache LKGV yang aktif.
-                    const isSnmpParser = source.parsing_id === 'snmp_system' || source.parsing_id === 'snmp_network_basic';
-                    const hasCachedData = this._lkgvCache && this._lkgvCache.has(source.id);
-                    if (isSnmpParser && hasCachedData) {
-                        statusToEvaluate = 'Warning'; // Beri status Warning sementara (kuning) bukan Offline (abu-abu/mati)
-                    } else {
-                        statusToEvaluate = 'Offline';
-                    }
+                    statusToEvaluate = 'Offline';
                 } else {
                     statusToEvaluate = 'Disconnect';
                 }
@@ -1715,32 +1680,9 @@ class NetworkListenerService {
     startSnmpSystemListener(source) {
         const { id, equipt_id, ip_address, name, community, poll_interval, snmp_port, snmp_version } = source;
         const pollSec = parseInt(poll_interval) || 60;
-        const comm = (community && community !== 'public') ? community : (process.env.SNMP_DEFAULT_COMMUNITY || community || 'public');
+        const comm = community || 'public';
         const port = parseInt(snmp_port) || 161;
         const version = snmp_version || '2c';
-
-        if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
-
-        // A4. Deteksi start ganda
-        if (this._snmpSystemTimers.has(id)) {
-            console.warn(`[DUP-START] listener id=${id} name=${name} dipanggil lagi tanpa stopAll`);
-        }
-
-        const endpointKey = `${ip_address}:${port}`;
-        if (this._snmpEndpointOwners && this._snmpEndpointOwners.has(endpointKey)) {
-            const owner = this._snmpEndpointOwners.get(endpointKey);
-            if (owner.id !== id) {
-                console.warn(`[DUP-SOURCE] ${name} dan ${owner.name} memakai endpoint SNMP sama ${endpointKey}`);
-                // FASE D: Pengaman start ganda, GATED (default MATI)
-                const shouldSkip = String(process.env.SNMP_DEDUPE_SKIP || 'false').toLowerCase() === 'true';
-                if (shouldSkip) {
-                    console.warn(`[DUP-SOURCE] skipped starting duplicate listener for ${name} (${endpointKey})`);
-                    return;
-                }
-            }
-        } else if (this._snmpEndpointOwners) {
-            this._snmpEndpointOwners.set(endpointKey, { id, name });
-        }
 
         const parserFile = source.parsing_id === 'snmp_network_basic' ? 'snmp_network_basic' : 'snmp_system';
         const { pollSNMP } = require(`../parsers/${parserFile}`);
@@ -1752,57 +1694,20 @@ class NetworkListenerService {
         const doPoll = async () => {
             if (isPolling) return;
             isPolling = true;
-            const t0 = Date.now();
-            let t1 = t0;
-            let t2 = t0;
-            let t3 = t0;
+            console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
             try {
-                // Ambil alarm limits dari cache lokal (TTL 5 menit) atau query DB dengan timeout 3 detik
+                // Ambil alarm limits dari DB untuk alat ini, agar threshold tidak hardcode di parser
                 let limitsMap = null;
-                const cached = this._snmpLimitsCache ? this._snmpLimitsCache.get(equipt_id) : null;
-                const now = Date.now();
-                if (cached && (now - cached.cachedAt < 300000)) {
-                    limitsMap = cached.limitsMap;
-                } else {
-                    try {
-                        const timeoutPromise = new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('getLimitationsByEquipment timeout (>3s)')), 3000)
-                        );
-                        const rawLimits = await Promise.race([
-                            this.equipmentService.db.getLimitationsByEquipment(equipt_id),
-                            timeoutPromise
-                        ]);
-
-                        if (Array.isArray(rawLimits) && rawLimits.length > 0) {
-                            limitsMap = {};
-                            for (const lim of rawLimits) {
-                                limitsMap[lim.parameter] = { warn_value: lim.warn_value, alarm_value: lim.alarm_value };
-                            }
-                        }
-                        if (this._snmpLimitsCache) {
-                            this._snmpLimitsCache.set(equipt_id, { limitsMap, cachedAt: now });
-                        }
-                    } catch (limErr) {
-                        if (cached) {
-                            limitsMap = cached.limitsMap;
+                try {
+                    const rawLimits = await this.equipmentService.db.getLimitationsByEquipment(equipt_id);
+                    if (Array.isArray(rawLimits) && rawLimits.length > 0) {
+                        limitsMap = {};
+                        for (const lim of rawLimits) {
+                            limitsMap[lim.parameter] = { warn_value: lim.warn_value, alarm_value: lim.alarm_value };
                         }
                     }
-                }
-                t1 = Date.now();
-
-                // Dapatkan slot SNMP (Kapasitas hingga 100 perangkat paralel)
-                await _acquireSnmpSlot();
-                console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
-                let result = null;
-                try {
-                    // Timeout per perangkat: default 40 detik (mengadopsi konfigurasi stabil asli Monitoring-ARIFIN-main)
-                    const snmpTimeoutMs = parseInt(process.env.SNMP_POLL_TIMEOUT_MS, 10) || 40000;
-                    result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap, timeoutMs: snmpTimeoutMs });
-                } finally {
-                    _releaseSnmpSlot();
-                }
-                t2 = Date.now();
-
+                } catch (limErr) { }
+                const result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap });
                 const logLine = `[SNMP System] ${name}: status=${result.status} cpu=${result.data.cpu_usage} ram=${result.data.ram_usage_pct} disk=${result.data.disk_usage_pct} err=${result.error || 'none'}`;
                 if (String(result.status || '').toLowerCase() === 'disconnect') {
                     this._logThrottled('log', `snmp-system:disconnect:${id}`, logLine);
@@ -1815,48 +1720,21 @@ class NetworkListenerService {
                     source.parsing_id || 'snmp_system',
                     result.status || 'Disconnect'
                 );
-                t3 = Date.now();
-
-                const totalDuration = t3 - t0;
-                if (totalDuration > 20000) {
-                    const durLimits = t1 - t0;
-                    const durSnmp = t2 - t1;
-                    const durSave = t3 - t2;
-                    this._logThrottled('warn', `snmp-system:slow:${id}`, `[SLOW] ${name} limits=${durLimits}ms snmp=${durSnmp}ms save=${durSave}ms`, 60000);
-                }
             } catch (err) {
-                t2 = Date.now();
-                console.warn(`[SNMP System] Poll warning for ${name}:`, err.message);
-                try {
-                    await this._handleLogOutput(
-                        source,
-                        { data: { connectivity: 'Disconnected' }, source: name, _ip: ip_address },
-                        source.parsing_id || 'snmp_system',
-                        'Disconnect'
-                    );
-                } catch (hErr) { }
-                t3 = Date.now();
-
-                const totalDuration = t3 - t0;
-                if (totalDuration > 20000) {
-                    const durLimits = t1 - t0;
-                    const durSnmp = t2 - t1;
-                    const durSave = t3 - t2;
-                    this._logThrottled('warn', `snmp-system:slow:${id}`, `[SLOW] ${name} limits=${durLimits}ms snmp=${durSnmp}ms save=${durSave}ms`, 60000);
-                }
+                console.error(`[SNMP System] Poll error ${name}:`, err.message);
+                throw err;
             } finally {
                 isPolling = false;
             }
         };
 
+        if (!this._snmpSystemTimers) this._snmpSystemTimers = new Map();
         this._startCircuitBreakerPolling({
             id,
             name,
             pollSec,
             timersMap: this._snmpSystemTimers,
-            doPoll,
-            maxFailures: 8,
-            backoffMs: 15000 // 15s backoff singkat agar lekas online kembali jika ada fluktuasi
+            doPoll
         });
     }
 

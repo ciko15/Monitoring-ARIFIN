@@ -141,7 +141,6 @@ function normalizeSnmpVersion(version) {
 function normalizeSnmpOptions(options = {}) {
     if (!options || typeof options !== 'object') return { port: 161, version: '2c' };
     return {
-        ...options,
         port: parseInt(options.port, 10) || 161,
         version: options.version || '2c',
     };
@@ -154,7 +153,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [3000, 4000, 5000], // Mengadopsi konfigurasi stabil asli Monitoring-ARIFIN-main
+        timeouts: [3000, 4000, 5000],
     });
 }
 function snmpGet(session, oid) {
@@ -164,19 +163,10 @@ function snmpGet(session, oid) {
         });
     });
 }
-async function snmpGetAll(session, oids) {
+function snmpGetAll(session, oids) {
     return new Promise(resolve => {
-        session.getAll({ oids }, async (err, vbs) => {
-            if (err || !vbs || vbs.length === 0) {
-                // Fallback: Jika batch getAll ditolak Windows agent (noSuchName / packet error),
-                // lakukan GET individual paralel agar OID yang didukung tetap terbaca
-                try {
-                    const fallbackResults = await Promise.all(oids.map(oid => snmpGet(session, oid)));
-                    return resolve(fallbackResults);
-                } catch (e) {
-                    return resolve(oids.map(() => null));
-                }
-            }
+        session.getAll({ oids }, (err, vbs) => {
+            if (err || !vbs) return resolve(oids.map(() => null));
             const result = oids.map(oid => {
                 const oidStr = oid.join('.');
                 const match = vbs.find(vb => vb.oid.join('.') === oidStr);
@@ -200,44 +190,32 @@ async function readDeviceTemperature(session, sysObjectID, sysDescr) {
     const isAlcatelDevice = sysObjectIdText.startsWith('1.3.6.1.4.1.6486.');
     const isLinux = sysObjectIdText.startsWith('1.3.6.1.4.1.8072.') || sysObjectIdText.startsWith('1.3.6.1.4.1.2021.') || descr.includes('linux');
 
-    // Hindari buang waktu probing sensor jika ini PC Windows standar (kebanyakan PC operasional bandara)
-    if (!isAlcatelDevice && !isLinux && (descr.includes('windows') || descr.includes('microsoft'))) {
-        return { sensors: [], hottest: null };
+    if (isAlcatelDevice) {
+        const alcatelTemp = await readAlcatelTemperature(session, snmpWalk, snmpGet);
+        if (alcatelTemp.hottest) return alcatelTemp;
     }
 
-    try {
-        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ sensors: [], hottest: null }), 2000));
-        const probePromise = (async () => {
-            if (isAlcatelDevice) {
-                const alcatelTemp = await readAlcatelTemperature(session, snmpWalk, snmpGet);
-                if (alcatelTemp.hottest) return alcatelTemp;
-            } else if (isLinux) {
-                const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
-                if (ucdSensors.hottest) return ucdSensors;
-            } else {
-                const genericSensors = await readTemperatureSensors(session, snmpWalk);
-                if (genericSensors.hottest) return genericSensors;
-            }
-            return { sensors: [], hottest: null };
-        })();
+    if (isLinux) {
+        const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
+        if (ucdSensors.hottest) return ucdSensors;
+    } else {
+        const genericSensors = await readTemperatureSensors(session, snmpWalk);
+        if (genericSensors.hottest) return genericSensors;
 
-        return await Promise.race([probePromise, timeoutPromise]);
-    } catch (e) {
-        return { sensors: [], hottest: null };
+        const ucdSensors = await readUcdTemperatureSensors(session, snmpWalk);
+        if (ucdSensors.hottest) return ucdSensors;
     }
+
+    return { sensors: [], hottest: null };
 }
-
-const lastKnownSystemData = new Map();
 
 async function pollSNMP(host, community = 'public', options = {}) {
     // limits: objek dari DB alarm limit, format { [param_name]: { warn_value, alarm_value } }
     // Diteruskan dari network_listener.js saat memanggil pollSNMP.
     const limits = options.limits || null;
     const session = createSession(host, community, options);
-    if (typeof options.onSession === 'function') {
-        try { options.onSession(session); } catch (e) { }
-    }
     try {
+        // Memecah menjadi dua batch agar paket UDP tidak terlalu besar dan di-drop oleh network switch
         const oids1 = [OID.sysName, OID.sysDescr, OID.sysObjectID, OID.sysContact, OID.sysLocation, OID.sysUpTime];
         const oids2 = [OID.memTotalSwap, OID.memAvailSwap, OID.memTotalReal, OID.memAvailReal, OID.memShared, OID.memBuffer, OID.memCached];
 
@@ -263,11 +241,9 @@ async function pollSNMP(host, community = 'public', options = {}) {
         }
 
         const walkOids = [OID.hrStorageType, OID.hrStorageSize, OID.hrStorageUsed, OID.hrStorageAlloc];
-        const storageTimeout = new Promise(resolve => setTimeout(() => resolve([[], [], [], []]), 8000));
-        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.race([
-            Promise.all(walkOids.map(oid => snmpWalk(session, oid))),
-            storageTimeout
-        ]);
+        const [typeVbs, sizeVbs, usedVbs, allocVbs] = await Promise.all(
+            walkOids.map(oid => snmpWalk(session, oid))
+        );
 
         // Build index maps
         // NOTE: hrStorageType value dikembalikan snmp-native sebagai Array OID
@@ -397,15 +373,6 @@ async function pollSNMP(host, community = 'public', options = {}) {
             };
         }
 
-        // Clamp percent values between 0.0 and 100.0 to prevent corrupted OID numbers
-        const clampPct = (val) => {
-            if (val === null || isNaN(val)) return null;
-            return Math.max(0, Math.min(100, Math.round(Number(val) * 10) / 10));
-        };
-        const safeCpuPct = clampPct(cpu_pct);
-        const safeRamPct = clampPct(ram_pct);
-        const safeDiskPct = clampPct(disk_pct);
-
         const rawData = {
             connectivity: 'Connected',
             resolved_ip: host,
@@ -418,10 +385,10 @@ async function pollSNMP(host, community = 'public', options = {}) {
             sys_location: String(sysLocation || '—'),
             sys_uptime: sysUpRaw !== null ? formatUptime(sysUpRaw) : '—',
             processor_count,
-            cpu_usage: safeCpuPct !== null ? safeCpuPct.toFixed(1) : '—',
+            cpu_usage: cpu_pct !== null ? cpu_pct.toFixed(1) : '—',
             ram_total_mb: ram_total_final !== null ? ram_total_final.toFixed(0) : '—',
             ram_used_mb: ram_used_final !== null ? ram_used_final.toFixed(0) : '—',
-            ram_usage_pct: safeRamPct !== null ? safeRamPct.toFixed(1) : '—',
+            ram_usage_pct: ram_pct !== null ? ram_pct.toFixed(1) : '—',
             ram_available_mb: ram_available_mb !== null ? ram_available_mb.toFixed(0) : '—',
             ram_available_pct: ram_available_pct !== null ? ram_available_pct.toFixed(1) : '—',
             physical_memory_total_mb: memTotalRealMbRaw !== null ? memTotalRealMbRaw.toFixed(0) : '—',
@@ -438,21 +405,18 @@ async function pollSNMP(host, community = 'public', options = {}) {
             swap_usage_pct: memSwapPct !== null ? memSwapPct.toFixed(1) : '—',
             disk_total_gb: disk_total_gb !== null ? disk_total_gb.toFixed(1) : '—',
             disk_used_gb: disk_used_gb !== null ? disk_used_gb.toFixed(1) : '—',
-            disk_usage_pct: safeDiskPct !== null ? safeDiskPct.toFixed(1) : '—',
+            disk_usage_pct: disk_pct !== null ? disk_pct.toFixed(1) : '—',
             temperature_c: tempInfo.hottest ? tempInfo.hottest.value_c.toFixed(1) : '—',
             temperature_sensor_name: tempInfo.hottest ? tempInfo.hottest.name : '—',
             temperature_sensor_count: String(temperatureSensors.length),
             temperature_sensors: temperatureSensors,
         };
 
-        try { session.close(); } catch (e) { }
-        const finalStructuredData = buildStructuredSystemData(rawData);
-        lastKnownSystemData.set(host, finalStructuredData);
-
+        session.close();
         return {
             success: true,
             status,
-            data: finalStructuredData,
+            data: buildStructuredSystemData(rawData),
             alarms: status === 'Alarm' ? ['Resource usage critical or temperature high'] : [],
             warnings: status === 'Warning' ? ['Resource usage high or temperature elevated'] : [],
             triggeredParams: [],
@@ -461,8 +425,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 
     } catch (err) {
         try { session.close(); } catch (e) { }
-        const prev = lastKnownSystemData.get(host);
-        const fallbackRaw = prev ? { ...prev, connectivity: 'Disconnected' } : {
+        const fallbackRaw = {
             connectivity: 'Disconnected',
             resolved_ip: host,
             sys_name: '—', sys_descr: '—', sys_uptime: '—',
@@ -478,7 +441,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
             disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
             temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
         };
-        const structuredFallback = prev ? { ...prev, connectivity: 'Disconnected' } : {
+        const structuredFallback = {
             ...fallbackRaw,
             'SISTEM': {
                 connectivity: fallbackRaw.connectivity, sys_name: fallbackRaw.sys_name,
@@ -523,7 +486,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
 }
 
 // Wrapper dengan hard timeout — mencegah hang di Bun runtime
-async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 55000) {
+async function pollSNMPWithTimeout(host, community = 'public', options = {}, timeoutMs = 60000) {
     if (typeof options === 'number') {
         timeoutMs = options;
         options = {};
@@ -533,95 +496,77 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
     const effectiveTimeoutMs = Number(options && options.timeoutMs) || timeoutMs;
 
     return new Promise((resolve) => {
-        const prev = lastKnownSystemData.get(host);
-        const timeoutFallbackRaw = prev ? { ...prev, connectivity: 'Disconnected' } : {
-            connectivity: 'Disconnected',
-            resolved_ip: host,
-            sys_name: '—', sys_descr: '—', sys_uptime: '—',
-            hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
-            processor_count: '—',
-            cpu_usage: '—',
-            ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
-            ram_available_mb: '—', ram_available_pct: '—',
-            physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
-            virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
-            memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
-            swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
-            disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
-            temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
-        };
-        const timeoutStructuredFallback = prev ? { ...prev, connectivity: 'Disconnected' } : {
-            ...timeoutFallbackRaw,
-            'SISTEM': {
-                connectivity: timeoutFallbackRaw.connectivity, sys_name: timeoutFallbackRaw.sys_name,
-                sys_descr: timeoutFallbackRaw.sys_descr, hardware: timeoutFallbackRaw.hardware,
-                operating_system: timeoutFallbackRaw.operating_system, sys_uptime: timeoutFallbackRaw.sys_uptime,
-                sys_contact: timeoutFallbackRaw.sys_contact, sys_location: timeoutFallbackRaw.sys_location
-            },
-            'CPU': { cpu_usage: timeoutFallbackRaw.cpu_usage, processor_count: timeoutFallbackRaw.processor_count },
-            'TEMPERATURE': {
-                temperature_c: timeoutFallbackRaw.temperature_c,
-                temperature_sensor_name: timeoutFallbackRaw.temperature_sensor_name,
-                temperature_sensor_count: timeoutFallbackRaw.temperature_sensor_count
-            },
-            'MEMORY (RAM)': {
-                ram_total_mb: timeoutFallbackRaw.ram_total_mb, ram_used_mb: timeoutFallbackRaw.ram_used_mb,
-                ram_available_mb: timeoutFallbackRaw.ram_available_mb, ram_usage_pct: timeoutFallbackRaw.ram_usage_pct,
-                ram_available_pct: timeoutFallbackRaw.ram_available_pct
-            },
-            'MEMORY (PHYSICAL / VIRTUAL / SWAP)': {
-                physical_memory_total_mb: timeoutFallbackRaw.physical_memory_total_mb,
-                physical_memory_usage_pct: timeoutFallbackRaw.physical_memory_usage_pct,
-                virtual_memory_total_mb: timeoutFallbackRaw.virtual_memory_total_mb,
-                virtual_memory_usage_pct: timeoutFallbackRaw.virtual_memory_usage_pct,
-                swap_total_mb: timeoutFallbackRaw.swap_total_mb, swap_used_mb: timeoutFallbackRaw.swap_used_mb,
-                memory_buffers_mb: timeoutFallbackRaw.memory_buffers_mb, cached_memory_mb: timeoutFallbackRaw.cached_memory_mb,
-                shared_memory_mb: timeoutFallbackRaw.shared_memory_mb
-            },
-            'DISK': {
-                disk_total_gb: timeoutFallbackRaw.disk_total_gb, disk_used_gb: timeoutFallbackRaw.disk_used_gb,
-                disk_usage_pct: timeoutFallbackRaw.disk_usage_pct
-            }
-        };
+        // JITTER DELAY: Tunda eksekusi secara acak antara 0 hingga 2500 milidetik (2.5 detik)
+        // Ini sangat krusial dan aman untuk mencegah UDP Flooding (Thundering Herd) 
+        // ketika puluhan PC di-poll secara serentak di milidetik yang sama.
+        const jitterMs = Math.floor(Math.random() * 2500);
 
-        let activeSession = null;
-        let settled = false;
-
-        const timer = setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            if (activeSession) {
-                try { activeSession.close(); } catch (e) { }
-            }
-            resolve({
-                success: false,
-                status: 'Disconnect',
-                error: `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
-                data: timeoutStructuredFallback,
-                timestamp: new Date().toISOString(),
-            });
-        }, effectiveTimeoutMs);
-
-        const pollOpts = {
-            ...snmpOptions,
-            onSession: (sess) => {
-                activeSession = sess;
-                if (typeof options.onSession === 'function') {
-                    try { options.onSession(sess); } catch (e) { }
+        setTimeout(() => {
+            const timeoutFallbackRaw = {
+                connectivity: 'Disconnected',
+                resolved_ip: host,
+                sys_name: '—', sys_descr: '—', sys_uptime: '—',
+                hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
+                processor_count: '—',
+                cpu_usage: '—',
+                ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+                ram_available_mb: '—', ram_available_pct: '—',
+                physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
+                virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
+                memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
+                swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
+                disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
+                temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
+            };
+            const timeoutStructuredFallback = {
+                ...timeoutFallbackRaw,
+                'SISTEM': {
+                    connectivity: timeoutFallbackRaw.connectivity, sys_name: timeoutFallbackRaw.sys_name,
+                    sys_descr: timeoutFallbackRaw.sys_descr, hardware: timeoutFallbackRaw.hardware,
+                    operating_system: timeoutFallbackRaw.operating_system, sys_uptime: timeoutFallbackRaw.sys_uptime,
+                    sys_contact: timeoutFallbackRaw.sys_contact, sys_location: timeoutFallbackRaw.sys_location
+                },
+                'CPU': { cpu_usage: timeoutFallbackRaw.cpu_usage, processor_count: timeoutFallbackRaw.processor_count },
+                'TEMPERATURE': {
+                    temperature_c: timeoutFallbackRaw.temperature_c,
+                    temperature_sensor_name: timeoutFallbackRaw.temperature_sensor_name,
+                    temperature_sensor_count: timeoutFallbackRaw.temperature_sensor_count
+                },
+                'MEMORY (RAM)': {
+                    ram_total_mb: timeoutFallbackRaw.ram_total_mb, ram_used_mb: timeoutFallbackRaw.ram_used_mb,
+                    ram_available_mb: timeoutFallbackRaw.ram_available_mb, ram_usage_pct: timeoutFallbackRaw.ram_usage_pct,
+                    ram_available_pct: timeoutFallbackRaw.ram_available_pct
+                },
+                'MEMORY (PHYSICAL / VIRTUAL / SWAP)': {
+                    physical_memory_total_mb: timeoutFallbackRaw.physical_memory_total_mb,
+                    physical_memory_usage_pct: timeoutFallbackRaw.physical_memory_usage_pct,
+                    virtual_memory_total_mb: timeoutFallbackRaw.virtual_memory_total_mb,
+                    virtual_memory_usage_pct: timeoutFallbackRaw.virtual_memory_usage_pct,
+                    swap_total_mb: timeoutFallbackRaw.swap_total_mb, swap_used_mb: timeoutFallbackRaw.swap_used_mb,
+                    memory_buffers_mb: timeoutFallbackRaw.memory_buffers_mb, cached_memory_mb: timeoutFallbackRaw.cached_memory_mb,
+                    shared_memory_mb: timeoutFallbackRaw.shared_memory_mb
+                },
+                'DISK': {
+                    disk_total_gb: timeoutFallbackRaw.disk_total_gb, disk_used_gb: timeoutFallbackRaw.disk_used_gb,
+                    disk_usage_pct: timeoutFallbackRaw.disk_usage_pct
                 }
-            }
-        };
+            };
 
-        pollSNMP(host, community, pollOpts).then(result => {
-            clearTimeout(timer);
-            if (!settled) {
-                settled = true;
+            const timer = setTimeout(() => {
+                resolve({
+                    success: false,
+                    status: 'Disconnect',
+                    error: `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
+                    data: timeoutStructuredFallback,
+                    timestamp: new Date().toISOString(),
+                });
+            }, effectiveTimeoutMs);
+
+            pollSNMP(host, community, snmpOptions).then(result => {
+                clearTimeout(timer);
                 resolve(result);
-            }
-        }).catch(err => {
-            clearTimeout(timer);
-            if (!settled) {
-                settled = true;
+            }).catch(err => {
+                clearTimeout(timer);
                 resolve({
                     success: false,
                     status: 'Disconnect',
@@ -629,8 +574,8 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
                     data: timeoutStructuredFallback,
                     timestamp: new Date().toISOString(),
                 });
-            }
-        });
+            });
+        }, jitterMs); // Akhir dari blok Jitter Delay
     });
 }
 
