@@ -397,6 +397,15 @@ async function pollSNMP(host, community = 'public', options = {}) {
             };
         }
 
+        // Clamp percent values between 0.0 and 100.0 to prevent corrupted OID numbers
+        const clampPct = (val) => {
+            if (val === null || isNaN(val)) return null;
+            return Math.max(0, Math.min(100, Math.round(Number(val) * 10) / 10));
+        };
+        const safeCpuPct = clampPct(cpu_pct);
+        const safeRamPct = clampPct(ram_pct);
+        const safeDiskPct = clampPct(disk_pct);
+
         const rawData = {
             connectivity: 'Connected',
             resolved_ip: host,
@@ -409,10 +418,10 @@ async function pollSNMP(host, community = 'public', options = {}) {
             sys_location: String(sysLocation || '—'),
             sys_uptime: sysUpRaw !== null ? formatUptime(sysUpRaw) : '—',
             processor_count,
-            cpu_usage: cpu_pct !== null ? cpu_pct.toFixed(1) : '—',
+            cpu_usage: safeCpuPct !== null ? safeCpuPct.toFixed(1) : '—',
             ram_total_mb: ram_total_final !== null ? ram_total_final.toFixed(0) : '—',
             ram_used_mb: ram_used_final !== null ? ram_used_final.toFixed(0) : '—',
-            ram_usage_pct: ram_pct !== null ? ram_pct.toFixed(1) : '—',
+            ram_usage_pct: safeRamPct !== null ? safeRamPct.toFixed(1) : '—',
             ram_available_mb: ram_available_mb !== null ? ram_available_mb.toFixed(0) : '—',
             ram_available_pct: ram_available_pct !== null ? ram_available_pct.toFixed(1) : '—',
             physical_memory_total_mb: memTotalRealMbRaw !== null ? memTotalRealMbRaw.toFixed(0) : '—',
@@ -429,7 +438,7 @@ async function pollSNMP(host, community = 'public', options = {}) {
             swap_usage_pct: memSwapPct !== null ? memSwapPct.toFixed(1) : '—',
             disk_total_gb: disk_total_gb !== null ? disk_total_gb.toFixed(1) : '—',
             disk_used_gb: disk_used_gb !== null ? disk_used_gb.toFixed(1) : '—',
-            disk_usage_pct: disk_pct !== null ? disk_pct.toFixed(1) : '—',
+            disk_usage_pct: safeDiskPct !== null ? safeDiskPct.toFixed(1) : '—',
             temperature_c: tempInfo.hottest ? tempInfo.hottest.value_c.toFixed(1) : '—',
             temperature_sensor_name: tempInfo.hottest ? tempInfo.hottest.name : '—',
             temperature_sensor_count: String(temperatureSensors.length),

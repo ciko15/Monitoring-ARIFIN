@@ -1712,12 +1712,10 @@ class NetworkListenerService {
      */
 
     // ─────────────────────────────────────────────────────────────────────────
-    // SNMP SYSTEM MONITOR (Server / Workstation / Switch)
-    // ─────────────────────────────────────────────────────────────────────────
     startSnmpSystemListener(source) {
         const { id, equipt_id, ip_address, name, community, poll_interval, snmp_port, snmp_version } = source;
         const pollSec = parseInt(poll_interval) || 60;
-        const comm = community || 'public';
+        const comm = (community && community !== 'public') ? community : (process.env.SNMP_DEFAULT_COMMUNITY || community || 'public');
         const port = parseInt(snmp_port) || 161;
         const version = snmp_version || '2c';
 
