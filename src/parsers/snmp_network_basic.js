@@ -69,18 +69,36 @@ function createSession(host, community, options = {}) {
     });
 }
 
-function snmpGet(session, oid) {
+function snmpGetAll(session, oids) {
     return new Promise(resolve => {
-        session.get({ oid }, (err, vbs) => {
-            resolve((!err && vbs && vbs[0]) ? vbs[0].value : null);
+        session.getAll({ oids }, (err, vbs) => {
+            if (err || !vbs) return resolve(oids.map(() => null));
+            const result = oids.map(oid => {
+                const oidStr = oid.join('.');
+                const match = vbs.find(vb => vb.oid.join('.') === oidStr);
+                return match && match.type !== 128 && match.type !== 129 ? match.value : null;
+            });
+            resolve(result);
         });
     });
 }
 
-function snmpWalk(session, oid) {
+function snmpWalkSafe(session, oid, timeoutMs = 4000) {
     return new Promise(resolve => {
-        session.getSubtree({ oid, combinedTimeout: 12000 }, (err, vbs) => {
-            resolve(!err && vbs ? vbs : []);
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                resolve([]);
+            }
+        }, timeoutMs);
+
+        session.getSubtree({ oid, combinedTimeout: timeoutMs }, (err, vbs) => {
+            if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                resolve(!err && vbs ? vbs : []);
+            }
         });
     });
 }
@@ -158,34 +176,50 @@ async function readSwitchTemperature(session, sysObjectID) {
     const isAlcatelSwitch = sysObjectIdText.startsWith('1.3.6.1.4.1.6486.');
 
     if (isAlcatelSwitch) {
-        const alcatelTemp = await readAlcatelTemperature(session, snmpWalk, snmpGet);
+        const alcatelTemp = await readAlcatelTemperature(session, snmpWalkSafe, snmpGet);
         if (alcatelTemp.hottest) return alcatelTemp;
     }
 
-    return readTemperatureSensors(session, snmpWalk);
+    return readTemperatureSensors(session, snmpWalkSafe);
 }
 
 async function pollSNMP(host, community = 'public', options = {}) {
     const session = createSession(host, community, options);
     try {
-        const sysName = await snmpGet(session, OID.sysName);
-        const sysDescr = await snmpGet(session, OID.sysDescr);
-        const sysObjectID = await snmpGet(session, OID.sysObjectID);
-        const sysContact = await snmpGet(session, OID.sysContact);
-        const sysUpTime = await snmpGet(session, OID.sysUpTime);
-        const sysLocation = await snmpGet(session, OID.sysLocation);
-        const ifNumber = await snmpGet(session, OID.ifNumber);
-        const ifDescrVbs = await snmpWalk(session, OID.ifDescr);
-        const ifNameVbs = await snmpWalk(session, OID.ifName);
-        const ifOperStatusVbs = await snmpWalk(session, OID.ifOperStatus);
-        const ifInOctetsVbs = await snmpWalk(session, OID.ifInOctets);
-        const ifOutOctetsVbs = await snmpWalk(session, OID.ifOutOctets);
-        const ifHCInOctetsVbs = await snmpWalk(session, OID.ifHCInOctets);
-        const ifHCOutOctetsVbs = await snmpWalk(session, OID.ifHCOutOctets);
+        const isV1 = String(options.version || '2c').toLowerCase().replace(/^v/, '') === '1';
+
+        // 1. Ambil System MIB sekaligus dalam 1 batch paket UDP (sangat cepat & andal)
+        const sysOids = [
+            OID.sysName, OID.sysDescr, OID.sysObjectID,
+            OID.sysContact, OID.sysUpTime, OID.sysLocation, OID.ifNumber
+        ];
+        const [sysName, sysDescr, sysObjectID, sysContact, sysUpTime, sysLocation, ifNumber] = await snmpGetAll(session, sysOids);
 
         if (sysName === null && sysDescr === null) {
             throw new Error('No SNMP response');
         }
+
+        // 2. Ambil tabel interface secara paralel dengan proteksi timeout per walk
+        // Catatan: SNMP v1 tidak mendukung 64-bit Counter (ifHCInOctets/ifHCOutOctets)
+        const walkPromises = [
+            snmpWalkSafe(session, OID.ifDescr, 4000),
+            snmpWalkSafe(session, OID.ifName, 4000),
+            snmpWalkSafe(session, OID.ifOperStatus, 4000),
+            snmpWalkSafe(session, OID.ifInOctets, 4000),
+            snmpWalkSafe(session, OID.ifOutOctets, 4000),
+            isV1 ? Promise.resolve([]) : snmpWalkSafe(session, OID.ifHCInOctets, 3000),
+            isV1 ? Promise.resolve([]) : snmpWalkSafe(session, OID.ifHCOutOctets, 3000),
+        ];
+
+        const [
+            ifDescrVbs,
+            ifNameVbs,
+            ifOperStatusVbs,
+            ifInOctetsVbs,
+            ifOutOctetsVbs,
+            ifHCInOctetsVbs,
+            ifHCOutOctetsVbs
+        ] = await Promise.all(walkPromises);
 
         const descrMap = toIndexMap(ifDescrVbs);
         const ifNameMap = toIndexMap(ifNameVbs);
