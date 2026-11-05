@@ -1795,8 +1795,8 @@ class NetworkListenerService {
                 console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
                 let result = null;
                 try {
-                    // Timeout per perangkat: default 30 detik (cukup untuk SNMP walk CPU, Storage, RAM di ATC system/workstation)
-                    const snmpTimeoutMs = parseInt(process.env.SNMP_POLL_TIMEOUT_MS, 10) || 30000;
+                    // Timeout per perangkat: default 40 detik (mengadopsi konfigurasi stabil asli Monitoring-ARIFIN-main)
+                    const snmpTimeoutMs = parseInt(process.env.SNMP_POLL_TIMEOUT_MS, 10) || 40000;
                     result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap, timeoutMs: snmpTimeoutMs });
                 } finally {
                     _releaseSnmpSlot();

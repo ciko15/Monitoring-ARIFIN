@@ -154,7 +154,7 @@ function createSession(host, community, options = {}) {
         community,
         port: snmpOptions.port,
         version: normalizeSnmpVersion(snmpOptions.version),
-        timeouts: [2500, 3500], // Toleran terhadap latency LAN/VLAN bandara
+        timeouts: [3000, 4000, 5000], // Mengadopsi konfigurasi stabil asli Monitoring-ARIFIN-main
     });
 }
 function snmpGet(session, oid) {
@@ -188,7 +188,7 @@ async function snmpGetAll(session, oids) {
 }
 function snmpWalk(session, oid) {
     return new Promise(resolve => {
-        session.getSubtree({ oid, combinedTimeout: 5000 }, (err, vbs) => {
+        session.getSubtree({ oid, combinedTimeout: 12000 }, (err, vbs) => {
             resolve(!err && vbs ? vbs : []);
         });
     });
