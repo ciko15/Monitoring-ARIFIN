@@ -184,12 +184,19 @@ function _recordProfileSample(parsingId, metrics) {
 }
 
 // Concurrency semaphore specifically for SNMP System pollSNMP
+// Default ditingkatkan ke 100 agar mampu menampung puluhan hingga ratusan perangkat PC/Switch
+// secara paralel tanpa tertahan antrean (Queue Starvation).
 let _snmpActiveCount = 0;
 const _snmpQueue = [];
 
 function _acquireSnmpSlot() {
-    const maxConcurrent = parseInt(process.env.SNMP_MAX_CONCURRENT, 10) || 6;
-    if (_snmpActiveCount < maxConcurrent) {
+    // Default 500 concurrent (atau unlimited jika SNMP_MAX_CONCURRENT=0),
+    // memastikan ratusan hingga ribuan perangkat dapat dipolling secara paralel tanpa antrean (queue starvation).
+    const maxConcurrent = process.env.SNMP_MAX_CONCURRENT !== undefined 
+        ? parseInt(process.env.SNMP_MAX_CONCURRENT, 10) 
+        : 500;
+
+    if (maxConcurrent <= 0 || _snmpActiveCount < maxConcurrent) {
         _snmpActiveCount++;
         return Promise.resolve();
     }
@@ -1736,7 +1743,6 @@ class NetworkListenerService {
             if (isPolling) return;
             isPolling = true;
             const t0 = Date.now();
-            console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
             let t1 = t0;
             let t2 = t0;
             let t3 = t0;
@@ -1767,7 +1773,6 @@ class NetworkListenerService {
                             this._snmpLimitsCache.set(equipt_id, { limitsMap, cachedAt: now });
                         }
                     } catch (limErr) {
-                        // Jika timeout/gagal, pakai cache lama jika ada, jika tidak pakai null
                         if (cached) {
                             limitsMap = cached.limitsMap;
                         }
@@ -1775,11 +1780,13 @@ class NetworkListenerService {
                 }
                 t1 = Date.now();
 
-                // FASE C: Batasi concurrency pollSNMP + timeout via env (mulai SETELAH slot didapat)
-                const snmpTimeoutMs = parseInt(process.env.SNMP_POLL_TIMEOUT_MS, 10) || 30000;
+                // Dapatkan slot SNMP (Kapasitas hingga 100 perangkat paralel)
                 await _acquireSnmpSlot();
+                console.log(`[SNMP System] Polling ${name} (${ip_address}:${port}, v${version})...`);
                 let result = null;
                 try {
+                    // Timeout per perangkat: default 12 detik (cukup untuk LAN/WAN bandara, mencegah hang)
+                    const snmpTimeoutMs = parseInt(process.env.SNMP_POLL_TIMEOUT_MS, 10) || 12000;
                     result = await pollSNMP(ip_address, comm, { port, version, limits: limitsMap, timeoutMs: snmpTimeoutMs });
                 } finally {
                     _releaseSnmpSlot();
@@ -1838,8 +1845,8 @@ class NetworkListenerService {
             pollSec,
             timersMap: this._snmpSystemTimers,
             doPoll,
-            maxFailures: 5,
-            backoffMs: 30000 // 30s backoff (bukan 2 menit)
+            maxFailures: 8,
+            backoffMs: 15000 // 15s backoff singkat agar lekas online kembali jika ada fluktuasi
         });
     }
 

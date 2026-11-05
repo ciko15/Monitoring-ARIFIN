@@ -513,111 +513,104 @@ async function pollSNMPWithTimeout(host, community = 'public', options = {}, tim
     const effectiveTimeoutMs = Number(options && options.timeoutMs) || timeoutMs;
 
     return new Promise((resolve) => {
-        // JITTER DELAY: Tunda eksekusi secara acak antara 0 hingga 4000 milidetik (4 detik)
-        // Ini sangat krusial dan aman untuk mencegah UDP Flooding (Thundering Herd) 
-        // ketika puluhan PC di-poll secara serentak di milidetik yang sama.
-        const jitterMs = Math.floor(Math.random() * 4000);
+        const prev = lastKnownSystemData.get(host);
+        const timeoutFallbackRaw = prev ? { ...prev, connectivity: 'Disconnected' } : {
+            connectivity: 'Disconnected',
+            resolved_ip: host,
+            sys_name: '—', sys_descr: '—', sys_uptime: '—',
+            hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
+            processor_count: '—',
+            cpu_usage: '—',
+            ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
+            ram_available_mb: '—', ram_available_pct: '—',
+            physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
+            virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
+            memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
+            swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
+            disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
+            temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
+        };
+        const timeoutStructuredFallback = prev ? { ...prev, connectivity: 'Disconnected' } : {
+            ...timeoutFallbackRaw,
+            'SISTEM': {
+                connectivity: timeoutFallbackRaw.connectivity, sys_name: timeoutFallbackRaw.sys_name,
+                sys_descr: timeoutFallbackRaw.sys_descr, hardware: timeoutFallbackRaw.hardware,
+                operating_system: timeoutFallbackRaw.operating_system, sys_uptime: timeoutFallbackRaw.sys_uptime,
+                sys_contact: timeoutFallbackRaw.sys_contact, sys_location: timeoutFallbackRaw.sys_location
+            },
+            'CPU': { cpu_usage: timeoutFallbackRaw.cpu_usage, processor_count: timeoutFallbackRaw.processor_count },
+            'TEMPERATURE': {
+                temperature_c: timeoutFallbackRaw.temperature_c,
+                temperature_sensor_name: timeoutFallbackRaw.temperature_sensor_name,
+                temperature_sensor_count: timeoutFallbackRaw.temperature_sensor_count
+            },
+            'MEMORY (RAM)': {
+                ram_total_mb: timeoutFallbackRaw.ram_total_mb, ram_used_mb: timeoutFallbackRaw.ram_used_mb,
+                ram_available_mb: timeoutFallbackRaw.ram_available_mb, ram_usage_pct: timeoutFallbackRaw.ram_usage_pct,
+                ram_available_pct: timeoutFallbackRaw.ram_available_pct
+            },
+            'MEMORY (PHYSICAL / VIRTUAL / SWAP)': {
+                physical_memory_total_mb: timeoutFallbackRaw.physical_memory_total_mb,
+                physical_memory_usage_pct: timeoutFallbackRaw.physical_memory_usage_pct,
+                virtual_memory_total_mb: timeoutFallbackRaw.virtual_memory_total_mb,
+                virtual_memory_usage_pct: timeoutFallbackRaw.virtual_memory_usage_pct,
+                swap_total_mb: timeoutFallbackRaw.swap_total_mb, swap_used_mb: timeoutFallbackRaw.swap_used_mb,
+                memory_buffers_mb: timeoutFallbackRaw.memory_buffers_mb, cached_memory_mb: timeoutFallbackRaw.cached_memory_mb,
+                shared_memory_mb: timeoutFallbackRaw.shared_memory_mb
+            },
+            'DISK': {
+                disk_total_gb: timeoutFallbackRaw.disk_total_gb, disk_used_gb: timeoutFallbackRaw.disk_used_gb,
+                disk_usage_pct: timeoutFallbackRaw.disk_usage_pct
+            }
+        };
 
-        setTimeout(() => {
-            const prev = lastKnownSystemData.get(host);
-            const timeoutFallbackRaw = prev ? { ...prev, connectivity: 'Disconnected' } : {
-                connectivity: 'Disconnected',
-                resolved_ip: host,
-                sys_name: '—', sys_descr: '—', sys_uptime: '—',
-                hardware: '—', operating_system: '—', sys_object_id: '—', sys_contact: '—', sys_location: '—',
-                processor_count: '—',
-                cpu_usage: '—',
-                ram_total_mb: '—', ram_used_mb: '—', ram_usage_pct: '—',
-                ram_available_mb: '—', ram_available_pct: '—',
-                physical_memory_total_mb: '—', physical_memory_used_mb: '—', physical_memory_usage_pct: '—',
-                virtual_memory_total_mb: '—', virtual_memory_used_mb: '—', virtual_memory_usage_pct: '—',
-                memory_buffers_mb: '—', cached_memory_mb: '—', shared_memory_mb: '—',
-                swap_total_mb: '—', swap_used_mb: '—', swap_usage_pct: '—',
-                disk_total_gb: '—', disk_used_gb: '—', disk_usage_pct: '—',
-                temperature_c: '—', temperature_sensor_name: '—', temperature_sensor_count: '—', temperature_sensors: [],
-            };
-            const timeoutStructuredFallback = prev ? { ...prev, connectivity: 'Disconnected' } : {
-                ...timeoutFallbackRaw,
-                'SISTEM': {
-                    connectivity: timeoutFallbackRaw.connectivity, sys_name: timeoutFallbackRaw.sys_name,
-                    sys_descr: timeoutFallbackRaw.sys_descr, hardware: timeoutFallbackRaw.hardware,
-                    operating_system: timeoutFallbackRaw.operating_system, sys_uptime: timeoutFallbackRaw.sys_uptime,
-                    sys_contact: timeoutFallbackRaw.sys_contact, sys_location: timeoutFallbackRaw.sys_location
-                },
-                'CPU': { cpu_usage: timeoutFallbackRaw.cpu_usage, processor_count: timeoutFallbackRaw.processor_count },
-                'TEMPERATURE': {
-                    temperature_c: timeoutFallbackRaw.temperature_c,
-                    temperature_sensor_name: timeoutFallbackRaw.temperature_sensor_name,
-                    temperature_sensor_count: timeoutFallbackRaw.temperature_sensor_count
-                },
-                'MEMORY (RAM)': {
-                    ram_total_mb: timeoutFallbackRaw.ram_total_mb, ram_used_mb: timeoutFallbackRaw.ram_used_mb,
-                    ram_available_mb: timeoutFallbackRaw.ram_available_mb, ram_usage_pct: timeoutFallbackRaw.ram_usage_pct,
-                    ram_available_pct: timeoutFallbackRaw.ram_available_pct
-                },
-                'MEMORY (PHYSICAL / VIRTUAL / SWAP)': {
-                    physical_memory_total_mb: timeoutFallbackRaw.physical_memory_total_mb,
-                    physical_memory_usage_pct: timeoutFallbackRaw.physical_memory_usage_pct,
-                    virtual_memory_total_mb: timeoutFallbackRaw.virtual_memory_total_mb,
-                    virtual_memory_usage_pct: timeoutFallbackRaw.virtual_memory_usage_pct,
-                    swap_total_mb: timeoutFallbackRaw.swap_total_mb, swap_used_mb: timeoutFallbackRaw.swap_used_mb,
-                    memory_buffers_mb: timeoutFallbackRaw.memory_buffers_mb, cached_memory_mb: timeoutFallbackRaw.cached_memory_mb,
-                    shared_memory_mb: timeoutFallbackRaw.shared_memory_mb
-                },
-                'DISK': {
-                    disk_total_gb: timeoutFallbackRaw.disk_total_gb, disk_used_gb: timeoutFallbackRaw.disk_used_gb,
-                    disk_usage_pct: timeoutFallbackRaw.disk_usage_pct
+        let activeSession = null;
+        let settled = false;
+
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            if (activeSession) {
+                try { activeSession.close(); } catch (e) { }
+            }
+            resolve({
+                success: false,
+                status: 'Disconnect',
+                error: `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
+                data: timeoutStructuredFallback,
+                timestamp: new Date().toISOString(),
+            });
+        }, effectiveTimeoutMs);
+
+        const pollOpts = {
+            ...snmpOptions,
+            onSession: (sess) => {
+                activeSession = sess;
+                if (typeof options.onSession === 'function') {
+                    try { options.onSession(sess); } catch (e) { }
                 }
-            };
+            }
+        };
 
-            let activeSession = null;
-            let settled = false;
-
-            const timer = setTimeout(() => {
-                if (settled) return;
+        pollSNMP(host, community, pollOpts).then(result => {
+            clearTimeout(timer);
+            if (!settled) {
                 settled = true;
-                if (activeSession) {
-                    try { activeSession.close(); } catch (e) { }
-                }
+                resolve(result);
+            }
+        }).catch(err => {
+            clearTimeout(timer);
+            if (!settled) {
+                settled = true;
                 resolve({
                     success: false,
                     status: 'Disconnect',
-                    error: `Poll timeout (>${Math.round(effectiveTimeoutMs / 1000)}s)`,
+                    error: err.message,
                     data: timeoutStructuredFallback,
                     timestamp: new Date().toISOString(),
                 });
-            }, effectiveTimeoutMs);
-
-            const pollOpts = {
-                ...snmpOptions,
-                onSession: (sess) => {
-                    activeSession = sess;
-                    if (typeof options.onSession === 'function') {
-                        try { options.onSession(sess); } catch (e) { }
-                    }
-                }
-            };
-
-            pollSNMP(host, community, pollOpts).then(result => {
-                clearTimeout(timer);
-                if (!settled) {
-                    settled = true;
-                    resolve(result);
-                }
-            }).catch(err => {
-                clearTimeout(timer);
-                if (!settled) {
-                    settled = true;
-                    resolve({
-                        success: false,
-                        status: 'Disconnect',
-                        error: err.message,
-                        data: timeoutStructuredFallback,
-                        timestamp: new Date().toISOString(),
-                    });
-                }
-            });
-        }, jitterMs); // Akhir dari blok Jitter Delay
+            }
+        });
     });
 }
 
