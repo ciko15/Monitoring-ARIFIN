@@ -183,7 +183,136 @@ function _recordProfileSample(parsingId, metrics) {
     }
 }
 
+const thresholdEvaluator = require('../utils/thresholdEvaluator');
 
+const ALIAS_MAP = {
+    'suhu': ['temperature', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp'],
+    'temperature': ['suhu', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp', 'cpatemp', 'msgtemp'],
+    'kelembaban': ['humidity', 'humidity_pct', 'humidity pct', 'humi'],
+    'kelembapan': ['humidity', 'humidity_pct', 'humidity pct', 'humi'],
+    'humidity': ['kelembaban', 'kelembapan', 'humidity_pct', 'humidity pct', 'humi'],
+    'tegangan': ['voltage', 'volt', 'vln', 'vll', 'van voltage', 'vab', 'vbc', 'vca'],
+    'voltage': ['tegangan', 'volt', 'vln', 'vll', 'van voltage', 'vab', 'vbc', 'vca'],
+    'arus': ['current', 'ampere', 'amp', 'ia', 'ib', 'ic'],
+    'current': ['arus', 'ampere', 'amp', 'ia', 'ib', 'ic'],
+    'daya': ['power', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
+    'power': ['daya', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
+    'frekuensi': ['frequency', 'freq'],
+    'frequency': ['frekuensi', 'freq'],
+    'totalinterface': ['interfacecount', 'totalinterfaces', 'total interface'],
+    'interfaceup': ['activeinterfacecount', 'activeinterfaces', 'interface up'],
+    'interfacedown': ['downinterfacecount', 'downinterfaces', 'interface down'],
+    'cpuusage': ['cpu', 'processorload', 'cpu usage'],
+    'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct', 'ram usage'],
+    'ramavailable': ['ramavailablepct', 'memoryavailable', 'ram available'],
+    'diskusage': ['diskusagepct', 'storageusage', 'disk usage'],
+    'crsrf': ['crsrf', 'crsrflevel', 'crsposrf', 'crsposrflevel', 'crs_rf', 'rf_power', 'rfpower', 'rf power'],
+    'crsddm': ['crsddm', 'crsposddm', 'crs_ddm', 'ddm_course', 'ddmcourse', 'ddm course'],
+    'crssdm': ['crssdm', 'crspossdm', 'crs_sdm', 'carrier_pwr', 'carrierpower', 'carrierpwr', 'carrier power'],
+    'identam': ['identam', 'ident', 'ident_am', 'ident am'],
+    'widthrf': ['widthrf', 'crswidthrf', 'crswidthrflevel', 'width_rf', 'csb_power', 'csbpower', 'csb power', 'widthrflevel'],
+    'widthddm': ['widthddm', 'crswidthddm', 'width_ddm', 'ddm_clr', 'ddmclr', 'ddm clr'],
+    'widthsdm': ['widthsdm', 'crswidthsdm', 'width_sdm', 'sbo_power', 'sbopower', 'sbo power'],
+    'clrrf': ['clrrf', 'clrwidthrf', 'clrwidthrflevel', 'clr_rf', 'clr_power', 'clrpower', 'clr power'],
+    'clrddm': ['clrddm', 'clrwidthddm', 'clr_ddm'],
+    'clrsdm': ['clrsdm', 'clrwidthsdm', 'clr_sdm'],
+    'nfrf': ['nfrf', 'nearfieldrf', 'nearfieldposrf', 'nearfieldposrflevel', 'nf_rf', 'rf_out', 'rfout', 'rf out', 'nearfieldposrflevel'],
+    'nfddm': ['nfddm', 'nearfieldddm', 'nearfieldposddm', 'nf_ddm', 'ddm_mon', 'ddmmon', 'ddm mon'],
+    'nfsdm': ['nfsdm', 'nearfieldsdm', 'nearfieldpossdm', 'nf_sdm', 'mon_power', 'monpower', 'mon power'],
+    'freqdev': ['freqdev', 'freqdeviation', 'frequencydeviation', 'freq_dev', 'frequency deviation', 'freq deviation'],
+    'gpangle': ['gpangle', 'glidepathangle', 'gp_angle', 'gp angle'],
+    'am1020hz': ['am1020hz', '1020hzam', 'am1020', '1020hz'],
+    'am30hz': ['am30hz', '30hzam', 'am30', '30hz'],
+    'am9960hz': ['am9960hz', '9960hzam', 'am9960', '9960hz'],
+    'fmindex': ['fmindex', 'fm index'],
+    'carrierpower': ['carrierpower', 'carrierpwr', 'carrier power'],
+    'rfinput': ['rfinput', 'rf input'],
+    'azimuth': ['azimuth', 'azimuth deg'],
+    'systemdelay': ['sysdelay', 'systemdelay', 'system delay'],
+    'pulserefficiency': ['replyeff', 'replyefficiency', 'reply efficiency'],
+    'pulsespacing': ['spacing', 'pulsespacing', 'pulse spacing'],
+    'forwardpower': ['fwdpower', 'forwardpower', 'forward power'],
+    'reflectedpower': ['reflpower', 'reflectedpower', 'reflected power']
+};
+
+// Pre-compute array varian (canon + alias) sekali saja
+const ALIAS_VARIANTS = Object.entries(ALIAS_MAP).map(([canon, aliases]) => [canon, ...aliases]);
+
+// Memoize limitMatchesKey
+const _limitMatchCache = new Map();
+const MAX_LIMIT_MATCH_CACHE_SIZE = 50000;
+
+function limitMatchesKey(lim, lName, lSource, key) {
+    const matchMode = lim.match_mode || '';
+    const cacheKey = `${lName}|${lSource}|${matchMode}|${key}`;
+    if (_limitMatchCache.has(cacheKey)) {
+        return _limitMatchCache.get(cacheKey);
+    }
+
+    const dKey = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const strippedKey = dKey.replace(/^(mon1|mon2|tx1|tx2|lcu)/, '');
+
+    let isMatch = (lName === dKey || lSource === dKey || lName === strippedKey || lSource === strippedKey);
+    if (!isMatch) {
+        for (let i = 0; i < ALIAS_VARIANTS.length; i++) {
+            const allVariants = ALIAS_VARIANTS[i];
+            const candMatches = allVariants.some(a => a === lName || (a.length >= 4 && lName.length >= 4 && (lName.includes(a) || a.includes(lName))));
+            const keyMatches = allVariants.some(a => a === dKey || a === strippedKey || (a.length >= 4 && dKey.length >= 4 && (dKey.includes(a) || a.includes(dKey))) || (a.length >= 4 && strippedKey.length >= 4 && (strippedKey.includes(a) || a.includes(strippedKey))));
+            if (candMatches && keyMatches) {
+                isMatch = true;
+                break;
+            }
+        }
+    }
+    if (!isMatch && matchMode !== 'exact' && lName.length >= 4) {
+        isMatch = (dKey.length >= 4 && (dKey.includes(lName) || lName.includes(dKey))) || (strippedKey.length >= 4 && (strippedKey.includes(lName) || lName.includes(strippedKey)));
+    }
+
+    if (_limitMatchCache.size >= MAX_LIMIT_MATCH_CACHE_SIZE) {
+        _limitMatchCache.clear();
+    }
+    _limitMatchCache.set(cacheKey, isMatch);
+    return isMatch;
+}
+
+// Limits cache with 60s TTL
+const _limitsCache = new Map(); // `${equiptId}|${parsingId || ''}` -> { expiresAt, limits }
+
+function clearLimitsCache() {
+    _limitsCache.clear();
+    _limitMatchCache.clear();
+}
+
+async function getLimitsCached(equipmentService, equiptId, parsingId) {
+    const cacheKey = `${equiptId}|${parsingId || ''}`;
+    const now = Date.now();
+    const entry = _limitsCache.get(cacheKey);
+    if (entry && entry.expiresAt > now) {
+        return entry.limits;
+    }
+
+    const rawLimits = await equipmentService.db.getLimitationsByEquipment(equiptId, parsingId);
+    let preparedLimits = [];
+    if (Array.isArray(rawLimits)) {
+        preparedLimits = rawLimits.map(lim => {
+            const isActive = !(lim.is_active === false || lim.is_active === 'false' || lim.is_active === 0 || lim.is_active === '0');
+            const lName = String(lim.name || lim.label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const lSource = String(lim.source || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return {
+                ...lim,
+                _isActive: isActive,
+                _lName: lName,
+                _lSource: lSource
+            };
+        });
+    }
+
+    _limitsCache.set(cacheKey, {
+        expiresAt: now + 60000,
+        limits: preparedLimits
+    });
+    return preparedLimits;
+}
 
 class NetworkListenerService {
     constructor() {
@@ -620,63 +749,11 @@ class NetworkListenerService {
             // Dynamic Limitation Threshold Evaluation
             try {
                 const tLimStart = shouldProfile ? performance.now() : 0;
-                const limits = await this.equipmentService.db.getLimitationsByEquipment(source.equipt_id, source.parsing_id);
+                const limits = await getLimitsCached(this.equipmentService, source.equipt_id, source.parsing_id);
                 if (shouldProfile) profMetrics.limits = performance.now() - tLimStart;
 
                 const tEvalStart = shouldProfile ? performance.now() : 0;
                 if (Array.isArray(limits) && limits.length > 0) {
-                    const aliasMap = {
-                        'suhu': ['temperature', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp'],
-                        'temperature': ['suhu', 'temp', 'temperature_c', 'temperature c', 'ambient temp', 'internal temp', 'cpatemp', 'msgtemp'],
-                        'kelembaban': ['humidity', 'humidity_pct', 'humidity pct', 'humi'],
-                        'kelembapan': ['humidity', 'humidity_pct', 'humidity pct', 'humi'],
-                        'humidity': ['kelembaban', 'kelembapan', 'humidity_pct', 'humidity pct', 'humi'],
-                        'tegangan': ['voltage', 'volt', 'vln', 'vll', 'van voltage', 'vab', 'vbc', 'vca'],
-                        'voltage': ['tegangan', 'volt', 'vln', 'vll', 'van voltage', 'vab', 'vbc', 'vca'],
-                        'arus': ['current', 'ampere', 'amp', 'ia', 'ib', 'ic'],
-                        'current': ['arus', 'ampere', 'amp', 'ia', 'ib', 'ic'],
-                        'daya': ['power', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
-                        'power': ['daya', 'watt', 'kw', 'fwd power', 'refl power', 'carrier power'],
-                        'frekuensi': ['frequency', 'freq'],
-                        'frequency': ['frekuensi', 'freq'],
-                        'totalinterface': ['interfacecount', 'totalinterfaces', 'total interface'],
-                        'interfaceup': ['activeinterfacecount', 'activeinterfaces', 'interface up'],
-                        'interfacedown': ['downinterfacecount', 'downinterfaces', 'interface down'],
-                        'cpuusage': ['cpu', 'processorload', 'cpu usage'],
-                        'ramusage': ['ramusagepct', 'memoryusage', 'memoryusagepct', 'ram usage'],
-                        'ramavailable': ['ramavailablepct', 'memoryavailable', 'ram available'],
-                        'diskusage': ['diskusagepct', 'storageusage', 'disk usage'],
-                        'crsrf': ['crsrf', 'crsrflevel', 'crsposrf', 'crsposrflevel', 'crs_rf', 'rf_power', 'rfpower', 'rf power'],
-                        'crsddm': ['crsddm', 'crsposddm', 'crs_ddm', 'ddm_course', 'ddmcourse', 'ddm course'],
-                        'crssdm': ['crssdm', 'crspossdm', 'crs_sdm', 'carrier_pwr', 'carrierpower', 'carrierpwr', 'carrier power'],
-                        'identam': ['identam', 'ident', 'ident_am', 'ident am'],
-                        'widthrf': ['widthrf', 'crswidthrf', 'crswidthrflevel', 'width_rf', 'csb_power', 'csbpower', 'csb power', 'widthrflevel'],
-                        'widthddm': ['widthddm', 'crswidthddm', 'width_ddm', 'ddm_clr', 'ddmclr', 'ddm clr'],
-                        'widthsdm': ['widthsdm', 'crswidthsdm', 'width_sdm', 'sbo_power', 'sbopower', 'sbo power'],
-                        'clrrf': ['clrrf', 'clrwidthrf', 'clrwidthrflevel', 'clr_rf', 'clr_power', 'clrpower', 'clr power'],
-                        'clrddm': ['clrddm', 'clrwidthddm', 'clr_ddm'],
-                        'clrsdm': ['clrsdm', 'clrwidthsdm', 'clr_sdm'],
-                        'nfrf': ['nfrf', 'nearfieldrf', 'nearfieldposrf', 'nearfieldposrflevel', 'nf_rf', 'rf_out', 'rfout', 'rf out', 'nearfieldposrflevel'],
-                        'nfddm': ['nfddm', 'nearfieldddm', 'nearfieldposddm', 'nf_ddm', 'ddm_mon', 'ddmmon', 'ddm mon'],
-                        'nfsdm': ['nfsdm', 'nearfieldsdm', 'nearfieldpossdm', 'nf_sdm', 'mon_power', 'monpower', 'mon power'],
-                        'freqdev': ['freqdev', 'freqdeviation', 'frequencydeviation', 'freq_dev', 'frequency deviation', 'freq deviation'],
-                        'gpangle': ['gpangle', 'glidepathangle', 'gp_angle', 'gp angle'],
-                        'am1020hz': ['am1020hz', '1020hzam', 'am1020', '1020hz'],
-                        'am30hz': ['am30hz', '30hzam', 'am30', '30hz'],
-                        'am9960hz': ['am9960hz', '9960hzam', 'am9960', '9960hz'],
-                        'fmindex': ['fmindex', 'fm index'],
-                        'carrierpower': ['carrierpower', 'carrierpwr', 'carrier power'],
-                        'rfinput': ['rfinput', 'rf input'],
-                        'azimuth': ['azimuth', 'azimuth deg'],
-                        'systemdelay': ['sysdelay', 'systemdelay', 'system delay'],
-                        'pulserefficiency': ['replyeff', 'replyefficiency', 'reply efficiency'],
-                        'pulsespacing': ['spacing', 'pulsespacing', 'pulse spacing'],
-                        'forwardpower': ['fwdpower', 'forwardpower', 'forward power'],
-                        'reflectedpower': ['reflpower', 'reflectedpower', 'reflected power']
-                    };
-
-                    const thresholdEvaluator = require('../utils/thresholdEvaluator');
-
                     // Flatten nested data (seperti ioLogik devices: { DME: { TX: 'TX 1' } })
                     const flatParams = {};
                     const flatten = (obj, prefix = '') => {
@@ -695,34 +772,20 @@ class NetworkListenerService {
                     };
                     flatten(parsedData.data);
 
-                    for (const lim of limits) {
-                        if (lim.is_active === false || lim.is_active === 'false' || lim.is_active === 0 || lim.is_active === '0') continue;
-                        const lName = String(lim.name || lim.label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                        const lSource = String(lim.source || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const flatEntries = Object.entries(flatParams);
+                    const flatLen = flatEntries.length;
 
-                        for (const [key, rawVal] of Object.entries(flatParams)) {
+                    for (let i = 0; i < limits.length; i++) {
+                        const lim = limits[i];
+                        if (lim._isActive === false) continue;
+                        const lName = lim._lName;
+                        const lSource = lim._lSource;
+
+                        for (let j = 0; j < flatLen; j++) {
+                            const [key, rawVal] = flatEntries[j];
                             if (rawVal === undefined || rawVal === null) continue;
-                            const dKey = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                            // Hapus prefix umum seperti mon1_, mon2_, tx1_, tx2_, lcu_ untuk pencocokan generik
-                            const strippedKey = dKey.replace(/^(mon1|mon2|tx1|tx2|lcu)/, '');
 
-                            let isMatch = (lName === dKey || lSource === dKey || lName === strippedKey || lSource === strippedKey);
-                            if (!isMatch) {
-                                for (const [canon, aliases] of Object.entries(aliasMap)) {
-                                    const allVariants = [canon, ...aliases];
-                                    const candMatches = allVariants.some(a => a === lName || (a.length >= 4 && lName.length >= 4 && (lName.includes(a) || a.includes(lName))));
-                                    const keyMatches = allVariants.some(a => a === dKey || a === strippedKey || (a.length >= 4 && dKey.length >= 4 && (dKey.includes(a) || a.includes(dKey))) || (a.length >= 4 && strippedKey.length >= 4 && (strippedKey.includes(a) || a.includes(strippedKey))));
-                                    if (candMatches && keyMatches) {
-                                        isMatch = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (!isMatch && lim.match_mode !== 'exact' && lName.length >= 4) {
-                                isMatch = (dKey.length >= 4 && (dKey.includes(lName) || lName.includes(dKey))) || (strippedKey.length >= 4 && (strippedKey.includes(lName) || lName.includes(strippedKey)));
-                            }
-
-                            if (isMatch) {
+                            if (limitMatchesKey(lim, lName, lSource, key)) {
                                 const evalStatus = thresholdEvaluator.checkThreshold(rawVal, lim);
                                 if (evalStatus === 'Alert' || evalStatus === 'Alarm' || evalStatus === 'Warning') {
                                     // Aturan 1: Berapapun pembacaan nilainya (warning maupun alarm), status data source tetap Warning
@@ -730,6 +793,9 @@ class NetworkListenerService {
                                     break;
                                 }
                             }
+                        }
+                        if (statusToEvaluate === 'Warning') {
+                            break;
                         }
                     }
                 }
@@ -2960,5 +3026,14 @@ class NetworkListenerService {
 
 // Singleton instance
 const networkListenerService = new NetworkListenerService();
+networkListenerService.clearLimitsCache = clearLimitsCache;
+networkListenerService.getLimitsCached = getLimitsCached;
+networkListenerService.limitMatchesKey = limitMatchesKey;
+networkListenerService.ALIAS_MAP = ALIAS_MAP;
 
 module.exports = networkListenerService;
+module.exports.clearLimitsCache = clearLimitsCache;
+module.exports.getLimitsCached = getLimitsCached;
+module.exports.limitMatchesKey = limitMatchesKey;
+module.exports.ALIAS_MAP = ALIAS_MAP;
+

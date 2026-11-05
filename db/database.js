@@ -214,6 +214,14 @@ async function writeJson(filePath, data) {
       }
       if (renameSuccess) {
         jsonCache.set(filePath, { mtimeMs: Date.now(), data: JSON.parse(content) });
+        if (filePath.endsWith('limitation_config.json')) {
+          try {
+            const nl = require('../src/services/network_listener');
+            if (nl && typeof nl.clearLimitsCache === 'function') {
+              nl.clearLimitsCache();
+            }
+          } catch (e) { }
+        }
         if (onConfigUpdated) {
           setTimeout(() => onConfigUpdated(filePath, data), 0);
         }
