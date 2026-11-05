@@ -20,7 +20,7 @@ let _pingActiveCount = 0;
 const _pingQueue = [];
 
 function _acquirePingSlot() {
-    const maxConcurrent = parseInt(process.env.PING_MAX_CONCURRENT, 10) || 6;
+    const maxConcurrent = parseInt(process.env.PING_MAX_CONCURRENT, 10) || 50;
     if (_pingActiveCount < maxConcurrent) {
         _pingActiveCount++;
         return Promise.resolve();
