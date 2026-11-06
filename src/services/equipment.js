@@ -337,6 +337,11 @@ class EquipmentService {
                 cache.mergedData.source_name = parsedData.source_name;
             }
 
+            // Sertakan juga _parsing_id ke dalam cache.mergedData jika ada
+            if (parsingId) {
+                cache.mergedData._parsing_id = parsingId;
+            }
+
             // Real-time Local Update: Segera perbarui snapshot in-memory di database agar UI (dashboard & detail modal)
             // langsung menampilkan data terbaru tanpa menunggu 30 detik interval EMS!
             const datalog = {
@@ -344,10 +349,12 @@ class EquipmentService {
                 equipment_name: equipName,
                 status: finalStatus,
                 source_status: status,
-                data: { ...cache.mergedData },
+                data: { ...cache.mergedData, ...(parsingId ? { _parsing_id: parsingId } : {}) },
                 source: sourceName,
                 source_id: sourceId,
                 source_name: parsedData.source_name || sourceName,
+                source_parsing_id: parsingId,
+                parsing_id: parsingId,
                 connection_type: connectionType,
                 airport_name: airport ? airport.name : 'Unknown',
                 airport_city: airport ? airport.city : 'Unknown',
@@ -376,10 +383,12 @@ class EquipmentService {
                         equipment_name: equipName,
                         status: finalStatus,
                         source_status: status, // Status spesifik dari source ini
-                        data: { ...cache.mergedData },
+                        data: { ...cache.mergedData, ...(parsingId ? { _parsing_id: parsingId } : {}) },
                         source: sourceName,
                         source_id: sourceId,
                         source_name: parsedData.source_name || sourceName,
+                        source_parsing_id: parsingId,
+                        parsing_id: parsingId,
                         connection_type: connectionType,
                         airport_name: airport ? airport.name : 'Unknown',
                         airport_city: airport ? airport.city : 'Unknown',
@@ -419,6 +428,8 @@ class EquipmentService {
                     source: 'default',
                     source_id: 'default',
                     source_name: 'default',
+                    source_parsing_id: '',
+                    parsing_id: '',
                     connection_type: 'system',
                     airport_name: airport ? airport.name : 'Unknown',
                     airport_city: airport ? airport.city : 'Unknown',
@@ -436,12 +447,17 @@ class EquipmentService {
                 // Cek data source aktual dari memory / lastData
                 const lastSourceData = (equipment.lastData && equipment.lastData[sourceName]) || {};
                 const sourceStatus = lastSourceData._status || (cache && cache.mergedData && cache.mergedData.connectivity === 'Connected' ? 'Normal' : null) || forcedStatus || equipment.status || 'Normal';
+                const sourceParsingId = src.parsing_id || lastSourceData._parsing_id || (cache && cache.mergedData && cache.mergedData._parsing_id) || '';
 
                 let sourceData = {};
                 if (cache && cache.mergedData && Object.keys(cache.mergedData).length > 0) {
                     sourceData = { ...cache.mergedData };
                 } else if (lastSourceData && Object.keys(lastSourceData).length > 0) {
                     sourceData = { ...lastSourceData };
+                }
+
+                if (sourceParsingId && !sourceData._parsing_id) {
+                    sourceData._parsing_id = sourceParsingId;
                 }
 
                 // Jangan timpa status data source yang normal
@@ -454,6 +470,8 @@ class EquipmentService {
                     source: sourceName,
                     source_id: src.id || sourceName,
                     source_name: sourceName,
+                    source_parsing_id: sourceParsingId,
+                    parsing_id: sourceParsingId,
                     connection_type: src.connection_type || 'network',
                     airport_name: airport ? airport.name : 'Unknown',
                     airport_city: airport ? airport.city : 'Unknown',

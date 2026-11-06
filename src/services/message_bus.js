@@ -68,6 +68,7 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
     telemetryThrottleCache.set(cacheKey, { hash: payloadHash, time: now });
     const airportCode = await getAirportCode();
     
+    const parsingId = datalog.source_parsing_id || datalog.parsing_id || (datalog.data && datalog.data._parsing_id) || '';
     const payload = {
         equipment_id: datalog.equipmentId,
         equipment_name: datalog.equipment_name,
@@ -76,10 +77,16 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
         airport_name: datalog.airport_name || null,
         source: datalog.source,
         source_id: datalog.source_id || datalog.source,
+        source_name: datalog.source_name || datalog.source,
+        source_parsing_id: parsingId,
+        parsing_id: parsingId,
         connection_type: datalog.connection_type,
         status: datalog.status,
         logged_at: datalog.logged_at,
-        data: datalog.data || {}
+        data: {
+            ...(datalog.data || {}),
+            ...(parsingId ? { _parsing_id: parsingId } : {})
+        }
     };
 
     // console.log("[EMS-PAYLOAD]", JSON.stringify(payload)); /* FIXED BUG */
