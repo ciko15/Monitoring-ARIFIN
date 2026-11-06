@@ -2167,6 +2167,27 @@ async function startServices() {
             } catch (e) {
                 console.error('[SYSTEM] heartbeat init error:', e);
             }
+
+            // Periodic EMS Telemetry Keepalive (Semua alat termasuk Disconnect dikirim ke Pusat tiap 30 detik)
+            const runPeriodicTelemetrySync = async () => {
+                let intervalSec = 30;
+                try {
+                    const profile = await db.getBranchProfile();
+                    if (profile && profile.emsTelemetryIntervalSeconds) {
+                        intervalSec = Math.max(5, Number(profile.emsTelemetryIntervalSeconds));
+                    }
+                } catch (_) {}
+
+                setInterval(async () => {
+                    try {
+                        await equipmentService.publishAllEquipmentTelemetrySnapshot();
+                    } catch (e) {
+                        console.error('[EMS-SYNC] Periodic telemetry broadcast error:', e);
+                    }
+                }, intervalSec * 1000);
+            };
+
+            setTimeout(runPeriodicTelemetrySync, 10000); // Mulai setelah startup 10 detik
         }
 
         if (SHOULD_START_PROCESSOR) {

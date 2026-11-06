@@ -253,6 +253,9 @@ class EquipmentService {
                     error,
                     { changedAt: new Date().toISOString() }
                 ));
+
+                // Pastikan Pusat juga menerima telemetry snapshot untuk status baru (misal Disconnect/Offline)
+                this._publishAsync('equipment.telemetry.received', () => this.publishEquipmentSnapshot(equipmentId, status));
             }
         } catch (error) {
             console.error('[EquipmentService] Error updating status:', error);
@@ -392,55 +395,94 @@ class EquipmentService {
     }
 
     /**
-     * Send all equipment grouped by category to EMS
+     * Publish telemetry snapshot for a specific equipment
+     * Useful when equipment status changes to Disconnect/Offline or for periodic telemetry keepalive
      */
-    async sendEquipmentListToEms() {
+    async publishEquipmentSnapshot(equipmentId, forcedStatus = null) {
         try {
-            const equipmentResult = await this.db.getAllEquipment();
-            const equipmentList = equipmentResult.data || (Array.isArray(equipmentResult) ? equipmentResult : []);
+            const equipment = await this.db.getEquipmentById(equipmentId);
+            if (!equipment || equipment.isActive === false || equipment.isActive === 0) return;
 
-            const grouped = {
-                Communication: [],
-                Navigation: [],
-                Surveillance: [],
-                'Data Processing': [],
-                Support: []
-            };
+            const airport = await this.db.getAirportById(equipment.airportId);
+            const status = forcedStatus || equipment.status || 'Disconnect';
+            const authSources = await this.db.getOtenticationByEquipment(equipmentId);
+            const activeSources = (authSources || []).filter(s => s.is_active !== 0 && s.is_active !== false && s.is_active !== '0');
 
-            for (const item of equipmentList) {
-                const cat = item.category || 'Support';
-                const dataToPush = {
-                    id: item.id,
-                    name: item.name,
-                    status: item.status,
-                    airportId: item.airportId,
-                    isActive: item.isActive
+            if (activeSources.length === 0) {
+                // Single synthetic payload jika tidak ada source
+                const emsDatalog = {
+                    equipmentId: equipment.id,
+                    equipment_name: equipment.name,
+                    status,
+                    source_status: status,
+                    data: { connectivity: status === 'Normal' ? 'Connected' : 'Disconnected' },
+                    source: 'default',
+                    source_id: 'default',
+                    source_name: 'default',
+                    connection_type: 'system',
+                    airport_name: airport ? airport.name : 'Unknown',
+                    airport_city: airport ? airport.city : 'Unknown',
+                    logged_at: new Date().toISOString()
                 };
-
-                if (grouped[cat]) {
-                    grouped[cat].push(dataToPush);
-                } else {
-                    if (!grouped['Support']) grouped['Support'] = [];
-                    grouped['Support'].push(dataToPush);
-                }
+                this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(emsDatalog, equipment));
+                return;
             }
 
-            const { produceInternalMessage } = require('../connection/ems');
+            for (const src of activeSources) {
+                const sourceName = src.name || 'default';
+                const cacheKey = `${equipment.id}:${sourceName}`;
+                const cache = globalTelemetryCache.get(cacheKey);
 
-            // Send to Q.SUP queue
-            await produceInternalMessage(
-                'Q.SUP',
-                { REQUEST_TYPE: 'EQUIPMENT_LIST' },
-                grouped
-            );
+                let sourceData = {};
+                if (cache && cache.mergedData && Object.keys(cache.mergedData).length > 0) {
+                    sourceData = { ...cache.mergedData };
+                }
 
-            console.log('[EquipmentService] Sent grouped equipment list to EMS');
-            return { success: true, data: grouped };
-        } catch (error) {
-            console.error('[EquipmentService] Error sending equipment list to EMS:', error);
-            return { success: false, error: error.message };
+                // Jika status disconnect atau offline, tandai connectivity
+                if (status === 'Disconnect' || status === 'Offline') {
+                    sourceData.connectivity = 'Disconnected';
+                }
+
+                const emsDatalog = {
+                    equipmentId: equipment.id,
+                    equipment_name: equipment.name,
+                    status,
+                    source_status: status,
+                    data: sourceData,
+                    source: sourceName,
+                    source_id: src.id || sourceName,
+                    source_name: sourceName,
+                    connection_type: src.connection_type || 'network',
+                    airport_name: airport ? airport.name : 'Unknown',
+                    airport_city: airport ? airport.city : 'Unknown',
+                    logged_at: new Date().toISOString()
+                };
+
+                this._publishAsync('equipment.telemetry.received', () => publishEquipmentTelemetry(emsDatalog, equipment));
+            }
+        } catch (err) {
+            console.error(`[EquipmentService] Error publishing snapshot for ${equipmentId}:`, err.message);
         }
     }
+
+    /**
+     * Publish periodic telemetry snapshots for all active equipment (termasuk status Disconnect/Offline)
+     * Dipanggil secara berkala agar aplikasi Pusat selalu menerima pembaruan berkala dari setiap alat cabang
+     */
+    async publishAllEquipmentTelemetrySnapshot() {
+        try {
+            const result = await this.db.getAllEquipment({ isActive: true, limit: 1000 });
+            const equipmentList = result.data || (Array.isArray(result) ? result : []);
+            if (!equipmentList || equipmentList.length === 0) return;
+
+            for (const item of equipmentList) {
+                await this.publishEquipmentSnapshot(item.id, item.status);
+            }
+        } catch (error) {
+            console.error('[EquipmentService] Error publishing periodic equipment telemetry snapshots:', error.message);
+        }
+    }
+
 
     // --- REUSE OLD HELPERS ---
     computeParsedChanges(previous = {}, current = {}) {

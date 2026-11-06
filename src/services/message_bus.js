@@ -44,14 +44,23 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
     const now = Date.now();
     const lastSent = telemetryThrottleCache.get(cacheKey);
 
-    if (lastSent) {
+    if (lastSent && !options.bypassThrottle) {
         const timeSinceLastSent = now - lastSent.time;
         // Hard throttle: Never publish more often than every 5 seconds, even if data changes
         if (timeSinceLastSent < HARD_THROTTLE_INTERVAL_MS) {
             return Promise.resolve(null);
         }
-        // Delta-sync: skip if data is identical and 60 seconds haven't passed
-        if (lastSent.hash === payloadHash && timeSinceLastSent < THROTTLE_INTERVAL_MS) {
+        // Dynamic throttle interval based on branch setting if available, default to 30s
+        let maxThrottleMs = THROTTLE_INTERVAL_MS;
+        try {
+            const profile = await getBranchProfile();
+            if (profile && profile.emsTelemetryIntervalSeconds) {
+                maxThrottleMs = Math.max(5000, Number(profile.emsTelemetryIntervalSeconds) * 1000);
+            }
+        } catch (_) {}
+
+        // Delta-sync: skip if data is identical and interval hasn't passed
+        if (lastSent.hash === payloadHash && timeSinceLastSent < maxThrottleMs) {
             return Promise.resolve(null);
         }
     }
