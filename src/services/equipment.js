@@ -396,20 +396,20 @@ class EquipmentService {
 
     /**
      * Publish telemetry snapshot for a specific equipment
-     * Useful when equipment status changes to Disconnect/Offline or for periodic telemetry keepalive
+     * Hanya mengirimkan status Disconnect jika source memang benar-benar mati/timed out.
      */
     async publishEquipmentSnapshot(equipmentId, forcedStatus = null) {
         try {
+            // Ambil equipment lengkap beserta lastData in-memory
             const equipment = await this.db.getEquipmentById(equipmentId);
             if (!equipment || equipment.isActive === false || equipment.isActive === 0) return;
 
             const airport = await this.db.getAirportById(equipment.airportId);
-            const status = forcedStatus || equipment.status || 'Disconnect';
             const authSources = await this.db.getOtenticationByEquipment(equipmentId);
             const activeSources = (authSources || []).filter(s => s.is_active !== 0 && s.is_active !== false && s.is_active !== '0');
 
             if (activeSources.length === 0) {
-                // Single synthetic payload jika tidak ada source
+                const status = forcedStatus || equipment.status || 'Normal';
                 const emsDatalog = {
                     equipmentId: equipment.id,
                     equipment_name: equipment.name,
@@ -433,21 +433,23 @@ class EquipmentService {
                 const cacheKey = `${equipment.id}:${sourceName}`;
                 const cache = globalTelemetryCache.get(cacheKey);
 
+                // Cek data source aktual dari memory / lastData
+                const lastSourceData = (equipment.lastData && equipment.lastData[sourceName]) || {};
+                const sourceStatus = lastSourceData._status || (cache && cache.mergedData && cache.mergedData.connectivity === 'Connected' ? 'Normal' : null) || forcedStatus || equipment.status || 'Normal';
+
                 let sourceData = {};
                 if (cache && cache.mergedData && Object.keys(cache.mergedData).length > 0) {
                     sourceData = { ...cache.mergedData };
+                } else if (lastSourceData && Object.keys(lastSourceData).length > 0) {
+                    sourceData = { ...lastSourceData };
                 }
 
-                // Jika status disconnect atau offline, tandai connectivity
-                if (status === 'Disconnect' || status === 'Offline') {
-                    sourceData.connectivity = 'Disconnected';
-                }
-
+                // Jangan timpa status data source yang normal
                 const emsDatalog = {
                     equipmentId: equipment.id,
                     equipment_name: equipment.name,
-                    status,
-                    source_status: status,
+                    status: sourceStatus,
+                    source_status: sourceStatus,
                     data: sourceData,
                     source: sourceName,
                     source_id: src.id || sourceName,
@@ -466,12 +468,11 @@ class EquipmentService {
     }
 
     /**
-     * Publish periodic telemetry snapshots for all active equipment (termasuk status Disconnect/Offline)
-     * Dipanggil secara berkala agar aplikasi Pusat selalu menerima pembaruan berkala dari setiap alat cabang
+     * Publish periodic telemetry snapshots for all active equipment
      */
     async publishAllEquipmentTelemetrySnapshot() {
         try {
-            const result = await this.db.getAllEquipment({ isActive: true, limit: 1000 });
+            const result = await this.db.getAllEquipment({ isActive: true, includeData: true, limit: 1000 });
             const equipmentList = result.data || (Array.isArray(result) ? result : []);
             if (!equipmentList || equipmentList.length === 0) return;
 
