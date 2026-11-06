@@ -69,6 +69,14 @@ function createSession(host, community, options = {}) {
     });
 }
 
+function snmpGet(session, oid) {
+    return new Promise(resolve => {
+        session.get({ oid }, (err, vbs) => {
+            resolve((!err && vbs && vbs[0]) ? vbs[0].value : null);
+        });
+    });
+}
+
 function snmpGetAll(session, oids) {
     return new Promise(resolve => {
         session.getAll({ oids }, (err, vbs) => {
