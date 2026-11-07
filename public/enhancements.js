@@ -2283,6 +2283,9 @@
             // Tidak me-return agar layout fallback (dengan '-') tetap di-render di bawahnya
         }
 
+        // Helper: filter data cards so empty / dash / unreceived params are not rendered
+        const filterParams = (list) => list.filter(p => p[1] !== null && p[1] !== undefined && p[1] !== '—' && p[1] !== '-');
+
         // Helper: value color berdasarkan range min-max
         const vc = (v, min, max) => {
             const n = parseFloat(v);
@@ -3090,8 +3093,6 @@
                     ['STATUS', data.status_label || 'Normal', '#00ffcc'],
                 ]
             });
-
-            const filterParams = (list) => list.filter(p => p[1] !== null && p[1] !== undefined && p[1] !== '—' && p[1] !== '-');
 
             // 1. EXECUTIVE MEASUREMENT MON 1
             const execMon1List = filterParams([
