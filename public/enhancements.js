@@ -3017,6 +3017,38 @@
                 ]
             });
 
+            // Jika ada data Monitor 1 / Monitor 2 (dari Thales 421)
+            const mon1Title = `MONITOR 1 (${data.mon1_role || (data.tx_main === 'TX1' ? 'MAIN' : 'STANDBY')})`;
+            const mon2Title = `MONITOR 2 (${data.mon2_role || (data.tx_main === 'TX2' ? 'MAIN' : 'STANDBY')})`;
+
+            const mon1Rf = data.mon1_rf_power !== undefined ? data.mon1_rf_power : data.RF_POWER;
+            const mon1Ddm = data.mon1_ddm_course !== undefined ? data.mon1_ddm_course : data.DDM_COURSE;
+            const mon1Carrier = data.mon1_carrier_pwr !== undefined ? data.mon1_carrier_pwr : data.CARRIER_PWR;
+            const mon1Angle = data.mon1_gp_angle !== undefined ? data.mon1_gp_angle : data.GP_ANGLE;
+
+            const mon2Rf = data.mon2_rf_power !== undefined ? data.mon2_rf_power : (data.tx_main === 'TX2' ? data.RF_POWER : 0);
+            const mon2Ddm = data.mon2_ddm_course !== undefined ? data.mon2_ddm_course : (data.tx_main === 'TX2' ? data.DDM_COURSE : 0);
+            const mon2Carrier = data.mon2_carrier_pwr !== undefined ? data.mon2_carrier_pwr : (data.tx_main === 'TX2' ? data.CARRIER_PWR : 0);
+            const mon2Angle = data.mon2_gp_angle !== undefined ? data.mon2_gp_angle : (data.tx_main === 'TX2' ? data.GP_ANGLE : 3.0);
+
+            sections.push({
+                title: mon1Title, params: [
+                    ['GP ANGLE (°)', mon1Angle, getLimitColor(sup, 'GP Angle', mon1Angle)],
+                    ['RF POWER (%)', mon1Rf, getLimitColor(sup, 'RF Power', mon1Rf)],
+                    ['DDM COURSE (%)', mon1Ddm, getLimitColor(sup, 'DDM Course', mon1Ddm)],
+                    ['CARRIER PWR (%)', mon1Carrier, getLimitColor(sup, 'SDM Course', mon1Carrier)],
+                ]
+            });
+
+            sections.push({
+                title: mon2Title, params: [
+                    ['GP ANGLE (°)', mon2Angle, getLimitColor(sup, 'GP Angle', mon2Angle)],
+                    ['RF POWER (%)', mon2Rf, getLimitColor(sup, 'RF Power', mon2Rf)],
+                    ['DDM COURSE (%)', mon2Ddm, getLimitColor(sup, 'DDM Course', mon2Ddm)],
+                    ['CARRIER PWR (%)', mon2Carrier, getLimitColor(sup, 'SDM Course', mon2Carrier)],
+                ]
+            });
+
             const paramLabels = {
                 GP_ANGLE: 'GP ANGLE',
                 RF_POWER: 'RF POWER',
@@ -3034,7 +3066,7 @@
             };
 
             sections.push({
-                title: 'MONITORING PARAMETERS', params: Object.entries(paramLabels).map(([key, label]) => {
+                title: 'EXECUTIVE MONITOR (OVERALL)', params: Object.entries(paramLabels).map(([key, label]) => {
                     const val = data[key];
                     const unit = (key === 'GP_ANGLE') ? '°' : '%';
                     return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];

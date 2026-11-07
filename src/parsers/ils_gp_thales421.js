@@ -44,19 +44,19 @@ function isPktCSync(buf, i) {
 }
 
 const OFFSETS = {
-    RF_POWER: 15,
-    DDM_COURSE: 19,
-    CARRIER_PWR: 23,
-    CSB_POWER: 31,
-    DDM_CLR: 35,
-    SBO_POWER: 39,
-    CLR_POWER: 43,
-    CLR_DDM: 47,
-    CLR_SDM: 51,
-    RF_OUT: 57,
-    DDM_MON: 61,
-    MON_POWER: 65,
-    GP_ANGLE: 66,
+    RF_POWER:    43, // CRS Pos. RF Level (%) (sebelumnya di 15)
+    DDM_COURSE:  47, // CRS Pos. DDM (raw*100 = %) (sebelumnya di 19)
+    CARRIER_PWR: 51, // CRS Pos. SDM (%) (sebelumnya di 23)
+    CSB_POWER:   31,
+    DDM_CLR:     35,
+    SBO_POWER:   39,
+    CLR_POWER:   43,
+    CLR_DDM:     47,
+    CLR_SDM:     51,
+    RF_OUT:      57,
+    DDM_MON:     61,
+    MON_POWER:   65,
+    GP_ANGLE:    69, // 32-bit float aligned
 };
 
 const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'DDM_MON']);
@@ -78,22 +78,22 @@ const LIMITS = {
 };
 
 const PARAM_LABELS = {
-    RF_POWER: ['CRS Pos. RF Level', '%'],
-    DDM_COURSE: ['CRS Pos. DDM', '%'],
-    CARRIER_PWR: ['CRS Pos. SDM', '%'],
-    CSB_POWER: ['CRS Width RF Level', '%'],
-    DDM_CLR: ['CRS Width DDM', '%'],
-    SBO_POWER: ['CRS Width SDM', '%'],
-    CLR_POWER: ['CLR Width RF Level', '%'],
-    CLR_DDM: ['CLR Width DDM', '%'],
-    CLR_SDM: ['CLR Width SDM', '%'],
-    RF_OUT: ['Nearfield Pos. RF', '%'],
-    DDM_MON: ['Nearfield Pos. DDM', '%'],
-    MON_POWER: ['Monitor Power', '%'],
-    GP_ANGLE: ['GP Angle', '°'],
+    RF_POWER:    ['CRS Pos. RF Level',  '%'],
+    DDM_COURSE:  ['CRS Pos. DDM',       '%'],
+    CARRIER_PWR: ['CRS Pos. SDM',       '%'],
+    CSB_POWER:   ['CRS Width RF Level', '%'],
+    DDM_CLR:     ['CRS Width DDM',      '%'],
+    SBO_POWER:   ['CRS Width SDM',      '%'],
+    CLR_POWER:   ['CLR Width RF Level', '%'],
+    CLR_DDM:     ['CLR Width DDM',      '%'],
+    CLR_SDM:     ['CLR Width SDM',      '%'],
+    RF_OUT:      ['Nearfield Pos. RF',  '%'],
+    DDM_MON:     ['Nearfield Pos. DDM', '%'],
+    MON_POWER:   ['Monitor Power',      '%'],
+    GP_ANGLE:    ['GP Angle',           '°'],
 };
 
-const PASSIVE_TIMEOUT = 4000; // Dikurangi dari 30s ke 4s untuk LLZ-style polling
+const PASSIVE_TIMEOUT = 4000;
 const POLL_INTERVAL = 2000;
 const POLL_REQ_DELAY = 150;
 
@@ -113,7 +113,12 @@ function decodePktC(pkt) {
     const isRemote = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
 
-    const txData = pkt[4] === 0x10 ? 'TX2' : 'TX1';
+    // Identifikasi channel data dari paket:
+    // pkt[4]: 0x00 = TX1, 0x10 = TX2, 0x01 = MON1, 0x02 = MON2
+    let channelType = 'TX1';
+    if (pkt[4] === 0x10) channelType = 'TX2';
+    else if (pkt[4] === 0x01) channelType = 'MON1';
+    else if (pkt[4] === 0x02) channelType = 'MON2';
 
     const params = {};
     for (const [key, offset] of Object.entries(OFFSETS)) {
@@ -126,8 +131,12 @@ function decodePktC(pkt) {
     }
 
     return {
-        tx_main: tx1IsMain ? 'TX1' : 'TX2', tx_stby: tx1IsMain ? 'TX2' : 'TX1',
-        is_remote: isRemote, tx_data: txData, params
+        tx_main: tx1IsMain ? 'TX1' : 'TX2',
+        tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+        is_remote: isRemote,
+        tx_data: channelType,
+        channel_type: channelType,
+        params
     };
 }
 
@@ -165,6 +174,15 @@ class IlsGpThales421Parser extends BaseParser {
         this._lastDataTime = Date.now();
         this._mode = 'PASSIVE';
         this._lastDecoded = null;
+
+        // State cache untuk Monitor 1, Monitor 2, TX1, TX2
+        this._mon1 = null;
+        this._mon2 = null;
+        this._tx1 = null;
+        this._tx2 = null;
+        this._txMain = 'TX1';
+        this._txStby = 'TX2';
+        this._isRemote = false;
     }
 
     parse(rawData) {
@@ -187,7 +205,6 @@ class IlsGpThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
-                // Prevent buffer accumulation CPU spike
                 if (this._buf.length > 1024) {
                     this._buf = this._buf.slice(this._buf.length - 512);
                 }
@@ -196,6 +213,34 @@ class IlsGpThales421Parser extends BaseParser {
                     _mode: this._mode,
                     data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null
                 };
+            }
+
+            // Proses semua frame yang ditemukan untuk update state mon1/mon2/tx1/tx2
+            let latestDecoded = null;
+            for (const f of frames) {
+                const dec = f.decoded;
+                latestDecoded = dec;
+                this._txMain = dec.tx_main;
+                this._txStby = dec.tx_stby;
+                this._isRemote = dec.is_remote;
+
+                if (dec.channel_type === 'MON1') {
+                    this._mon1 = { ...dec.params };
+                } else if (dec.channel_type === 'MON2') {
+                    this._mon2 = { ...dec.params };
+                } else if (dec.channel_type === 'TX1') {
+                    this._tx1 = { ...dec.params };
+                } else if (dec.channel_type === 'TX2') {
+                    this._tx2 = { ...dec.params };
+                }
+
+                // Jika stream memancarkan TX1/TX2 utama yang sedang connect ke monitor
+                // sinkronisasikan ke mon1/mon2 jika belum ada paket terpisah
+                if (dec.tx_main === 'TX1') {
+                    if (!this._mon1 || dec.channel_type === 'TX1') this._mon1 = { ...(this._mon1 || {}), ...dec.params };
+                } else {
+                    if (!this._mon2 || dec.channel_type === 'TX2') this._mon2 = { ...(this._mon2 || {}), ...dec.params };
+                }
             }
 
             const latest = frames[frames.length - 1];
@@ -212,15 +257,46 @@ class IlsGpThales421Parser extends BaseParser {
 
     _buildOutput(d, isStale) {
         const alarms = checkAlarms(d.params);
+
+        // State role: mana yang MAIN dan mana yang STANDBY
+        const mon1Role = this._txMain === 'TX1' ? 'MAIN' : 'STANDBY';
+        const mon2Role = this._txMain === 'TX2' ? 'MAIN' : 'STANDBY';
+
+        const mon1Data = this._mon1 || d.params;
+        const mon2Data = this._mon2 || (mon2Role === 'STANDBY' ? {
+            RF_POWER: 0,
+            DDM_COURSE: 0,
+            CARRIER_PWR: 0,
+            GP_ANGLE: 0
+        } : d.params);
+
         return {
             success: true,
             data: {
                 _mode: this._mode, _stale: isStale,
-                tx_main: d.tx_main, tx_stby: d.tx_stby,
-                is_remote: d.is_remote, tx_data: d.tx_data,
-                status_label: d.is_remote ? 'Remote Maintenance' : 'Normal',
-                tx_main_label: `${d.tx_main} MAIN`,
-                tx_stby_label: `${d.tx_stby} STBY`,
+                tx_main: this._txMain, tx_stby: this._txStby,
+                is_remote: this._isRemote, tx_data: d.tx_data,
+                status_label: this._isRemote ? 'Remote Maintenance' : 'Normal',
+                tx_main_label: `${this._txMain} MAIN`,
+                tx_stby_label: `${this._txStby} STBY`,
+
+                // Status Executive Monitor
+                mon1_role: mon1Role,
+                mon2_role: mon2Role,
+
+                // Parameter Detail Monitor 1
+                mon1_rf_power: mon1Data.RF_POWER ?? 0,
+                mon1_ddm_course: mon1Data.DDM_COURSE ?? 0,
+                mon1_carrier_pwr: mon1Data.CARRIER_PWR ?? 0,
+                mon1_gp_angle: mon1Data.GP_ANGLE ?? 3.0,
+
+                // Parameter Detail Monitor 2
+                mon2_rf_power: mon2Data.RF_POWER ?? 0,
+                mon2_ddm_course: mon2Data.DDM_COURSE ?? 0,
+                mon2_carrier_pwr: mon2Data.CARRIER_PWR ?? 0,
+                mon2_gp_angle: mon2Data.GP_ANGLE ?? 3.0,
+
+                // Parameter aktif saat ini (Backward Compatibility)
                 ...d.params,
             },
             status: alarms.length > 0 ? 'Alarm' : 'Normal',
