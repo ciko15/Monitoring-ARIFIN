@@ -377,6 +377,11 @@ class IlsLlzThales421Parser extends BaseParser {
                 exec_mon1_clr_rf: exec1.CLR_RF ?? 102.7,
                 exec_mon1_clr_ddm: exec1.CLR_DDM ?? 25.6,
                 exec_mon1_clr_sdm: exec1.CLR_SDM ?? 39.8,
+                exec_mon1_nf_rf: exec1.NF_RF ?? 98.8,
+                exec_mon1_nf_ddm: exec1.NF_DDM ?? 0.4,
+                exec_mon1_nf_sdm: exec1.NF_SDM ?? 40.2,
+                exec_mon1_rf_freq: 8000,
+                exec_mon1_freq_dev: 2.9,
 
                 // EXECUTIVE MEASUREMENT MON 2
                 exec_mon2_rf: exec2.CRS_RF ?? 99.8,
@@ -389,6 +394,11 @@ class IlsLlzThales421Parser extends BaseParser {
                 exec_mon2_clr_rf: exec2.CLR_RF ?? 103.1,
                 exec_mon2_clr_ddm: exec2.CLR_DDM ?? 25.9,
                 exec_mon2_clr_sdm: exec2.CLR_SDM ?? 40.1,
+                exec_mon2_nf_rf: exec2.NF_RF ?? 98.8,
+                exec_mon2_nf_ddm: exec2.NF_DDM ?? 0.5,
+                exec_mon2_nf_sdm: exec2.NF_SDM ?? 40.2,
+                exec_mon2_rf_freq: 8000,
+                exec_mon2_freq_dev: 2.1,
 
                 // STANDBY MEASUREMENT MON 1
                 stby_mon1_rf: stby1.CRS_RF ?? 98.9,
@@ -400,6 +410,8 @@ class IlsLlzThales421Parser extends BaseParser {
                 stby_mon1_clr_rf: stby1.CLR_RF ?? 99.2,
                 stby_mon1_clr_ddm: stby1.CLR_DDM ?? 25.3,
                 stby_mon1_clr_sdm: stby1.CLR_SDM ?? 37.0,
+                stby_mon1_rf_freq: 8000,
+                stby_mon1_freq_dev: 1.8,
 
                 // STANDBY MEASUREMENT MON 2
                 stby_mon2_rf: stby2.CRS_RF ?? 99.1,
@@ -411,6 +423,8 @@ class IlsLlzThales421Parser extends BaseParser {
                 stby_mon2_clr_rf: stby2.CLR_RF ?? 99.7,
                 stby_mon2_clr_ddm: stby2.CLR_DDM ?? 25.5,
                 stby_mon2_clr_sdm: stby2.CLR_SDM ?? 37.3,
+                stby_mon2_rf_freq: 8000,
+                stby_mon2_freq_dev: 1.2,
 
                 // Default overall parameters (Backward compatibility)
                 ...d.params,

@@ -3097,6 +3097,11 @@
                     ['CLR Width RF Level (%)', data.exec_mon1_clr_rf, getLimitColor(sup, 'CLR RF Level', data.exec_mon1_clr_rf)],
                     ['CLR Width DDM (%)', data.exec_mon1_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon1_clr_ddm)],
                     ['CLR Width SDM (%)', data.exec_mon1_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon1_clr_sdm)],
+                    ['Nearfield Pos. RF (%)', data.exec_mon1_nf_rf, getLimitColor(sup, 'NF RF Level', data.exec_mon1_nf_rf)],
+                    ['Nearfield Pos. DDM (%)', data.exec_mon1_nf_ddm, getLimitColor(sup, 'NF DDM', data.exec_mon1_nf_ddm)],
+                    ['Nearfield Pos. SDM (%)', data.exec_mon1_nf_sdm, getLimitColor(sup, 'NF SDM', data.exec_mon1_nf_sdm)],
+                    ['CRS/CLR RF Freq (Hz)', data.exec_mon1_rf_freq, '#00ffcc'],
+                    ['Frequency Deviation (kHz)', data.exec_mon1_freq_dev, '#00ffcc'],
                 ]
             });
 
@@ -3113,6 +3118,11 @@
                     ['CLR Width RF Level (%)', data.exec_mon2_clr_rf, getLimitColor(sup, 'CLR RF Level', data.exec_mon2_clr_rf)],
                     ['CLR Width DDM (%)', data.exec_mon2_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon2_clr_ddm)],
                     ['CLR Width SDM (%)', data.exec_mon2_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon2_clr_sdm)],
+                    ['Nearfield Pos. RF (%)', data.exec_mon2_nf_rf, getLimitColor(sup, 'NF RF Level', data.exec_mon2_nf_rf)],
+                    ['Nearfield Pos. DDM (%)', data.exec_mon2_nf_ddm, getLimitColor(sup, 'NF DDM', data.exec_mon2_nf_ddm)],
+                    ['Nearfield Pos. SDM (%)', data.exec_mon2_nf_sdm, getLimitColor(sup, 'NF SDM', data.exec_mon2_nf_sdm)],
+                    ['CRS/CLR RF Freq (Hz)', data.exec_mon2_rf_freq, '#00ffcc'],
+                    ['Frequency Deviation (kHz)', data.exec_mon2_freq_dev, '#00ffcc'],
                 ]
             });
 
@@ -3128,6 +3138,8 @@
                     ['CLR Width RF Level (%)', data.stby_mon1_clr_rf, '#a0d8ef'],
                     ['CLR Width DDM (%)', data.stby_mon1_clr_ddm, '#a0d8ef'],
                     ['CLR Width SDM (%)', data.stby_mon1_clr_sdm, '#a0d8ef'],
+                    ['CRS/CLR RF Freq (Hz)', data.stby_mon1_rf_freq, '#00d4ff'],
+                    ['Frequency Deviation (kHz)', data.stby_mon1_freq_dev, '#00d4ff'],
                 ]
             });
 
@@ -3143,6 +3155,8 @@
                     ['CLR Width RF Level (%)', data.stby_mon2_clr_rf, '#a0d8ef'],
                     ['CLR Width DDM (%)', data.stby_mon2_clr_ddm, '#a0d8ef'],
                     ['CLR Width SDM (%)', data.stby_mon2_clr_sdm, '#a0d8ef'],
+                    ['CRS/CLR RF Freq (Hz)', data.stby_mon2_rf_freq, '#00d4ff'],
+                    ['Frequency Deviation (kHz)', data.stby_mon2_freq_dev, '#00d4ff'],
                 ]
             });
         } else {
