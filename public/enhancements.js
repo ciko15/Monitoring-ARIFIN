@@ -3012,66 +3012,73 @@
                 title: 'SYSTEM STATUS', params: [
                     ['TX MAIN', data.tx_main_label || '—', '#00ffcc'],
                     ['TX STANDBY', data.tx_stby_label || '—', '#5a8aaa'],
-                    ['MODE', data.status_label || '—', data.is_remote ? '#ffcc00' : '#00d4ff'],
-                    ['DATA SOURCE', data.tx_data || '—', '#3a6a8a'],
+                    ['MODE', data._mode === 'ACTIVE' ? 'Active Poll' : 'Passive Sniff', '#00d4ff'],
+                    ['STATUS', data.status_label || 'Normal', '#00ffcc'],
                 ]
             });
 
-            // Jika ada data Monitor 1 / Monitor 2 (dari Thales 421)
-            const mon1Title = `MONITOR 1 (${data.mon1_role || (data.tx_main === 'TX1' ? 'MAIN' : 'STANDBY')})`;
-            const mon2Title = `MONITOR 2 (${data.mon2_role || (data.tx_main === 'TX2' ? 'MAIN' : 'STANDBY')})`;
+            // 1. MONITOR 1 (Data murni dari alat)
+            const mon1Role = data.mon1_role || (data.tx_main === 'TX1' ? 'MAIN' : 'STANDBY');
+            const mon1List = filterParams([
+                ['GP ANGLE (°)', data.mon1_gp_angle, getLimitColor(sup, 'GP Angle', data.mon1_gp_angle)],
+                ['CRS Pos. RF Level (%)', data.mon1_rf_power, getLimitColor(sup, 'RF Power', data.mon1_rf_power)],
+                ['CRS Pos. DDM (%)', data.mon1_ddm_course, getLimitColor(sup, 'DDM Course', data.mon1_ddm_course)],
+                ['CRS Pos. SDM / CARRIER (%)', data.mon1_carrier_pwr, getLimitColor(sup, 'SDM Course', data.mon1_carrier_pwr)],
+                ['CRS Width RF / CSB (%)', data.mon1_csb_power, getLimitColor(sup, 'CSB Power', data.mon1_csb_power)],
+                ['CRS Width DDM (%)', data.mon1_ddm_clr, getLimitColor(sup, 'Width DDM', data.mon1_ddm_clr)],
+                ['CRS Width SDM / SBO (%)', data.mon1_sbo_power, getLimitColor(sup, 'Width SDM', data.mon1_sbo_power)],
+                ['CLR Width RF Level (%)', data.mon1_clr_power, getLimitColor(sup, 'CLR Power', data.mon1_clr_power)],
+                ['CLR Width DDM (%)', data.mon1_clr_ddm, getLimitColor(sup, 'CLR DDM', data.mon1_clr_ddm)],
+                ['CLR Width SDM (%)', data.mon1_clr_sdm, getLimitColor(sup, 'CLR SDM', data.mon1_clr_sdm)],
+            ]);
+            if (mon1List.length > 0) {
+                sections.push({ title: `MONITOR 1 (${mon1Role})`, params: mon1List });
+            }
 
-            const mon1Rf = data.mon1_rf_power !== undefined ? data.mon1_rf_power : data.RF_POWER;
-            const mon1Ddm = data.mon1_ddm_course !== undefined ? data.mon1_ddm_course : data.DDM_COURSE;
-            const mon1Carrier = data.mon1_carrier_pwr !== undefined ? data.mon1_carrier_pwr : data.CARRIER_PWR;
-            const mon1Angle = data.mon1_gp_angle !== undefined ? data.mon1_gp_angle : data.GP_ANGLE;
+            // 2. MONITOR 2 (Data murni dari alat)
+            const mon2Role = data.mon2_role || (data.tx_main === 'TX2' ? 'MAIN' : 'STANDBY');
+            const mon2List = filterParams([
+                ['GP ANGLE (°)', data.mon2_gp_angle, getLimitColor(sup, 'GP Angle', data.mon2_gp_angle)],
+                ['CRS Pos. RF Level (%)', data.mon2_rf_power, getLimitColor(sup, 'RF Power', data.mon2_rf_power)],
+                ['CRS Pos. DDM (%)', data.mon2_ddm_course, getLimitColor(sup, 'DDM Course', data.mon2_ddm_course)],
+                ['CRS Pos. SDM / CARRIER (%)', data.mon2_carrier_pwr, getLimitColor(sup, 'SDM Course', data.mon2_carrier_pwr)],
+                ['CRS Width RF / CSB (%)', data.mon2_csb_power, getLimitColor(sup, 'CSB Power', data.mon2_csb_power)],
+                ['CRS Width DDM (%)', data.mon2_ddm_clr, getLimitColor(sup, 'Width DDM', data.mon2_ddm_clr)],
+                ['CRS Width SDM / SBO (%)', data.mon2_sbo_power, getLimitColor(sup, 'Width SDM', data.mon2_sbo_power)],
+                ['CLR Width RF Level (%)', data.mon2_clr_power, getLimitColor(sup, 'CLR Power', data.mon2_clr_power)],
+                ['CLR Width DDM (%)', data.mon2_clr_ddm, getLimitColor(sup, 'CLR DDM', data.mon2_clr_ddm)],
+                ['CLR Width SDM (%)', data.mon2_clr_sdm, getLimitColor(sup, 'CLR SDM', data.mon2_clr_sdm)],
+            ]);
+            if (mon2List.length > 0) {
+                sections.push({ title: `MONITOR 2 (${mon2Role})`, params: mon2List });
+            }
 
-            const mon2Rf = data.mon2_rf_power !== undefined ? data.mon2_rf_power : (data.tx_main === 'TX2' ? data.RF_POWER : 0);
-            const mon2Ddm = data.mon2_ddm_course !== undefined ? data.mon2_ddm_course : (data.tx_main === 'TX2' ? data.DDM_COURSE : 0);
-            const mon2Carrier = data.mon2_carrier_pwr !== undefined ? data.mon2_carrier_pwr : (data.tx_main === 'TX2' ? data.CARRIER_PWR : 0);
-            const mon2Angle = data.mon2_gp_angle !== undefined ? data.mon2_gp_angle : (data.tx_main === 'TX2' ? data.GP_ANGLE : 3.0);
-
-            sections.push({
-                title: mon1Title, params: [
-                    ['GP ANGLE (°)', mon1Angle, getLimitColor(sup, 'GP Angle', mon1Angle)],
-                    ['RF POWER (%)', mon1Rf, getLimitColor(sup, 'RF Power', mon1Rf)],
-                    ['DDM COURSE (%)', mon1Ddm, getLimitColor(sup, 'DDM Course', mon1Ddm)],
-                    ['CARRIER PWR (%)', mon1Carrier, getLimitColor(sup, 'SDM Course', mon1Carrier)],
-                ]
-            });
-
-            sections.push({
-                title: mon2Title, params: [
-                    ['GP ANGLE (°)', mon2Angle, getLimitColor(sup, 'GP Angle', mon2Angle)],
-                    ['RF POWER (%)', mon2Rf, getLimitColor(sup, 'RF Power', mon2Rf)],
-                    ['DDM COURSE (%)', mon2Ddm, getLimitColor(sup, 'DDM Course', mon2Ddm)],
-                    ['CARRIER PWR (%)', mon2Carrier, getLimitColor(sup, 'SDM Course', mon2Carrier)],
-                ]
-            });
-
+            // 3. OVERALL MEASUREMENTS (Filter kartu kosong)
             const paramLabels = {
                 GP_ANGLE: 'GP ANGLE',
-                RF_POWER: 'RF POWER',
-                DDM_COURSE: 'DDM COURSE',
-                CARRIER_PWR: 'CARRIER PWR',
-                CSB_POWER: 'CSB POWER',
-                DDM_CLR: 'DDM CLR',
-                SBO_POWER: 'SBO POWER',
-                CLR_POWER: 'CLR POWER',
-                CLR_DDM: 'CLR DDM',
-                CLR_SDM: 'CLR SDM',
-                RF_OUT: 'RF OUT',
-                DDM_MON: 'DDM MON',
-                MON_POWER: 'MON POWER'
+                RF_POWER: 'CRS Pos. RF Level',
+                DDM_COURSE: 'CRS Pos. DDM',
+                CARRIER_PWR: 'CRS Pos. SDM / Carrier',
+                CSB_POWER: 'CRS Width RF / CSB',
+                DDM_CLR: 'CRS Width DDM',
+                SBO_POWER: 'CRS Width SDM / SBO',
+                CLR_POWER: 'CLR Width RF Level',
+                CLR_DDM: 'CLR Width DDM',
+                CLR_SDM: 'CLR Width SDM',
+                RF_OUT: 'Nearfield Pos. RF',
+                DDM_MON: 'Nearfield Pos. DDM',
+                MON_POWER: 'Monitor Power'
             };
 
-            sections.push({
-                title: 'EXECUTIVE MONITOR (OVERALL)', params: Object.entries(paramLabels).map(([key, label]) => {
-                    const val = data[key];
-                    const unit = (key === 'GP_ANGLE') ? '°' : '%';
-                    return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
-                })
-            });
+            const overallList = filterParams(Object.entries(paramLabels).map(([key, label]) => {
+                const val = data[key];
+                const unit = (key === 'GP_ANGLE') ? '°' : '%';
+                return [label + (unit ? ` (${unit})` : ''), val, getLimitColor(sup, label, val)];
+            }));
+
+            if (overallList.length > 0) {
+                sections.push({ title: 'EXECUTIVE MEASUREMENTS (OVERALL)', params: overallList });
+            }
 
         } else if (parserId === 'ils_llz_thales421') {
             const sup = 'ILS-LLZ';

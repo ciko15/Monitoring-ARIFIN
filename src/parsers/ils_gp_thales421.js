@@ -262,13 +262,9 @@ class IlsGpThales421Parser extends BaseParser {
         const mon1Role = this._txMain === 'TX1' ? 'MAIN' : 'STANDBY';
         const mon2Role = this._txMain === 'TX2' ? 'MAIN' : 'STANDBY';
 
-        const mon1Data = this._mon1 || d.params;
-        const mon2Data = this._mon2 || (mon2Role === 'STANDBY' ? {
-            RF_POWER: 0,
-            DDM_COURSE: 0,
-            CARRIER_PWR: 0,
-            GP_ANGLE: 0
-        } : d.params);
+        // Data murni dari alat
+        const mon1Data = this._mon1 || {};
+        const mon2Data = this._mon2 || {};
 
         return {
             success: true,
@@ -284,17 +280,29 @@ class IlsGpThales421Parser extends BaseParser {
                 mon1_role: mon1Role,
                 mon2_role: mon2Role,
 
-                // Parameter Detail Monitor 1
-                mon1_rf_power: mon1Data.RF_POWER ?? 0,
-                mon1_ddm_course: mon1Data.DDM_COURSE ?? 0,
-                mon1_carrier_pwr: mon1Data.CARRIER_PWR ?? 0,
-                mon1_gp_angle: mon1Data.GP_ANGLE ?? 3.0,
+                // Parameter Detail Monitor 1 (Murni dari alat tanpa fallback dummy)
+                mon1_rf_power: mon1Data.RF_POWER,
+                mon1_ddm_course: mon1Data.DDM_COURSE,
+                mon1_carrier_pwr: mon1Data.CARRIER_PWR,
+                mon1_gp_angle: mon1Data.GP_ANGLE,
+                mon1_csb_power: mon1Data.CSB_POWER,
+                mon1_ddm_clr: mon1Data.DDM_CLR,
+                mon1_sbo_power: mon1Data.SBO_POWER,
+                mon1_clr_power: mon1Data.CLR_POWER,
+                mon1_clr_ddm: mon1Data.CLR_DDM,
+                mon1_clr_sdm: mon1Data.CLR_SDM,
 
-                // Parameter Detail Monitor 2
-                mon2_rf_power: mon2Data.RF_POWER ?? 0,
-                mon2_ddm_course: mon2Data.DDM_COURSE ?? 0,
-                mon2_carrier_pwr: mon2Data.CARRIER_PWR ?? 0,
-                mon2_gp_angle: mon2Data.GP_ANGLE ?? 3.0,
+                // Parameter Detail Monitor 2 (Murni dari alat tanpa fallback dummy)
+                mon2_rf_power: mon2Data.RF_POWER,
+                mon2_ddm_course: mon2Data.DDM_COURSE,
+                mon2_carrier_pwr: mon2Data.CARRIER_PWR,
+                mon2_gp_angle: mon2Data.GP_ANGLE,
+                mon2_csb_power: mon2Data.CSB_POWER,
+                mon2_ddm_clr: mon2Data.DDM_CLR,
+                mon2_sbo_power: mon2Data.SBO_POWER,
+                mon2_clr_power: mon2Data.CLR_POWER,
+                mon2_clr_ddm: mon2Data.CLR_DDM,
+                mon2_clr_sdm: mon2Data.CLR_SDM,
 
                 // Parameter aktif saat ini (Backward Compatibility)
                 ...d.params,
