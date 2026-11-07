@@ -39,24 +39,24 @@ const HBEAT_RECV = Buffer.from([0x13, 0x00, 0xF8, 0x06]); // Heartbeat dari devi
 const HBEAT_REPLY = Buffer.from([0x13, 0x00, 0xF9, 0x06]); // Balasan heartbeat kita ke device
 
 function isPktCSync(buf, i) {
+    // Thales 421 GP Telemetry frame: 11 8D [Flag] 01
+    // Subtype 0x01 berisi seluruh parameter float32 pengukuran sinyal ILS GP
     return i + 3 < buf.length &&
-        buf[i] === 0x11 && buf[i + 1] === 0x8D && (buf[i + 3] === 0x0C || buf[i + 3] === 0x0E);
+        buf[i] === 0x11 && buf[i + 1] === 0x8D && buf[i + 3] === 0x01;
 }
 
+// Offset riil hasil capture biner langsung dari GlidePath Thales 421 (192.168.50.160)
 const OFFSETS = {
-    RF_POWER:    43, // CRS Pos. RF Level (%) (sebelumnya di 15)
-    DDM_COURSE:  47, // CRS Pos. DDM (raw*100 = %) (sebelumnya di 19)
-    CARRIER_PWR: 51, // CRS Pos. SDM (%) (sebelumnya di 23)
-    CSB_POWER:   31,
-    DDM_CLR:     35,
-    SBO_POWER:   39,
-    CLR_POWER:   43,
-    CLR_DDM:     47,
-    CLR_SDM:     51,
-    RF_OUT:      57,
-    DDM_MON:     61,
-    MON_POWER:   65,
-    GP_ANGLE:    69, // 32-bit float aligned
+    RF_POWER:    52, // CRS Pos. RF Level = 99.0 %
+    DDM_COURSE:  56, // CRS Pos. DDM = -0.0079 raw -> x100 = -0.79 %
+    CARRIER_PWR: 60, // CRS Pos. SDM = 73.8 %
+    CSB_POWER:   68, // CSB / Width RF Level = 96.8 %
+    DDM_CLR:     72, // Width / CLR DDM = 0.1611 raw -> x100 = 16.11 %
+    SBO_POWER:   76, // SBO / Width SDM = 73.8 %
+    CLR_POWER:   80, // CLR Power / RF Level = 110.0 %
+    CLR_DDM:     84, // CLR DDM = 0.2988 raw -> x100 = 29.88 %
+    CLR_SDM:     88, // CLR SDM = 79.7 %
+    GP_ANGLE:    8,  // Angle reference / monitor indicator = ~3.0 / 4.408
 };
 
 const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'DDM_MON']);
