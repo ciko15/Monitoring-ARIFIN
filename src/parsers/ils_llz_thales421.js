@@ -254,14 +254,22 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._txMain = dec.tx_main;
                 this._txStby = dec.tx_stby;
 
+                // Hanya update parameter yang memiliki nilai valid (tidak nol/rusak)
+                const validParams = {};
+                for (const [k, v] of Object.entries(dec.params)) {
+                    if (v !== null && v !== undefined && !isNaN(v)) {
+                        // Jangan biarkan nilai RF level atau SDM yang valid tertimpa angka 0
+                        if ((k.includes('RF') || k.includes('SDM')) && v === 0) continue;
+                        validParams[k] = v;
+                    }
+                }
+
                 if (dec.channel === 'MON1') {
-                    // Update Executive MON 1 & Standby MON 1
-                    this._execMon1 = { ...(this._execMon1 || {}), ...dec.params };
-                    this._stbyMon1 = { ...(this._stbyMon1 || {}), ...dec.params };
+                    this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
+                    this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
                 } else if (dec.channel === 'MON2') {
-                    // Update Executive MON 2 & Standby MON 2
-                    this._execMon2 = { ...(this._execMon2 || {}), ...dec.params };
-                    this._stbyMon2 = { ...(this._stbyMon2 || {}), ...dec.params };
+                    this._execMon2 = { ...(this._execMon2 || {}), ...validParams };
+                    this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
                 }
             }
 
@@ -280,10 +288,10 @@ class IlsLlzThales421Parser extends BaseParser {
     _buildOutput(d, isStale) {
         const alarms = checkAlarms(d.params);
 
-        const exec1 = this._execMon1 || d.params;
-        const exec2 = this._execMon2 || d.params;
-        const stby1 = this._stbyMon1 || d.params;
-        const stby2 = this._stbyMon2 || d.params;
+        const exec1 = this._execMon1 || {};
+        const exec2 = this._execMon2 || {};
+        const stby1 = this._stbyMon1 || {};
+        const stby2 = this._stbyMon2 || {};
 
         return {
             success: true,
@@ -295,7 +303,7 @@ class IlsLlzThales421Parser extends BaseParser {
                 tx_main_label: `${this._txMain} MAIN`,
                 tx_stby_label: `${this._txStby} STBY`,
 
-                // EXECUTIVE MEASUREMENT
+                // EXECUTIVE MEASUREMENT MON 1
                 exec_mon1_rf: exec1.CRS_RF ?? 99.7,
                 exec_mon1_ddm: exec1.CRS_DDM ?? 0.0,
                 exec_mon1_sdm: exec1.CRS_SDM ?? 40.4,
@@ -307,6 +315,7 @@ class IlsLlzThales421Parser extends BaseParser {
                 exec_mon1_clr_ddm: exec1.CLR_DDM ?? 25.6,
                 exec_mon1_clr_sdm: exec1.CLR_SDM ?? 39.8,
 
+                // EXECUTIVE MEASUREMENT MON 2
                 exec_mon2_rf: exec2.CRS_RF ?? 99.8,
                 exec_mon2_ddm: exec2.CRS_DDM ?? 0.0,
                 exec_mon2_sdm: exec2.CRS_SDM ?? 40.4,
@@ -318,26 +327,27 @@ class IlsLlzThales421Parser extends BaseParser {
                 exec_mon2_clr_ddm: exec2.CLR_DDM ?? 25.9,
                 exec_mon2_clr_sdm: exec2.CLR_SDM ?? 40.1,
 
-                // STANDBY MEASUREMENT
+                // STANDBY MEASUREMENT MON 1
                 stby_mon1_rf: stby1.CRS_RF ?? 98.9,
-                stby_mon1_ddm: -0.2,
-                stby_mon1_sdm: 40.6,
-                stby_mon1_width_rf: 99.6,
-                stby_mon1_width_ddm: 15.2,
-                stby_mon1_width_sdm: 40.6,
-                stby_mon1_clr_rf: 99.2,
-                stby_mon1_clr_ddm: 25.3,
-                stby_mon1_clr_sdm: 37.0,
+                stby_mon1_ddm: stby1.CRS_DDM ?? -0.2,
+                stby_mon1_sdm: stby1.CRS_SDM ?? 40.6,
+                stby_mon1_width_rf: stby1.WIDTH_RF ?? 99.6,
+                stby_mon1_width_ddm: stby1.WIDTH_DDM ?? 15.2,
+                stby_mon1_width_sdm: stby1.WIDTH_SDM ?? 40.6,
+                stby_mon1_clr_rf: stby1.CLR_RF ?? 99.2,
+                stby_mon1_clr_ddm: stby1.CLR_DDM ?? 25.3,
+                stby_mon1_clr_sdm: stby1.CLR_SDM ?? 37.0,
 
+                // STANDBY MEASUREMENT MON 2
                 stby_mon2_rf: stby2.CRS_RF ?? 99.1,
-                stby_mon2_ddm: -0.2,
-                stby_mon2_sdm: 40.4,
-                stby_mon2_width_rf: 99.5,
-                stby_mon2_width_ddm: 15.3,
-                stby_mon2_width_sdm: 40.6,
-                stby_mon2_clr_rf: 99.7,
-                stby_mon2_clr_ddm: 25.5,
-                stby_mon2_clr_sdm: 37.3,
+                stby_mon2_ddm: stby2.CRS_DDM ?? -0.2,
+                stby_mon2_sdm: stby2.CRS_SDM ?? 40.4,
+                stby_mon2_width_rf: stby2.WIDTH_RF ?? 99.5,
+                stby_mon2_width_ddm: stby2.WIDTH_DDM ?? 15.3,
+                stby_mon2_width_sdm: stby2.WIDTH_SDM ?? 40.6,
+                stby_mon2_clr_rf: stby2.CLR_RF ?? 99.7,
+                stby_mon2_clr_ddm: stby2.CLR_DDM ?? 25.5,
+                stby_mon2_clr_sdm: stby2.CLR_SDM ?? 37.3,
 
                 // Default overall parameters (Backward compatibility)
                 ...d.params,
