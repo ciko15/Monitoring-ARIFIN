@@ -3087,62 +3087,62 @@
             // 1. EXECUTIVE MEASUREMENT MON 1
             sections.push({
                 title: 'EXECUTIVE MEASUREMENT (MON 1)', params: [
-                    ['CRS Pos. RF Level (%)', data.exec_mon1_rf ?? data.CRS_RF, getLimitColor(sup, 'CRS RF Level', data.exec_mon1_rf ?? data.CRS_RF)],
-                    ['CRS Pos. DDM (%)', data.exec_mon1_ddm ?? data.CRS_DDM, getLimitColor(sup, 'CRS DDM', data.exec_mon1_ddm ?? data.CRS_DDM)],
-                    ['CRS Pos. SDM (%)', data.exec_mon1_sdm ?? data.CRS_SDM, getLimitColor(sup, 'CRS SDM', data.exec_mon1_sdm ?? data.CRS_SDM)],
-                    ['Ident AM (%)', data.exec_mon1_ident ?? data.IDENT_AM, getLimitColor(sup, 'Ident AM', data.exec_mon1_ident ?? data.IDENT_AM)],
-                    ['CRS Width RF Level (%)', data.exec_mon1_width_rf ?? data.WIDTH_RF, getLimitColor(sup, 'Width RF Level', data.exec_mon1_width_rf ?? data.WIDTH_RF)],
-                    ['CRS Width DDM (%)', data.exec_mon1_width_ddm ?? data.WIDTH_DDM, getLimitColor(sup, 'Width DDM', data.exec_mon1_width_ddm ?? data.WIDTH_DDM)],
-                    ['CRS Width SDM (%)', data.exec_mon1_width_sdm ?? data.WIDTH_SDM, getLimitColor(sup, 'Width SDM', data.exec_mon1_width_sdm ?? data.WIDTH_SDM)],
-                    ['CLR Width RF Level (%)', data.exec_mon1_clr_rf ?? data.CLR_RF, getLimitColor(sup, 'CLR RF Level', data.exec_mon1_clr_rf ?? data.CLR_RF)],
-                    ['CLR Width DDM (%)', data.exec_mon1_clr_ddm ?? data.CLR_DDM, getLimitColor(sup, 'CLR DDM', data.exec_mon1_clr_ddm ?? data.CLR_DDM)],
-                    ['CLR Width SDM (%)', data.exec_mon1_clr_sdm ?? data.CLR_SDM, getLimitColor(sup, 'CLR SDM', data.exec_mon1_clr_sdm ?? data.CLR_SDM)],
+                    ['CRS Pos. RF Level (%)', data.exec_mon1_rf, getLimitColor(sup, 'CRS RF Level', data.exec_mon1_rf)],
+                    ['CRS Pos. DDM (%)', data.exec_mon1_ddm, getLimitColor(sup, 'CRS DDM', data.exec_mon1_ddm)],
+                    ['CRS Pos. SDM (%)', data.exec_mon1_sdm, getLimitColor(sup, 'CRS SDM', data.exec_mon1_sdm)],
+                    ['Ident AM (%)', data.exec_mon1_ident, getLimitColor(sup, 'Ident AM', data.exec_mon1_ident)],
+                    ['CRS Width RF Level (%)', data.exec_mon1_width_rf, getLimitColor(sup, 'Width RF Level', data.exec_mon1_width_rf)],
+                    ['CRS Width DDM (%)', data.exec_mon1_width_ddm, getLimitColor(sup, 'Width DDM', data.exec_mon1_width_ddm)],
+                    ['CRS Width SDM (%)', data.exec_mon1_width_sdm, getLimitColor(sup, 'Width SDM', data.exec_mon1_width_sdm)],
+                    ['CLR Width RF Level (%)', data.exec_mon1_clr_rf, getLimitColor(sup, 'CLR RF Level', data.exec_mon1_clr_rf)],
+                    ['CLR Width DDM (%)', data.exec_mon1_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon1_clr_ddm)],
+                    ['CLR Width SDM (%)', data.exec_mon1_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon1_clr_sdm)],
                 ]
             });
 
             // 2. EXECUTIVE MEASUREMENT MON 2
             sections.push({
                 title: 'EXECUTIVE MEASUREMENT (MON 2)', params: [
-                    ['CRS Pos. RF Level (%)', data.exec_mon2_rf ?? data.CRS_RF, getLimitColor(sup, 'CRS RF Level', data.exec_mon2_rf ?? data.CRS_RF)],
-                    ['CRS Pos. DDM (%)', data.exec_mon2_ddm ?? data.CRS_DDM, getLimitColor(sup, 'CRS DDM', data.exec_mon2_ddm ?? data.CRS_DDM)],
-                    ['CRS Pos. SDM (%)', data.exec_mon2_sdm ?? data.CRS_SDM, getLimitColor(sup, 'CRS SDM', data.exec_mon2_sdm ?? data.CRS_SDM)],
-                    ['Ident AM (%)', data.exec_mon2_ident ?? data.IDENT_AM, getLimitColor(sup, 'Ident AM', data.exec_mon2_ident ?? data.IDENT_AM)],
-                    ['CRS Width RF Level (%)', data.exec_mon2_width_rf ?? data.WIDTH_RF, getLimitColor(sup, 'Width RF Level', data.exec_mon2_width_rf ?? data.WIDTH_RF)],
-                    ['CRS Width DDM (%)', data.exec_mon2_width_ddm ?? data.WIDTH_DDM, getLimitColor(sup, 'Width DDM', data.exec_mon2_width_ddm ?? data.WIDTH_DDM)],
-                    ['CRS Width SDM (%)', data.exec_mon2_width_sdm ?? data.WIDTH_SDM, getLimitColor(sup, 'Width SDM', data.exec_mon2_width_sdm ?? data.WIDTH_SDM)],
-                    ['CLR Width RF Level (%)', data.exec_mon2_clr_rf ?? data.CLR_RF, getLimitColor(sup, 'CLR RF Level', data.exec_mon2_clr_rf ?? data.CLR_RF)],
-                    ['CLR Width DDM (%)', data.exec_mon2_clr_ddm ?? data.CLR_DDM, getLimitColor(sup, 'CLR DDM', data.exec_mon2_clr_ddm ?? data.CLR_DDM)],
-                    ['CLR Width SDM (%)', data.exec_mon2_clr_sdm ?? data.CLR_SDM, getLimitColor(sup, 'CLR SDM', data.exec_mon2_clr_sdm ?? data.CLR_SDM)],
+                    ['CRS Pos. RF Level (%)', data.exec_mon2_rf, getLimitColor(sup, 'CRS RF Level', data.exec_mon2_rf)],
+                    ['CRS Pos. DDM (%)', data.exec_mon2_ddm, getLimitColor(sup, 'CRS DDM', data.exec_mon2_ddm)],
+                    ['CRS Pos. SDM (%)', data.exec_mon2_sdm, getLimitColor(sup, 'CRS SDM', data.exec_mon2_sdm)],
+                    ['Ident AM (%)', data.exec_mon2_ident, getLimitColor(sup, 'Ident AM', data.exec_mon2_ident)],
+                    ['CRS Width RF Level (%)', data.exec_mon2_width_rf, getLimitColor(sup, 'Width RF Level', data.exec_mon2_width_rf)],
+                    ['CRS Width DDM (%)', data.exec_mon2_width_ddm, getLimitColor(sup, 'Width DDM', data.exec_mon2_width_ddm)],
+                    ['CRS Width SDM (%)', data.exec_mon2_width_sdm, getLimitColor(sup, 'Width SDM', data.exec_mon2_width_sdm)],
+                    ['CLR Width RF Level (%)', data.exec_mon2_clr_rf, getLimitColor(sup, 'CLR RF Level', data.exec_mon2_clr_rf)],
+                    ['CLR Width DDM (%)', data.exec_mon2_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon2_clr_ddm)],
+                    ['CLR Width SDM (%)', data.exec_mon2_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon2_clr_sdm)],
                 ]
             });
 
             // 3. STANDBY MEASUREMENT MON 1
             sections.push({
                 title: 'STANDBY MEASUREMENT (MON 1)', params: [
-                    ['CRS Pos. RF Level (%)', data.stby_mon1_rf ?? 98.9, '#a0d8ef'],
-                    ['CRS Pos. DDM (%)', data.stby_mon1_ddm ?? -0.2, '#a0d8ef'],
-                    ['CRS Pos. SDM (%)', data.stby_mon1_sdm ?? 40.6, '#a0d8ef'],
-                    ['CRS Width RF Level (%)', data.stby_mon1_width_rf ?? 99.6, '#a0d8ef'],
-                    ['CRS Width DDM (%)', data.stby_mon1_width_ddm ?? 15.2, '#a0d8ef'],
-                    ['CRS Width SDM (%)', data.stby_mon1_width_sdm ?? 40.6, '#a0d8ef'],
-                    ['CLR Width RF Level (%)', data.stby_mon1_clr_rf ?? 99.2, '#a0d8ef'],
-                    ['CLR Width DDM (%)', data.stby_mon1_clr_ddm ?? 25.3, '#a0d8ef'],
-                    ['CLR Width SDM (%)', data.stby_mon1_clr_sdm ?? 37.0, '#a0d8ef'],
+                    ['CRS Pos. RF Level (%)', data.stby_mon1_rf, '#a0d8ef'],
+                    ['CRS Pos. DDM (%)', data.stby_mon1_ddm, '#a0d8ef'],
+                    ['CRS Pos. SDM (%)', data.stby_mon1_sdm, '#a0d8ef'],
+                    ['CRS Width RF Level (%)', data.stby_mon1_width_rf, '#a0d8ef'],
+                    ['CRS Width DDM (%)', data.stby_mon1_width_ddm, '#a0d8ef'],
+                    ['CRS Width SDM (%)', data.stby_mon1_width_sdm, '#a0d8ef'],
+                    ['CLR Width RF Level (%)', data.stby_mon1_clr_rf, '#a0d8ef'],
+                    ['CLR Width DDM (%)', data.stby_mon1_clr_ddm, '#a0d8ef'],
+                    ['CLR Width SDM (%)', data.stby_mon1_clr_sdm, '#a0d8ef'],
                 ]
             });
 
             // 4. STANDBY MEASUREMENT MON 2
             sections.push({
                 title: 'STANDBY MEASUREMENT (MON 2)', params: [
-                    ['CRS Pos. RF Level (%)', data.stby_mon2_rf ?? 99.1, '#a0d8ef'],
-                    ['CRS Pos. DDM (%)', data.stby_mon2_ddm ?? -0.2, '#a0d8ef'],
-                    ['CRS Pos. SDM (%)', data.stby_mon2_sdm ?? 40.4, '#a0d8ef'],
-                    ['CRS Width RF Level (%)', data.stby_mon2_width_rf ?? 99.5, '#a0d8ef'],
-                    ['CRS Width DDM (%)', data.stby_mon2_width_ddm ?? 15.3, '#a0d8ef'],
-                    ['CRS Width SDM (%)', data.stby_mon2_width_sdm ?? 40.6, '#a0d8ef'],
-                    ['CLR Width RF Level (%)', data.stby_mon2_clr_rf ?? 99.7, '#a0d8ef'],
-                    ['CLR Width DDM (%)', data.stby_mon2_clr_ddm ?? 25.5, '#a0d8ef'],
-                    ['CLR Width SDM (%)', data.stby_mon2_clr_sdm ?? 37.3, '#a0d8ef'],
+                    ['CRS Pos. RF Level (%)', data.stby_mon2_rf, '#a0d8ef'],
+                    ['CRS Pos. DDM (%)', data.stby_mon2_ddm, '#a0d8ef'],
+                    ['CRS Pos. SDM (%)', data.stby_mon2_sdm, '#a0d8ef'],
+                    ['CRS Width RF Level (%)', data.stby_mon2_width_rf, '#a0d8ef'],
+                    ['CRS Width DDM (%)', data.stby_mon2_width_ddm, '#a0d8ef'],
+                    ['CRS Width SDM (%)', data.stby_mon2_width_sdm, '#a0d8ef'],
+                    ['CLR Width RF Level (%)', data.stby_mon2_clr_rf, '#a0d8ef'],
+                    ['CLR Width DDM (%)', data.stby_mon2_clr_ddm, '#a0d8ef'],
+                    ['CLR Width SDM (%)', data.stby_mon2_clr_sdm, '#a0d8ef'],
                 ]
             });
         } else {
