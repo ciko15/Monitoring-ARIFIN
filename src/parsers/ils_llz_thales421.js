@@ -174,9 +174,21 @@ function decodePacket(pkt) {
         let off = baseOffset + offsetShift;
         // Posisi Ident AM (8.0%):
         // Di Subtype 0x01 (MON 1) berada di offset 14
-        // Di Subtype 0x0E (MON 2) berada di offset 42
+        // Di Subtype 0x0E (MON 2) berada di offset 42 (atau 42 + offsetShift)
         if (key === 'IDENT_AM') {
-            off = (channel === 'MON2') ? 42 : 14;
+            if (channel === 'MON2') {
+                const id42 = readFloat(pkt, 42);
+                const id44 = readFloat(pkt, 44);
+                let idVal = null;
+                if (id42 !== null && id42 >= 4.0 && id42 <= 25.0) idVal = id42;
+                else if (id44 !== null && id44 >= 4.0 && id44 <= 25.0) idVal = id44;
+                if (idVal !== null) {
+                    params[key] = parseFloat(idVal.toFixed(2));
+                }
+                continue;
+            } else {
+                off = 14;
+            }
         }
 
         let val = readFloat(pkt, off);
