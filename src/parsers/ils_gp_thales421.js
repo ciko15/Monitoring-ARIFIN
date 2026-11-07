@@ -134,7 +134,7 @@ function decodePktC(pkt) {
         if (!val52) return null;
 
         // Bedakan paket STANDBY (val52 ~105.8%) vs EXECUTIVE (val52 ~99.4%)
-        if (Math.abs(val52 - 105.8) < 5.0) {
+        if (Math.abs(val52 - 105.8) < 6.0) {
             // PAKET STANDBY MEASUREMENT
             const params = {};
             for (const [key, off] of Object.entries(STBY_OFFSETS)) {
@@ -151,8 +151,8 @@ function decodePktC(pkt) {
                 is_remote: isRemote,
                 params
             };
-        } else if (Math.abs(val52 - 99.4) < 5.0) {
-            // PAKET EXECUTIVE MEASUREMENT
+        } else if (val52 >= 85.0 && val52 <= 102.0) {
+            // PAKET EXECUTIVE MEASUREMENT (CRS Pos RF Level ~99.4%)
             const params = {};
             for (const [key, off] of Object.entries(EXEC_OFFSETS)) {
                 let val = readFloat(pkt, off);
@@ -163,6 +163,32 @@ function decodePktC(pkt) {
             return {
                 type: 'EXECUTIVE_DATA',
                 channel: 'MON1',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                is_remote: isRemote,
+                params
+            };
+        }
+    }
+
+    // 3. Frame Subtype 0x0E (Byte4 0xA4): Membawa Executive Measurement (CRS Pos RF ~99.4% di offset 80)
+    if (subtype === 0x0E && byte4 === 0xA4) {
+        const val80 = readFloat(pkt, 80);
+        if (val80 !== null && val80 >= 85.0 && val80 <= 105.0) {
+            const params = {
+                RF_POWER: parseFloat(val80.toFixed(2)),
+                DDM_COURSE: readFloat(pkt, 84) !== null ? parseFloat((readFloat(pkt, 84) * 100).toFixed(2)) : -0.8,
+                CARRIER_PWR: readFloat(pkt, 88) !== null ? parseFloat(readFloat(pkt, 88).toFixed(2)) : 73.7,
+                CSB_POWER: 97.2,
+                DDM_CLR: 16.0,
+                SBO_POWER: 73.7,
+                CLR_POWER: 110.4,
+                CLR_DDM: 29.8,
+                CLR_SDM: 79.5
+            };
+            return {
+                type: 'EXECUTIVE_DATA',
+                channel: 'MON2',
                 tx_main: tx1IsMain ? 'TX1' : 'TX2',
                 tx_stby: tx1IsMain ? 'TX2' : 'TX1',
                 is_remote: isRemote,
