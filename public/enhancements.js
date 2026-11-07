@@ -3020,9 +3020,8 @@
                 ]
             });
 
-            // 1. EXECUTIVE MEASUREMENT MON 1
+            // 1. EXECUTIVE MEASUREMENT MON 1 (Persis Jendela ADRACS Executive)
             const execMon1List = filterParams([
-                ['GP ANGLE (°)', data.exec_mon1_angle, getLimitColor(sup, 'GP Angle', data.exec_mon1_angle)],
                 ['CRS Pos. RF Level (%)', data.exec_mon1_rf, getLimitColor(sup, 'RF Power', data.exec_mon1_rf)],
                 ['CRS Pos. DDM (%)', data.exec_mon1_ddm, getLimitColor(sup, 'DDM Course', data.exec_mon1_ddm)],
                 ['CRS Pos. SDM (%)', data.exec_mon1_sdm, getLimitColor(sup, 'SDM Course', data.exec_mon1_sdm)],
@@ -3032,14 +3031,18 @@
                 ['CLR Width RF Level (%)', data.exec_mon1_clr_rf, getLimitColor(sup, 'CLR Power', data.exec_mon1_clr_rf)],
                 ['CLR Width DDM (%)', data.exec_mon1_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon1_clr_ddm)],
                 ['CLR Width SDM (%)', data.exec_mon1_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon1_clr_sdm)],
+                ['Nearfield Pos. RF Level (%)', data.exec_mon1_nf_rf, '#a0d8ef'],
+                ['Nearfield Pos. DDM (%)', data.exec_mon1_nf_ddm, '#a0d8ef'],
+                ['Nearfield Pos. SDM (%)', data.exec_mon1_nf_sdm, '#a0d8ef'],
+                ['CRS/CLR RF Frequency (Hz)', data.exec_mon1_freq, '#00ffcc'],
+                ['GP ANGLE (°)', data.exec_mon1_angle, getLimitColor(sup, 'GP Angle', data.exec_mon1_angle)],
             ]);
             if (execMon1List.length > 0) {
                 sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 1)', params: execMon1List });
             }
 
-            // 2. EXECUTIVE MEASUREMENT MON 2
+            // 2. EXECUTIVE MEASUREMENT MON 2 (Persis Jendela ADRACS Executive)
             const execMon2List = filterParams([
-                ['GP ANGLE (°)', data.exec_mon2_angle, getLimitColor(sup, 'GP Angle', data.exec_mon2_angle)],
                 ['CRS Pos. RF Level (%)', data.exec_mon2_rf, getLimitColor(sup, 'RF Power', data.exec_mon2_rf)],
                 ['CRS Pos. DDM (%)', data.exec_mon2_ddm, getLimitColor(sup, 'DDM Course', data.exec_mon2_ddm)],
                 ['CRS Pos. SDM (%)', data.exec_mon2_sdm, getLimitColor(sup, 'SDM Course', data.exec_mon2_sdm)],
@@ -3049,6 +3052,11 @@
                 ['CLR Width RF Level (%)', data.exec_mon2_clr_rf, getLimitColor(sup, 'CLR Power', data.exec_mon2_clr_rf)],
                 ['CLR Width DDM (%)', data.exec_mon2_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon2_clr_ddm)],
                 ['CLR Width SDM (%)', data.exec_mon2_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon2_clr_sdm)],
+                ['Nearfield Pos. RF Level (%)', data.exec_mon2_nf_rf, '#a0d8ef'],
+                ['Nearfield Pos. DDM (%)', data.exec_mon2_nf_ddm, '#a0d8ef'],
+                ['Nearfield Pos. SDM (%)', data.exec_mon2_nf_sdm, '#a0d8ef'],
+                ['CRS/CLR RF Frequency (Hz)', data.exec_mon2_freq, '#00ffcc'],
+                ['GP ANGLE (°)', data.exec_mon2_angle, getLimitColor(sup, 'GP Angle', data.exec_mon2_angle)],
             ]);
             if (execMon2List.length > 0) {
                 sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 2)', params: execMon2List });

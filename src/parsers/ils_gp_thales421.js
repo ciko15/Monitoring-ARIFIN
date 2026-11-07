@@ -126,6 +126,18 @@ function decodePktC(pkt) {
         const ddmClr = readFloat(pkt, 47);
         const sdmClr = readFloat(pkt, 51);
 
+        // Nearfield Pos (RF, DDM, SDM) dan CRS/CLR RF Frequency (Hz)
+        const rfNf = readFloat(pkt, 57);
+        const ddmNf = readFloat(pkt, 61);
+        const sdmNf = readFloat(pkt, 65);
+        let freqHz = null;
+        try {
+            if (pkt.length >= 71) {
+                const f = pkt.readUInt16LE(69);
+                if (f >= 7900 && f <= 8100) freqHz = f;
+            }
+        } catch (e) {}
+
         const params = {};
         if (rfPos !== null && rfPos > 50.0 && rfPos < 150.0) params.RF_POWER = parseFloat(rfPos.toFixed(2));
         if (ddmPos !== null) params.DDM_COURSE = parseFloat((ddmPos * 100).toFixed(2));
@@ -137,6 +149,11 @@ function decodePktC(pkt) {
         if (rfClr !== null) params.CLR_POWER = parseFloat(rfClr.toFixed(2));
         if (ddmClr !== null) params.CLR_DDM = parseFloat((ddmClr * 100).toFixed(2));
         if (sdmClr !== null) params.CLR_SDM = parseFloat(sdmClr.toFixed(2));
+
+        if (rfNf !== null && rfNf > 50.0 && rfNf < 150.0) params.NF_RF = parseFloat(rfNf.toFixed(2));
+        if (ddmNf !== null) params.NF_DDM = parseFloat((ddmNf * 100).toFixed(2));
+        if (sdmNf !== null) params.NF_SDM = parseFloat(sdmNf.toFixed(2));
+        if (freqHz !== null) params.FREQ_HZ = freqHz;
 
         if (Object.keys(params).length > 0) {
             return {
@@ -348,6 +365,10 @@ class IlsGpThales421Parser extends BaseParser {
                 exec_mon1_clr_rf: exec1.CLR_POWER,
                 exec_mon1_clr_ddm: exec1.CLR_DDM,
                 exec_mon1_clr_sdm: exec1.CLR_SDM,
+                exec_mon1_nf_rf: exec1.NF_RF,
+                exec_mon1_nf_ddm: exec1.NF_DDM,
+                exec_mon1_nf_sdm: exec1.NF_SDM,
+                exec_mon1_freq: exec1.FREQ_HZ,
 
                 // EXECUTIVE MEASUREMENT MON 2 (Persis jendela ADRACS Executive)
                 exec_mon2_rf: exec2.RF_POWER,
@@ -360,6 +381,10 @@ class IlsGpThales421Parser extends BaseParser {
                 exec_mon2_clr_rf: exec2.CLR_POWER,
                 exec_mon2_clr_ddm: exec2.CLR_DDM,
                 exec_mon2_clr_sdm: exec2.CLR_SDM,
+                exec_mon2_nf_rf: exec2.NF_RF,
+                exec_mon2_nf_ddm: exec2.NF_DDM,
+                exec_mon2_nf_sdm: exec2.NF_SDM,
+                exec_mon2_freq: exec2.FREQ_HZ,
 
                 // STANDBY MEASUREMENT MON 1 (Persis jendela ADRACS Standby)
                 stby_mon1_csb1_rf: stby1.CSB1_RF,
