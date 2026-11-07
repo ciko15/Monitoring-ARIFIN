@@ -3054,12 +3054,11 @@
                 sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 2)', params: execMon2List });
             }
 
-            // 3. STANDBY MEASUREMENT MON 1
+            // 3. STANDBY MEASUREMENT MON 1 (Persis Jendela ADRACS Standby)
             const stbyMon1List = filterParams([
-                ['GP ANGLE (°)', data.stby_mon1_angle, '#a0d8ef'],
-                ['CRS Pos. RF Level (%)', data.stby_mon1_rf, '#a0d8ef'],
-                ['CRS Pos. DDM (%)', data.stby_mon1_ddm, '#a0d8ef'],
-                ['CRS Pos. SDM (%)', data.stby_mon1_sdm, '#a0d8ef'],
+                ['CRS CSB1 RF Level (%)', data.stby_mon1_csb1_rf, '#a0d8ef'],
+                ['CRS CSB1 DDM (%)', data.stby_mon1_csb1_ddm, '#a0d8ef'],
+                ['CRS CSB1 SDM (%)', data.stby_mon1_csb1_sdm, '#a0d8ef'],
                 ['CRS Width RF Level (%)', data.stby_mon1_width_rf, '#a0d8ef'],
                 ['CRS Width DDM (%)', data.stby_mon1_width_ddm, '#a0d8ef'],
                 ['CRS Width SDM (%)', data.stby_mon1_width_sdm, '#a0d8ef'],
@@ -3071,12 +3070,11 @@
                 sections.push({ title: 'STANDBY MEASUREMENT (MON 1)', params: stbyMon1List });
             }
 
-            // 4. STANDBY MEASUREMENT MON 2
+            // 4. STANDBY MEASUREMENT MON 2 (Persis Jendela ADRACS Standby)
             const stbyMon2List = filterParams([
-                ['GP ANGLE (°)', data.stby_mon2_angle, '#a0d8ef'],
-                ['CRS Pos. RF Level (%)', data.stby_mon2_rf, '#a0d8ef'],
-                ['CRS Pos. DDM (%)', data.stby_mon2_ddm, '#a0d8ef'],
-                ['CRS Pos. SDM (%)', data.stby_mon2_sdm, '#a0d8ef'],
+                ['CRS CSB1 RF Level (%)', data.stby_mon2_csb1_rf, '#a0d8ef'],
+                ['CRS CSB1 DDM (%)', data.stby_mon2_csb1_ddm, '#a0d8ef'],
+                ['CRS CSB1 SDM (%)', data.stby_mon2_csb1_sdm, '#a0d8ef'],
                 ['CRS Width RF Level (%)', data.stby_mon2_width_rf, '#a0d8ef'],
                 ['CRS Width DDM (%)', data.stby_mon2_width_ddm, '#a0d8ef'],
                 ['CRS Width SDM (%)', data.stby_mon2_width_sdm, '#a0d8ef'],

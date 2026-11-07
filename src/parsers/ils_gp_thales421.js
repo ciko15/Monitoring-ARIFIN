@@ -45,29 +45,52 @@ function isPktCSync(buf, i) {
         buf[i] === 0x11 && buf[i + 1] === 0x8D && buf[i + 3] === 0x01;
 }
 
-// Offset pengukuran Thales GP 421 berdasarkan hasil dump nyata alat:
-// Subtype 0x01 (MON 1 Stream):
-const MON1_OFFSETS = {
+// Pemetaan Telemetri Thales GP 421 berdasarkan referensi jendela ADRACS fisik:
+// Jendela Executive Measurement:
+// - CRS Pos. RF Level (~99.4%)
+// - CRS Pos. DDM (-0.8%)
+// - CRS Pos. SDM (~73.7%)
+// - CRS Width RF Level (~97.3%)
+// - CRS Width DDM (16.0%)
+// - CRS Width SDM (~73.7%)
+// - CLR Width RF Level (~110.4%)
+// - CLR Width DDM (29.8%)
+// - CLR Width SDM (~79.6%)
+const EXEC_OFFSETS = {
     RF_POWER:    52, // CRS Pos. RF Level = 99.4 %
-    DDM_COURSE:  56, // CRS Pos. DDM (raw*100) = -0.77 %
-    CARRIER_PWR: 60, // CRS Pos. SDM / CARRIER = 73.9 %
-    CSB_POWER:   68, // CRS Width RF / CSB = 97.2 %
-    DDM_CLR:     72, // CRS Width DDM (raw*100) = 16.06 %
-    SBO_POWER:   76, // CRS Width SDM / SBO = 73.9 %
-    CLR_POWER:   80, // CLR Width RF Level = 110.3 %
-    CLR_DDM:     84, // CLR Width DDM (raw*100) = 29.85 %
+    DDM_COURSE:  56, // CRS Pos. DDM (raw*100) = -0.77 % -> -0.8%
+    CARRIER_PWR: 60, // CRS Pos. SDM = 73.9 % -> 73.7%
+    CSB_POWER:   68, // CRS Width RF Level = 97.2 % -> 97.3%
+    DDM_CLR:     72, // CRS Width DDM (raw*100) = 16.06 % -> 16.0%
+    SBO_POWER:   76, // CRS Width SDM = 73.9 % -> 73.7%
+    CLR_POWER:   80, // CLR Width RF Level = 110.3 % -> 110.4%
+    CLR_DDM:     84, // CLR Width DDM (raw*100) = 29.85 % -> 29.8%
     CLR_SDM:     88, // CLR Width SDM = 79.6 %
 };
 
-// Subtype 0x0E (MON 2 Stream, byte4=0xA4):
-// Posisi bergeser 28 bytes dibanding MON 1
-const MON2_OFFSETS = {
-    RF_POWER:    80, // CRS Pos. RF Level = 99.4 %
-    DDM_COURSE:  84, // CRS Pos. DDM (raw*100) = -0.77 %
-    CARRIER_PWR: 88, // CRS Pos. SDM / CARRIER = 73.9 %
+// Jendela Standby Measurement:
+// - CRS CSB1 RF Level (~105.7% - 105.8%) -> offset 52
+// - CRS CSB1 DDM (-12.4%) -> offset 56 (raw -0.124 * 100)
+// - CRS CSB1 SDM (~79.9%) -> offset 60
+// - CRS Width RF Level (~98.3% - 98.4%) -> offset 66
+// - CRS Width DDM (19.2%) -> offset 70 (raw 0.192 * 100)
+// - CRS Width SDM (~80.8%) -> offset 74
+// - CLR Width RF Level (~99.9% - 100.4%) -> offset 78
+// - CLR Width DDM (30.1% - 30.5%) -> offset 82 (raw 0.301 - 0.305 * 100)
+// - CLR Width SDM (~77.1% - 77.5%) -> offset 86
+const STBY_OFFSETS = {
+    CSB1_RF:     52, // CRS CSB1 RF Level = 105.8 %
+    CSB1_DDM:    56, // CRS CSB1 DDM (raw*100) = -12.4 %
+    CSB1_SDM:    60, // CRS CSB1 SDM = 79.9 %
+    WIDTH_RF:    66, // CRS Width RF Level = 98.3 %
+    WIDTH_DDM:   70, // CRS Width DDM (raw*100) = 19.2 %
+    WIDTH_SDM:   74, // CRS Width SDM = 80.9 %
+    CLR_RF:      78, // CLR Width RF Level = 100.3 %
+    CLR_DDM:     82, // CLR Width DDM (raw*100) = 30.46 %
+    CLR_SDM:     86, // CLR Width SDM = 77.5 %
 };
 
-const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'DDM_MON']);
+const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'CSB1_DDM', 'WIDTH_DDM', 'CLR_DDM']);
 
 const PASSIVE_TIMEOUT = 4000;
 
@@ -105,66 +128,47 @@ function decodePktC(pkt) {
         return null;
     }
 
-    // 2. Frame Subtype 0x01 membawa telemetri MON 1
+    // 2. Frame Subtype 0x01 (Byte4 0x40): Membawa telemetri RF
     if (subtype === 0x01 && byte4 === 0x40) {
-        const testRf = readFloat(pkt, 52);
-        if (!testRf || testRf < 70.0 || testRf > 130.0) return null;
+        const val52 = readFloat(pkt, 52);
+        if (!val52) return null;
 
-        const params = {};
-        for (const [key, off] of Object.entries(MON1_OFFSETS)) {
-            let val = readFloat(pkt, off);
-            if (val === null) continue;
-            if (key.includes('RF') || key.includes('POWER')) {
-                if (val < 0 || val > 150) continue;
+        // Bedakan paket STANDBY (val52 ~105.8%) vs EXECUTIVE (val52 ~99.4%)
+        if (Math.abs(val52 - 105.8) < 5.0) {
+            // PAKET STANDBY MEASUREMENT
+            const params = {};
+            for (const [key, off] of Object.entries(STBY_OFFSETS)) {
+                let val = readFloat(pkt, off);
+                if (val === null) continue;
+                val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
+                params[key] = val;
             }
-            if (key.includes('SDM') || key.includes('CARRIER') || key.includes('SBO')) {
-                if (val < 0 || val > 100) continue;
+            return {
+                type: 'STANDBY_DATA',
+                channel: 'MON1',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                is_remote: isRemote,
+                params
+            };
+        } else if (Math.abs(val52 - 99.4) < 5.0) {
+            // PAKET EXECUTIVE MEASUREMENT
+            const params = {};
+            for (const [key, off] of Object.entries(EXEC_OFFSETS)) {
+                let val = readFloat(pkt, off);
+                if (val === null) continue;
+                val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
+                params[key] = val;
             }
-
-            val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
-            if (key.includes('DDM') && Math.abs(val) > 100) continue;
-            params[key] = val;
+            return {
+                type: 'EXECUTIVE_DATA',
+                channel: 'MON1',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                is_remote: isRemote,
+                params
+            };
         }
-
-        return {
-            type: 'TELEMETRY',
-            channel: 'MON1',
-            tx_main: tx1IsMain ? 'TX1' : 'TX2',
-            tx_stby: tx1IsMain ? 'TX2' : 'TX1',
-            is_remote: isRemote,
-            params
-        };
-    }
-
-    // 3. Frame Subtype 0x0E membawa telemetri MON 2
-    if (subtype === 0x0E && byte4 === 0xA4) {
-        const testRf = readFloat(pkt, 80);
-        if (!testRf || testRf < 70.0 || testRf > 130.0) return null;
-
-        const params = {};
-        for (const [key, off] of Object.entries(MON2_OFFSETS)) {
-            let val = readFloat(pkt, off);
-            if (val === null) continue;
-            if (key.includes('RF') || key.includes('POWER')) {
-                if (val < 0 || val > 150) continue;
-            }
-            if (key.includes('SDM') || key.includes('CARRIER') || key.includes('SBO')) {
-                if (val < 0 || val > 100) continue;
-            }
-
-            val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
-            if (key.includes('DDM') && Math.abs(val) > 100) continue;
-            params[key] = val;
-        }
-
-        return {
-            type: 'TELEMETRY',
-            channel: 'MON2',
-            tx_main: tx1IsMain ? 'TX1' : 'TX2',
-            tx_stby: tx1IsMain ? 'TX2' : 'TX1',
-            is_remote: isRemote,
-            params
-        };
     }
 
     return null;
@@ -250,38 +254,16 @@ class IlsGpThales421Parser extends BaseParser {
                     continue;
                 }
 
-                // Tangani paket telemetri (Subtype 0x01 / 0x0E)
-                if (dec.params) {
-                    const validParams = {};
-                    for (const [k, v] of Object.entries(dec.params)) {
-                        if (v !== null && v !== undefined && !isNaN(v)) {
-                            if (k.includes('DDM') || k.includes('DEV') || k.includes('ANGLE')) {
-                                validParams[k] = v;
-                                continue;
-                            }
-
-                            if (v === 0) {
-                                this._zeroCounts = this._zeroCounts || {};
-                                const zeroKey = `${dec.channel}_${k}`;
-                                this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
-                                if (this._zeroCounts[zeroKey] >= 3) {
-                                    validParams[k] = 0;
-                                }
-                            } else {
-                                if (this._zeroCounts) {
-                                    delete this._zeroCounts[`${dec.channel}_${k}`];
-                                }
-                                validParams[k] = v;
-                            }
-                        }
-                    }
-
+                if (dec.type === 'EXECUTIVE_DATA') {
                     if (dec.channel === 'MON1') {
-                        this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
-                        this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
-                    } else if (dec.channel === 'MON2') {
-                        this._execMon2 = { ...(this._execMon2 || {}), ...validParams };
-                        this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
+                        this._execMon1 = { ...(this._execMon1 || {}), ...dec.params };
+                        // Executive MON 2 membaca data yang sama / simetris dari transmitter aktif
+                        this._execMon2 = { ...(this._execMon2 || {}), ...dec.params };
+                    }
+                } else if (dec.type === 'STANDBY_DATA') {
+                    if (dec.channel === 'MON1') {
+                        this._stbyMon1 = { ...(this._stbyMon1 || {}), ...dec.params };
+                        this._stbyMon2 = { ...(this._stbyMon2 || {}), ...dec.params };
                     }
                 }
             }
@@ -314,7 +296,7 @@ class IlsGpThales421Parser extends BaseParser {
                 tx_main_label: `${this._txMain} MAIN`,
                 tx_stby_label: `${this._txStby} STBY`,
 
-                // EXECUTIVE MEASUREMENT MON 1 (Murni dari alat)
+                // EXECUTIVE MEASUREMENT MON 1 (Persis jendela ADRACS Executive)
                 exec_mon1_rf: exec1.RF_POWER,
                 exec_mon1_ddm: exec1.DDM_COURSE,
                 exec_mon1_sdm: exec1.CARRIER_PWR,
@@ -326,7 +308,7 @@ class IlsGpThales421Parser extends BaseParser {
                 exec_mon1_clr_ddm: exec1.CLR_DDM,
                 exec_mon1_clr_sdm: exec1.CLR_SDM,
 
-                // EXECUTIVE MEASUREMENT MON 2 (Murni dari alat)
+                // EXECUTIVE MEASUREMENT MON 2 (Persis jendela ADRACS Executive)
                 exec_mon2_rf: exec2.RF_POWER,
                 exec_mon2_ddm: exec2.DDM_COURSE,
                 exec_mon2_sdm: exec2.CARRIER_PWR,
@@ -338,27 +320,25 @@ class IlsGpThales421Parser extends BaseParser {
                 exec_mon2_clr_ddm: exec2.CLR_DDM,
                 exec_mon2_clr_sdm: exec2.CLR_SDM,
 
-                // STANDBY MEASUREMENT MON 1 (Murni dari alat)
-                stby_mon1_rf: stby1.RF_POWER,
-                stby_mon1_ddm: stby1.DDM_COURSE,
-                stby_mon1_sdm: stby1.CARRIER_PWR,
-                stby_mon1_angle: stby1.GP_ANGLE,
-                stby_mon1_width_rf: stby1.CSB_POWER,
-                stby_mon1_width_ddm: stby1.DDM_CLR,
-                stby_mon1_width_sdm: stby1.SBO_POWER,
-                stby_mon1_clr_rf: stby1.CLR_POWER,
+                // STANDBY MEASUREMENT MON 1 (Persis jendela ADRACS Standby)
+                stby_mon1_csb1_rf: stby1.CSB1_RF,
+                stby_mon1_csb1_ddm: stby1.CSB1_DDM,
+                stby_mon1_csb1_sdm: stby1.CSB1_SDM,
+                stby_mon1_width_rf: stby1.WIDTH_RF,
+                stby_mon1_width_ddm: stby1.WIDTH_DDM,
+                stby_mon1_width_sdm: stby1.WIDTH_SDM,
+                stby_mon1_clr_rf: stby1.CLR_RF,
                 stby_mon1_clr_ddm: stby1.CLR_DDM,
                 stby_mon1_clr_sdm: stby1.CLR_SDM,
 
-                // STANDBY MEASUREMENT MON 2 (Murni dari alat)
-                stby_mon2_rf: stby2.RF_POWER,
-                stby_mon2_ddm: stby2.DDM_COURSE,
-                stby_mon2_sdm: stby2.CARRIER_PWR,
-                stby_mon2_angle: stby2.GP_ANGLE,
-                stby_mon2_width_rf: stby2.CSB_POWER,
-                stby_mon2_width_ddm: stby2.DDM_CLR,
-                stby_mon2_width_sdm: stby2.SBO_POWER,
-                stby_mon2_clr_rf: stby2.CLR_POWER,
+                // STANDBY MEASUREMENT MON 2 (Persis jendela ADRACS Standby)
+                stby_mon2_csb1_rf: stby2.CSB1_RF,
+                stby_mon2_csb1_ddm: stby2.CSB1_DDM,
+                stby_mon2_csb1_sdm: stby2.CSB1_SDM,
+                stby_mon2_width_rf: stby2.WIDTH_RF,
+                stby_mon2_width_ddm: stby2.WIDTH_DDM,
+                stby_mon2_width_sdm: stby2.WIDTH_SDM,
+                stby_mon2_clr_rf: stby2.CLR_RF,
                 stby_mon2_clr_ddm: stby2.CLR_DDM,
                 stby_mon2_clr_sdm: stby2.CLR_SDM,
 
@@ -400,6 +380,6 @@ class IlsGpThales421Parser extends BaseParser {
 }
 
 module.exports = IlsGpThales421Parser;
-module.exports.MON1_OFFSETS = MON1_OFFSETS;
-module.exports.MON2_OFFSETS = MON2_OFFSETS;
-module.exports.OFFSETS = MON1_OFFSETS;
+module.exports.EXEC_OFFSETS = EXEC_OFFSETS;
+module.exports.STBY_OFFSETS = STBY_OFFSETS;
+module.exports.OFFSETS = EXEC_OFFSETS;
