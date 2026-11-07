@@ -3084,81 +3084,87 @@
                 ]
             });
 
+            const filterParams = (list) => list.filter(p => p[1] !== null && p[1] !== undefined && p[1] !== '—' && p[1] !== '-');
+
             // 1. EXECUTIVE MEASUREMENT MON 1
-            sections.push({
-                title: 'EXECUTIVE MEASUREMENT (MON 1)', params: [
-                    ['CRS Pos. RF Level (%)', data.exec_mon1_rf, getLimitColor(sup, 'CRS RF Level', data.exec_mon1_rf)],
-                    ['CRS Pos. DDM (%)', data.exec_mon1_ddm, getLimitColor(sup, 'CRS DDM', data.exec_mon1_ddm)],
-                    ['CRS Pos. SDM (%)', data.exec_mon1_sdm, getLimitColor(sup, 'CRS SDM', data.exec_mon1_sdm)],
-                    ['Ident AM (%)', data.exec_mon1_ident, getLimitColor(sup, 'Ident AM', data.exec_mon1_ident)],
-                    ['CRS Width RF Level (%)', data.exec_mon1_width_rf, getLimitColor(sup, 'Width RF Level', data.exec_mon1_width_rf)],
-                    ['CRS Width DDM (%)', data.exec_mon1_width_ddm, getLimitColor(sup, 'Width DDM', data.exec_mon1_width_ddm)],
-                    ['CRS Width SDM (%)', data.exec_mon1_width_sdm, getLimitColor(sup, 'Width SDM', data.exec_mon1_width_sdm)],
-                    ['CLR Width RF Level (%)', data.exec_mon1_clr_rf, getLimitColor(sup, 'CLR RF Level', data.exec_mon1_clr_rf)],
-                    ['CLR Width DDM (%)', data.exec_mon1_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon1_clr_ddm)],
-                    ['CLR Width SDM (%)', data.exec_mon1_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon1_clr_sdm)],
-                    ['Nearfield Pos. RF (%)', data.exec_mon1_nf_rf, getLimitColor(sup, 'NF RF Level', data.exec_mon1_nf_rf)],
-                    ['Nearfield Pos. DDM (%)', data.exec_mon1_nf_ddm, getLimitColor(sup, 'NF DDM', data.exec_mon1_nf_ddm)],
-                    ['Nearfield Pos. SDM (%)', data.exec_mon1_nf_sdm, getLimitColor(sup, 'NF SDM', data.exec_mon1_nf_sdm)],
-                    ['CRS/CLR RF Freq (Hz)', data.exec_mon1_rf_freq, '#00ffcc'],
-                    ['Frequency Deviation (kHz)', data.exec_mon1_freq_dev, '#00ffcc'],
-                ]
-            });
+            const execMon1List = filterParams([
+                ['CRS Pos. RF Level (%)', data.exec_mon1_rf, getLimitColor(sup, 'CRS RF Level', data.exec_mon1_rf)],
+                ['CRS Pos. DDM (%)', data.exec_mon1_ddm, getLimitColor(sup, 'CRS DDM', data.exec_mon1_ddm)],
+                ['CRS Pos. SDM (%)', data.exec_mon1_sdm, getLimitColor(sup, 'CRS SDM', data.exec_mon1_sdm)],
+                ['Ident AM (%)', data.exec_mon1_ident, getLimitColor(sup, 'Ident AM', data.exec_mon1_ident)],
+                ['CRS Width RF Level (%)', data.exec_mon1_width_rf, getLimitColor(sup, 'Width RF Level', data.exec_mon1_width_rf)],
+                ['CRS Width DDM (%)', data.exec_mon1_width_ddm, getLimitColor(sup, 'Width DDM', data.exec_mon1_width_ddm)],
+                ['CRS Width SDM (%)', data.exec_mon1_width_sdm, getLimitColor(sup, 'Width SDM', data.exec_mon1_width_sdm)],
+                ['CLR Width RF Level (%)', data.exec_mon1_clr_rf, getLimitColor(sup, 'CLR RF Level', data.exec_mon1_clr_rf)],
+                ['CLR Width DDM (%)', data.exec_mon1_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon1_clr_ddm)],
+                ['CLR Width SDM (%)', data.exec_mon1_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon1_clr_sdm)],
+                ['Nearfield Pos. RF (%)', data.exec_mon1_nf_rf, getLimitColor(sup, 'NF RF Level', data.exec_mon1_nf_rf)],
+                ['Nearfield Pos. DDM (%)', data.exec_mon1_nf_ddm, getLimitColor(sup, 'NF DDM', data.exec_mon1_nf_ddm)],
+                ['Nearfield Pos. SDM (%)', data.exec_mon1_nf_sdm, getLimitColor(sup, 'NF SDM', data.exec_mon1_nf_sdm)],
+                ['CRS/CLR RF Freq (Hz)', data.exec_mon1_rf_freq, '#00ffcc'],
+                ['Frequency Deviation (kHz)', data.exec_mon1_freq_dev, '#00ffcc'],
+            ]);
+            if (execMon1List.length > 0) {
+                sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 1)', params: execMon1List });
+            }
 
             // 2. EXECUTIVE MEASUREMENT MON 2
-            sections.push({
-                title: 'EXECUTIVE MEASUREMENT (MON 2)', params: [
-                    ['CRS Pos. RF Level (%)', data.exec_mon2_rf, getLimitColor(sup, 'CRS RF Level', data.exec_mon2_rf)],
-                    ['CRS Pos. DDM (%)', data.exec_mon2_ddm, getLimitColor(sup, 'CRS DDM', data.exec_mon2_ddm)],
-                    ['CRS Pos. SDM (%)', data.exec_mon2_sdm, getLimitColor(sup, 'CRS SDM', data.exec_mon2_sdm)],
-                    ['Ident AM (%)', data.exec_mon2_ident, getLimitColor(sup, 'Ident AM', data.exec_mon2_ident)],
-                    ['CRS Width RF Level (%)', data.exec_mon2_width_rf, getLimitColor(sup, 'Width RF Level', data.exec_mon2_width_rf)],
-                    ['CRS Width DDM (%)', data.exec_mon2_width_ddm, getLimitColor(sup, 'Width DDM', data.exec_mon2_width_ddm)],
-                    ['CRS Width SDM (%)', data.exec_mon2_width_sdm, getLimitColor(sup, 'Width SDM', data.exec_mon2_width_sdm)],
-                    ['CLR Width RF Level (%)', data.exec_mon2_clr_rf, getLimitColor(sup, 'CLR RF Level', data.exec_mon2_clr_rf)],
-                    ['CLR Width DDM (%)', data.exec_mon2_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon2_clr_ddm)],
-                    ['CLR Width SDM (%)', data.exec_mon2_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon2_clr_sdm)],
-                    ['Nearfield Pos. RF (%)', data.exec_mon2_nf_rf, getLimitColor(sup, 'NF RF Level', data.exec_mon2_nf_rf)],
-                    ['Nearfield Pos. DDM (%)', data.exec_mon2_nf_ddm, getLimitColor(sup, 'NF DDM', data.exec_mon2_nf_ddm)],
-                    ['Nearfield Pos. SDM (%)', data.exec_mon2_nf_sdm, getLimitColor(sup, 'NF SDM', data.exec_mon2_nf_sdm)],
-                    ['CRS/CLR RF Freq (Hz)', data.exec_mon2_rf_freq, '#00ffcc'],
-                    ['Frequency Deviation (kHz)', data.exec_mon2_freq_dev, '#00ffcc'],
-                ]
-            });
+            const execMon2List = filterParams([
+                ['CRS Pos. RF Level (%)', data.exec_mon2_rf, getLimitColor(sup, 'CRS RF Level', data.exec_mon2_rf)],
+                ['CRS Pos. DDM (%)', data.exec_mon2_ddm, getLimitColor(sup, 'CRS DDM', data.exec_mon2_ddm)],
+                ['CRS Pos. SDM (%)', data.exec_mon2_sdm, getLimitColor(sup, 'CRS SDM', data.exec_mon2_sdm)],
+                ['Ident AM (%)', data.exec_mon2_ident, getLimitColor(sup, 'Ident AM', data.exec_mon2_ident)],
+                ['CRS Width RF Level (%)', data.exec_mon2_width_rf, getLimitColor(sup, 'Width RF Level', data.exec_mon2_width_rf)],
+                ['CRS Width DDM (%)', data.exec_mon2_width_ddm, getLimitColor(sup, 'Width DDM', data.exec_mon2_width_ddm)],
+                ['CRS Width SDM (%)', data.exec_mon2_width_sdm, getLimitColor(sup, 'Width SDM', data.exec_mon2_width_sdm)],
+                ['CLR Width RF Level (%)', data.exec_mon2_clr_rf, getLimitColor(sup, 'CLR RF Level', data.exec_mon2_clr_rf)],
+                ['CLR Width DDM (%)', data.exec_mon2_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon2_clr_ddm)],
+                ['CLR Width SDM (%)', data.exec_mon2_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon2_clr_sdm)],
+                ['Nearfield Pos. RF (%)', data.exec_mon2_nf_rf, getLimitColor(sup, 'NF RF Level', data.exec_mon2_nf_rf)],
+                ['Nearfield Pos. DDM (%)', data.exec_mon2_nf_ddm, getLimitColor(sup, 'NF DDM', data.exec_mon2_nf_ddm)],
+                ['Nearfield Pos. SDM (%)', data.exec_mon2_nf_sdm, getLimitColor(sup, 'NF SDM', data.exec_mon2_nf_sdm)],
+                ['CRS/CLR RF Freq (Hz)', data.exec_mon2_rf_freq, '#00ffcc'],
+                ['Frequency Deviation (kHz)', data.exec_mon2_freq_dev, '#00ffcc'],
+            ]);
+            if (execMon2List.length > 0) {
+                sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 2)', params: execMon2List });
+            }
 
             // 3. STANDBY MEASUREMENT MON 1
-            sections.push({
-                title: 'STANDBY MEASUREMENT (MON 1)', params: [
-                    ['CRS Pos. RF Level (%)', data.stby_mon1_rf, '#a0d8ef'],
-                    ['CRS Pos. DDM (%)', data.stby_mon1_ddm, '#a0d8ef'],
-                    ['CRS Pos. SDM (%)', data.stby_mon1_sdm, '#a0d8ef'],
-                    ['CRS Width RF Level (%)', data.stby_mon1_width_rf, '#a0d8ef'],
-                    ['CRS Width DDM (%)', data.stby_mon1_width_ddm, '#a0d8ef'],
-                    ['CRS Width SDM (%)', data.stby_mon1_width_sdm, '#a0d8ef'],
-                    ['CLR Width RF Level (%)', data.stby_mon1_clr_rf, '#a0d8ef'],
-                    ['CLR Width DDM (%)', data.stby_mon1_clr_ddm, '#a0d8ef'],
-                    ['CLR Width SDM (%)', data.stby_mon1_clr_sdm, '#a0d8ef'],
-                    ['CRS/CLR RF Freq (Hz)', data.stby_mon1_rf_freq, '#00d4ff'],
-                    ['Frequency Deviation (kHz)', data.stby_mon1_freq_dev, '#00d4ff'],
-                ]
-            });
+            const stbyMon1List = filterParams([
+                ['CRS Pos. RF Level (%)', data.stby_mon1_rf, '#a0d8ef'],
+                ['CRS Pos. DDM (%)', data.stby_mon1_ddm, '#a0d8ef'],
+                ['CRS Pos. SDM (%)', data.stby_mon1_sdm, '#a0d8ef'],
+                ['CRS Width RF Level (%)', data.stby_mon1_width_rf, '#a0d8ef'],
+                ['CRS Width DDM (%)', data.stby_mon1_width_ddm, '#a0d8ef'],
+                ['CRS Width SDM (%)', data.stby_mon1_width_sdm, '#a0d8ef'],
+                ['CLR Width RF Level (%)', data.stby_mon1_clr_rf, '#a0d8ef'],
+                ['CLR Width DDM (%)', data.stby_mon1_clr_ddm, '#a0d8ef'],
+                ['CLR Width SDM (%)', data.stby_mon1_clr_sdm, '#a0d8ef'],
+                ['CRS/CLR RF Freq (Hz)', data.stby_mon1_rf_freq, '#00d4ff'],
+                ['Frequency Deviation (kHz)', data.stby_mon1_freq_dev, '#00d4ff'],
+            ]);
+            if (stbyMon1List.length > 0) {
+                sections.push({ title: 'STANDBY MEASUREMENT (MON 1)', params: stbyMon1List });
+            }
 
             // 4. STANDBY MEASUREMENT MON 2
-            sections.push({
-                title: 'STANDBY MEASUREMENT (MON 2)', params: [
-                    ['CRS Pos. RF Level (%)', data.stby_mon2_rf, '#a0d8ef'],
-                    ['CRS Pos. DDM (%)', data.stby_mon2_ddm, '#a0d8ef'],
-                    ['CRS Pos. SDM (%)', data.stby_mon2_sdm, '#a0d8ef'],
-                    ['CRS Width RF Level (%)', data.stby_mon2_width_rf, '#a0d8ef'],
-                    ['CRS Width DDM (%)', data.stby_mon2_width_ddm, '#a0d8ef'],
-                    ['CRS Width SDM (%)', data.stby_mon2_width_sdm, '#a0d8ef'],
-                    ['CLR Width RF Level (%)', data.stby_mon2_clr_rf, '#a0d8ef'],
-                    ['CLR Width DDM (%)', data.stby_mon2_clr_ddm, '#a0d8ef'],
-                    ['CLR Width SDM (%)', data.stby_mon2_clr_sdm, '#a0d8ef'],
-                    ['CRS/CLR RF Freq (Hz)', data.stby_mon2_rf_freq, '#00d4ff'],
-                    ['Frequency Deviation (kHz)', data.stby_mon2_freq_dev, '#00d4ff'],
-                ]
-            });
+            const stbyMon2List = filterParams([
+                ['CRS Pos. RF Level (%)', data.stby_mon2_rf, '#a0d8ef'],
+                ['CRS Pos. DDM (%)', data.stby_mon2_ddm, '#a0d8ef'],
+                ['CRS Pos. SDM (%)', data.stby_mon2_sdm, '#a0d8ef'],
+                ['CRS Width RF Level (%)', data.stby_mon2_width_rf, '#a0d8ef'],
+                ['CRS Width DDM (%)', data.stby_mon2_width_ddm, '#a0d8ef'],
+                ['CRS Width SDM (%)', data.stby_mon2_width_sdm, '#a0d8ef'],
+                ['CLR Width RF Level (%)', data.stby_mon2_clr_rf, '#a0d8ef'],
+                ['CLR Width DDM (%)', data.stby_mon2_clr_ddm, '#a0d8ef'],
+                ['CLR Width SDM (%)', data.stby_mon2_clr_sdm, '#a0d8ef'],
+                ['CRS/CLR RF Freq (Hz)', data.stby_mon2_rf_freq, '#00d4ff'],
+                ['Frequency Deviation (kHz)', data.stby_mon2_freq_dev, '#00d4ff'],
+            ]);
+            if (stbyMon2List.length > 0) {
+                sections.push({ title: 'STANDBY MEASUREMENT (MON 2)', params: stbyMon2List });
+            }
         } else {
             // Check if we have a template for this parser
             let tmpl = window.templatesCache?.find(t => t.id === parserId);
