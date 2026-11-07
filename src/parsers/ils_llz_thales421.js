@@ -254,13 +254,36 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._txMain = dec.tx_main;
                 this._txStby = dec.tx_stby;
 
-                // Hanya update parameter yang memiliki nilai valid (tidak nol/rusak)
+                // Track and validate measurements
+                // Bedakan antara "Frame Kosong / Glitch" vs "Alat Benar-Benar Mati / Power Drop ke 0"
                 const validParams = {};
                 for (const [k, v] of Object.entries(dec.params)) {
                     if (v !== null && v !== undefined && !isNaN(v)) {
-                        // Jangan biarkan nilai RF level atau SDM yang valid tertimpa angka 0
-                        if ((k.includes('RF') || k.includes('SDM')) && v === 0) continue;
-                        validParams[k] = v;
+                        // Untuk DDM atau Deviasi Freq, nilai 0.0 adalah SANGAT NORMAL (Perfect On-Course)
+                        if (k.includes('DDM') || k.includes('DEV') || k.includes('IDENT')) {
+                            validParams[k] = v;
+                            continue;
+                        }
+
+                        // Untuk level RF & SDM:
+                        // Jika terbaca 0, verifikasi apakah ini glitch 1 frame atau memang sinyal drop/mati
+                        if (v === 0) {
+                            this._zeroCounts = this._zeroCounts || {};
+                            const zeroKey = `${dec.channel}_${k}`;
+                            this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
+
+                            // Jika terbaca 0 berturut-turut >= 3 frame (artinya pemancar benar-benar mati/off),
+                            // barulah kita update menjadi 0 riil (Alarm mati)
+                            if (this._zeroCounts[zeroKey] >= 3) {
+                                validParams[k] = 0;
+                            }
+                        } else {
+                            // Jika ada nilai normal (>0), reset counter glitch dan update nilai riil
+                            if (this._zeroCounts) {
+                                delete this._zeroCounts[`${dec.channel}_${k}`];
+                            }
+                            validParams[k] = v;
+                        }
                     }
                 }
 
