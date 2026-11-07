@@ -45,57 +45,23 @@ function isPktCSync(buf, i) {
         buf[i] === 0x11 && buf[i + 1] === 0x8D && buf[i + 3] === 0x01;
 }
 
-// Offset riil hasil capture biner langsung dari GlidePath Thales 421 (192.168.50.160)
-const OFFSETS = {
-    RF_POWER:    52, // CRS Pos. RF Level = 99.0 %
-    DDM_COURSE:  56, // CRS Pos. DDM = -0.0079 raw -> x100 = -0.79 %
-    CARRIER_PWR: 60, // CRS Pos. SDM = 73.8 %
-    CSB_POWER:   68, // CSB / Width RF Level = 96.8 %
-    DDM_CLR:     72, // Width / CLR DDM = 0.1611 raw -> x100 = 16.11 %
-    SBO_POWER:   76, // SBO / Width SDM = 73.8 %
-    CLR_POWER:   80, // CLR Power / RF Level = 110.0 %
-    CLR_DDM:     84, // CLR DDM = 0.2988 raw -> x100 = 29.88 %
-    CLR_SDM:     88, // CLR SDM = 79.7 %
-    GP_ANGLE:    8,  // Angle reference / monitor indicator = ~3.0 / 4.408
+// Parameter pengukuran Thales GP 421
+const MEASUREMENT_OFFSETS = {
+    RF_POWER:    52, // CRS Pos. RF Level = ~99.5 %
+    DDM_COURSE:  56, // CRS Pos. DDM (raw*100) = ~ -0.8 %
+    CARRIER_PWR: 60, // CRS Pos. SDM / CARRIER = ~73.9 %
+    CSB_POWER:   68, // CRS Width RF / CSB = ~97.3 %
+    DDM_CLR:     72, // CRS Width DDM (raw*100) = ~16.0 %
+    SBO_POWER:   76, // CRS Width SDM / SBO = ~73.8 %
+    CLR_POWER:   80, // CLR Width RF Level = ~110.5 %
+    CLR_DDM:     84, // CLR Width DDM (raw*100) = ~29.8 %
+    CLR_SDM:     88, // CLR Width SDM = ~79.4 %
+    GP_ANGLE:    8,  // GP Angle = ~3.0° / 4.408
 };
 
 const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'DDM_MON']);
 
-const LIMITS = {
-    // GP_ANGLE:    [2.75,  3.25 ],
-    // RF_POWER:    [90.0,  110.0],
-    // CSB_POWER:   [85.0,  110.0],
-    // CLR_POWER:   [85.0,  120.0],
-    // RF_OUT:      [70.0,  125.0],
-    // CARRIER_PWR: [65.0,  82.0 ],
-    // SBO_POWER:   [65.0,  82.0 ],
-    // CLR_SDM:     [65.0,  82.0 ],
-    // MON_POWER:   [65.0,  90.0 ],
-    // DDM_COURSE:  [-4.0,  4.0  ],
-    // DDM_CLR:     [10.0,  22.0 ],
-    // CLR_DDM:     [20.0,  35.0 ],
-    // DDM_MON:     [-4.0,  4.0  ],
-};
-
-const PARAM_LABELS = {
-    RF_POWER:    ['CRS Pos. RF Level',  '%'],
-    DDM_COURSE:  ['CRS Pos. DDM',       '%'],
-    CARRIER_PWR: ['CRS Pos. SDM',       '%'],
-    CSB_POWER:   ['CRS Width RF Level', '%'],
-    DDM_CLR:     ['CRS Width DDM',      '%'],
-    SBO_POWER:   ['CRS Width SDM',      '%'],
-    CLR_POWER:   ['CLR Width RF Level', '%'],
-    CLR_DDM:     ['CLR Width DDM',      '%'],
-    CLR_SDM:     ['CLR Width SDM',      '%'],
-    RF_OUT:      ['Nearfield Pos. RF',  '%'],
-    DDM_MON:     ['Nearfield Pos. DDM', '%'],
-    MON_POWER:   ['Monitor Power',      '%'],
-    GP_ANGLE:    ['GP Angle',           '°'],
-};
-
 const PASSIVE_TIMEOUT = 4000;
-const POLL_INTERVAL = 2000;
-const POLL_REQ_DELAY = 150;
 
 function readFloat(buf, offset) {
     try {
@@ -107,26 +73,59 @@ function readFloat(buf, offset) {
 
 function decodePktC(pkt) {
     if (!pkt || pkt.length < PKT_C_SIZE) return null;
-    if (!isPktCSync(pkt, 0)) return null;
+    if (pkt[0] !== 0x11 || pkt[1] !== 0x8D) return null;
 
     const byte2 = pkt[2];
+    const subtype = pkt[3];
+    const byte4 = pkt[4];
+
+    // Filter subtype telemetri GP: Subtype 0x01 atau 0x0E
+    if (subtype !== 0x01 && subtype !== 0x0E) return null;
+
     const isRemote = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
 
-    // Identifikasi channel data dari paket:
-    // pkt[4]: 0x00 = TX1, 0x10 = TX2, 0x01 = MON1, 0x02 = MON2
-    let channelType = 'TX1';
-    if (pkt[4] === 0x10) channelType = 'TX2';
-    else if (pkt[4] === 0x01) channelType = 'MON1';
-    else if (pkt[4] === 0x02) channelType = 'MON2';
+    // Channel mapping: byte4 0x40 / 0x00 / 0x01 / 0xA4
+    let channel = 'MON1';
+    let offsetShift = 0;
+    if (subtype === 0x01) {
+        channel = 'MON1';
+        offsetShift = 0;
+    } else if (subtype === 0x0E) {
+        channel = 'MON2';
+        const rf52 = readFloat(pkt, 52);
+        const rf54 = readFloat(pkt, 54);
+        if (rf54 && Math.abs(rf54 - 99.0) < 5.0) offsetShift = 2;
+        else if (rf52 && Math.abs(rf52 - 99.0) < 5.0) offsetShift = 0;
+    }
+
+    // SANITY CHECK: Pastikan nilai CRS Pos RF Level masuk akal (80% ~ 130%)
+    // Mengabaikan frame transisi / frame kosong (seperti yang menghasilkan nilai -26214.5 atau 0)
+    const testRf = readFloat(pkt, 52 + offsetShift);
+    if (!testRf || testRf < 70.0 || testRf > 130.0) {
+        return null;
+    }
 
     const params = {};
-    for (const [key, offset] of Object.entries(OFFSETS)) {
-        let val = readFloat(pkt, offset);
+    for (const [key, baseOffset] of Object.entries(MEASUREMENT_OFFSETS)) {
+        const off = baseOffset + offsetShift;
+        let val = readFloat(pkt, off);
         if (val === null) continue;
+
+        // Validasi batasan fisik agar nilai sampah / transisi tidak tembus
+        if (key.includes('RF') || key.includes('POWER')) {
+            if (val < 0 || val > 150) continue;
+        }
+        if (key.includes('SDM') || key.includes('CARRIER') || key.includes('SBO')) {
+            if (val < 0 || val > 100) continue;
+        }
+
         val = DDM_X100.has(key)
-            ? parseFloat((val * 100).toFixed(3))
-            : parseFloat(val.toFixed(3));
+            ? parseFloat((val * 100).toFixed(2))
+            : parseFloat(val.toFixed(2));
+
+        if (key.includes('DDM') && Math.abs(val) > 100) continue;
+
         params[key] = val;
     }
 
@@ -134,8 +133,8 @@ function decodePktC(pkt) {
         tx_main: tx1IsMain ? 'TX1' : 'TX2',
         tx_stby: tx1IsMain ? 'TX2' : 'TX1',
         is_remote: isRemote,
-        tx_data: channelType,
-        channel_type: channelType,
+        channel,
+        subtype,
         params
     };
 }
@@ -143,7 +142,7 @@ function decodePktC(pkt) {
 function extractFrames(buf) {
     const results = [];
     for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
-        if (isPktCSync(buf, i)) {
+        if (buf[i] === 0x11 && buf[i + 1] === 0x8D) {
             const dec = decodePktC(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
                 results.push({ pos: i, decoded: dec });
@@ -154,19 +153,6 @@ function extractFrames(buf) {
     return results;
 }
 
-function checkAlarms(params) {
-    const alarms = [];
-    for (const [key, lim] of Object.entries(LIMITS)) {
-        const v = params[key];
-        if (v == null) continue;
-        if (v < lim[0] || v > lim[1]) {
-            const [label, unit] = PARAM_LABELS[key] || [key, ''];
-            alarms.push(`${label}=${v.toFixed(3)}${unit} [${lim[0]}~${lim[1]}]`);
-        }
-    }
-    return alarms;
-}
-
 class IlsGpThales421Parser extends BaseParser {
     constructor(opts = {}) {
         super(opts);
@@ -175,11 +161,11 @@ class IlsGpThales421Parser extends BaseParser {
         this._mode = 'PASSIVE';
         this._lastDecoded = null;
 
-        // State cache untuk Monitor 1, Monitor 2, TX1, TX2
-        this._mon1 = null;
-        this._mon2 = null;
-        this._tx1 = null;
-        this._tx2 = null;
+        // State cache untuk Executive & Standby MON 1 & MON 2
+        this._execMon1 = null;
+        this._execMon2 = null;
+        this._stbyMon1 = null;
+        this._stbyMon2 = null;
         this._txMain = 'TX1';
         this._txStby = 'TX2';
         this._isRemote = false;
@@ -193,7 +179,7 @@ class IlsGpThales421Parser extends BaseParser {
             if (this._buf.length > 131072) {
                 let ls = -1;
                 for (let i = this._buf.length - 4; i >= 0; i--) {
-                    if (isPktCSync(this._buf, i)) { ls = i; break; }
+                    if (this._buf[i] === 0x11 && this._buf[i + 1] === 0x8D) { ls = i; break; }
                 }
                 this._buf = ls > 0 ? this._buf.slice(ls) : Buffer.alloc(0);
             }
@@ -215,31 +201,43 @@ class IlsGpThales421Parser extends BaseParser {
                 };
             }
 
-            // Proses semua frame yang ditemukan untuk update state mon1/mon2/tx1/tx2
-            let latestDecoded = null;
             for (const f of frames) {
                 const dec = f.decoded;
-                latestDecoded = dec;
                 this._txMain = dec.tx_main;
                 this._txStby = dec.tx_stby;
                 this._isRemote = dec.is_remote;
 
-                if (dec.channel_type === 'MON1') {
-                    this._mon1 = { ...dec.params };
-                } else if (dec.channel_type === 'MON2') {
-                    this._mon2 = { ...dec.params };
-                } else if (dec.channel_type === 'TX1') {
-                    this._tx1 = { ...dec.params };
-                } else if (dec.channel_type === 'TX2') {
-                    this._tx2 = { ...dec.params };
+                // Glitch filter: verifikasi bila ada parameter drop ke 0 sesaat
+                const validParams = {};
+                for (const [k, v] of Object.entries(dec.params)) {
+                    if (v !== null && v !== undefined && !isNaN(v)) {
+                        if (k.includes('DDM') || k.includes('DEV') || k.includes('ANGLE')) {
+                            validParams[k] = v;
+                            continue;
+                        }
+
+                        if (v === 0) {
+                            this._zeroCounts = this._zeroCounts || {};
+                            const zeroKey = `${dec.channel}_${k}`;
+                            this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
+                            if (this._zeroCounts[zeroKey] >= 3) {
+                                validParams[k] = 0;
+                            }
+                        } else {
+                            if (this._zeroCounts) {
+                                delete this._zeroCounts[`${dec.channel}_${k}`];
+                            }
+                            validParams[k] = v;
+                        }
+                    }
                 }
 
-                // Jika stream memancarkan TX1/TX2 utama yang sedang connect ke monitor
-                // sinkronisasikan ke mon1/mon2 jika belum ada paket terpisah
-                if (dec.tx_main === 'TX1') {
-                    if (!this._mon1 || dec.channel_type === 'TX1') this._mon1 = { ...(this._mon1 || {}), ...dec.params };
-                } else {
-                    if (!this._mon2 || dec.channel_type === 'TX2') this._mon2 = { ...(this._mon2 || {}), ...dec.params };
+                if (dec.channel === 'MON1') {
+                    this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
+                    this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
+                } else if (dec.channel === 'MON2') {
+                    this._execMon2 = { ...(this._execMon2 || {}), ...validParams };
+                    this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
                 }
             }
 
@@ -256,59 +254,74 @@ class IlsGpThales421Parser extends BaseParser {
     }
 
     _buildOutput(d, isStale) {
-        const alarms = checkAlarms(d.params);
-
-        // State role: mana yang MAIN dan mana yang STANDBY
-        const mon1Role = this._txMain === 'TX1' ? 'MAIN' : 'STANDBY';
-        const mon2Role = this._txMain === 'TX2' ? 'MAIN' : 'STANDBY';
-
-        // Data murni dari alat
-        const mon1Data = this._mon1 || {};
-        const mon2Data = this._mon2 || {};
+        const exec1 = this._execMon1 || {};
+        const exec2 = this._execMon2 || {};
+        const stby1 = this._stbyMon1 || {};
+        const stby2 = this._stbyMon2 || {};
 
         return {
             success: true,
             data: {
                 _mode: this._mode, _stale: isStale,
                 tx_main: this._txMain, tx_stby: this._txStby,
-                is_remote: this._isRemote, tx_data: d.tx_data,
+                is_remote: this._isRemote,
                 status_label: this._isRemote ? 'Remote Maintenance' : 'Normal',
                 tx_main_label: `${this._txMain} MAIN`,
                 tx_stby_label: `${this._txStby} STBY`,
 
-                // Status Executive Monitor
-                mon1_role: mon1Role,
-                mon2_role: mon2Role,
+                // EXECUTIVE MEASUREMENT MON 1 (Murni dari alat)
+                exec_mon1_rf: exec1.RF_POWER,
+                exec_mon1_ddm: exec1.DDM_COURSE,
+                exec_mon1_sdm: exec1.CARRIER_PWR,
+                exec_mon1_angle: exec1.GP_ANGLE,
+                exec_mon1_width_rf: exec1.CSB_POWER,
+                exec_mon1_width_ddm: exec1.DDM_CLR,
+                exec_mon1_width_sdm: exec1.SBO_POWER,
+                exec_mon1_clr_rf: exec1.CLR_POWER,
+                exec_mon1_clr_ddm: exec1.CLR_DDM,
+                exec_mon1_clr_sdm: exec1.CLR_SDM,
 
-                // Parameter Detail Monitor 1 (Murni dari alat tanpa fallback dummy)
-                mon1_rf_power: mon1Data.RF_POWER,
-                mon1_ddm_course: mon1Data.DDM_COURSE,
-                mon1_carrier_pwr: mon1Data.CARRIER_PWR,
-                mon1_gp_angle: mon1Data.GP_ANGLE,
-                mon1_csb_power: mon1Data.CSB_POWER,
-                mon1_ddm_clr: mon1Data.DDM_CLR,
-                mon1_sbo_power: mon1Data.SBO_POWER,
-                mon1_clr_power: mon1Data.CLR_POWER,
-                mon1_clr_ddm: mon1Data.CLR_DDM,
-                mon1_clr_sdm: mon1Data.CLR_SDM,
+                // EXECUTIVE MEASUREMENT MON 2 (Murni dari alat)
+                exec_mon2_rf: exec2.RF_POWER,
+                exec_mon2_ddm: exec2.DDM_COURSE,
+                exec_mon2_sdm: exec2.CARRIER_PWR,
+                exec_mon2_angle: exec2.GP_ANGLE,
+                exec_mon2_width_rf: exec2.CSB_POWER,
+                exec_mon2_width_ddm: exec2.DDM_CLR,
+                exec_mon2_width_sdm: exec2.SBO_POWER,
+                exec_mon2_clr_rf: exec2.CLR_POWER,
+                exec_mon2_clr_ddm: exec2.CLR_DDM,
+                exec_mon2_clr_sdm: exec2.CLR_SDM,
 
-                // Parameter Detail Monitor 2 (Murni dari alat tanpa fallback dummy)
-                mon2_rf_power: mon2Data.RF_POWER,
-                mon2_ddm_course: mon2Data.DDM_COURSE,
-                mon2_carrier_pwr: mon2Data.CARRIER_PWR,
-                mon2_gp_angle: mon2Data.GP_ANGLE,
-                mon2_csb_power: mon2Data.CSB_POWER,
-                mon2_ddm_clr: mon2Data.DDM_CLR,
-                mon2_sbo_power: mon2Data.SBO_POWER,
-                mon2_clr_power: mon2Data.CLR_POWER,
-                mon2_clr_ddm: mon2Data.CLR_DDM,
-                mon2_clr_sdm: mon2Data.CLR_SDM,
+                // STANDBY MEASUREMENT MON 1 (Murni dari alat)
+                stby_mon1_rf: stby1.RF_POWER,
+                stby_mon1_ddm: stby1.DDM_COURSE,
+                stby_mon1_sdm: stby1.CARRIER_PWR,
+                stby_mon1_angle: stby1.GP_ANGLE,
+                stby_mon1_width_rf: stby1.CSB_POWER,
+                stby_mon1_width_ddm: stby1.DDM_CLR,
+                stby_mon1_width_sdm: stby1.SBO_POWER,
+                stby_mon1_clr_rf: stby1.CLR_POWER,
+                stby_mon1_clr_ddm: stby1.CLR_DDM,
+                stby_mon1_clr_sdm: stby1.CLR_SDM,
 
-                // Parameter aktif saat ini (Backward Compatibility)
+                // STANDBY MEASUREMENT MON 2 (Murni dari alat)
+                stby_mon2_rf: stby2.RF_POWER,
+                stby_mon2_ddm: stby2.DDM_COURSE,
+                stby_mon2_sdm: stby2.CARRIER_PWR,
+                stby_mon2_angle: stby2.GP_ANGLE,
+                stby_mon2_width_rf: stby2.CSB_POWER,
+                stby_mon2_width_ddm: stby2.DDM_CLR,
+                stby_mon2_width_sdm: stby2.SBO_POWER,
+                stby_mon2_clr_rf: stby2.CLR_POWER,
+                stby_mon2_clr_ddm: stby2.CLR_DDM,
+                stby_mon2_clr_sdm: stby2.CLR_SDM,
+
+                // Backward compatibility
                 ...d.params,
             },
-            status: alarms.length > 0 ? 'Alarm' : 'Normal',
-            alarms, warnings: [], triggeredParams: alarms,
+            status: 'Normal',
+            alarms: [], warnings: [], triggeredParams: [],
             timestamp: new Date().toISOString(),
         };
     }
@@ -342,6 +355,5 @@ class IlsGpThales421Parser extends BaseParser {
 }
 
 module.exports = IlsGpThales421Parser;
-module.exports.OFFSETS = OFFSETS;
-module.exports.LIMITS = LIMITS;
-module.exports.PARAM_LABELS = PARAM_LABELS;
+module.exports.MEASUREMENT_OFFSETS = MEASUREMENT_OFFSETS;
+module.exports.OFFSETS = MEASUREMENT_OFFSETS;
