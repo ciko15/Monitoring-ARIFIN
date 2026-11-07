@@ -45,18 +45,26 @@ function isPktCSync(buf, i) {
         buf[i] === 0x11 && buf[i + 1] === 0x8D && buf[i + 3] === 0x01;
 }
 
-// Parameter pengukuran Thales GP 421
-const MEASUREMENT_OFFSETS = {
-    RF_POWER:    52, // CRS Pos. RF Level = ~99.5 %
-    DDM_COURSE:  56, // CRS Pos. DDM (raw*100) = ~ -0.8 %
-    CARRIER_PWR: 60, // CRS Pos. SDM / CARRIER = ~73.9 %
-    CSB_POWER:   68, // CRS Width RF / CSB = ~97.3 %
-    DDM_CLR:     72, // CRS Width DDM (raw*100) = ~16.0 %
-    SBO_POWER:   76, // CRS Width SDM / SBO = ~73.8 %
-    CLR_POWER:   80, // CLR Width RF Level = ~110.5 %
-    CLR_DDM:     84, // CLR Width DDM (raw*100) = ~29.8 %
-    CLR_SDM:     88, // CLR Width SDM = ~79.4 %
-    GP_ANGLE:    8,  // GP Angle = ~3.0° / 4.408
+// Offset pengukuran Thales GP 421 berdasarkan hasil dump nyata alat:
+// Subtype 0x01 (MON 1 Stream):
+const MON1_OFFSETS = {
+    RF_POWER:    52, // CRS Pos. RF Level = 99.4 %
+    DDM_COURSE:  56, // CRS Pos. DDM (raw*100) = -0.77 %
+    CARRIER_PWR: 60, // CRS Pos. SDM / CARRIER = 73.9 %
+    CSB_POWER:   68, // CRS Width RF / CSB = 97.2 %
+    DDM_CLR:     72, // CRS Width DDM (raw*100) = 16.06 %
+    SBO_POWER:   76, // CRS Width SDM / SBO = 73.9 %
+    CLR_POWER:   80, // CLR Width RF Level = 110.3 %
+    CLR_DDM:     84, // CLR Width DDM (raw*100) = 29.85 %
+    CLR_SDM:     88, // CLR Width SDM = 79.6 %
+};
+
+// Subtype 0x0E (MON 2 Stream, byte4=0xA4):
+// Posisi bergeser 28 bytes dibanding MON 1
+const MON2_OFFSETS = {
+    RF_POWER:    80, // CRS Pos. RF Level = 99.4 %
+    DDM_COURSE:  84, // CRS Pos. DDM (raw*100) = -0.77 %
+    CARRIER_PWR: 88, // CRS Pos. SDM / CARRIER = 73.9 %
 };
 
 const DDM_X100 = new Set(['DDM_COURSE', 'DDM_CLR', 'CLR_DDM', 'DDM_MON']);
@@ -79,64 +87,87 @@ function decodePktC(pkt) {
     const subtype = pkt[3];
     const byte4 = pkt[4];
 
-    // Filter subtype telemetri GP: Subtype 0x01 atau 0x0E
-    if (subtype !== 0x01 && subtype !== 0x0E) return null;
-
     const isRemote = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
 
-    // Channel mapping: byte4 0x40 / 0x00 / 0x01 / 0xA4
-    let channel = 'MON1';
-    let offsetShift = 0;
-    if (subtype === 0x01) {
-        channel = 'MON1';
-        offsetShift = 0;
-    } else if (subtype === 0x0E) {
-        channel = 'MON2';
-        const rf52 = readFloat(pkt, 52);
-        const rf54 = readFloat(pkt, 54);
-        if (rf54 && Math.abs(rf54 - 99.0) < 5.0) offsetShift = 2;
-        else if (rf52 && Math.abs(rf52 - 99.0) < 5.0) offsetShift = 0;
-    }
-
-    // SANITY CHECK: Pastikan nilai CRS Pos RF Level masuk akal (80% ~ 130%)
-    // Mengabaikan frame transisi / frame kosong (seperti yang menghasilkan nilai -26214.5 atau 0)
-    const testRf = readFloat(pkt, 52 + offsetShift);
-    if (!testRf || testRf < 70.0 || testRf > 130.0) {
+    // 1. Frame Subtype 0x0C membawa GP ANGLE sudut 3.041°
+    if (subtype === 0x0C) {
+        const angle = readFloat(pkt, 66);
+        if (angle !== null && angle >= 2.5 && angle <= 3.5) {
+            return {
+                type: 'ANGLE',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                channel: byte4 === 0x10 ? 'MON2' : 'MON1',
+                gp_angle: parseFloat(angle.toFixed(3))
+            };
+        }
         return null;
     }
 
-    const params = {};
-    for (const [key, baseOffset] of Object.entries(MEASUREMENT_OFFSETS)) {
-        const off = baseOffset + offsetShift;
-        let val = readFloat(pkt, off);
-        if (val === null) continue;
+    // 2. Frame Subtype 0x01 membawa telemetri MON 1
+    if (subtype === 0x01 && byte4 === 0x40) {
+        const testRf = readFloat(pkt, 52);
+        if (!testRf || testRf < 70.0 || testRf > 130.0) return null;
 
-        // Validasi batasan fisik agar nilai sampah / transisi tidak tembus
-        if (key.includes('RF') || key.includes('POWER')) {
-            if (val < 0 || val > 150) continue;
+        const params = {};
+        for (const [key, off] of Object.entries(MON1_OFFSETS)) {
+            let val = readFloat(pkt, off);
+            if (val === null) continue;
+            if (key.includes('RF') || key.includes('POWER')) {
+                if (val < 0 || val > 150) continue;
+            }
+            if (key.includes('SDM') || key.includes('CARRIER') || key.includes('SBO')) {
+                if (val < 0 || val > 100) continue;
+            }
+
+            val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
+            if (key.includes('DDM') && Math.abs(val) > 100) continue;
+            params[key] = val;
         }
-        if (key.includes('SDM') || key.includes('CARRIER') || key.includes('SBO')) {
-            if (val < 0 || val > 100) continue;
-        }
 
-        val = DDM_X100.has(key)
-            ? parseFloat((val * 100).toFixed(2))
-            : parseFloat(val.toFixed(2));
-
-        if (key.includes('DDM') && Math.abs(val) > 100) continue;
-
-        params[key] = val;
+        return {
+            type: 'TELEMETRY',
+            channel: 'MON1',
+            tx_main: tx1IsMain ? 'TX1' : 'TX2',
+            tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+            is_remote: isRemote,
+            params
+        };
     }
 
-    return {
-        tx_main: tx1IsMain ? 'TX1' : 'TX2',
-        tx_stby: tx1IsMain ? 'TX2' : 'TX1',
-        is_remote: isRemote,
-        channel,
-        subtype,
-        params
-    };
+    // 3. Frame Subtype 0x0E membawa telemetri MON 2
+    if (subtype === 0x0E && byte4 === 0xA4) {
+        const testRf = readFloat(pkt, 80);
+        if (!testRf || testRf < 70.0 || testRf > 130.0) return null;
+
+        const params = {};
+        for (const [key, off] of Object.entries(MON2_OFFSETS)) {
+            let val = readFloat(pkt, off);
+            if (val === null) continue;
+            if (key.includes('RF') || key.includes('POWER')) {
+                if (val < 0 || val > 150) continue;
+            }
+            if (key.includes('SDM') || key.includes('CARRIER') || key.includes('SBO')) {
+                if (val < 0 || val > 100) continue;
+            }
+
+            val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
+            if (key.includes('DDM') && Math.abs(val) > 100) continue;
+            params[key] = val;
+        }
+
+        return {
+            type: 'TELEMETRY',
+            channel: 'MON2',
+            tx_main: tx1IsMain ? 'TX1' : 'TX2',
+            tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+            is_remote: isRemote,
+            params
+        };
+    }
+
+    return null;
 }
 
 function extractFrames(buf) {
@@ -205,39 +236,53 @@ class IlsGpThales421Parser extends BaseParser {
                 const dec = f.decoded;
                 this._txMain = dec.tx_main;
                 this._txStby = dec.tx_stby;
-                this._isRemote = dec.is_remote;
+                if (dec.is_remote !== undefined) this._isRemote = dec.is_remote;
 
-                // Glitch filter: verifikasi bila ada parameter drop ke 0 sesaat
-                const validParams = {};
-                for (const [k, v] of Object.entries(dec.params)) {
-                    if (v !== null && v !== undefined && !isNaN(v)) {
-                        if (k.includes('DDM') || k.includes('DEV') || k.includes('ANGLE')) {
-                            validParams[k] = v;
-                            continue;
-                        }
-
-                        if (v === 0) {
-                            this._zeroCounts = this._zeroCounts || {};
-                            const zeroKey = `${dec.channel}_${k}`;
-                            this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
-                            if (this._zeroCounts[zeroKey] >= 3) {
-                                validParams[k] = 0;
-                            }
-                        } else {
-                            if (this._zeroCounts) {
-                                delete this._zeroCounts[`${dec.channel}_${k}`];
-                            }
-                            validParams[k] = v;
-                        }
+                // Tangani paket sudut GP ANGLE (Subtype 0x0C)
+                if (dec.type === 'ANGLE') {
+                    if (dec.channel === 'MON1') {
+                        this._execMon1 = { ...(this._execMon1 || {}), GP_ANGLE: dec.gp_angle };
+                        this._stbyMon1 = { ...(this._stbyMon1 || {}), GP_ANGLE: dec.gp_angle };
+                    } else if (dec.channel === 'MON2') {
+                        this._execMon2 = { ...(this._execMon2 || {}), GP_ANGLE: dec.gp_angle };
+                        this._stbyMon2 = { ...(this._stbyMon2 || {}), GP_ANGLE: dec.gp_angle };
                     }
+                    continue;
                 }
 
-                if (dec.channel === 'MON1') {
-                    this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
-                    this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
-                } else if (dec.channel === 'MON2') {
-                    this._execMon2 = { ...(this._execMon2 || {}), ...validParams };
-                    this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
+                // Tangani paket telemetri (Subtype 0x01 / 0x0E)
+                if (dec.params) {
+                    const validParams = {};
+                    for (const [k, v] of Object.entries(dec.params)) {
+                        if (v !== null && v !== undefined && !isNaN(v)) {
+                            if (k.includes('DDM') || k.includes('DEV') || k.includes('ANGLE')) {
+                                validParams[k] = v;
+                                continue;
+                            }
+
+                            if (v === 0) {
+                                this._zeroCounts = this._zeroCounts || {};
+                                const zeroKey = `${dec.channel}_${k}`;
+                                this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
+                                if (this._zeroCounts[zeroKey] >= 3) {
+                                    validParams[k] = 0;
+                                }
+                            } else {
+                                if (this._zeroCounts) {
+                                    delete this._zeroCounts[`${dec.channel}_${k}`];
+                                }
+                                validParams[k] = v;
+                            }
+                        }
+                    }
+
+                    if (dec.channel === 'MON1') {
+                        this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
+                        this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
+                    } else if (dec.channel === 'MON2') {
+                        this._execMon2 = { ...(this._execMon2 || {}), ...validParams };
+                        this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
+                    }
                 }
             }
 
@@ -355,5 +400,6 @@ class IlsGpThales421Parser extends BaseParser {
 }
 
 module.exports = IlsGpThales421Parser;
-module.exports.MEASUREMENT_OFFSETS = MEASUREMENT_OFFSETS;
-module.exports.OFFSETS = MEASUREMENT_OFFSETS;
+module.exports.MON1_OFFSETS = MON1_OFFSETS;
+module.exports.MON2_OFFSETS = MON2_OFFSETS;
+module.exports.OFFSETS = MON1_OFFSETS;
