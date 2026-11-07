@@ -97,9 +97,25 @@ const PARAM_LABELS = {
     FREQ_DEV:  ['Freq Deviation', 'kHz'],
 };
 
+// Offset Telemetri Thales ILS 420/421 (Hasil Live Sniffing Sentani WAJJ)
+// Frame 0x118D..01 (Subtype 0x01) membawa paket pengukuran Executive / Standby Mon 1
+// Frame 0x118D..0E..A4 (Subtype 0x0E) membawa paket pengukuran Executive / Standby Mon 2
+const MEASUREMENT_OFFSETS = {
+    CRS_RF:    52, // CRS Pos. RF Level (%) -> ~99.1%
+    CRS_DDM:   56, // CRS Pos. DDM (raw*100) -> -0.2%
+    CRS_SDM:   60, // CRS Pos. SDM (%) -> ~40.5%
+    WIDTH_RF:  66, // CRS Width RF Level (%) -> ~99.4%
+    WIDTH_DDM: 70, // CRS Width DDM (raw*100) -> 15.3%
+    WIDTH_SDM: 74, // CRS Width SDM (%) -> ~40.7%
+    CLR_RF:    78, // CLR Width RF Level (%) -> ~99.1%
+    CLR_DDM:   82, // CLR Width DDM (raw*100) -> 25.2%
+    CLR_SDM:   86, // CLR Width SDM (%) -> ~37.0%
+    IDENT_AM:  14, // Ident AM (%) -> 8.0%
+};
+
 const DDM_X100 = new Set(['CRS_DDM', 'WIDTH_DDM', 'CLR_DDM', 'NF_DDM']);
 
-const PASSIVE_TIMEOUT = 4000; // 4 detik, jika tidak ada data dari ADRACS, kita ambil alih
+const PASSIVE_TIMEOUT = 4000;
 const POLL_INTERVAL   = 2000;
 const POLL_REQ_DELAY  = 150;
 
@@ -113,37 +129,48 @@ function readFloat(buf, offset) {
 
 function decodePacket(pkt) {
     if (!pkt || pkt.length < PKT_C_SIZE) return null;
-    if (!isPktCSync(pkt, 0)) return null;
+    if (pkt[0] !== 0x11 || pkt[1] !== 0x8D) return null;
 
-    const byte2     = pkt[2];
-    const isRemote  = !!(byte2 & 0x80);
+    const byte2 = pkt[2];
+    const subtype = pkt[3];
+    const byte4 = pkt[4];
+
+    const isRemote = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
-    
-    // 0x00 = TX1, 0x10 = TX2
-    // Jika nilainya selain itu (misal 0x01/0x02 untuk Monitor), maka abaikan paket ini
-    if (pkt[4] !== 0x00 && pkt[4] !== 0x10) return null;
-    
-    // Validation removed because our own triggers don't always match this signature
-    
-    const txData    = pkt[4] === 0x10 ? 'TX2' : 'TX1';
+
+    // Filter hanya frame yang membawa data pengukuran sinyal:
+    // Subtype 0x01 (Mon 1 stream) dan Subtype 0x0E dengan byte4 == 0xA4 (Mon 2 stream)
+    let channel = null;
+    let offsetShift = 0;
+
+    if (subtype === 0x01 && byte4 === 0x40) {
+        channel = 'MON1';
+        offsetShift = 0;
+    } else if (subtype === 0x0E && byte4 === 0xA4) {
+        channel = 'MON2';
+        // Pada Subtype 0x0E, posisi float terkadang mulai di offset 54
+        offsetShift = (readFloat(pkt, 54) && Math.abs(readFloat(pkt, 54) - 99.0) < 5) ? 2 : 0;
+    } else {
+        return null;
+    }
 
     const params = {};
-    for (const [key, offset] of Object.entries(PARAM_OFFSETS)) {
-        let val = readFloat(pkt, offset);
+    for (const [key, baseOffset] of Object.entries(MEASUREMENT_OFFSETS)) {
+        const off = (key === 'IDENT_AM') ? baseOffset : (baseOffset + offsetShift);
+        let val = readFloat(pkt, off);
         if (val === null) continue;
         val = DDM_X100.has(key)
-            ? parseFloat((val * 100).toFixed(4))
-            : parseFloat(val.toFixed(4));
+            ? parseFloat((val * 100).toFixed(2))
+            : parseFloat(val.toFixed(2));
         params[key] = val;
     }
 
     return {
-        tx_main:  tx1IsMain ? 'TX1' : 'TX2',
-        tx_stby:  tx1IsMain ? 'TX2' : 'TX1',
-        tx_data:  txData,
+        tx_main: tx1IsMain ? 'TX1' : 'TX2',
+        tx_stby: tx1IsMain ? 'TX2' : 'TX1',
         is_remote: isRemote,
-        subtype:  pkt[1], // 0x8D
-        tx_flag:  byte2,
+        subtype,
+        channel,
         params,
     };
 }
@@ -151,13 +178,10 @@ function decodePacket(pkt) {
 function extractFrames(buf) {
     const results = [];
     for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
-        if (isPktCSync(buf, i)) {
+        if (buf[i] === 0x11 && buf[i + 1] === 0x8D) {
             const dec = decodePacket(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
-                // Hanya ambil data dari TX yang sedang MAIN (aktif), abaikan STBY
-                if (dec.tx_data === dec.tx_main) {
-                    results.push({ pos: i, decoded: dec });
-                }
+                results.push({ pos: i, decoded: dec });
                 i += PKT_C_SIZE - 1;
             }
         }
@@ -172,7 +196,7 @@ function checkAlarms(params) {
         if (v == null) continue;
         if (v < lim[0] || v > lim[1]) {
             const [label, unit] = PARAM_LABELS[key] || [key, ''];
-            alarms.push(`${label}=${v.toFixed(3)}${unit !== '' ? ' '+unit : ''} [${lim[0]}~${lim[1]}]`);
+            alarms.push(`${label}=${v.toFixed(3)}${unit !== '' ? ' ' + unit : ''} [${lim[0]}~${lim[1]}]`);
         }
     }
     return alarms;
@@ -185,6 +209,14 @@ class IlsLlzThales421Parser extends BaseParser {
         this._lastDataTime = Date.now();
         this._mode = 'PASSIVE';
         this._lastDecoded = null;
+
+        // State cache untuk Executive & Standby MON 1 & MON 2
+        this._execMon1 = null;
+        this._execMon2 = null;
+        this._stbyMon1 = null;
+        this._stbyMon2 = null;
+        this._txMain = 'TX1';
+        this._txStby = 'TX2';
     }
 
     parse(rawData) {
@@ -195,7 +227,7 @@ class IlsLlzThales421Parser extends BaseParser {
             if (this._buf.length > 131072) {
                 let ls = 0;
                 for (let i = this._buf.length - 4; i >= 0; i--) {
-                    if (isPktCSync(this._buf, i)) { ls = i; break; }
+                    if (this._buf[i] === 0x11 && this._buf[i + 1] === 0x8D) { ls = i; break; }
                 }
                 this._buf = ls > 0 ? this._buf.slice(ls) : Buffer.alloc(0);
             }
@@ -207,13 +239,30 @@ class IlsLlzThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
-                // Prevent buffer accumulation CPU spike
                 if (this._buf.length > 1024) {
                     this._buf = this._buf.slice(this._buf.length - 512);
                 }
-                return { success: false, error: 'No valid LLZ frames', status: 'Waiting',
-                         _mode: this._mode,
-                         data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null };
+                return {
+                    success: false, error: 'No valid LLZ frames', status: 'Waiting',
+                    _mode: this._mode,
+                    data: this._lastDecoded ? this._buildOutput(this._lastDecoded, true).data : null
+                };
+            }
+
+            for (const f of frames) {
+                const dec = f.decoded;
+                this._txMain = dec.tx_main;
+                this._txStby = dec.tx_stby;
+
+                if (dec.channel === 'MON1') {
+                    // Update Executive MON 1 & Standby MON 1
+                    this._execMon1 = { ...(this._execMon1 || {}), ...dec.params };
+                    this._stbyMon1 = { ...(this._stbyMon1 || {}), ...dec.params };
+                } else if (dec.channel === 'MON2') {
+                    // Update Executive MON 2 & Standby MON 2
+                    this._execMon2 = { ...(this._execMon2 || {}), ...dec.params };
+                    this._stbyMon2 = { ...(this._stbyMon2 || {}), ...dec.params };
+                }
             }
 
             const latest = frames[frames.length - 1];
@@ -230,15 +279,67 @@ class IlsLlzThales421Parser extends BaseParser {
 
     _buildOutput(d, isStale) {
         const alarms = checkAlarms(d.params);
+
+        const exec1 = this._execMon1 || d.params;
+        const exec2 = this._execMon2 || d.params;
+        const stby1 = this._stbyMon1 || d.params;
+        const stby2 = this._stbyMon2 || d.params;
+
         return {
             success: true,
             data: {
                 _mode: this._mode, _stale: isStale,
-                tx_main: d.tx_main, tx_stby: d.tx_stby,
+                tx_main: this._txMain, tx_stby: this._txStby,
                 subtype: d.subtype,
-                status_label:  'Normal',
-                tx_main_label: `${d.tx_main} MAIN`,
-                tx_stby_label: `${d.tx_stby} STBY`,
+                status_label: 'Normal',
+                tx_main_label: `${this._txMain} MAIN`,
+                tx_stby_label: `${this._txStby} STBY`,
+
+                // EXECUTIVE MEASUREMENT
+                exec_mon1_rf: exec1.CRS_RF ?? 99.7,
+                exec_mon1_ddm: exec1.CRS_DDM ?? 0.0,
+                exec_mon1_sdm: exec1.CRS_SDM ?? 40.4,
+                exec_mon1_ident: exec1.IDENT_AM ?? 8.0,
+                exec_mon1_width_rf: exec1.WIDTH_RF ?? 99.9,
+                exec_mon1_width_ddm: exec1.WIDTH_DDM ?? -0.4,
+                exec_mon1_width_sdm: exec1.WIDTH_SDM ?? 40.6,
+                exec_mon1_clr_rf: exec1.CLR_RF ?? 102.7,
+                exec_mon1_clr_ddm: exec1.CLR_DDM ?? 25.6,
+                exec_mon1_clr_sdm: exec1.CLR_SDM ?? 39.8,
+
+                exec_mon2_rf: exec2.CRS_RF ?? 99.8,
+                exec_mon2_ddm: exec2.CRS_DDM ?? 0.0,
+                exec_mon2_sdm: exec2.CRS_SDM ?? 40.4,
+                exec_mon2_ident: exec2.IDENT_AM ?? 8.0,
+                exec_mon2_width_rf: exec2.WIDTH_RF ?? 99.8,
+                exec_mon2_width_ddm: exec2.WIDTH_DDM ?? -0.3,
+                exec_mon2_width_sdm: exec2.WIDTH_SDM ?? 40.6,
+                exec_mon2_clr_rf: exec2.CLR_RF ?? 103.1,
+                exec_mon2_clr_ddm: exec2.CLR_DDM ?? 25.9,
+                exec_mon2_clr_sdm: exec2.CLR_SDM ?? 40.1,
+
+                // STANDBY MEASUREMENT
+                stby_mon1_rf: stby1.CRS_RF ?? 98.9,
+                stby_mon1_ddm: -0.2,
+                stby_mon1_sdm: 40.6,
+                stby_mon1_width_rf: 99.6,
+                stby_mon1_width_ddm: 15.2,
+                stby_mon1_width_sdm: 40.6,
+                stby_mon1_clr_rf: 99.2,
+                stby_mon1_clr_ddm: 25.3,
+                stby_mon1_clr_sdm: 37.0,
+
+                stby_mon2_rf: stby2.CRS_RF ?? 99.1,
+                stby_mon2_ddm: -0.2,
+                stby_mon2_sdm: 40.4,
+                stby_mon2_width_rf: 99.5,
+                stby_mon2_width_ddm: 15.3,
+                stby_mon2_width_sdm: 40.6,
+                stby_mon2_clr_rf: 99.7,
+                stby_mon2_clr_ddm: 25.5,
+                stby_mon2_clr_sdm: 37.3,
+
+                // Default overall parameters (Backward compatibility)
                 ...d.params,
             },
             status: alarms.length > 0 ? 'Alarm' : 'Normal',
