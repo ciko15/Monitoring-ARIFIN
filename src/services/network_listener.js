@@ -727,23 +727,14 @@ class NetworkListenerService {
         let isPingable = false;
 
         if (isInitialDisconnect) {
-            // Jika parsing_id adalah ils_mophien_llz / ils_mophien_gp / dme_mophien_tdme atau modul TCP streaming khusus,
-            // jangan biarkan ping ICMP yang di-block mematikan status alat
-            if (source.parsing_id === 'ils_mophien_llz' || source.parsing_id === 'ils_mophien_gp' || source.parsing_id === 'dme_mophien_tdme') {
-                isPingable = true;
-                if (!parsedData.data) parsedData.data = {};
-                parsedData.data.ping_status = 'Normal';
-                statusToEvaluate = 'Normal';
-            } else {
-                isPingable = await checkIcmpPing(source.ip_address);
-                if (!parsedData.data) parsedData.data = {};
-                parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
+            isPingable = await checkIcmpPing(source.ip_address);
+            if (!parsedData.data) parsedData.data = {};
+            parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
 
-                if (isPingable) {
-                    statusToEvaluate = 'Offline';
-                } else {
-                    statusToEvaluate = 'Disconnect';
-                }
+            if (isPingable) {
+                statusToEvaluate = 'Offline';
+            } else {
+                statusToEvaluate = 'Disconnect';
             }
         } else if (source.equipt_id && parsedData && parsedData.data) {
             // Dynamic Limitation Threshold Evaluation
@@ -859,10 +850,8 @@ class NetworkListenerService {
             }
         }
 
-        // Jangan timpa parameter menjadi strip jika alat adalah streaming TCP aktif atau SNMP system monitor (biarkan Last Known Good Value bertahan)
+        // Jangan timpa parameter menjadi strip jika alat adalah SNMP system monitor (biarkan Last Known Good Value bertahan)
         if ((isDisconnect || finalStatus === 'Offline') &&
-            source.parsing_id !== 'ils_mophien_llz' &&
-            source.parsing_id !== 'ils_mophien_gp' &&
             source.parsing_id !== 'snmp_system' &&
             source.parsing_id !== 'snmp_network_basic') {
             const prevData = this._lkgvCache.get(source.id);
@@ -874,7 +863,11 @@ class NetworkListenerService {
                 dashData.connectivity = 'Disconnected';
                 parsedData.data = { ...parsedData.data, ...dashData };
             }
-            parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
+            if (parsedData.data) {
+                if (parsedData.data.status_label) parsedData.data.status_label = finalStatus || 'Disconnect';
+                parsedData.data.connectivity = 'Disconnected';
+                parsedData.data.ping_status = isPingable ? 'Normal' : 'Gagal';
+            }
         }
 
         if (this._isSplitCollectorMode()) {
@@ -1381,10 +1374,7 @@ class NetworkListenerService {
             });
 
             const reportDisconnect = (reason) => {
-                // Untuk ils_mophien_llz, pertahankan data terakhir saat reconnect sesaat agar tampilan tidak kosong
-                const cached = this._lkgvCache ? this._lkgvCache.get(source.id) : null;
-                const fallbackData = (moduleName === 'ils_mophien_llz' && cached) ? cached : {};
-                this._handleLogOutput(source, { data: fallbackData, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
+                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
             };
 
             socket.on('error', (err) => {

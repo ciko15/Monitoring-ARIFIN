@@ -69,6 +69,18 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
     const airportCode = await getAirportCode();
     
     const parsingId = datalog.source_parsing_id || datalog.parsing_id || (datalog.data && datalog.data._parsing_id) || '';
+    const isDead = String(datalog.status || '').toLowerCase() === 'disconnect' || String(datalog.status || '').toLowerCase() === 'offline' || String(datalog.status || '').toLowerCase() === 'error';
+    const finalData = {
+        ...(datalog.data || {}),
+        ...(parsingId ? { _parsing_id: parsingId } : {})
+    };
+    if (isDead) {
+        finalData.connectivity = 'Disconnected';
+        if (finalData.status_label) {
+            finalData.status_label = datalog.status || 'Disconnect';
+        }
+    }
+
     const payload = {
         equipment_id: datalog.equipmentId,
         equipment_name: datalog.equipment_name,
@@ -83,10 +95,7 @@ async function publishEquipmentTelemetry(datalog, equipment = {}, options = {}) 
         connection_type: datalog.connection_type,
         status: datalog.status,
         logged_at: datalog.logged_at,
-        data: {
-            ...(datalog.data || {}),
-            ...(parsingId ? { _parsing_id: parsingId } : {})
-        }
+        data: finalData
     };
 
     // console.log("[EMS-PAYLOAD]", JSON.stringify(payload)); /* FIXED BUG */

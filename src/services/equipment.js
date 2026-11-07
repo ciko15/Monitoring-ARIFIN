@@ -319,10 +319,9 @@ class EquipmentService {
             
             // BUGFIX: Jika statusnya Offline/Disconnect tapi network_listener gagal mengirimkan dashData 
             // (misal karena _lkgvCache kosong saat baru restart), paksa ubah cache.mergedData menjadi '-'
-            // KECUALIKAN parser streaming/metering (ILS, PM5560, DSE7320, Diris) agar datanya tidak mendadak hilang saat reconnect sesaat
             const isDead = String(finalStatus || '').toLowerCase() === 'disconnect' || String(finalStatus || '').toLowerCase() === 'offline' || String(finalStatus || '').toLowerCase() === 'error';
             const parsingId = parsedData.parsing_id || parsedData.source_parsing_id || '';
-            const isPersistentStreamOrMeter = parsingId.includes('ils_') || parsingId.includes('pm5560') || parsingId.includes('diris') || parsingId.includes('dse7320');
+            const isPersistentStreamOrMeter = parsingId.includes('pm5560') || parsingId.includes('diris') || parsingId.includes('dse7320');
             if (isDead && !isPersistentStreamOrMeter) {
                 for (const key of Object.keys(cache.mergedData)) {
                     if (key !== 'connectivity' && key !== 'source_name' && !key.startsWith('_')) {
@@ -330,6 +329,9 @@ class EquipmentService {
                     }
                 }
                 cache.mergedData.connectivity = 'Disconnected';
+                if (cache.mergedData.status_label) {
+                    cache.mergedData.status_label = finalStatus || 'Disconnect';
+                }
             }
 
             // Injeksi source_name selalu, meskipun statusnya Disconnect, agar nama baru tetap terkirim ke EMS
