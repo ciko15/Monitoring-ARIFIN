@@ -171,7 +171,14 @@ function decodePacket(pkt) {
 
     const params = {};
     for (const [key, baseOffset] of Object.entries(MEASUREMENT_OFFSETS)) {
-        const off = (key === 'IDENT_AM') ? baseOffset : (baseOffset + offsetShift);
+        let off = baseOffset + offsetShift;
+        // Posisi Ident AM (8.0%):
+        // Di Subtype 0x01 (MON 1) berada di offset 14
+        // Di Subtype 0x0E (MON 2) berada di offset 42
+        if (key === 'IDENT_AM') {
+            off = (channel === 'MON2') ? 42 : 14;
+        }
+
         let val = readFloat(pkt, off);
         if (val === null) continue;
 
@@ -283,20 +290,19 @@ class IlsLlzThales421Parser extends BaseParser {
                 for (const [k, v] of Object.entries(dec.params)) {
                     if (v !== null && v !== undefined && !isNaN(v)) {
                         // Untuk DDM atau Deviasi Freq, nilai 0.0 adalah SANGAT NORMAL (Perfect On-Course)
-                        if (k.includes('DDM') || k.includes('DEV') || k.includes('IDENT')) {
+                        if (k.includes('DDM') || k.includes('DEV')) {
                             validParams[k] = v;
                             continue;
                         }
 
-                        // Untuk level RF & SDM:
+                        // Untuk level RF, SDM, dan Ident AM:
                         // Jika terbaca 0, verifikasi apakah ini glitch 1 frame atau memang sinyal drop/mati
                         if (v === 0) {
                             this._zeroCounts = this._zeroCounts || {};
                             const zeroKey = `${dec.channel}_${k}`;
                             this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
 
-                            // Jika terbaca 0 berturut-turut >= 3 frame (artinya pemancar benar-benar mati/off),
-                            // barulah kita update menjadi 0 riil (Alarm mati)
+                            // Jika terbaca 0 berturut-turut >= 3 frame, barulah kita update menjadi 0 riil
                             if (this._zeroCounts[zeroKey] >= 3) {
                                 validParams[k] = 0;
                             }
