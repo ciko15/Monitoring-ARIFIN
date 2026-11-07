@@ -113,16 +113,39 @@ function decodePktC(pkt) {
     const isRemote = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
 
-    // 1. Frame Subtype 0x0C membawa GP ANGLE sudut 3.041°
+    // 1. Frame Subtype 0x0C membawa telemetri EXECUTIVE MEASUREMENT (CRS Pos, CRS Width, CLR Width, GP ANGLE)
     if (subtype === 0x0C) {
         const angle = readFloat(pkt, 66);
-        if (angle !== null && angle >= 2.5 && angle <= 3.5) {
+        const rfPos = readFloat(pkt, 15);
+        const ddmPos = readFloat(pkt, 19);
+        const sdmPos = readFloat(pkt, 23);
+        const rfWidth = readFloat(pkt, 31);
+        const ddmWidth = readFloat(pkt, 35);
+        const sdmWidth = readFloat(pkt, 39);
+        const rfClr = readFloat(pkt, 43);
+        const ddmClr = readFloat(pkt, 47);
+        const sdmClr = readFloat(pkt, 51);
+
+        const params = {};
+        if (rfPos !== null && rfPos > 50.0 && rfPos < 150.0) params.RF_POWER = parseFloat(rfPos.toFixed(2));
+        if (ddmPos !== null) params.DDM_COURSE = parseFloat((ddmPos * 100).toFixed(2));
+        if (sdmPos !== null) params.CARRIER_PWR = parseFloat(sdmPos.toFixed(2));
+        if (angle !== null && angle >= 2.0 && angle <= 4.0) params.GP_ANGLE = parseFloat(angle.toFixed(3));
+        if (rfWidth !== null) params.CSB_POWER = parseFloat(rfWidth.toFixed(2));
+        if (ddmWidth !== null) params.DDM_CLR = parseFloat((ddmWidth * 100).toFixed(2));
+        if (sdmWidth !== null) params.SBO_POWER = parseFloat(sdmWidth.toFixed(2));
+        if (rfClr !== null) params.CLR_POWER = parseFloat(rfClr.toFixed(2));
+        if (ddmClr !== null) params.CLR_DDM = parseFloat((ddmClr * 100).toFixed(2));
+        if (sdmClr !== null) params.CLR_SDM = parseFloat(sdmClr.toFixed(2));
+
+        if (Object.keys(params).length > 0) {
             return {
-                type: 'ANGLE',
+                type: 'EXECUTIVE_DATA',
                 tx_main: tx1IsMain ? 'TX1' : 'TX2',
                 tx_stby: tx1IsMain ? 'TX2' : 'TX1',
                 channel: byte4 === 0x10 ? 'MON2' : 'MON1',
-                gp_angle: parseFloat(angle.toFixed(3))
+                is_remote: isRemote,
+                params
             };
         }
         return null;
@@ -171,21 +194,18 @@ function decodePktC(pkt) {
         }
     }
 
-    // 3. Frame Subtype 0x0E (Byte4 0xA4): Membawa Executive Measurement (CRS Pos RF ~99.4% di offset 80)
+    // 3. Frame Subtype 0x0E (Byte4 0xA4): Membawa Executive Measurement dari alat
     if (subtype === 0x0E && byte4 === 0xA4) {
         const val80 = readFloat(pkt, 80);
-        if (val80 !== null && val80 >= 85.0 && val80 <= 105.0) {
+        if (val80 !== null && val80 >= 80.0 && val80 <= 120.0) {
             const params = {
-                RF_POWER: parseFloat(val80.toFixed(2)),
-                DDM_COURSE: readFloat(pkt, 84) !== null ? parseFloat((readFloat(pkt, 84) * 100).toFixed(2)) : -0.8,
-                CARRIER_PWR: readFloat(pkt, 88) !== null ? parseFloat(readFloat(pkt, 88).toFixed(2)) : 73.7,
-                CSB_POWER: 97.2,
-                DDM_CLR: 16.0,
-                SBO_POWER: 73.7,
-                CLR_POWER: 110.4,
-                CLR_DDM: 29.8,
-                CLR_SDM: 79.5
+                RF_POWER: parseFloat(val80.toFixed(2))
             };
+            const f84 = readFloat(pkt, 84);
+            if (f84 !== null) params.DDM_COURSE = parseFloat((f84 * 100).toFixed(2));
+            const f88 = readFloat(pkt, 88);
+            if (f88 !== null) params.CARRIER_PWR = parseFloat(f88.toFixed(2));
+
             return {
                 type: 'EXECUTIVE_DATA',
                 channel: 'MON2',
@@ -268,28 +288,23 @@ class IlsGpThales421Parser extends BaseParser {
                 this._txStby = dec.tx_stby;
                 if (dec.is_remote !== undefined) this._isRemote = dec.is_remote;
 
-                // Tangani paket sudut GP ANGLE (Subtype 0x0C)
-                if (dec.type === 'ANGLE') {
-                    if (dec.channel === 'MON1') {
-                        this._execMon1 = { ...(this._execMon1 || {}), GP_ANGLE: dec.gp_angle };
-                        this._stbyMon1 = { ...(this._stbyMon1 || {}), GP_ANGLE: dec.gp_angle };
-                    } else if (dec.channel === 'MON2') {
-                        this._execMon2 = { ...(this._execMon2 || {}), GP_ANGLE: dec.gp_angle };
-                        this._stbyMon2 = { ...(this._stbyMon2 || {}), GP_ANGLE: dec.gp_angle };
-                    }
-                    continue;
-                }
+
 
                 if (dec.type === 'EXECUTIVE_DATA') {
-                    if (dec.channel === 'MON1') {
-                        this._execMon1 = { ...(this._execMon1 || {}), ...dec.params };
-                        // Executive MON 2 membaca data yang sama / simetris dari transmitter aktif
+                    if (dec.channel === 'MON2') {
                         this._execMon2 = { ...(this._execMon2 || {}), ...dec.params };
+                        if (!this._execMon1) this._execMon1 = { ...dec.params };
+                    } else {
+                        this._execMon1 = { ...(this._execMon1 || {}), ...dec.params };
+                        if (!this._execMon2) this._execMon2 = { ...dec.params };
                     }
                 } else if (dec.type === 'STANDBY_DATA') {
-                    if (dec.channel === 'MON1') {
-                        this._stbyMon1 = { ...(this._stbyMon1 || {}), ...dec.params };
+                    if (dec.channel === 'MON2') {
                         this._stbyMon2 = { ...(this._stbyMon2 || {}), ...dec.params };
+                        if (!this._stbyMon1) this._stbyMon1 = { ...dec.params };
+                    } else {
+                        this._stbyMon1 = { ...(this._stbyMon1 || {}), ...dec.params };
+                        if (!this._stbyMon2) this._stbyMon2 = { ...dec.params };
                     }
                 }
             }
