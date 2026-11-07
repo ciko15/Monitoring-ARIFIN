@@ -310,12 +310,29 @@ class IlsLlzThales421Parser extends BaseParser {
                     }
                 }
 
+                // Perhatikan:
+                // Subtype 0x01 & 0x0E membawa paket Standby Measurement (CRS Width DDM = 15.2% ~ 15.3%)
+                // Sementara Executive Measurement pada antenna Course Width bernilai -0.4% (MON 1) / -0.3% (MON 2)
                 if (dec.channel === 'MON1') {
-                    this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
+                    // Update Standby Mon 1 dengan data paket ini
                     this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
+                    
+                    // Untuk Executive Mon 1, hanya perbarui parameter umum (seperti RF, SDM, Ident)
+                    // jangan timpa Course Width DDM (-0.4%) dengan Standby Width DDM (15.2%)
+                    const execParams = { ...validParams };
+                    if (execParams.WIDTH_DDM !== undefined && execParams.WIDTH_DDM > 1.0) {
+                        delete execParams.WIDTH_DDM; // Pertahankan Executive Width DDM ~ -0.4%
+                    }
+                    this._execMon1 = { ...(this._execMon1 || {}), ...execParams };
                 } else if (dec.channel === 'MON2') {
-                    this._execMon2 = { ...(this._execMon2 || {}), ...validParams };
+                    // Update Standby Mon 2 dengan data paket ini
                     this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
+
+                    const execParams = { ...validParams };
+                    if (execParams.WIDTH_DDM !== undefined && execParams.WIDTH_DDM > 1.0) {
+                        delete execParams.WIDTH_DDM; // Pertahankan Executive Width DDM ~ -0.3%
+                    }
+                    this._execMon2 = { ...(this._execMon2 || {}), ...execParams };
                 }
             }
 
