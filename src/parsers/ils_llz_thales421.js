@@ -148,17 +148,25 @@ function decodePacket(pkt) {
         offsetShift = 0;
     } else if (subtype === 0x0E && byte4 === 0xA4) {
         channel = 'MON2';
-        const rf54 = readFloat(pkt, 54);
+        // Pada Subtype 0x0E, cek apakah ada nilai CRS RF (~99%) di offset 52 atau 54
         const rf52 = readFloat(pkt, 52);
-        if (rf54 && Math.abs(rf54 - 99.0) < 6.0) {
+        const rf54 = readFloat(pkt, 54);
+        if (rf54 && Math.abs(rf54 - 99.0) < 5.0) {
             offsetShift = 2;
-        } else if (rf52 && Math.abs(rf52 - 99.0) < 6.0) {
+        } else if (rf52 && Math.abs(rf52 - 99.0) < 5.0) {
             offsetShift = 0;
         } else {
-            offsetShift = 0;
+            return null; // Bukan frame telemetri yang valid
         }
     } else {
         return null;
+    }
+
+    // SANITY CHECK: Pastikan nilai CRS Pos RF Level masuk akal (80% ~ 120%)
+    // Jika nilainya anomali (seperti 0.03, 440.83, atau 243314), abaikan frame ini!
+    const testRf = readFloat(pkt, 52 + offsetShift);
+    if (!testRf || testRf < 70.0 || testRf > 130.0) {
+        return null; // Tolak false-sync / frame rusak
     }
 
     const params = {};
@@ -166,7 +174,7 @@ function decodePacket(pkt) {
         let off = baseOffset + offsetShift;
         // Posisi Ident AM (8.0%):
         // Di Subtype 0x01 (MON 1) berada di offset 14
-        // Di Subtype 0x0E (MON 2) berada di offset 42
+        // Di Subtype 0x0E (MON 2) berada di offset 42 (atau 42 + offsetShift)
         if (key === 'IDENT_AM') {
             if (channel === 'MON2') {
                 const id42 = readFloat(pkt, 42);
@@ -180,25 +188,15 @@ function decodePacket(pkt) {
                 continue;
             } else {
                 off = 14;
-                let idVal = readFloat(pkt, off);
-                if (idVal !== null && idVal >= 4.0 && idVal <= 25.0) {
-                    params[key] = parseFloat(idVal.toFixed(2));
-                }
-                continue;
             }
         }
 
         let val = readFloat(pkt, off);
         if (val === null) continue;
 
-        // Validasi batasan fisik: level RF pemancar LLZ beroperasi di range normal (50% ~ 140%)
-        // Jika nilai di luar batas ini (misal 8.43% pada heartbeat), jangan masukkan sebagai parameter RF
-        if (key.includes('RF')) {
-            if (val < 50.0 || val > 140.0) continue;
-        }
-        if (key.includes('SDM')) {
-            if (val < 10.0 || val > 95.0) continue;
-        }
+        // Validasi batasan fisik agar angka aneh (seperti 440.83 atau ribuan) tidak pernah masuk
+        if (key.includes('RF') && (val < 0 || val > 150)) continue;
+        if (key.includes('SDM') && (val < 0 || val > 100)) continue;
 
         val = DDM_X100.has(key)
             ? parseFloat((val * 100).toFixed(2))
@@ -208,8 +206,6 @@ function decodePacket(pkt) {
 
         params[key] = val;
     }
-
-    if (Object.keys(params).length === 0) return null;
 
     return {
         tx_main: tx1IsMain ? 'TX1' : 'TX2',
@@ -228,6 +224,7 @@ function extractFrames(buf) {
             const dec = decodePacket(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
                 results.push({ pos: i, decoded: dec });
+                i += PKT_C_SIZE - 1;
             }
         }
     }
@@ -300,7 +297,7 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._txStby = dec.tx_stby;
 
                 // Track and validate measurements
-                // Hanya perbarui parameter yang valid dan ada pada frame fisik
+                // Bedakan antara "Frame Kosong / Glitch" vs "Alat Benar-Benar Mati / Power Drop ke 0"
                 const validParams = {};
                 for (const [k, v] of Object.entries(dec.params)) {
                     if (v !== null && v !== undefined && !isNaN(v)) {
@@ -311,16 +308,29 @@ class IlsLlzThales421Parser extends BaseParser {
                         }
 
                         // Untuk level RF, SDM, dan Ident AM:
-                        // Jika terbaca 0, verifikasi apakah ini glitch / paket parsial atau memang sinyal drop
-                        // Jangan langsung menimpa data telemetri valid sebelumnya dengan 0 kecuali alat benar-benar mati
+                        // Jika terbaca 0, verifikasi apakah ini glitch 1 frame atau memang sinyal drop/mati
                         if (v === 0) {
-                            continue; // Abaikan 0 pada paket parsial agar tidak merusak data telemetri valid
+                            this._zeroCounts = this._zeroCounts || {};
+                            const zeroKey = `${dec.channel}_${k}`;
+                            this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
+
+                            // Jika terbaca 0 berturut-turut >= 3 frame, barulah kita update menjadi 0 riil
+                            if (this._zeroCounts[zeroKey] >= 3) {
+                                validParams[k] = 0;
+                            }
                         } else {
+                            // Jika ada nilai normal (>0), reset counter glitch dan update nilai riil
+                            if (this._zeroCounts) {
+                                delete this._zeroCounts[`${dec.channel}_${k}`];
+                            }
                             validParams[k] = v;
                         }
                     }
                 }
 
+                // Perhatikan:
+                // Subtype 0x01 & 0x0E membawa paket Standby Measurement (CRS Width DDM = 15.2% ~ 15.3%)
+                // Sementara Executive Measurement pada antenna Course Width bernilai -0.4% (MON 1) / -0.3% (MON 2)
                 if (dec.channel === 'MON1') {
                     // Update Standby Mon 1 dengan data paket ini
                     this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
