@@ -1335,6 +1335,14 @@ class NetworkListenerService {
                             moduleName,
                             'Normal'
                         ).catch(e => { });
+                    } else if (moduleName === 'ils_llz_thales421' || moduleName === 'ils_gp_thales421') {
+                        // Untuk Thales ILS, koneksi socket TCP telah berhasil tersambung ke port 950
+                        this._handleLogOutput(
+                            source,
+                            { success: true, data: { status_label: 'Normal', _mode: 'PASSIVE' }, source: name, _ip: ip_address },
+                            moduleName,
+                            'Normal'
+                        ).catch(e => { });
                     }
                 } catch (e) { }
 
