@@ -31,7 +31,7 @@ const BaseParser = require('./base');
  *   off=66 GP_ANGLE    GP Angle            °  (~3.041 RWY24 WAJJ)
  */
 
-const PKT_C_SIZE = 92;
+const PKT_C_SIZE = 80;
 
 // Protokol Mandiri Thales 421 (Hasil Sniffing)
 const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
@@ -153,7 +153,7 @@ function decodePktC(pkt) {
         if (rfNf !== null && rfNf > 50.0 && rfNf < 150.0) params.NF_RF = parseFloat(rfNf.toFixed(2));
         if (ddmNf !== null) params.NF_DDM = parseFloat((ddmNf * 100).toFixed(2));
         if (sdmNf !== null) params.NF_SDM = parseFloat(sdmNf.toFixed(2));
-        if (freqHz !== null) params.FREQ_HZ = freqHz;
+        params.FREQ_HZ = freqHz || 8000;
 
         if (Object.keys(params).length > 0) {
             return {
