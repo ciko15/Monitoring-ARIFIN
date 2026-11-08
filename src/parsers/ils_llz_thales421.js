@@ -244,18 +244,18 @@ function decodePacket(pkt) {
 
     // 3. SUBTYPE 0x1A: CURRENT MAINTENANCE ALERT DATA / POWER SUPPLY (TX 1 & TX 2)
     // Sesuai jendela ADRACS Current Maintenance Alert Data
-    if (subtype === 0x1A && pkt.length >= 54) {
+    if (subtype === 0x1A && pkt.length >= 55) {
         const tx = (byte4 === 0x30) ? 'TX2' : 'TX1';
-        const v5 = readFloat(pkt, 13);
-        const v15p = readFloat(pkt, 17);
-        const v15n = readFloat(pkt, 21);
-        const v24 = readFloat(pkt, 25);
-        const v54 = readFloat(pkt, 29);
-        const tempIn = readFloat(pkt, 33);
-        const tempOut = readFloat(pkt, 37);
-        const obsLights = readFloat(pkt, 41);
-        const spare1 = readFloat(pkt, 45);
-        const spare2 = readFloat(pkt, 49);
+        const v5 = readFloat(pkt, 15);
+        const v15p = readFloat(pkt, 19);
+        const v15n = readFloat(pkt, 23);
+        const v24 = readFloat(pkt, 27);
+        const v54 = readFloat(pkt, 31);
+        const tempIn = readFloat(pkt, 35);
+        const tempOut = readFloat(pkt, 39);
+        const obsLights = readFloat(pkt, 43);
+        const spare1 = readFloat(pkt, 47);
+        const spare2 = readFloat(pkt, 51);
 
         if (v5 !== null && Math.abs(v5 - 5.0) < 1.0) {
             const params = {
@@ -272,7 +272,7 @@ function decodePacket(pkt) {
             };
 
             return {
-                frameLen: 55,
+                frameLen: 57,
                 type: 'POWER_SUPPLY_DATA',
                 tx_main: tx1IsMain ? 'TX1' : 'TX2',
                 tx_stby: tx1IsMain ? 'TX2' : 'TX1',
