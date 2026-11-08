@@ -393,9 +393,11 @@ class IlsLlzThales421Parser extends BaseParser {
         const alarms = checkAlarms(d.params);
 
         const exec1 = this._execMon1 || {};
-        const exec2 = this._execMon2 || {};
+        // Di Thales 421, pemancar TX (Executive) memancarkan sinyal yang sama ke kedua sensor monitor (MON 1 dan MON 2).
+        // Jika paket Subtype 0x0E (MON 2) belum tiba, gunakan data pengukuran pemancar aktif dari MON 1 sebagai referensi dasar (simetris)
+        const exec2 = this._execMon2 || this._execMon1 || {};
         const stby1 = this._stbyMon1 || {};
-        const stby2 = this._stbyMon2 || {};
+        const stby2 = this._stbyMon2 || this._stbyMon1 || {};
 
         return {
             success: true,
