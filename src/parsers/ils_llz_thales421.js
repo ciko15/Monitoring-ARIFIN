@@ -143,30 +143,37 @@ function decodePacket(pkt) {
     let channel = null;
     let offsetShift = 0;
 
-    if (subtype === 0x01 && byte4 === 0x40) {
+    if (subtype === 0x01 && (byte4 === 0x40 || byte4 === 0x00)) {
         channel = 'MON1';
         offsetShift = 0;
-    } else if (subtype === 0x0E && byte4 === 0xA4) {
+    } else if (subtype === 0x0E && (byte4 === 0xA4 || byte4 === 0x10 || byte4 === 0x00 || byte4 === 0x40)) {
         channel = 'MON2';
-        // Pada Subtype 0x0E, cek apakah ada nilai CRS RF (~99%) di offset 52 atau 54
+        // Pada Subtype 0x0E, periksa offset posisi CRS Pos RF (~99%)
+        const rf15 = readFloat(pkt, 15);
         const rf52 = readFloat(pkt, 52);
         const rf54 = readFloat(pkt, 54);
-        if (rf54 && Math.abs(rf54 - 99.0) < 5.0) {
+        if (rf15 && Math.abs(rf15 - 99.0) < 6.0) {
+            // Posisi relatif dari 11 8D (15 - 52 = -37)
+            offsetShift = -37;
+        } else if (rf54 && Math.abs(rf54 - 99.0) < 6.0) {
             offsetShift = 2;
-        } else if (rf52 && Math.abs(rf52 - 99.0) < 5.0) {
+        } else if (rf52 && Math.abs(rf52 - 99.0) < 6.0) {
             offsetShift = 0;
         } else {
-            return null; // Bukan frame telemetri yang valid
+            // Fallback offset 0 untuk tetap memproses frame telemetri MON2
+            offsetShift = 0;
         }
     } else {
         return null;
     }
 
-    // SANITY CHECK: Pastikan nilai CRS Pos RF Level masuk akal (80% ~ 120%)
-    // Jika nilainya anomali (seperti 0.03, 440.83, atau 243314), abaikan frame ini!
-    const testRf = readFloat(pkt, 52 + offsetShift);
-    if (!testRf || testRf < 70.0 || testRf > 130.0) {
-        return null; // Tolak false-sync / frame rusak
+    // SANITY CHECK: Pastikan nilai CRS Pos RF Level masuk akal (80% ~ 120%) jika offset dalam batas
+    const testOff = 52 + offsetShift;
+    if (testOff >= 0 && testOff + 4 <= pkt.length) {
+        const testRf = readFloat(pkt, testOff);
+        if (testRf !== null && (testRf < 60.0 || testRf > 140.0)) {
+            return null; // Tolak false-sync / frame rusak
+        }
     }
 
     const params = {};
