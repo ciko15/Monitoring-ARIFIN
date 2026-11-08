@@ -38,7 +38,7 @@ const BaseParser = require('./base');
  *   off=84  FREQ_DEV    Freq Deviation       kHz
  */
 
-const PKT_C_SIZE = 92;
+const PKT_C_SIZE = 84;
 
 // Protokol Mandiri Thales 421 (Hasil Sniffing)
 const TRIGGER_SEND = Buffer.from([0x0B, 0x00, 0xF9, 0x06]); // ACK / trigger kita kirim
@@ -97,15 +97,34 @@ const PARAM_LABELS = {
     FREQ_DEV:  ['Freq Deviation', 'kHz'],
 };
 
-// Offset Telemetri Thales ILS 420/421 (Hasil Live Sniffing Sentani WAJJ)
-// Frame 0x118D..01 (Subtype 0x01) membawa paket pengukuran Executive / Standby Mon 1
-// Frame 0x118D..0E..A4 (Subtype 0x0E) membawa paket pengukuran Executive / Standby Mon 2
+// Offset Telemetri Thales ILS 420/421 Subtype 0x0C (Executive Measurement Packet)
+// Berdasarkan verifikasi paket live tshark Sentani:
+// Subtype 0x0C dengan byte4 == 0x00 membawa data lengkap MON 1
+// Subtype 0x0C dengan byte4 == 0x10 membawa data lengkap MON 2
+const MEASUREMENT_OFFSETS_0C = {
+    CRS_RF:    15, // CRS Pos. RF Level (%) -> ~98.3% / 98.4%
+    CRS_DDM:   19, // CRS Pos. DDM (raw*100) -> 0.09% / 0.01%
+    CRS_SDM:   23, // CRS Pos. SDM (%) -> ~40.4% / 40.5%
+    IDENT_AM:  27, // Ident AM (%) -> 8.0%
+    WIDTH_RF:  31, // CRS Width RF Level (%) -> ~98.4%
+    WIDTH_DDM: 35, // CRS Width DDM (raw*100) -> -0.26%
+    WIDTH_SDM: 39, // CRS Width SDM (%) -> ~40.5%
+    CLR_RF:    43, // CLR Width RF Level (%) -> ~101.0% / 101.2%
+    CLR_DDM:   47, // CLR Width DDM (raw*100) -> 25.53% / 25.58%
+    CLR_SDM:   51, // CLR Width SDM (%) -> ~39.8% / 40.1%
+    NF_RF:     57, // Nearfield Pos. RF Level (%) -> ~98.7% / 98.6%
+    NF_DDM:    61, // Nearfield Pos. DDM (raw*100) -> 0.46% / 0.50%
+    NF_SDM:    65, // Nearfield Pos. SDM (%) -> ~40.2%
+    FREQ_DEV:  79, // Frequency Deviation (kHz) -> ~2.9 / 2.2
+};
+
+// Offset Telemetri Thales ILS 420/421 Subtype 0x01 / 0x0E (Standby Measurement Packet)
 const MEASUREMENT_OFFSETS = {
     CRS_RF:    52, // CRS Pos. RF Level (%) -> ~99.1%
     CRS_DDM:   56, // CRS Pos. DDM (raw*100) -> -0.2%
     CRS_SDM:   60, // CRS Pos. SDM (%) -> ~40.5%
     WIDTH_RF:  66, // CRS Width RF Level (%) -> ~99.4%
-    WIDTH_DDM: 70, // CRS Width DDM (raw*100) -> 15.3%
+    WIDTH_DDM: 70, // CRS Width DDM (raw*100) -> 15.3% (Standby Width DDM)
     WIDTH_SDM: 74, // CRS Width SDM (%) -> ~40.7%
     CLR_RF:    78, // CLR Width RF Level (%) -> ~99.1%
     CLR_DDM:   82, // CLR Width DDM (raw*100) -> 25.2%
@@ -142,50 +161,76 @@ function decodePacket(pkt) {
     const isRemote = !!(byte2 & 0x80);
     const tx1IsMain = !!(byte2 & 0x40);
 
-    // Filter hanya frame yang membawa data pengukuran sinyal:
-    // Subtype 0x01 (Mon 1 stream) dan Subtype 0x0E dengan byte4 == 0xA4 (Mon 2 stream)
     let channel = null;
+    let isExecStream = false;
     let offsetShift = 0;
 
+    // 1. SUBTYPE 0x0C: FRAME EXECUTIVE MEASUREMENT RESMI (MON 1 & MON 2)
+    if (subtype === 0x0C) {
+        channel = (byte4 === 0x10) ? 'MON2' : 'MON1';
+        isExecStream = true;
+
+        const params = {};
+        for (const [key, off] of Object.entries(MEASUREMENT_OFFSETS_0C)) {
+            let val = readFloat(pkt, off);
+            if (val === null) continue;
+            if (key.includes('RF') && (val < 0 || val > 150)) continue;
+            if (key.includes('SDM') && (val < 0 || val > 100)) continue;
+
+            val = DDM_X100.has(key)
+                ? parseFloat((val * 100).toFixed(2))
+                : parseFloat(val.toFixed(2));
+
+            if (key.includes('DDM') && Math.abs(val) > 100) continue;
+            params[key] = val;
+        }
+
+        // RF Freq konstan 8000 Hz untuk Thales ILS
+        params.RF_FREQ = 8000;
+
+        return {
+            tx_main: tx1IsMain ? 'TX1' : 'TX2',
+            tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+            is_remote: isRemote,
+            subtype,
+            channel,
+            isExecStream: true,
+            params,
+        };
+    }
+
+    // 2. SUBTYPE 0x01 (MON 1 Standby) & 0x0E (MON 2 Standby)
     if (subtype === 0x01 && (byte4 === 0x40 || byte4 === 0x00)) {
         channel = 'MON1';
         offsetShift = 0;
     } else if (subtype === 0x0E && (byte4 === 0xA4 || byte4 === 0x10 || byte4 === 0x00 || byte4 === 0x40)) {
         channel = 'MON2';
-        // Pada Subtype 0x0E, periksa offset posisi CRS Pos RF (~99%)
         const rf15 = readFloat(pkt, 15);
         const rf52 = readFloat(pkt, 52);
         const rf54 = readFloat(pkt, 54);
         if (rf15 && Math.abs(rf15 - 99.0) < 6.0) {
-            // Posisi relatif dari 11 8D (15 - 52 = -37)
             offsetShift = -37;
         } else if (rf54 && Math.abs(rf54 - 99.0) < 6.0) {
             offsetShift = 2;
-        } else if (rf52 && Math.abs(rf52 - 99.0) < 6.0) {
-            offsetShift = 0;
         } else {
-            // Fallback offset 0 untuk tetap memproses frame telemetri MON2
             offsetShift = 0;
         }
     } else {
         return null;
     }
 
-    // SANITY CHECK: Pastikan nilai CRS Pos RF Level masuk akal (80% ~ 120%) jika offset dalam batas
+    // SANITY CHECK
     const testOff = 52 + offsetShift;
     if (testOff >= 0 && testOff + 4 <= pkt.length) {
         const testRf = readFloat(pkt, testOff);
         if (testRf !== null && (testRf < 60.0 || testRf > 140.0)) {
-            return null; // Tolak false-sync / frame rusak
+            return null;
         }
     }
 
     const params = {};
     for (const [key, baseOffset] of Object.entries(MEASUREMENT_OFFSETS)) {
         let off = baseOffset + offsetShift;
-        // Posisi Ident AM (8.0%):
-        // Di Subtype 0x01 (MON 1) berada di offset 14
-        // Di Subtype 0x0E (MON 2) berada di offset 42 (atau 42 + offsetShift)
         if (key === 'IDENT_AM') {
             if (channel === 'MON2') {
                 const id42 = readFloat(pkt, 42);
@@ -205,7 +250,6 @@ function decodePacket(pkt) {
         let val = readFloat(pkt, off);
         if (val === null) continue;
 
-        // Validasi batasan fisik agar angka aneh (seperti 440.83 atau ribuan) tidak pernah masuk
         if (key.includes('RF') && (val < 0 || val > 150)) continue;
         if (key.includes('SDM') && (val < 0 || val > 100)) continue;
 
@@ -218,12 +262,15 @@ function decodePacket(pkt) {
         params[key] = val;
     }
 
+    params.RF_FREQ = 8000;
+
     return {
         tx_main: tx1IsMain ? 'TX1' : 'TX2',
         tx_stby: tx1IsMain ? 'TX2' : 'TX1',
         is_remote: isRemote,
         subtype,
         channel,
+        isExecStream: false,
         params,
     };
 }
@@ -351,29 +398,19 @@ class IlsLlzThales421Parser extends BaseParser {
                     }
                 }
 
-                // Perhatikan:
-                // Subtype 0x01 & 0x0E membawa paket Standby Measurement (CRS Width DDM = 15.2% ~ 15.3%)
-                // Sementara Executive Measurement pada antenna Course Width bernilai -0.4% (MON 1) / -0.3% (MON 2)
-                if (dec.channel === 'MON1') {
-                    // Update Standby Mon 1 dengan data paket ini
-                    this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
-                    
-                    // Untuk Executive Mon 1, hanya perbarui parameter umum (seperti RF, SDM, Ident)
-                    // jangan timpa Course Width DDM (-0.4%) dengan Standby Width DDM (15.2%)
-                    const execParams = { ...validParams };
-                    if (execParams.WIDTH_DDM !== undefined && execParams.WIDTH_DDM > 1.0) {
-                        delete execParams.WIDTH_DDM; // Pertahankan Executive Width DDM ~ -0.4%
+                // Pisahkan penyimpanan paket Executive (Subtype 0x0C) dan Standby (Subtype 0x01/0x0E)
+                if (dec.isExecStream) {
+                    if (dec.channel === 'MON1') {
+                        this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
+                    } else if (dec.channel === 'MON2') {
+                        this._execMon2 = { ...(this._execMon2 || {}), ...validParams };
                     }
-                    this._execMon1 = { ...(this._execMon1 || {}), ...execParams };
-                } else if (dec.channel === 'MON2') {
-                    // Update Standby Mon 2 dengan data paket ini
-                    this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
-
-                    const execParams = { ...validParams };
-                    if (execParams.WIDTH_DDM !== undefined && execParams.WIDTH_DDM > 1.0) {
-                        delete execParams.WIDTH_DDM; // Pertahankan Executive Width DDM ~ -0.3%
+                } else {
+                    if (dec.channel === 'MON1') {
+                        this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
+                    } else if (dec.channel === 'MON2') {
+                        this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
                     }
-                    this._execMon2 = { ...(this._execMon2 || {}), ...execParams };
                 }
             }
 
