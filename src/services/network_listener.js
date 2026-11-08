@@ -1352,6 +1352,7 @@ class NetworkListenerService {
                             try {
                                 const bytes = req.bytes ? req.bytes : req;
                                 socket.write(bytes);
+                                lastTxTime = Date.now();
                             } catch (e) {
                                 console.warn(`[NetworkListener] TCP trigger write error ${name}: ${e.message}`);
                             }
@@ -1364,7 +1365,30 @@ class NetworkListenerService {
 
             if (!this._lastHeartbeatReply) this._lastHeartbeatReply = new Map();
 
+            let rxByteCount = 0;
+            let lastRxTime = 0;
+            let lastTxTime = 0;
+
+            const diagTimer = setInterval(() => {
+                if (stopped) return;
+                const now = Date.now();
+                const secSinceRx = lastRxTime > 0 ? Math.round((now - lastRxTime) / 1000) : 'never';
+                const secSinceTx = lastTxTime > 0 ? Math.round((now - lastTxTime) / 1000) : 'never';
+                if (moduleName.includes('thales421')) {
+                    console.log(`[ILS-DIAG] ${name} (${ip_address}:${port}) | RX last 10s: ${rxByteCount} bytes | Last RX: ${secSinceRx}s ago | Last TX: ${secSinceTx}s ago | Socket: ${socket && !socket.destroyed ? 'CONNECTED' : 'DISCONNECTED'}`);
+                }
+                rxByteCount = 0;
+            }, 10000);
+            if (typeof diagTimer.unref === 'function') diagTimer.unref();
+
             socket.on('data', async (chunk) => {
+                rxByteCount += chunk.length;
+                lastRxTime = Date.now();
+
+                if (moduleName.includes('thales421')) {
+                    this._logThrottled('log', `thales:rx:${id}`, `[ILS-RAW] ${name} received ${chunk.length} bytes: ${chunk.slice(0, 32).toString('hex')}`, 20000);
+                }
+
                 if (moduleName === 'ils_mophien_llz') {
                     this._logThrottled('log', `llz:tcp:rx:${id}`, `[LLZ-TCP] Received ${chunk.length} bytes from ${name}: ${chunk.slice(0, 32).toString('hex')}...`, 15000);
                 }
@@ -1413,6 +1437,7 @@ class NetworkListenerService {
             stopped = true;
             if (pollTimer) clearInterval(pollTimer);
             if (reconnectTimer) clearTimeout(reconnectTimer);
+            if (diagTimer) clearInterval(diagTimer);
             if (socket) socket.destroy();
         });
 
