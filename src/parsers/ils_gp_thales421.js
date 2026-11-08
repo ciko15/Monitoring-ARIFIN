@@ -168,27 +168,70 @@ function decodePktC(pkt) {
         return null;
     }
 
-    // 2. Frame Subtype 0x01 (Byte4 0x40): Membawa telemetri Standby Measurement dari alat
+    // 2. Frame Subtype 0x01 (Byte4 0x40): Membawa telemetri RF
     if (subtype === 0x01 && byte4 === 0x40) {
         const val52 = readFloat(pkt, 52);
         if (!val52) return null;
 
-        // PAKET STANDBY MEASUREMENT (CRS CSB1 RF ~105.8%, DDM ~-12.4%, SDM ~79.9%, dll)
-        const params = {};
-        for (const [key, off] of Object.entries(STBY_OFFSETS)) {
-            let val = readFloat(pkt, off);
-            if (val === null) continue;
-            val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
-            params[key] = val;
+        // Bedakan paket STANDBY (val52 ~105.8%) vs EXECUTIVE (val52 ~99.4%)
+        if (Math.abs(val52 - 105.8) < 6.0) {
+            // PAKET STANDBY MEASUREMENT
+            const params = {};
+            for (const [key, off] of Object.entries(STBY_OFFSETS)) {
+                let val = readFloat(pkt, off);
+                if (val === null) continue;
+                val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
+                params[key] = val;
+            }
+            return {
+                type: 'STANDBY_DATA',
+                channel: 'MON1',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                is_remote: isRemote,
+                params
+            };
+        } else if (val52 >= 85.0 && val52 <= 102.0) {
+            // PAKET EXECUTIVE MEASUREMENT (CRS Pos RF Level ~99.4%)
+            const params = {};
+            for (const [key, off] of Object.entries(EXEC_OFFSETS)) {
+                let val = readFloat(pkt, off);
+                if (val === null) continue;
+                val = DDM_X100.has(key) ? parseFloat((val * 100).toFixed(2)) : parseFloat(val.toFixed(2));
+                params[key] = val;
+            }
+            return {
+                type: 'EXECUTIVE_DATA',
+                channel: 'MON1',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                is_remote: isRemote,
+                params
+            };
         }
-        return {
-            type: 'STANDBY_DATA',
-            channel: 'MON1',
-            tx_main: tx1IsMain ? 'TX1' : 'TX2',
-            tx_stby: tx1IsMain ? 'TX2' : 'TX1',
-            is_remote: isRemote,
-            params
-        };
+    }
+
+    // 3. Frame Subtype 0x0E (Byte4 0xA4): Membawa Executive Measurement dari alat
+    if (subtype === 0x0E && byte4 === 0xA4) {
+        const val80 = readFloat(pkt, 80);
+        if (val80 !== null && val80 >= 80.0 && val80 <= 120.0) {
+            const params = {
+                RF_POWER: parseFloat(val80.toFixed(2))
+            };
+            const f84 = readFloat(pkt, 84);
+            if (f84 !== null) params.DDM_COURSE = parseFloat((f84 * 100).toFixed(2));
+            const f88 = readFloat(pkt, 88);
+            if (f88 !== null) params.CARRIER_PWR = parseFloat(f88.toFixed(2));
+
+            return {
+                type: 'EXECUTIVE_DATA',
+                channel: 'MON2',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                is_remote: isRemote,
+                params
+            };
+        }
     }
 
     return null;
@@ -364,6 +407,9 @@ class IlsGpThales421Parser extends BaseParser {
                 stby_mon2_clr_rf: stby2.CLR_RF,
                 stby_mon2_clr_ddm: stby2.CLR_DDM,
                 stby_mon2_clr_sdm: stby2.CLR_SDM,
+
+                // Backward compatibility
+                ...d.params,
             },
             status: 'Normal',
             alarms: [], warnings: [], triggeredParams: [],

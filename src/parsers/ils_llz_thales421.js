@@ -148,17 +148,25 @@ function decodePacket(pkt) {
         offsetShift = 0;
     } else if (subtype === 0x0E && byte4 === 0xA4) {
         channel = 'MON2';
+        // Pada Subtype 0x0E, cek apakah ada nilai CRS RF (~99%) di offset 52 atau 54
         const rf52 = readFloat(pkt, 52);
         const rf54 = readFloat(pkt, 54);
-        if (rf54 && rf54 >= 50.0 && rf54 <= 140.0) {
+        if (rf54 && Math.abs(rf54 - 99.0) < 5.0) {
             offsetShift = 2;
-        } else if (rf52 && rf52 >= 50.0 && rf52 <= 140.0) {
+        } else if (rf52 && Math.abs(rf52 - 99.0) < 5.0) {
             offsetShift = 0;
         } else {
-            offsetShift = 0;
+            return null; // Bukan frame telemetri yang valid
         }
     } else {
         return null;
+    }
+
+    // SANITY CHECK: Pastikan nilai CRS Pos RF Level masuk akal (80% ~ 120%)
+    // Jika nilainya anomali (seperti 0.03, 440.83, atau 243314), abaikan frame ini!
+    const testRf = readFloat(pkt, 52 + offsetShift);
+    if (!testRf || testRf < 70.0 || testRf > 130.0) {
+        return null; // Tolak false-sync / frame rusak
     }
 
     const params = {};
@@ -187,9 +195,8 @@ function decodePacket(pkt) {
         if (val === null) continue;
 
         // Validasi batasan fisik agar angka aneh (seperti 440.83 atau ribuan) tidak pernah masuk
-        // Level RF dan SDM pemancar ILS LLZ memiliki rentang operasional yang jelas
-        if (key.includes('RF') && (val < 50.0 || val > 140.0)) continue;
-        if (key.includes('SDM') && (val < 10.0 || val > 95.0)) continue;
+        if (key.includes('RF') && (val < 0 || val > 150)) continue;
+        if (key.includes('SDM') && (val < 0 || val > 100)) continue;
 
         val = DDM_X100.has(key)
             ? parseFloat((val * 100).toFixed(2))
@@ -290,8 +297,7 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._txStby = dec.tx_stby;
 
                 // Track and validate measurements
-                // Pertahankan data telemetri valid yang sudah diterima dari alat
-                // Jangan pernah mereset data valid menjadi 0 hanya karena ADRACS beralih ke jendela Transmitter / status lain
+                // Bedakan antara "Frame Kosong / Glitch" vs "Alat Benar-Benar Mati / Power Drop ke 0"
                 const validParams = {};
                 for (const [k, v] of Object.entries(dec.params)) {
                     if (v !== null && v !== undefined && !isNaN(v)) {
@@ -302,9 +308,21 @@ class IlsLlzThales421Parser extends BaseParser {
                         }
 
                         // Untuk level RF, SDM, dan Ident AM:
-                        // Jika terbaca 0 atau nilai di luar batas operasional normal (misal frame parsial/heartbeat),
-                        // abaikan dan pertahankan nilai valid terakhir (tidak pernah ditimpa dengan 0 palsu)
-                        if (v > 0) {
+                        // Jika terbaca 0, verifikasi apakah ini glitch 1 frame atau memang sinyal drop/mati
+                        if (v === 0) {
+                            this._zeroCounts = this._zeroCounts || {};
+                            const zeroKey = `${dec.channel}_${k}`;
+                            this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
+
+                            // Jika terbaca 0 berturut-turut >= 3 frame, barulah kita update menjadi 0 riil
+                            if (this._zeroCounts[zeroKey] >= 3) {
+                                validParams[k] = 0;
+                            }
+                        } else {
+                            // Jika ada nilai normal (>0), reset counter glitch dan update nilai riil
+                            if (this._zeroCounts) {
+                                delete this._zeroCounts[`${dec.channel}_${k}`];
+                            }
                             validParams[k] = v;
                         }
                     }
