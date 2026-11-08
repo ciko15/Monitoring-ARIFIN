@@ -422,7 +422,8 @@ class IlsLlzThales421Parser extends BaseParser {
             this._lastDecoded = latest.decoded;
             this._lastDataTime = now;
             if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
-            this._buf = this._buf.slice(latest.pos + PKT_C_SIZE);
+            const advance = latest.decoded.frameLen ? latest.decoded.frameLen : PKT_C_SIZE;
+            this._buf = this._buf.slice(latest.pos + advance);
 
             return this._buildOutput(latest.decoded, false);
         } catch (err) {
