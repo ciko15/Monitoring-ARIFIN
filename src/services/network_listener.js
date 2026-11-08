@@ -1307,9 +1307,9 @@ class NetworkListenerService {
             socket.setKeepAlive(true, 10000);
             socket.setNoDelay(true);
 
-            // Untuk streaming pasif (sniffing) seperti ils_mophien_llz / ils_mophien_gp, jangan gunakan socket timeout pendek
-            // agar koneksi tetap standby mendengarkan stream tanpa diputus paksa.
-            if (moduleName !== 'ils_mophien_llz' && moduleName !== 'ils_mophien_gp') {
+            // Untuk streaming pasif / sniffing (ils_mophien, ils_thales421), jangan gunakan socket timeout pendek
+            // agar koneksi tetap standby mendengarkan stream tanpa diputus dan reconnect berulang-ulang.
+            if (!moduleName.includes('ils_mophien') && !moduleName.includes('thales421')) {
                 socket.setTimeout(60000);
             }
 
@@ -1374,7 +1374,8 @@ class NetworkListenerService {
             });
 
             const reportDisconnect = (reason) => {
-                this._handleLogOutput(source, { data: {}, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
+                const lastData = (parser && typeof parser.getLastData === 'function') ? parser.getLastData() : {};
+                this._handleLogOutput(source, { data: lastData, source: source.name, _ip: ip_address }, moduleName, 'Disconnect').catch(e => { });
             };
 
             socket.on('error', (err) => {

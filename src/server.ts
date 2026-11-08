@@ -374,10 +374,13 @@ async function checkEquipmentWatchdog() {
                     }
                 } else if (item.lastUpdate) {
                     // Fallback for equipment without grouped data
-                    const lastUpdate = new Date(item.lastUpdate).getTime();
                     if (now - lastUpdate > TIMEOUT_MS) {
                         const category = String(item.category || item.sup_category || '').toLowerCase();
-                        if (category.includes('radar') || category.includes('adsb')) {
+                        const parserId = String(item.parser_id || '').toLowerCase();
+                        if (parserId.includes('ils_llz_thales421') || parserId.includes('ils_gp_thales421') || parserId.includes('ils_mophien_llz') || parserId.includes('ils_mophien_gp')) {
+                            // Pertahankan status saat ini (Normal)
+                            finalStatus = item.status || 'Normal';
+                        } else if (category.includes('radar') || category.includes('adsb')) {
                             finalStatus = 'Offline';
                         } else {
                             const ipToPing = item.ip_address || null;
