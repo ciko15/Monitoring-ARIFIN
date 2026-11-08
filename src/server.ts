@@ -374,6 +374,7 @@ async function checkEquipmentWatchdog() {
                     }
                 } else if (item.lastUpdate) {
                     // Fallback for equipment without grouped data
+                    const lastUpdate = new Date(item.lastUpdate).getTime();
                     if (now - lastUpdate > TIMEOUT_MS) {
                         const category = String(item.category || item.sup_category || '').toLowerCase();
                         const parserId = String(item.parser_id || '').toLowerCase();
