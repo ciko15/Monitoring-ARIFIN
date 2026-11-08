@@ -111,6 +111,10 @@ const MEASUREMENT_OFFSETS = {
     CLR_DDM:   82, // CLR Width DDM (raw*100) -> 25.2%
     CLR_SDM:   86, // CLR Width SDM (%) -> ~37.0%
     IDENT_AM:  14, // Ident AM (%) -> 8.0%
+    NF_RF:     26, // Nearfield Pos. RF Level (%) -> ~98.8%
+    NF_DDM:    30, // Nearfield Pos. DDM (raw*100) -> ~0.4%
+    NF_SDM:    34, // Nearfield Pos. SDM (%) -> ~40.2%
+    FREQ_DEV:  46, // Frequency Deviation (kHz) -> ~2.9 / 2.1
 };
 
 const DDM_X100 = new Set(['CRS_DDM', 'WIDTH_DDM', 'CLR_DDM', 'NF_DDM']);
