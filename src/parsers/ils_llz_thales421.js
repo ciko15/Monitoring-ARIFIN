@@ -148,25 +148,17 @@ function decodePacket(pkt) {
         offsetShift = 0;
     } else if (subtype === 0x0E && byte4 === 0xA4) {
         channel = 'MON2';
-        // Pada Subtype 0x0E, cek apakah ada nilai CRS RF (~99%) di offset 52 atau 54
-        const rf52 = readFloat(pkt, 52);
         const rf54 = readFloat(pkt, 54);
-        if (rf54 && Math.abs(rf54 - 99.0) < 5.0) {
+        const rf52 = readFloat(pkt, 52);
+        if (rf54 && Math.abs(rf54 - 99.0) < 6.0) {
             offsetShift = 2;
-        } else if (rf52 && Math.abs(rf52 - 99.0) < 5.0) {
+        } else if (rf52 && Math.abs(rf52 - 99.0) < 6.0) {
             offsetShift = 0;
         } else {
-            return null; // Bukan frame telemetri yang valid
+            offsetShift = 0;
         }
     } else {
         return null;
-    }
-
-    // SANITY CHECK: Pastikan nilai CRS Pos RF Level masuk akal (80% ~ 120%)
-    // Jika nilainya anomali (seperti 0.03, 440.83, atau 243314), abaikan frame ini!
-    const testRf = readFloat(pkt, 52 + offsetShift);
-    if (!testRf || testRf < 70.0 || testRf > 130.0) {
-        return null; // Tolak false-sync / frame rusak
     }
 
     const params = {};
@@ -174,7 +166,7 @@ function decodePacket(pkt) {
         let off = baseOffset + offsetShift;
         // Posisi Ident AM (8.0%):
         // Di Subtype 0x01 (MON 1) berada di offset 14
-        // Di Subtype 0x0E (MON 2) berada di offset 42 (atau 42 + offsetShift)
+        // Di Subtype 0x0E (MON 2) berada di offset 42
         if (key === 'IDENT_AM') {
             if (channel === 'MON2') {
                 const id42 = readFloat(pkt, 42);
@@ -194,7 +186,7 @@ function decodePacket(pkt) {
         let val = readFloat(pkt, off);
         if (val === null) continue;
 
-        // Validasi batasan fisik agar angka aneh (seperti 440.83 atau ribuan) tidak pernah masuk
+        // Validasi batasan fisik agar angka aneh tidak masuk
         if (key.includes('RF') && (val < 0 || val > 150)) continue;
         if (key.includes('SDM') && (val < 0 || val > 100)) continue;
 
@@ -206,6 +198,8 @@ function decodePacket(pkt) {
 
         params[key] = val;
     }
+
+    if (Object.keys(params).length === 0) return null;
 
     return {
         tx_main: tx1IsMain ? 'TX1' : 'TX2',
@@ -224,7 +218,6 @@ function extractFrames(buf) {
             const dec = decodePacket(buf.slice(i, i + PKT_C_SIZE));
             if (dec) {
                 results.push({ pos: i, decoded: dec });
-                i += PKT_C_SIZE - 1;
             }
         }
     }
