@@ -151,7 +151,7 @@ function readFloat(buf, offset) {
 }
 
 function decodePacket(pkt) {
-    if (!pkt || pkt.length < PKT_C_SIZE) return null;
+    if (!pkt || pkt.length < 54) return null;
     if (pkt[0] !== 0x11 || pkt[1] !== 0x8D) return null;
 
     const byte2 = pkt[2];
@@ -163,10 +163,9 @@ function decodePacket(pkt) {
 
     let channel = null;
     let isExecStream = false;
-    let offsetShift = 0;
 
     // 1. SUBTYPE 0x0C: FRAME EXECUTIVE MEASUREMENT RESMI (MON 1 & MON 2)
-    if (subtype === 0x0C) {
+    if (subtype === 0x0C && pkt.length >= 80) {
         channel = (byte4 === 0x10) ? 'MON2' : 'MON1';
         isExecStream = true;
 
@@ -189,6 +188,7 @@ function decodePacket(pkt) {
         params.RF_FREQ = 8000;
 
         return {
+            frameLen: 85,
             tx_main: tx1IsMain ? 'TX1' : 'TX2',
             tx_stby: tx1IsMain ? 'TX2' : 'TX1',
             is_remote: isRemote,
@@ -199,90 +199,103 @@ function decodePacket(pkt) {
         };
     }
 
-    // 2. SUBTYPE 0x01 (MON 1 Standby) & 0x0E (MON 2 Standby)
-    if (subtype === 0x01 && (byte4 === 0x40 || byte4 === 0x00)) {
-        channel = 'MON1';
-        offsetShift = 0;
-    } else if (subtype === 0x0E && (byte4 === 0xA4 || byte4 === 0x10 || byte4 === 0x00 || byte4 === 0x40)) {
-        channel = 'MON2';
-        const rf15 = readFloat(pkt, 15);
-        const rf52 = readFloat(pkt, 52);
-        const rf54 = readFloat(pkt, 54);
-        if (rf15 && Math.abs(rf15 - 99.0) < 6.0) {
-            offsetShift = -37;
-        } else if (rf54 && Math.abs(rf54 - 99.0) < 6.0) {
-            offsetShift = 2;
-        } else {
-            offsetShift = 0;
+    // 2. SUBTYPE 0x0E: FRAME STANDBY MEASUREMENT RESMI (MON 1 & MON 2)
+    // Sesuai jendela ADRACS Standby Measurement
+    if (subtype === 0x0E && pkt.length >= 75) {
+        channel = (byte4 === 0x10) ? 'MON2' : 'MON1';
+
+        const rfPos = readFloat(pkt, 15);
+        const ddmPos = readFloat(pkt, 19);
+        const sdmPos = readFloat(pkt, 23);
+        const rfWidth = readFloat(pkt, 29);
+        const ddmWidth = readFloat(pkt, 33);
+        const sdmWidth = readFloat(pkt, 37);
+        const rfClr = readFloat(pkt, 41);
+        const ddmClr = readFloat(pkt, 45);
+        const sdmClr = readFloat(pkt, 49);
+        const freqDev = readFloat(pkt, 71);
+
+        if (rfPos !== null && Math.abs(rfPos - 99.0) < 6.0) {
+            const params = {};
+            params.CRS_RF = parseFloat(rfPos.toFixed(2));
+            if (ddmPos !== null) params.CRS_DDM = parseFloat((ddmPos * 100).toFixed(2));
+            if (sdmPos !== null) params.CRS_SDM = parseFloat(sdmPos.toFixed(2));
+            if (rfWidth !== null) params.WIDTH_RF = parseFloat(rfWidth.toFixed(2));
+            if (ddmWidth !== null) params.WIDTH_DDM = parseFloat((ddmWidth * 100).toFixed(2));
+            if (sdmWidth !== null) params.WIDTH_SDM = parseFloat(sdmWidth.toFixed(2));
+            if (rfClr !== null) params.CLR_RF = parseFloat(rfClr.toFixed(2));
+            if (ddmClr !== null) params.CLR_DDM = parseFloat((ddmClr * 100).toFixed(2));
+            if (sdmClr !== null) params.CLR_SDM = parseFloat(sdmClr.toFixed(2));
+            if (freqDev !== null) params.FREQ_DEV = parseFloat(freqDev.toFixed(2));
+            params.RF_FREQ = 8000;
+
+            return {
+                frameLen: 77,
+                type: 'STANDBY_DATA',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                is_remote: isRemote,
+                subtype,
+                channel,
+                params
+            };
         }
-    } else {
-        return null;
     }
 
-    // SANITY CHECK
-    const testOff = 52 + offsetShift;
-    if (testOff >= 0 && testOff + 4 <= pkt.length) {
-        const testRf = readFloat(pkt, testOff);
-        if (testRf !== null && (testRf < 60.0 || testRf > 140.0)) {
-            return null;
+    // 3. SUBTYPE 0x1A: CURRENT MAINTENANCE ALERT DATA / POWER SUPPLY (TX 1 & TX 2)
+    // Sesuai jendela ADRACS Current Maintenance Alert Data
+    if (subtype === 0x1A && pkt.length >= 54) {
+        const tx = (byte4 === 0x30) ? 'TX2' : 'TX1';
+        const v5 = readFloat(pkt, 13);
+        const v15p = readFloat(pkt, 17);
+        const v15n = readFloat(pkt, 21);
+        const v24 = readFloat(pkt, 25);
+        const v54 = readFloat(pkt, 29);
+        const tempIn = readFloat(pkt, 33);
+        const tempOut = readFloat(pkt, 37);
+        const obsLights = readFloat(pkt, 41);
+        const spare1 = readFloat(pkt, 45);
+        const spare2 = readFloat(pkt, 49);
+
+        if (v5 !== null && Math.abs(v5 - 5.0) < 1.0) {
+            const params = {
+                v5: parseFloat(v5.toFixed(2)),
+                v15_pos: v15p !== null ? parseFloat(v15p.toFixed(2)) : null,
+                v15_neg: v15n !== null ? parseFloat(v15n.toFixed(2)) : null,
+                v24: v24 !== null ? parseFloat(v24.toFixed(2)) : null,
+                v54_battery: v54 !== null ? parseFloat(v54.toFixed(2)) : null,
+                temp_in: tempIn !== null ? parseFloat(tempIn.toFixed(1)) : null,
+                temp_out: tempOut !== null ? parseFloat(tempOut.toFixed(1)) : null,
+                obs_lights: obsLights !== null ? parseFloat(obsLights.toFixed(3)) : null,
+                spare_ad1: spare1 !== null ? parseFloat(spare1.toFixed(3)) : null,
+                spare_ad2: spare2 !== null ? parseFloat(spare2.toFixed(3)) : null,
+            };
+
+            return {
+                frameLen: 55,
+                type: 'POWER_SUPPLY_DATA',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                tx,
+                is_remote: isRemote,
+                subtype,
+                params
+            };
         }
     }
 
-    const params = {};
-    for (const [key, baseOffset] of Object.entries(MEASUREMENT_OFFSETS)) {
-        let off = baseOffset + offsetShift;
-        if (key === 'IDENT_AM') {
-            if (channel === 'MON2') {
-                const id42 = readFloat(pkt, 42);
-                const id44 = readFloat(pkt, 44);
-                let idVal = null;
-                if (id42 !== null && id42 >= 4.0 && id42 <= 25.0) idVal = id42;
-                else if (id44 !== null && id44 >= 4.0 && id44 <= 25.0) idVal = id44;
-                if (idVal !== null) {
-                    params[key] = parseFloat(idVal.toFixed(2));
-                }
-                continue;
-            } else {
-                off = 14;
-            }
-        }
-
-        let val = readFloat(pkt, off);
-        if (val === null) continue;
-
-        if (key.includes('RF') && (val < 0 || val > 150)) continue;
-        if (key.includes('SDM') && (val < 0 || val > 100)) continue;
-
-        val = DDM_X100.has(key)
-            ? parseFloat((val * 100).toFixed(2))
-            : parseFloat(val.toFixed(2));
-
-        if (key.includes('DDM') && Math.abs(val) > 100) continue;
-
-        params[key] = val;
-    }
-
-    params.RF_FREQ = 8000;
-
-    return {
-        tx_main: tx1IsMain ? 'TX1' : 'TX2',
-        tx_stby: tx1IsMain ? 'TX2' : 'TX1',
-        is_remote: isRemote,
-        subtype,
-        channel,
-        isExecStream: false,
-        params,
-    };
+    return null;
 }
 
 function extractFrames(buf) {
     const results = [];
-    for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
+    for (let i = 0; i <= buf.length - 54; i++) {
         if (buf[i] === 0x11 && buf[i + 1] === 0x8D) {
-            const dec = decodePacket(buf.slice(i, i + PKT_C_SIZE));
+            const dec = decodePacket(buf.slice(i));
             if (dec) {
                 results.push({ pos: i, decoded: dec });
-                i += PKT_C_SIZE - 1;
+                const advance = dec.frameLen ? (dec.frameLen - 1) : 53;
+                i += advance;
             }
         }
     }
@@ -315,6 +328,8 @@ class IlsLlzThales421Parser extends BaseParser {
         this._execMon2 = null;
         this._stbyMon1 = null;
         this._stbyMon2 = null;
+        this._psTx1 = null;
+        this._psTx2 = null;
         this._txMain = 'TX1';
         this._txStby = 'TX2';
     }
@@ -366,50 +381,39 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._txMain = dec.tx_main;
                 this._txStby = dec.tx_stby;
 
-                // Track and validate measurements
-                // Bedakan antara "Frame Kosong / Glitch" vs "Alat Benar-Benar Mati / Power Drop ke 0"
+                // 1. Tangani Data Power Supply & Maintenance Alert Data (Subtype 0x1A)
+                if (dec.type === 'POWER_SUPPLY_DATA') {
+                    if (dec.tx === 'TX2') {
+                        this._psTx2 = { ...(this._psTx2 || {}), ...dec.params };
+                    } else {
+                        this._psTx1 = { ...(this._psTx1 || {}), ...dec.params };
+                    }
+                    continue;
+                }
+
+                // 2. Tangani Data Standby Measurement (Subtype 0x0E)
+                if (dec.type === 'STANDBY_DATA') {
+                    if (dec.channel === 'MON2') {
+                        this._stbyMon2 = { ...(this._stbyMon2 || {}), ...dec.params };
+                    } else {
+                        this._stbyMon1 = { ...(this._stbyMon1 || {}), ...dec.params };
+                    }
+                    continue;
+                }
+
+                // 3. Tangani Data Executive Measurement (Subtype 0x0C)
                 const validParams = {};
                 for (const [k, v] of Object.entries(dec.params)) {
                     if (v !== null && v !== undefined && !isNaN(v)) {
-                        // Untuk DDM atau Deviasi Freq, nilai 0.0 adalah SANGAT NORMAL (Perfect On-Course)
-                        if (k.includes('DDM') || k.includes('DEV')) {
-                            validParams[k] = v;
-                            continue;
-                        }
-
-                        // Untuk level RF, SDM, dan Ident AM:
-                        // Jika terbaca 0, verifikasi apakah ini glitch 1 frame atau memang sinyal drop/mati
-                        if (v === 0) {
-                            this._zeroCounts = this._zeroCounts || {};
-                            const zeroKey = `${dec.channel}_${k}`;
-                            this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
-
-                            // Jika terbaca 0 berturut-turut >= 3 frame, barulah kita update menjadi 0 riil
-                            if (this._zeroCounts[zeroKey] >= 3) {
-                                validParams[k] = 0;
-                            }
-                        } else {
-                            // Jika ada nilai normal (>0), reset counter glitch dan update nilai riil
-                            if (this._zeroCounts) {
-                                delete this._zeroCounts[`${dec.channel}_${k}`];
-                            }
-                            validParams[k] = v;
-                        }
+                        validParams[k] = v;
                     }
                 }
 
-                // Pisahkan penyimpanan paket Executive (Subtype 0x0C) dan Standby (Subtype 0x01/0x0E)
                 if (dec.isExecStream) {
-                    if (dec.channel === 'MON1') {
-                        this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
-                    } else if (dec.channel === 'MON2') {
+                    if (dec.channel === 'MON2') {
                         this._execMon2 = { ...(this._execMon2 || {}), ...validParams };
-                    }
-                } else {
-                    if (dec.channel === 'MON1') {
-                        this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
-                    } else if (dec.channel === 'MON2') {
-                        this._stbyMon2 = { ...(this._stbyMon2 || {}), ...validParams };
+                    } else {
+                        this._execMon1 = { ...(this._execMon1 || {}), ...validParams };
                     }
                 }
             }
@@ -505,6 +509,25 @@ class IlsLlzThales421Parser extends BaseParser {
                 stby_mon2_clr_sdm: stby2.CLR_SDM,
                 stby_mon2_rf_freq: stby2.RF_FREQ,
                 stby_mon2_freq_dev: stby2.FREQ_DEV,
+
+                // CURRENT MAINTENANCE ALERT DATA / POWER SUPPLY (100% MURNI DATA ASLI DARI ALAT)
+                ps_tx1_v5: this._psTx1?.v5,
+                ps_tx1_v15_pos: this._psTx1?.v15_pos,
+                ps_tx1_v15_neg: this._psTx1?.v15_neg,
+                ps_tx1_v24: this._psTx1?.v24,
+                ps_tx1_v54_battery: this._psTx1?.v54_battery,
+                ps_tx1_temp_in: this._psTx1?.temp_in,
+                ps_tx1_temp_out: this._psTx1?.temp_out,
+                ps_tx1_obs_lights: this._psTx1?.obs_lights,
+
+                ps_tx2_v5: this._psTx2?.v5,
+                ps_tx2_v15_pos: this._psTx2?.v15_pos,
+                ps_tx2_v15_neg: this._psTx2?.v15_neg,
+                ps_tx2_v24: this._psTx2?.v24,
+                ps_tx2_v54_battery: this._psTx2?.v54_battery,
+                ps_tx2_temp_in: this._psTx2?.temp_in,
+                ps_tx2_temp_out: this._psTx2?.temp_out,
+                ps_tx2_obs_lights: this._psTx2?.obs_lights,
 
                 // Default overall parameters (Backward compatibility)
                 ...d.params,
