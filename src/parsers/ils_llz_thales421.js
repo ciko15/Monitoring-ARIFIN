@@ -180,15 +180,25 @@ function decodePacket(pkt) {
                 continue;
             } else {
                 off = 14;
+                let idVal = readFloat(pkt, off);
+                if (idVal !== null && idVal >= 4.0 && idVal <= 25.0) {
+                    params[key] = parseFloat(idVal.toFixed(2));
+                }
+                continue;
             }
         }
 
         let val = readFloat(pkt, off);
         if (val === null) continue;
 
-        // Validasi batasan fisik agar angka aneh tidak masuk
-        if (key.includes('RF') && (val < 0 || val > 150)) continue;
-        if (key.includes('SDM') && (val < 0 || val > 100)) continue;
+        // Validasi batasan fisik: level RF pemancar LLZ beroperasi di range normal (50% ~ 140%)
+        // Jika nilai di luar batas ini (misal 8.43% pada heartbeat), jangan masukkan sebagai parameter RF
+        if (key.includes('RF')) {
+            if (val < 50.0 || val > 140.0) continue;
+        }
+        if (key.includes('SDM')) {
+            if (val < 10.0 || val > 95.0) continue;
+        }
 
         val = DDM_X100.has(key)
             ? parseFloat((val * 100).toFixed(2))
@@ -290,7 +300,7 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._txStby = dec.tx_stby;
 
                 // Track and validate measurements
-                // Bedakan antara "Frame Kosong / Glitch" vs "Alat Benar-Benar Mati / Power Drop ke 0"
+                // Hanya perbarui parameter yang valid dan ada pada frame fisik
                 const validParams = {};
                 for (const [k, v] of Object.entries(dec.params)) {
                     if (v !== null && v !== undefined && !isNaN(v)) {
@@ -301,29 +311,16 @@ class IlsLlzThales421Parser extends BaseParser {
                         }
 
                         // Untuk level RF, SDM, dan Ident AM:
-                        // Jika terbaca 0, verifikasi apakah ini glitch 1 frame atau memang sinyal drop/mati
+                        // Jika terbaca 0, verifikasi apakah ini glitch / paket parsial atau memang sinyal drop
+                        // Jangan langsung menimpa data telemetri valid sebelumnya dengan 0 kecuali alat benar-benar mati
                         if (v === 0) {
-                            this._zeroCounts = this._zeroCounts || {};
-                            const zeroKey = `${dec.channel}_${k}`;
-                            this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
-
-                            // Jika terbaca 0 berturut-turut >= 3 frame, barulah kita update menjadi 0 riil
-                            if (this._zeroCounts[zeroKey] >= 3) {
-                                validParams[k] = 0;
-                            }
+                            continue; // Abaikan 0 pada paket parsial agar tidak merusak data telemetri valid
                         } else {
-                            // Jika ada nilai normal (>0), reset counter glitch dan update nilai riil
-                            if (this._zeroCounts) {
-                                delete this._zeroCounts[`${dec.channel}_${k}`];
-                            }
                             validParams[k] = v;
                         }
                     }
                 }
 
-                // Perhatikan:
-                // Subtype 0x01 & 0x0E membawa paket Standby Measurement (CRS Width DDM = 15.2% ~ 15.3%)
-                // Sementara Executive Measurement pada antenna Course Width bernilai -0.4% (MON 1) / -0.3% (MON 2)
                 if (dec.channel === 'MON1') {
                     // Update Standby Mon 1 dengan data paket ini
                     this._stbyMon1 = { ...(this._stbyMon1 || {}), ...validParams };
