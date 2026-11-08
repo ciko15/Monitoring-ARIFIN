@@ -3150,69 +3150,61 @@
             }
 
             // 3. STANDBY MEASUREMENT MON 1
-            const stbyMon1List = filterParams([
-                ['CRS Pos. RF Level (%)', data.stby_mon1_rf, '#a0d8ef'],
-                ['CRS Pos. DDM (%)', data.stby_mon1_ddm, '#a0d8ef'],
-                ['CRS Pos. SDM (%)', data.stby_mon1_sdm, '#a0d8ef'],
-                ['CRS Width RF Level (%)', data.stby_mon1_width_rf, '#a0d8ef'],
-                ['CRS Width DDM (%)', data.stby_mon1_width_ddm, '#a0d8ef'],
-                ['CRS Width SDM (%)', data.stby_mon1_width_sdm, '#a0d8ef'],
-                ['CLR Width RF Level (%)', data.stby_mon1_clr_rf, '#a0d8ef'],
-                ['CLR Width DDM (%)', data.stby_mon1_clr_ddm, '#a0d8ef'],
-                ['CLR Width SDM (%)', data.stby_mon1_clr_sdm, '#a0d8ef'],
-                ['CRS/CLR RF Freq (Hz)', data.stby_mon1_rf_freq, '#00d4ff'],
-                ['Frequency Deviation (kHz)', data.stby_mon1_freq_dev, '#00d4ff'],
-            ]);
-            if (stbyMon1List.length > 0) {
-                sections.push({ title: 'STANDBY MEASUREMENT (MON 1)', params: stbyMon1List });
-            }
+            const stbyMon1List = [
+                ['CRS Pos. RF Level (%)', data.stby_mon1_rf ?? '—', '#a0d8ef'],
+                ['CRS Pos. DDM (%)', data.stby_mon1_ddm ?? '—', '#a0d8ef'],
+                ['CRS Pos. SDM (%)', data.stby_mon1_sdm ?? '—', '#a0d8ef'],
+                ['CRS Width RF Level (%)', data.stby_mon1_width_rf ?? '—', '#a0d8ef'],
+                ['CRS Width DDM (%)', data.stby_mon1_width_ddm ?? '—', '#a0d8ef'],
+                ['CRS Width SDM (%)', data.stby_mon1_width_sdm ?? '—', '#a0d8ef'],
+                ['CLR Width RF Level (%)', data.stby_mon1_clr_rf ?? '—', '#a0d8ef'],
+                ['CLR Width DDM (%)', data.stby_mon1_clr_ddm ?? '—', '#a0d8ef'],
+                ['CLR Width SDM (%)', data.stby_mon1_clr_sdm ?? '—', '#a0d8ef'],
+                ['CRS/CLR RF Freq (Hz)', data.stby_mon1_rf_freq ?? '—', '#00d4ff'],
+                ['Frequency Deviation (kHz)', data.stby_mon1_freq_dev ?? '—', '#00d4ff'],
+            ];
+            sections.push({ title: 'STANDBY MEASUREMENT (MON 1)', params: stbyMon1List });
 
             // 4. STANDBY MEASUREMENT MON 2
-            const stbyMon2List = filterParams([
-                ['CRS Pos. RF Level (%)', data.stby_mon2_rf, '#a0d8ef'],
-                ['CRS Pos. DDM (%)', data.stby_mon2_ddm, '#a0d8ef'],
-                ['CRS Pos. SDM (%)', data.stby_mon2_sdm, '#a0d8ef'],
-                ['CRS Width RF Level (%)', data.stby_mon2_width_rf, '#a0d8ef'],
-                ['CRS Width DDM (%)', data.stby_mon2_width_ddm, '#a0d8ef'],
-                ['CRS Width SDM (%)', data.stby_mon2_width_sdm, '#a0d8ef'],
-                ['CLR Width RF Level (%)', data.stby_mon2_clr_rf, '#a0d8ef'],
-                ['CLR Width DDM (%)', data.stby_mon2_clr_ddm, '#a0d8ef'],
-                ['CLR Width SDM (%)', data.stby_mon2_clr_sdm, '#a0d8ef'],
-                ['CRS/CLR RF Freq (Hz)', data.stby_mon2_rf_freq, '#00d4ff'],
-                ['Frequency Deviation (kHz)', data.stby_mon2_freq_dev, '#00d4ff'],
-            ]);
-            if (stbyMon2List.length > 0) {
-                sections.push({ title: 'STANDBY MEASUREMENT (MON 2)', params: stbyMon2List });
-            }
+            const stbyMon2List = [
+                ['CRS Pos. RF Level (%)', data.stby_mon2_rf ?? '—', '#a0d8ef'],
+                ['CRS Pos. DDM (%)', data.stby_mon2_ddm ?? '—', '#a0d8ef'],
+                ['CRS Pos. SDM (%)', data.stby_mon2_sdm ?? '—', '#a0d8ef'],
+                ['CRS Width RF Level (%)', data.stby_mon2_width_rf ?? '—', '#a0d8ef'],
+                ['CRS Width DDM (%)', data.stby_mon2_width_ddm ?? '—', '#a0d8ef'],
+                ['CRS Width SDM (%)', data.stby_mon2_width_sdm ?? '—', '#a0d8ef'],
+                ['CLR Width RF Level (%)', data.stby_mon2_clr_rf ?? '—', '#a0d8ef'],
+                ['CLR Width DDM (%)', data.stby_mon2_clr_ddm ?? '—', '#a0d8ef'],
+                ['CLR Width SDM (%)', data.stby_mon2_clr_sdm ?? '—', '#a0d8ef'],
+                ['CRS/CLR RF Freq (Hz)', data.stby_mon2_rf_freq ?? '—', '#00d4ff'],
+                ['Frequency Deviation (kHz)', data.stby_mon2_freq_dev ?? '—', '#00d4ff'],
+            ];
+            sections.push({ title: 'STANDBY MEASUREMENT (MON 2)', params: stbyMon2List });
 
             // 5. CURRENT MAINTENANCE ALERT DATA / POWER SUPPLY (TX 1 & TX 2)
-            const psTx1List = filterParams([
-                ['+5V supply (V)', data.ps_tx1_v5, '#00ffcc'],
-                ['+15V supply (V)', data.ps_tx1_v15_pos, '#00ffcc'],
-                ['-15V supply (V)', data.ps_tx1_v15_neg, '#00ffcc'],
-                ['+24V supply (V)', data.ps_tx1_v24, '#00ffcc'],
-                ['Battery / +54V supply (V)', data.ps_tx1_v54_battery, '#00ffcc'],
-                ['Inside temperature (°C)', data.ps_tx1_temp_in, '#00d4ff'],
-                ['Outside temperature (°C)', data.ps_tx1_temp_out, '#00d4ff'],
-                ['Obstruction lights (A)', data.ps_tx1_obs_lights, '#a0d8ef'],
-            ]);
-            if (psTx1List.length > 0) {
-                sections.push({ title: 'POWER SUPPLY & ENVIRONMENT (TX 1)', params: psTx1List });
-            }
+            const psTx1List = [
+                ['+5V supply (V)', data.ps_tx1_v5 ?? '—', '#00ffcc'],
+                ['+15V supply (V)', data.ps_tx1_v15_pos ?? '—', '#00ffcc'],
+                ['-15V supply (V)', data.ps_tx1_v15_neg ?? '—', '#00ffcc'],
+                ['+24V supply (V)', data.ps_tx1_v24 ?? '—', '#00ffcc'],
+                ['Battery / +54V supply (V)', data.ps_tx1_v54_battery ?? '—', '#00ffcc'],
+                ['Inside temperature (°C)', data.ps_tx1_temp_in ?? '—', '#00d4ff'],
+                ['Outside temperature (°C)', data.ps_tx1_temp_out ?? '—', '#00d4ff'],
+                ['Obstruction lights (A)', data.ps_tx1_obs_lights ?? '—', '#a0d8ef'],
+            ];
+            sections.push({ title: 'POWER SUPPLY & ENVIRONMENT (TX 1)', params: psTx1List });
 
-            const psTx2List = filterParams([
-                ['+5V supply (V)', data.ps_tx2_v5, '#00ffcc'],
-                ['+15V supply (V)', data.ps_tx2_v15_pos, '#00ffcc'],
-                ['-15V supply (V)', data.ps_tx2_v15_neg, '#00ffcc'],
-                ['+24V supply (V)', data.ps_tx2_v24, '#00ffcc'],
-                ['Battery / +54V supply (V)', data.ps_tx2_v54_battery, '#00ffcc'],
-                ['Inside temperature (°C)', data.ps_tx2_temp_in, '#00d4ff'],
-                ['Outside temperature (°C)', data.ps_tx2_temp_out, '#00d4ff'],
-                ['Obstruction lights (A)', data.ps_tx2_obs_lights, '#a0d8ef'],
-            ]);
-            if (psTx2List.length > 0) {
-                sections.push({ title: 'POWER SUPPLY & ENVIRONMENT (TX 2)', params: psTx2List });
-            }
+            const psTx2List = [
+                ['+5V supply (V)', data.ps_tx2_v5 ?? '—', '#00ffcc'],
+                ['+15V supply (V)', data.ps_tx2_v15_pos ?? '—', '#00ffcc'],
+                ['-15V supply (V)', data.ps_tx2_v15_neg ?? '—', '#00ffcc'],
+                ['+24V supply (V)', data.ps_tx2_v24 ?? '—', '#00ffcc'],
+                ['Battery / +54V supply (V)', data.ps_tx2_v54_battery ?? '—', '#00ffcc'],
+                ['Inside temperature (°C)', data.ps_tx2_temp_in ?? '—', '#00d4ff'],
+                ['Outside temperature (°C)', data.ps_tx2_temp_out ?? '—', '#00d4ff'],
+                ['Obstruction lights (A)', data.ps_tx2_obs_lights ?? '—', '#a0d8ef'],
+            ];
+            sections.push({ title: 'POWER SUPPLY & ENVIRONMENT (TX 2)', params: psTx2List });
         } else {
             // Check if we have a template for this parser
             let tmpl = window.templatesCache?.find(t => t.id === parserId);
