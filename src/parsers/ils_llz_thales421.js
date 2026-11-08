@@ -187,8 +187,9 @@ function decodePacket(pkt) {
         if (val === null) continue;
 
         // Validasi batasan fisik agar angka aneh (seperti 440.83 atau ribuan) tidak pernah masuk
-        if (key.includes('RF') && (val < 0 || val > 150)) continue;
-        if (key.includes('SDM') && (val < 0 || val > 100)) continue;
+        // Level RF dan SDM pemancar ILS LLZ memiliki rentang operasional yang jelas
+        if (key.includes('RF') && (val < 50.0 || val > 140.0)) continue;
+        if (key.includes('SDM') && (val < 10.0 || val > 95.0)) continue;
 
         val = DDM_X100.has(key)
             ? parseFloat((val * 100).toFixed(2))
@@ -289,7 +290,8 @@ class IlsLlzThales421Parser extends BaseParser {
                 this._txStby = dec.tx_stby;
 
                 // Track and validate measurements
-                // Bedakan antara "Frame Kosong / Glitch" vs "Alat Benar-Benar Mati / Power Drop ke 0"
+                // Pertahankan data telemetri valid yang sudah diterima dari alat
+                // Jangan pernah mereset data valid menjadi 0 hanya karena ADRACS beralih ke jendela Transmitter / status lain
                 const validParams = {};
                 for (const [k, v] of Object.entries(dec.params)) {
                     if (v !== null && v !== undefined && !isNaN(v)) {
@@ -300,21 +302,9 @@ class IlsLlzThales421Parser extends BaseParser {
                         }
 
                         // Untuk level RF, SDM, dan Ident AM:
-                        // Jika terbaca 0, verifikasi apakah ini glitch 1 frame atau memang sinyal drop/mati
-                        if (v === 0) {
-                            this._zeroCounts = this._zeroCounts || {};
-                            const zeroKey = `${dec.channel}_${k}`;
-                            this._zeroCounts[zeroKey] = (this._zeroCounts[zeroKey] || 0) + 1;
-
-                            // Jika terbaca 0 berturut-turut >= 3 frame, barulah kita update menjadi 0 riil
-                            if (this._zeroCounts[zeroKey] >= 3) {
-                                validParams[k] = 0;
-                            }
-                        } else {
-                            // Jika ada nilai normal (>0), reset counter glitch dan update nilai riil
-                            if (this._zeroCounts) {
-                                delete this._zeroCounts[`${dec.channel}_${k}`];
-                            }
+                        // Jika terbaca 0 atau nilai di luar batas operasional normal (misal frame parsial/heartbeat),
+                        // abaikan dan pertahankan nilai valid terakhir (tidak pernah ditimpa dengan 0 palsu)
+                        if (v > 0) {
                             validParams[k] = v;
                         }
                     }
