@@ -103,7 +103,7 @@ function readFloat(buf, offset) {
 }
 
 function decodePktC(pkt) {
-    if (!pkt || pkt.length < PKT_C_SIZE) return null;
+    if (!pkt || pkt.length < 55) return null;
     if (pkt[0] !== 0x11 || pkt[1] !== 0x8D) return null;
 
     const byte2 = pkt[2];
@@ -234,17 +234,58 @@ function decodePktC(pkt) {
         }
     }
 
+    // 4. Frame Subtype 0x1A: CURRENT MAINTENANCE ALERT DATA / POWER SUPPLY (TX 1 & TX 2)
+    if (subtype === 0x1A && pkt.length >= 55) {
+        const tx = (byte4 === 0x30) ? 'TX2' : 'TX1';
+        const v5 = readFloat(pkt, 15);
+        const v15p = readFloat(pkt, 19);
+        const v15n = readFloat(pkt, 23);
+        const v24 = readFloat(pkt, 27);
+        const v54 = readFloat(pkt, 31);
+        const tempIn = readFloat(pkt, 35);
+        const tempOut = readFloat(pkt, 39);
+        const obsLights = readFloat(pkt, 43);
+        const spare1 = readFloat(pkt, 47);
+        const spare2 = readFloat(pkt, 51);
+
+        if (v5 !== null && Math.abs(v5 - 5.0) < 1.0) {
+            const params = {
+                v5: parseFloat(v5.toFixed(2)),
+                v15_pos: v15p !== null ? parseFloat(v15p.toFixed(2)) : null,
+                v15_neg: v15n !== null ? parseFloat(v15n.toFixed(2)) : null,
+                v24: v24 !== null ? parseFloat(v24.toFixed(2)) : null,
+                v54_battery: v54 !== null ? parseFloat(v54.toFixed(2)) : null,
+                temp_in: tempIn !== null ? parseFloat(tempIn.toFixed(1)) : null,
+                temp_out: tempOut !== null ? parseFloat(tempOut.toFixed(1)) : null,
+                obs_lights: obsLights !== null ? parseFloat(obsLights.toFixed(3)) : null,
+                spare_ad1: spare1 !== null ? parseFloat(spare1.toFixed(3)) : null,
+                spare_ad2: spare2 !== null ? parseFloat(spare2.toFixed(3)) : null,
+            };
+
+            return {
+                frameLen: 57,
+                type: 'POWER_SUPPLY_DATA',
+                tx_main: tx1IsMain ? 'TX1' : 'TX2',
+                tx_stby: tx1IsMain ? 'TX2' : 'TX1',
+                tx,
+                is_remote: isRemote,
+                params
+            };
+        }
+    }
+
     return null;
 }
 
 function extractFrames(buf) {
     const results = [];
-    for (let i = 0; i <= buf.length - PKT_C_SIZE; i++) {
+    for (let i = 0; i <= buf.length - 55; i++) {
         if (buf[i] === 0x11 && buf[i + 1] === 0x8D) {
-            const dec = decodePktC(buf.slice(i, i + PKT_C_SIZE));
+            const dec = decodePktC(buf.slice(i));
             if (dec) {
                 results.push({ pos: i, decoded: dec });
-                i += PKT_C_SIZE - 1;
+                const advance = dec.frameLen ? (dec.frameLen - 1) : (PKT_C_SIZE - 1);
+                i += advance;
             }
         }
     }
@@ -259,11 +300,13 @@ class IlsGpThales421Parser extends BaseParser {
         this._mode = 'PASSIVE';
         this._lastDecoded = null;
 
-        // State cache untuk Executive & Standby MON 1 & MON 2
+        // State cache untuk Executive, Standby & Power Supply TX 1 & TX 2
         this._execMon1 = null;
         this._execMon2 = null;
         this._stbyMon1 = null;
         this._stbyMon2 = null;
+        this._psTx1 = null;
+        this._psTx2 = null;
         this._txMain = 'TX1';
         this._txStby = 'TX2';
         this._isRemote = false;
@@ -318,6 +361,15 @@ class IlsGpThales421Parser extends BaseParser {
 
 
 
+                if (dec.type === 'POWER_SUPPLY_DATA') {
+                    if (dec.tx === 'TX2') {
+                        this._psTx2 = { ...(this._psTx2 || {}), ...dec.params };
+                    } else {
+                        this._psTx1 = { ...(this._psTx1 || {}), ...dec.params };
+                    }
+                    continue;
+                }
+
                 if (dec.type === 'EXECUTIVE_DATA') {
                     if (dec.channel === 'MON2') {
                         this._execMon2 = { ...(this._execMon2 || {}), ...dec.params };
@@ -341,7 +393,8 @@ class IlsGpThales421Parser extends BaseParser {
             this._lastDecoded = latest.decoded;
             this._lastDataTime = now;
             if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
-            this._buf = this._buf.slice(latest.pos + PKT_C_SIZE);
+            const advance = latest.decoded.frameLen ? latest.decoded.frameLen : PKT_C_SIZE;
+            this._buf = this._buf.slice(latest.pos + advance);
 
             return this._buildOutput(latest.decoded, false);
         } catch (err) {
@@ -351,9 +404,9 @@ class IlsGpThales421Parser extends BaseParser {
 
     _buildOutput(d, isStale) {
         const exec1 = this._execMon1 || {};
-        const exec2 = this._execMon2 || {};
+        const exec2 = this._execMon2 || this._execMon1 || {};
         const stby1 = this._stbyMon1 || {};
-        const stby2 = this._stbyMon2 || {};
+        const stby2 = this._stbyMon2 || this._stbyMon1 || {};
 
         return {
             success: true,
@@ -418,6 +471,25 @@ class IlsGpThales421Parser extends BaseParser {
                 stby_mon2_clr_rf: stby2.CLR_RF,
                 stby_mon2_clr_ddm: stby2.CLR_DDM,
                 stby_mon2_clr_sdm: stby2.CLR_SDM,
+
+                // CURRENT MAINTENANCE ALERT DATA / POWER SUPPLY (TX 1 & TX 2)
+                ps_tx1_v5: this._psTx1?.v5,
+                ps_tx1_v15_pos: this._psTx1?.v15_pos,
+                ps_tx1_v15_neg: this._psTx1?.v15_neg,
+                ps_tx1_v24: this._psTx1?.v24,
+                ps_tx1_v54_battery: this._psTx1?.v54_battery,
+                ps_tx1_temp_in: this._psTx1?.temp_in,
+                ps_tx1_temp_out: this._psTx1?.temp_out,
+                ps_tx1_obs_lights: this._psTx1?.obs_lights,
+
+                ps_tx2_v5: this._psTx2?.v5,
+                ps_tx2_v15_pos: this._psTx2?.v15_pos,
+                ps_tx2_v15_neg: this._psTx2?.v15_neg,
+                ps_tx2_v24: this._psTx2?.v24,
+                ps_tx2_v54_battery: this._psTx2?.v54_battery,
+                ps_tx2_temp_in: this._psTx2?.temp_in,
+                ps_tx2_temp_out: this._psTx2?.temp_out,
+                ps_tx2_obs_lights: this._psTx2?.obs_lights,
 
                 // Backward compatibility
                 ...d.params,

@@ -3021,78 +3021,95 @@
             });
 
             // 1. EXECUTIVE MEASUREMENT MON 1 (Persis Jendela ADRACS Executive)
-            const execMon1List = filterParams([
-                ['CRS Pos. RF Level (%)', data.exec_mon1_rf, getLimitColor(sup, 'RF Power', data.exec_mon1_rf)],
-                ['CRS Pos. DDM (%)', data.exec_mon1_ddm, getLimitColor(sup, 'DDM Course', data.exec_mon1_ddm)],
-                ['CRS Pos. SDM (%)', data.exec_mon1_sdm, getLimitColor(sup, 'SDM Course', data.exec_mon1_sdm)],
-                ['CRS Width RF Level (%)', data.exec_mon1_width_rf, getLimitColor(sup, 'CSB Power', data.exec_mon1_width_rf)],
-                ['CRS Width DDM (%)', data.exec_mon1_width_ddm, getLimitColor(sup, 'Width DDM', data.exec_mon1_width_ddm)],
-                ['CRS Width SDM (%)', data.exec_mon1_width_sdm, getLimitColor(sup, 'Width SDM', data.exec_mon1_width_sdm)],
-                ['CLR Width RF Level (%)', data.exec_mon1_clr_rf, getLimitColor(sup, 'CLR Power', data.exec_mon1_clr_rf)],
-                ['CLR Width DDM (%)', data.exec_mon1_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon1_clr_ddm)],
-                ['CLR Width SDM (%)', data.exec_mon1_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon1_clr_sdm)],
-                ['Nearfield Pos. RF Level (%)', data.exec_mon1_nf_rf, '#a0d8ef'],
-                ['Nearfield Pos. DDM (%)', data.exec_mon1_nf_ddm, '#a0d8ef'],
-                ['Nearfield Pos. SDM (%)', data.exec_mon1_nf_sdm, '#a0d8ef'],
-                ['CRS/CLR RF Frequency (Hz)', data.exec_mon1_freq, '#00ffcc'],
-                ['GP ANGLE (°)', data.exec_mon1_angle, getLimitColor(sup, 'GP Angle', data.exec_mon1_angle)],
-            ]);
-            if (execMon1List.length > 0) {
-                sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 1)', params: execMon1List });
-            }
+            const execMon1List = [
+                ['CRS Pos. RF Level (%)', data.exec_mon1_rf ?? '—', getLimitColor(sup, 'RF Power', data.exec_mon1_rf)],
+                ['CRS Pos. DDM (%)', data.exec_mon1_ddm ?? '—', getLimitColor(sup, 'DDM Course', data.exec_mon1_ddm)],
+                ['CRS Pos. SDM (%)', data.exec_mon1_sdm ?? '—', getLimitColor(sup, 'SDM Course', data.exec_mon1_sdm)],
+                ['CRS Width RF Level (%)', data.exec_mon1_width_rf ?? '—', getLimitColor(sup, 'CSB Power', data.exec_mon1_width_rf)],
+                ['CRS Width DDM (%)', data.exec_mon1_width_ddm ?? '—', getLimitColor(sup, 'Width DDM', data.exec_mon1_width_ddm)],
+                ['CRS Width SDM (%)', data.exec_mon1_width_sdm ?? '—', getLimitColor(sup, 'Width SDM', data.exec_mon1_width_sdm)],
+                ['CLR Width RF Level (%)', data.exec_mon1_clr_rf ?? '—', getLimitColor(sup, 'CLR Power', data.exec_mon1_clr_rf)],
+                ['CLR Width DDM (%)', data.exec_mon1_clr_ddm ?? '—', getLimitColor(sup, 'CLR DDM', data.exec_mon1_clr_ddm)],
+                ['CLR Width SDM (%)', data.exec_mon1_clr_sdm ?? '—', getLimitColor(sup, 'CLR SDM', data.exec_mon1_clr_sdm)],
+                ['Nearfield Pos. RF Level (%)', data.exec_mon1_nf_rf ?? '—', '#a0d8ef'],
+                ['Nearfield Pos. DDM (%)', data.exec_mon1_nf_ddm ?? '—', '#a0d8ef'],
+                ['Nearfield Pos. SDM (%)', data.exec_mon1_nf_sdm ?? '—', '#a0d8ef'],
+                ['CRS/CLR RF Frequency (Hz)', data.exec_mon1_freq ?? '—', '#00ffcc'],
+                ['GP ANGLE (°)', data.exec_mon1_angle ?? '—', getLimitColor(sup, 'GP Angle', data.exec_mon1_angle)],
+            ];
+            sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 1)', params: execMon1List });
 
             // 2. EXECUTIVE MEASUREMENT MON 2 (Persis Jendela ADRACS Executive)
-            const execMon2List = filterParams([
-                ['CRS Pos. RF Level (%)', data.exec_mon2_rf, getLimitColor(sup, 'RF Power', data.exec_mon2_rf)],
-                ['CRS Pos. DDM (%)', data.exec_mon2_ddm, getLimitColor(sup, 'DDM Course', data.exec_mon2_ddm)],
-                ['CRS Pos. SDM (%)', data.exec_mon2_sdm, getLimitColor(sup, 'SDM Course', data.exec_mon2_sdm)],
-                ['CRS Width RF Level (%)', data.exec_mon2_width_rf, getLimitColor(sup, 'CSB Power', data.exec_mon2_width_rf)],
-                ['CRS Width DDM (%)', data.exec_mon2_width_ddm, getLimitColor(sup, 'Width DDM', data.exec_mon2_width_ddm)],
-                ['CRS Width SDM (%)', data.exec_mon2_width_sdm, getLimitColor(sup, 'Width SDM', data.exec_mon2_width_sdm)],
-                ['CLR Width RF Level (%)', data.exec_mon2_clr_rf, getLimitColor(sup, 'CLR Power', data.exec_mon2_clr_rf)],
-                ['CLR Width DDM (%)', data.exec_mon2_clr_ddm, getLimitColor(sup, 'CLR DDM', data.exec_mon2_clr_ddm)],
-                ['CLR Width SDM (%)', data.exec_mon2_clr_sdm, getLimitColor(sup, 'CLR SDM', data.exec_mon2_clr_sdm)],
-                ['Nearfield Pos. RF Level (%)', data.exec_mon2_nf_rf, '#a0d8ef'],
-                ['Nearfield Pos. DDM (%)', data.exec_mon2_nf_ddm, '#a0d8ef'],
-                ['Nearfield Pos. SDM (%)', data.exec_mon2_nf_sdm, '#a0d8ef'],
-                ['CRS/CLR RF Frequency (Hz)', data.exec_mon2_freq, '#00ffcc'],
-                ['GP ANGLE (°)', data.exec_mon2_angle, getLimitColor(sup, 'GP Angle', data.exec_mon2_angle)],
-            ]);
-            if (execMon2List.length > 0) {
-                sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 2)', params: execMon2List });
-            }
+            const execMon2List = [
+                ['CRS Pos. RF Level (%)', data.exec_mon2_rf ?? '—', getLimitColor(sup, 'RF Power', data.exec_mon2_rf)],
+                ['CRS Pos. DDM (%)', data.exec_mon2_ddm ?? '—', getLimitColor(sup, 'DDM Course', data.exec_mon2_ddm)],
+                ['CRS Pos. SDM (%)', data.exec_mon2_sdm ?? '—', getLimitColor(sup, 'SDM Course', data.exec_mon2_sdm)],
+                ['CRS Width RF Level (%)', data.exec_mon2_width_rf ?? '—', getLimitColor(sup, 'CSB Power', data.exec_mon2_width_rf)],
+                ['CRS Width DDM (%)', data.exec_mon2_width_ddm ?? '—', getLimitColor(sup, 'Width DDM', data.exec_mon2_width_ddm)],
+                ['CRS Width SDM (%)', data.exec_mon2_width_sdm ?? '—', getLimitColor(sup, 'Width SDM', data.exec_mon2_width_sdm)],
+                ['CLR Width RF Level (%)', data.exec_mon2_clr_rf ?? '—', getLimitColor(sup, 'CLR Power', data.exec_mon2_clr_rf)],
+                ['CLR Width DDM (%)', data.exec_mon2_clr_ddm ?? '—', getLimitColor(sup, 'CLR DDM', data.exec_mon2_clr_ddm)],
+                ['CLR Width SDM (%)', data.exec_mon2_clr_sdm ?? '—', getLimitColor(sup, 'CLR SDM', data.exec_mon2_clr_sdm)],
+                ['Nearfield Pos. RF Level (%)', data.exec_mon2_nf_rf ?? '—', '#a0d8ef'],
+                ['Nearfield Pos. DDM (%)', data.exec_mon2_nf_ddm ?? '—', '#a0d8ef'],
+                ['Nearfield Pos. SDM (%)', data.exec_mon2_nf_sdm ?? '—', '#a0d8ef'],
+                ['CRS/CLR RF Frequency (Hz)', data.exec_mon2_freq ?? '—', '#00ffcc'],
+                ['GP ANGLE (°)', data.exec_mon2_angle ?? '—', getLimitColor(sup, 'GP Angle', data.exec_mon2_angle)],
+            ];
+            sections.push({ title: 'EXECUTIVE MEASUREMENT (MON 2)', params: execMon2List });
 
             // 3. STANDBY MEASUREMENT MON 1 (Persis Jendela ADRACS Standby)
-            const stbyMon1List = filterParams([
-                ['CRS CSB1 RF Level (%)', data.stby_mon1_csb1_rf, '#a0d8ef'],
-                ['CRS CSB1 DDM (%)', data.stby_mon1_csb1_ddm, '#a0d8ef'],
-                ['CRS CSB1 SDM (%)', data.stby_mon1_csb1_sdm, '#a0d8ef'],
-                ['CRS Width RF Level (%)', data.stby_mon1_width_rf, '#a0d8ef'],
-                ['CRS Width DDM (%)', data.stby_mon1_width_ddm, '#a0d8ef'],
-                ['CRS Width SDM (%)', data.stby_mon1_width_sdm, '#a0d8ef'],
-                ['CLR Width RF Level (%)', data.stby_mon1_clr_rf, '#a0d8ef'],
-                ['CLR Width DDM (%)', data.stby_mon1_clr_ddm, '#a0d8ef'],
-                ['CLR Width SDM (%)', data.stby_mon1_clr_sdm, '#a0d8ef'],
-            ]);
-            if (stbyMon1List.length > 0) {
-                sections.push({ title: 'STANDBY MEASUREMENT (MON 1)', params: stbyMon1List });
-            }
+            const stbyMon1List = [
+                ['CRS CSB1 RF Level (%)', data.stby_mon1_csb1_rf ?? '—', '#a0d8ef'],
+                ['CRS CSB1 DDM (%)', data.stby_mon1_csb1_ddm ?? '—', '#a0d8ef'],
+                ['CRS CSB1 SDM (%)', data.stby_mon1_csb1_sdm ?? '—', '#a0d8ef'],
+                ['CRS Width RF Level (%)', data.stby_mon1_width_rf ?? '—', '#a0d8ef'],
+                ['CRS Width DDM (%)', data.stby_mon1_width_ddm ?? '—', '#a0d8ef'],
+                ['CRS Width SDM (%)', data.stby_mon1_width_sdm ?? '—', '#a0d8ef'],
+                ['CLR Width RF Level (%)', data.stby_mon1_clr_rf ?? '—', '#a0d8ef'],
+                ['CLR Width DDM (%)', data.stby_mon1_clr_ddm ?? '—', '#a0d8ef'],
+                ['CLR Width SDM (%)', data.stby_mon1_clr_sdm ?? '—', '#a0d8ef'],
+            ];
+            sections.push({ title: 'STANDBY MEASUREMENT (MON 1)', params: stbyMon1List });
 
             // 4. STANDBY MEASUREMENT MON 2 (Persis Jendela ADRACS Standby)
-            const stbyMon2List = filterParams([
-                ['CRS CSB1 RF Level (%)', data.stby_mon2_csb1_rf, '#a0d8ef'],
-                ['CRS CSB1 DDM (%)', data.stby_mon2_csb1_ddm, '#a0d8ef'],
-                ['CRS CSB1 SDM (%)', data.stby_mon2_csb1_sdm, '#a0d8ef'],
-                ['CRS Width RF Level (%)', data.stby_mon2_width_rf, '#a0d8ef'],
-                ['CRS Width DDM (%)', data.stby_mon2_width_ddm, '#a0d8ef'],
-                ['CRS Width SDM (%)', data.stby_mon2_width_sdm, '#a0d8ef'],
-                ['CLR Width RF Level (%)', data.stby_mon2_clr_rf, '#a0d8ef'],
-                ['CLR Width DDM (%)', data.stby_mon2_clr_ddm, '#a0d8ef'],
-                ['CLR Width SDM (%)', data.stby_mon2_clr_sdm, '#a0d8ef'],
-            ]);
-            if (stbyMon2List.length > 0) {
-                sections.push({ title: 'STANDBY MEASUREMENT (MON 2)', params: stbyMon2List });
-            }
+            const stbyMon2List = [
+                ['CRS CSB1 RF Level (%)', data.stby_mon2_csb1_rf ?? '—', '#a0d8ef'],
+                ['CRS CSB1 DDM (%)', data.stby_mon2_csb1_ddm ?? '—', '#a0d8ef'],
+                ['CRS CSB1 SDM (%)', data.stby_mon2_csb1_sdm ?? '—', '#a0d8ef'],
+                ['CRS Width RF Level (%)', data.stby_mon2_width_rf ?? '—', '#a0d8ef'],
+                ['CRS Width DDM (%)', data.stby_mon2_width_ddm ?? '—', '#a0d8ef'],
+                ['CRS Width SDM (%)', data.stby_mon2_width_sdm ?? '—', '#a0d8ef'],
+                ['CLR Width RF Level (%)', data.stby_mon2_clr_rf ?? '—', '#a0d8ef'],
+                ['CLR Width DDM (%)', data.stby_mon2_clr_ddm ?? '—', '#a0d8ef'],
+                ['CLR Width SDM (%)', data.stby_mon2_clr_sdm ?? '—', '#a0d8ef'],
+            ];
+            sections.push({ title: 'STANDBY MEASUREMENT (MON 2)', params: stbyMon2List });
+
+            // 5. CURRENT MAINTENANCE ALERT DATA / POWER SUPPLY (TX 1 & TX 2)
+            const gpPsTx1List = [
+                ['+5V supply (V)', data.ps_tx1_v5 ?? '—', '#00ffcc'],
+                ['+15V supply (V)', data.ps_tx1_v15_pos ?? '—', '#00ffcc'],
+                ['-15V supply (V)', data.ps_tx1_v15_neg ?? '—', '#00ffcc'],
+                ['+24V supply (V)', data.ps_tx1_v24 ?? '—', '#00ffcc'],
+                ['Battery / +54V supply (V)', data.ps_tx1_v54_battery ?? '—', '#00ffcc'],
+                ['Inside temperature (°C)', data.ps_tx1_temp_in ?? '—', '#00d4ff'],
+                ['Outside temperature (°C)', data.ps_tx1_temp_out ?? '—', '#00d4ff'],
+                ['Obstruction lights (A)', data.ps_tx1_obs_lights ?? '—', '#a0d8ef'],
+            ];
+            sections.push({ title: 'POWER SUPPLY & ENVIRONMENT (TX 1)', params: gpPsTx1List });
+
+            const gpPsTx2List = [
+                ['+5V supply (V)', data.ps_tx2_v5 ?? '—', '#00ffcc'],
+                ['+15V supply (V)', data.ps_tx2_v15_pos ?? '—', '#00ffcc'],
+                ['-15V supply (V)', data.ps_tx2_v15_neg ?? '—', '#00ffcc'],
+                ['+24V supply (V)', data.ps_tx2_v24 ?? '—', '#00ffcc'],
+                ['Battery / +54V supply (V)', data.ps_tx2_v54_battery ?? '—', '#00ffcc'],
+                ['Inside temperature (°C)', data.ps_tx2_temp_in ?? '—', '#00d4ff'],
+                ['Outside temperature (°C)', data.ps_tx2_temp_out ?? '—', '#00d4ff'],
+                ['Obstruction lights (A)', data.ps_tx2_obs_lights ?? '—', '#a0d8ef'],
+            ];
+            sections.push({ title: 'POWER SUPPLY & ENVIRONMENT (TX 2)', params: gpPsTx2List });
 
         } else if (parserId === 'ils_llz_thales421') {
             const sup = 'ILS-LLZ';
