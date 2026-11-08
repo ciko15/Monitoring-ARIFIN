@@ -289,8 +289,19 @@ class IlsGpThales421Parser extends BaseParser {
 
             const frames = extractFrames(this._buf);
             if (frames.length === 0) {
-                if (this._buf.length > 1024) {
-                    this._buf = this._buf.slice(this._buf.length - 512);
+                if (this._buf.length > 8192) {
+                    let firstHeader = -1;
+                    for (let i = 0; i <= this._buf.length - 2; i++) {
+                        if (this._buf[i] === 0x11 && this._buf[i + 1] === 0x8D) {
+                            firstHeader = i;
+                            break;
+                        }
+                    }
+                    if (firstHeader >= 0) {
+                        this._buf = this._buf.slice(firstHeader);
+                    } else {
+                        this._buf = this._buf.slice(this._buf.length - 1024);
+                    }
                 }
                 return {
                     success: false, error: 'No valid GP frames', status: 'Waiting',
@@ -432,7 +443,7 @@ class IlsGpThales421Parser extends BaseParser {
         return chunk && chunk.length >= 4 && chunk.slice(0, 4).equals(HBEAT_RECV);
     }
 
-    getHeartbeatReply() { return TRIGGER_SEND; }
+    getHeartbeatReply() { return HBEAT_REPLY; }
 
     getMode() {
         if (Date.now() - this._lastDataTime > PASSIVE_TIMEOUT && this._mode === 'PASSIVE') {

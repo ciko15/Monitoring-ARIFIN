@@ -1393,6 +1393,17 @@ class NetworkListenerService {
                     this._logThrottled('log', `llz:tcp:rx:${id}`, `[LLZ-TCP] Received ${chunk.length} bytes from ${name}: ${chunk.slice(0, 32).toString('hex')}...`, 15000);
                 }
 
+                // Cek dan balas Heartbeat dari Thales 421 (13 00 F8 06 -> balas 13 00 F9 06)
+                if (typeof parser.isHeartbeat === 'function' && parser.isHeartbeat(chunk)) {
+                    if (typeof parser.getHeartbeatReply === 'function') {
+                        try {
+                            const reply = parser.getHeartbeatReply();
+                            socket.write(reply);
+                            lastTxTime = Date.now();
+                        } catch (e) { }
+                    }
+                }
+
                 // Alirkan chunk mentah langsung ke parser & handler log/WebSocket
                 await this.handleIncomingData(source, chunk, parser);
             });
