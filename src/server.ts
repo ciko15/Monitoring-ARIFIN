@@ -312,9 +312,9 @@ async function checkEquipmentWatchdog() {
                             const parserId = String(src._parser_id || item.parser_id || '').toLowerCase();
                             const category = String(item.category || item.sup_category || '').toLowerCase();
                             
-                            // Jika parser adalah ils_mophien_llz, jangan dipaksa Disconnect oleh watchdog
-                            // karena status dan stream-nya dipelihara langsung oleh TCP persistent listener
-                            if (parserId.includes('ils_mophien_llz')) {
+                            // Jika parser adalah ILS streaming (ils_llz_thales421, ils_gp_thales421, ils_mophien_llz),
+                            // jangan dipaksa Disconnect/Offline oleh watchdog karena status dan stream-nya dipelihara langsung oleh TCP persistent listener
+                            if (parserId.includes('ils_llz_thales421') || parserId.includes('ils_gp_thales421') || parserId.includes('ils_mophien_llz') || parserId.includes('ils_mophien_gp')) {
                                 return src._status || 'Normal';
                             }
 
