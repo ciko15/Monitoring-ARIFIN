@@ -321,7 +321,7 @@ class EquipmentService {
             // (misal karena _lkgvCache kosong saat baru restart), paksa ubah cache.mergedData menjadi '-'
             const isDead = String(finalStatus || '').toLowerCase() === 'disconnect' || String(finalStatus || '').toLowerCase() === 'offline' || String(finalStatus || '').toLowerCase() === 'error';
             const parsingId = parsedData.parsing_id || parsedData.source_parsing_id || '';
-            const isPersistentStreamOrMeter = parsingId.includes('pm5560') || parsingId.includes('diris') || parsingId.includes('dse7320');
+            const isPersistentStreamOrMeter = parsingId.includes('ils_') || parsingId.includes('pm5560') || parsingId.includes('diris') || parsingId.includes('dse7320');
             if (isDead && !isPersistentStreamOrMeter) {
                 for (const key of Object.keys(cache.mergedData)) {
                     if (key !== 'connectivity' && key !== 'source_name' && !key.startsWith('_')) {

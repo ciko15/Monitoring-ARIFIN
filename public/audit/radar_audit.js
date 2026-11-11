@@ -28,40 +28,58 @@
     let _radarTargetTrafficFilter = 'all'; // 'all', 'inbound' (incoming), 'outbound' (outgoing)
     let _targetHistoryMap = new Map(); // Histori posisi [lat, lon, range, azim, time] untuk kalkulasi heading & track
 
-    // Electronic Bearing and Range Line (EBRL / Ruler Distance Measurement Tool)
-    let _isRulerMode = false;
-    let _rulerPointA = null; // { x, y, lat, lon, label }
-    let _rulerPointB = null; // { x, y, lat, lon, label }
+    // Electronic Bearing and Range Line (EBRL / Multi-Ruler Distance Measurement Tool)
+    let _isCtrlKeyDown = false;
+    let _pendingRulerStart = null; // { targetId, lat, lon, label } saat titik 1 dipilih
+    let _activeRulers = [];        // Koleksi garis pengukuran: [ { id, ptA: { targetId, lat, lon, label }, ptB: { targetId, lat, lon, label }, color } ]
 
     // ── Katalog Stasiun Radar MSSR Indonesia (SAC / SIC) ───────────────────────────
     const RADAR_STATIONS_MAP = {
-        '50/8':   { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
-        '50/008': { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
-        '32/157': { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
-        '32/153': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
-        '32/15':  { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
-        '32/015': { name: 'Timika',    lat: -4.5284, lon: 136.8860 },
-        '32/163': { name: 'Sentani',   lat: -2.5721, lon: 140.5148 },
-        '32/160': { name: 'Biak',      lat: -1.1874, lon: 136.1085 },
-        '32/154': { name: 'Merauke',   lat: -8.5204, lon: 140.4183 },
-        '32/143': { name: 'Sorong',    lat: -0.9255, lon: 131.1215 },
-        '32/169': { name: 'Nabire',    lat: -3.3683, lon: 135.4969 },
-        '32/164': { name: 'Wamena',    lat: -4.0988, lon: 138.9515 },
+        '50/8': { name: 'Surabaya', lat: -7.3798, lon: 112.7874 },
+        '50/008': { name: 'Surabaya', lat: -7.3798, lon: 112.7874 },
+        '32/157': { name: 'Surabaya', lat: -7.3798, lon: 112.7874 },
+        '32/153': { name: 'Timika', lat: -4.5284, lon: 136.8860 },
+        '32/15': { name: 'Timika', lat: -4.5284, lon: 136.8860 },
+        '32/015': { name: 'Timika', lat: -4.5284, lon: 136.8860 },
+        '32/163': { name: 'Sentani', lat: -2.5721, lon: 140.5148 },
+        '32/160': { name: 'Biak', lat: -1.1874, lon: 136.1085 },
+        '32/154': { name: 'Merauke', lat: -8.5204, lon: 140.4183 },
+        '32/143': { name: 'Sorong', lat: -0.9255, lon: 131.1215 },
+        '32/169': { name: 'Nabire', lat: -3.3683, lon: 135.4969 },
+        '32/164': { name: 'Wamena', lat: -4.0988, lon: 138.9515 },
         '32/179': { name: 'Manokwari', lat: -0.8920, lon: 134.0500 },
-        '32/180': { name: 'Kaimana',   lat: -3.6450, lon: 133.7430 },
-        '32/157': { name: 'Surabaya',  lat: -7.3798, lon: 112.7874 },
-        '31/1':   { name: 'Jakarta',   lat: -6.1256, lon: 106.6559 },
-        '31/001': { name: 'Jakarta',   lat: -6.1256, lon: 106.6559 },
-        '31/2':   { name: 'Cengkareng',lat: -6.1256, lon: 106.6559 },
-        '32/1':   { name: 'Makassar',  lat: -5.0616, lon: 119.5540 },
-        '32/001': { name: 'Makassar',  lat: -5.0616, lon: 119.5540 },
-        '32/2':   { name: 'Bali',      lat: -8.7482, lon: 115.1672 },
-        '32/002': { name: 'Bali',      lat: -8.7482, lon: 115.1672 },
-        '31/10':  { name: 'Medan',     lat: 3.6422,  lon: 98.8853 },
-        '31/010': { name: 'Medan',     lat: 3.6422,  lon: 98.8853 },
-        '31/20':  { name: 'Palembang', lat: -2.8986, lon: 104.7003 },
-        '32/20':  { name: 'Balikpapan',lat: -1.2683, lon: 116.8944 }
+        '32/180': { name: 'Kaimana', lat: -3.6450, lon: 133.7430 },
+        '32/157': { name: 'Surabaya', lat: -7.3798, lon: 112.7874 },
+        '31/1': { name: 'Jakarta', lat: -6.1256, lon: 106.6559 },
+        '31/001': { name: 'Jakarta', lat: -6.1256, lon: 106.6559 },
+        '31/2': { name: 'Cengkareng', lat: -6.1256, lon: 106.6559 },
+        '32/1': { name: 'Makassar', lat: -5.0616, lon: 119.5540 },
+        '32/001': { name: 'Makassar', lat: -5.0616, lon: 119.5540 },
+        '32/2': { name: 'Bali', lat: -8.7482, lon: 115.1672 },
+        '32/002': { name: 'Bali', lat: -8.7482, lon: 115.1672 },
+        '31/10': { name: 'Medan', lat: 3.6422, lon: 98.8853 },
+        '31/010': { name: 'Medan', lat: 3.6422, lon: 98.8853 },
+        '31/20': { name: 'Palembang', lat: -2.8986, lon: 104.7003 },
+        '32/20': { name: 'Balikpapan', lat: -1.2683, lon: 116.8944 }
     };
+
+    // Ambil daftar bandara cabang dari cache memory atau localStorage agar instan
+    function getKnownAirportsList() {
+        if (Array.isArray(window.airportsData) && window.airportsData.length > 0) {
+            return window.airportsData;
+        }
+        if (Array.isArray(window.airportsGridData) && window.airportsGridData.length > 0) {
+            return window.airportsGridData;
+        }
+        try {
+            const raw = localStorage.getItem('noc_airports_cache');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) { }
+        return [];
+    }
 
     // Ambil profil bandara cabang secara asinkron agar otomatis menyesuaikan dengan lokasi aktif
     function fetchBranchProfileCoords() {
@@ -69,15 +87,12 @@
         return fetch('/api/config/branch-profile', { headers: window.getAuthHeaders ? window.getAuthHeaders() : {} })
             .then(res => res.ok ? res.json() : null)
             .then(profile => {
-                if (profile && profile.lat && profile.lng) {
+                if (profile && (profile.lat || profile.lng)) {
                     _branchProfileCoords = {
                         lat: parseFloat(profile.lat),
-                        lon: parseFloat(profile.lng),
+                        lon: parseFloat(profile.lng !== undefined ? profile.lng : profile.lon),
                         name: profile.airportName || profile.siteId || 'Station'
                     };
-                    if (_lastRadarCoords && Math.abs(_lastRadarCoords.lat - (-4.5284)) < 0.001) {
-                        _lastRadarCoords = { lat: _branchProfileCoords.lat, lon: _branchProfileCoords.lon };
-                    }
                     return _branchProfileCoords;
                 }
                 return null;
@@ -85,24 +100,136 @@
     }
     fetchBranchProfileCoords();
 
-    // Resolusi otomatis koordinat stasiun radar (Rantai Prioritas):
-    // 1. data.lat & data.lon dari konfigurasi Data Source (input user di form config)
-    // 2. Profil koordinat bandara aktif (_branchProfileCoords / branch_profile.json)
-    // 3. Lookup tabel SAC / SIC (I034/010)
-    // 4. Default fallback aman (Surabaya)
-    function resolveRadarStationCoords(data) {
-        // 1. Koordinat spesifik dari konfigurasi Data Source (jika diinput user di UI & valid)
-        if (data) {
-            let lat = parseFloat(data.lat);
-            let lon = parseFloat(data.lon !== undefined && data.lon !== null ? data.lon : data.lng);
-            if (!isNaN(lat) && !isNaN(lon) && (Math.abs(lat) > 0.0001 || Math.abs(lon) > 0.0001)) {
-                if (lat >= -12.0 && lat <= 7.0 && lon >= 94.0 && lon <= 142.0) {
-                    return { lat, lon, name: data.radar_name || 'Radar Station (Source Config)' };
+    // Resolusi dinamis koordinat stasiun radar (Rantai Prioritas):
+    // 1. data.lat & data.lon langsung dari payload/konfigurasi Data Source
+    // 2. Koordinat Bandara dari Equipment / Data Source terkait (airport_id -> airportsData / cache)
+    // 3. Bandara cabang aktif yang sedang dipilih di UI Monitoring Cabang (selectedAirportForMonitoring)
+    // 4. Profil bandara cabang aktif (_branchProfileCoords / branch_profile.json)
+    // 5. Lookup tabel SAC / SIC (I034/010)
+    // 6. Bandara pertama dari daftar bandara yang valid
+    function resolveRadarStationCoords(data, sourceObj = null) {
+        // Ambil data source & equipment terkait jika tidak dipass langsung
+        if (!sourceObj && _activeRadarSourceId) {
+            const resolved = findRadarSourceAndData(_activeRadarSourceId);
+            if (resolved && resolved.src) sourceObj = resolved.src;
+            if (!data && resolved && resolved.data) data = resolved.data;
+        }
+
+        const airportsList = getKnownAirportsList();
+
+        // 1. PRIORITAS UTAMA: Koordinat spesifik dari konfigurasi Data Source langsung (sourceObj.lat & sourceObj.lon)
+        if (sourceObj) {
+            let sLat = parseFloat(sourceObj.lat !== undefined && sourceObj.lat !== null ? sourceObj.lat : sourceObj.latitude);
+            let sLon = parseFloat(sourceObj.lon !== undefined && sourceObj.lon !== null ? sourceObj.lon : (sourceObj.longitude !== undefined ? sourceObj.longitude : sourceObj.lng));
+            if (!isNaN(sLat) && !isNaN(sLon) && (Math.abs(sLat) > 0.0001 || Math.abs(sLon) > 0.0001)) {
+                if (sLat >= -12.0 && sLat <= 7.0 && sLon >= 94.0 && sLon <= 142.0) {
+                    return { lat: sLat, lon: sLon, name: sourceObj.name || sourceObj.location || 'Radar Station (Source Config)' };
                 }
             }
         }
 
-        // 2. Profil koordinat bandara aktif dari branch_profile.json (jika data source tidak mengisi lat/lon)
+        // 2. Koordinat dari payload data jika data source mengirimkan koordinat eksplisit
+        if (data) {
+            let lat = parseFloat(data.lat);
+            let lon = parseFloat(data.lon !== undefined && data.lon !== null ? data.lon : (data.lng !== undefined ? data.lng : null));
+            if (!isNaN(lat) && !isNaN(lon) && (Math.abs(lat) > 0.0001 || Math.abs(lon) > 0.0001)) {
+                if (lat >= -12.0 && lat <= 7.0 && lon >= 94.0 && lon <= 142.0) {
+                    return { lat, lon, name: data.radar_name || (sourceObj ? sourceObj.name : 'Radar Station') };
+                }
+            }
+        }
+
+        // 2. Lookup SAC / SIC dari header paket CAT 034 (I034/010)
+        if (data) {
+            if (data.sac !== undefined && data.sic !== undefined && data.sac !== null && data.sic !== null) {
+                const k1 = `${data.sac}/${data.sic}`;
+                const k2 = `${data.sac}/${String(data.sic).padStart(3, '0')}`;
+                if (RADAR_STATIONS_MAP[k1]) return RADAR_STATIONS_MAP[k1];
+                if (RADAR_STATIONS_MAP[k2]) return RADAR_STATIONS_MAP[k2];
+            }
+        }
+
+        // Cari parent equipment object jika ada
+        let parentEqObj = null;
+        if (sourceObj && sourceObj.equipt_id && Array.isArray(window.equipmentDataCache)) {
+            parentEqObj = window.equipmentDataCache.find(e => String(e.id) === String(sourceObj.equipt_id));
+        }
+
+        // 3. PRIORITAS TINGGI: Pencocokan nama stasiun/bandara dari nama radar, nama source, lokasi, atau nama alat induk
+        // Menjamin jika user memilih "Radar Merauke" atau "Radar Biak", lokasinya langsung tepat ke Merauke / Biak
+        const namesToCheck = [
+            data ? data.radar_name : '',
+            sourceObj ? sourceObj.name : '',
+            sourceObj ? sourceObj.source_name : '',
+            sourceObj ? sourceObj.location : '',
+            parentEqObj ? parentEqObj.name : ''
+        ].map(n => String(n || '').toLowerCase());
+
+        for (const nameStr of namesToCheck) {
+            if (!nameStr || nameStr === 'unknown' || nameStr === 'mssr') continue;
+            // Cek di katalog stasiun radar RADAR_STATIONS_MAP
+            for (const st of Object.values(RADAR_STATIONS_MAP)) {
+                if (nameStr.includes(st.name.toLowerCase())) {
+                    return st;
+                }
+            }
+            // Cek di daftar bandara airportsList
+            for (const ap of airportsList) {
+                const apName = String(ap.name || '').toLowerCase();
+                const apCity = String(ap.city || '').toLowerCase();
+                if ((apName && nameStr.includes(apName)) || (apCity && nameStr.includes(apCity))) {
+                    if (ap.lat && (ap.lng || ap.lon)) {
+                        return {
+                            lat: parseFloat(ap.lat),
+                            lon: parseFloat(ap.lng || ap.lon),
+                            name: ap.name || ap.city || 'Airport'
+                        };
+                    }
+                }
+            }
+        }
+
+        // 4. Cari dari Equipment yang menaungi data source ini (berdasarkan airportId / airport_id / branchId)
+        let eqAirportId = null;
+        if (sourceObj) {
+            eqAirportId = sourceObj.airport_id || sourceObj.airportId || sourceObj.branch_id || sourceObj.branchId;
+            if (parentEqObj) {
+                if (!eqAirportId) eqAirportId = parentEqObj.airport_id || parentEqObj.airportId || parentEqObj.branch_id || parentEqObj.branchId;
+                if (parentEqObj.airport && parentEqObj.airport.lat && (parentEqObj.airport.lng || parentEqObj.airport.lon)) {
+                    const aLat = parseFloat(parentEqObj.airport.lat);
+                    const aLon = parseFloat(parentEqObj.airport.lng || parentEqObj.airport.lon);
+                    if (!isNaN(aLat) && !isNaN(aLon)) {
+                        return { lat: aLat, lon: aLon, name: parentEqObj.airport.name || 'Airport' };
+                    }
+                }
+            }
+        }
+
+        // Jika ditemukan airportId pada equipment / data source, cocokkan ke airportsList
+        if (eqAirportId && airportsList.length > 0) {
+            const matchedAirport = airportsList.find(a => String(a.id) === String(eqAirportId));
+            if (matchedAirport && matchedAirport.lat && (matchedAirport.lng || matchedAirport.lon)) {
+                const aLat = parseFloat(matchedAirport.lat);
+                const aLon = parseFloat(matchedAirport.lng || matchedAirport.lon);
+                if (!isNaN(aLat) && !isNaN(aLon)) {
+                    return { lat: aLat, lon: aLon, name: matchedAirport.name || 'Airport Station' };
+                }
+            }
+        }
+
+        // 5. Bandara cabang aktif yang sedang dipilih di UI Monitoring Cabang saat ini
+        if (typeof window.selectedAirportForMonitoring !== 'undefined' && window.selectedAirportForMonitoring) {
+            const curAp = window.selectedChildAirportForMonitoring || window.selectedAirportForMonitoring;
+            if (curAp && curAp.lat && (curAp.lng || curAp.lon)) {
+                const aLat = parseFloat(curAp.lat);
+                const aLon = parseFloat(curAp.lng || curAp.lon);
+                if (!isNaN(aLat) && !isNaN(aLon)) {
+                    return { lat: aLat, lon: aLon, name: curAp.name || 'Selected Cabang Airport' };
+                }
+            }
+        }
+
+        // 6. Profil koordinat bandara cabang aktif dari branch_profile.json
         if (_branchProfileCoords && !isNaN(_branchProfileCoords.lat)) {
             const bLat = parseFloat(_branchProfileCoords.lat);
             const bLon = parseFloat(_branchProfileCoords.lon);
@@ -111,27 +238,19 @@
             }
         }
 
-        // 3. Prioritas berikutnya: Lookup SAC / SIC dari header paket CAT 034 (I034/010)
-        if (data) {
-            if (data.sac !== undefined && data.sic !== undefined && data.sac !== null && data.sic !== null) {
-                const k1 = `${data.sac}/${data.sic}`;
-                const k2 = `${data.sac}/${String(data.sic).padStart(3, '0')}`;
-                if (RADAR_STATIONS_MAP[k1]) return RADAR_STATIONS_MAP[k1];
-                if (RADAR_STATIONS_MAP[k2]) return RADAR_STATIONS_MAP[k2];
-            }
-
-            // Lookup Nama Stasiun jika membawa nama lokasi
-            const rName = String(data.radar_name || '').toLowerCase();
-            if (rName && rName !== 'unknown' && rName !== 'mssr') {
-                for (const st of Object.values(RADAR_STATIONS_MAP)) {
-                    if (rName.includes(st.name.toLowerCase())) {
-                        return st;
-                    }
-                }
+        // 7. Jika ada bandara dari airportsList, ambil yang pertama
+        if (airportsList.length > 0) {
+            const firstAp = airportsList.find(a => a.lat && (a.lng || a.lon) && Math.abs(parseFloat(a.lat)) > 0.0001);
+            if (firstAp) {
+                return {
+                    lat: parseFloat(firstAp.lat),
+                    lon: parseFloat(firstAp.lng || firstAp.lon),
+                    name: firstAp.name || 'Cabang Airport'
+                };
             }
         }
 
-        // 4. Default aman stasiun radar di Indonesia jika semua kosong
+        // Fallback default
         return { lat: -7.3798, lon: 112.7874, name: 'Surabaya' };
     }
 
@@ -253,8 +372,8 @@
 
         // Haversine formula
         const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-                  Math.cos(phi1) * Math.cos(phi2) *
-                  Math.sin(deltaLam / 2) * Math.sin(deltaLam / 2);
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLam / 2) * Math.sin(deltaLam / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         const distKm = R_km * c;
         const distNm = distKm / 1.852;
@@ -262,7 +381,7 @@
         // Bearing / Azimuth (0 - 360°)
         const y = Math.sin(deltaLam) * Math.cos(phi2);
         const x = Math.cos(phi1) * Math.sin(phi2) -
-                  Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLam);
+            Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLam);
         let brng = (Math.atan2(y, x) * 180) / Math.PI;
         brng = (brng + 360) % 360;
 
@@ -697,7 +816,7 @@
                 // Kriteria Standar Radar Display untuk Target Dobel / Split:
                 // 1. Squawk Khusus Identik (bukan VFR 1200 / 7000 / kosong) DAN jarak berdekatan (< 1.2 NM & < 1.2°)
                 const sameSquawk = aSq && bSq && aSq !== '—' && aSq !== '1200' && aSq !== '7000' && aSq === bSq;
-                
+
                 // 2. Proksimitas Polar Sangat Ketat (Satu beam width radar ~1.5°, selisih range sangat kecil < 0.8 NM)
                 const isPhysicalSplit = sameSquawk && dR <= 0.8 && dAz <= 1.2 && aR > 0 && bR > 0;
                 const isPhysicalMultipath = sameSquawk && dR > 0.8 && dR <= 4.0 && dAz <= 3.0 && aR > 0 && bR > 0;
@@ -787,7 +906,9 @@
                     </div>
 
                     <!-- Close Button -->
-                    <button onclick="window.closeRadarPpiScope()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; font-size: 18px; cursor: pointer; padding: 4px 12px; border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.3)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='#cbd5e1';">✕</button>
+                    <button onclick="window.closeRadarPpiScope()" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.3)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239,68,68,0.15)'; this.style.color='#f87171';">
+                        <i class="fas fa-times"></i> Tutup
+                    </button>
                 </div>
             </div>
 
@@ -803,8 +924,13 @@
                     <button class="radar-tab-btn" id="radarToggleIslsBtn" onclick="window.toggleRadarIslsFilter()" title="Simulasi Interrogation Side-Lobe Suppression (ISLS) & Anti-Multipath Filter" style="border-color: rgba(148, 163, 184, 0.4); color: #94a3b8;">
                         <i class="fas fa-shield-alt"></i> Filter ISLS: <span id="radarIslsStateText" style="font-weight: 700; color: #cbd5e1;">NONAKTIF</span>
                     </button>
-                    <button class="radar-tab-btn" id="radarRulerBtn" onclick="window.toggleRadarRuler()" title="Alat Pengukur Jarak & Arah Antara 2 Titik / Pesawat (Shortcut: M atau D)" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
-                        <i class="fas fa-ruler-combined"></i> Ukur Jarak: <span id="radarRulerStateText" style="font-weight: 700; color: #cbd5e1;">OFF</span>
+                    <div id="radarRulerShortcutHint" style="display: flex; align-items: center; gap: 6px; padding: 5px 12px; background: rgba(56, 189, 248, 0.08); border: 1px dashed rgba(56, 189, 248, 0.4); border-radius: 6px; font-size: 11px; color: #7dd3fc;" title="Tahan tombol CTRL (atau CMD di Mac) lalu klik pesawat/titik 1 dan titik 2 pada radar untuk mengukur jarak">
+                        <i class="fas fa-ruler-combined" style="color: #38bdf8;"></i>
+                        <span>Ukur Jarak: <kbd style="background: rgba(15,23,42,0.8); border: 1px solid rgba(56,189,248,0.5); padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 10px; color: #fff;">Ctrl</kbd> + Klik</span>
+                        <span id="radarRulerActiveIndicator" style="display: none; background: #00ff88; color: #020617; font-weight: 800; font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">TAHAN CTRL</span>
+                    </div>
+                    <button class="radar-tab-btn" id="radarResetRulerBtn" onclick="window.clearRadarRuler()" title="Hapus seluruh garis pengukuran jarak yang telah dibuat" style="display: none; border-color: rgba(239, 68, 68, 0.5); color: #f87171; background: rgba(239, 68, 68, 0.15); padding: 4px 10px; font-size: 11px;">
+                        <i class="fas fa-trash-alt"></i> Reset Jarak (<span id="radarRulerCountBadge">0</span>)
                     </button>
                 </div>
                 <div id="radarPpiControlsRight" style="display: flex; align-items: center; gap: 12px;">
@@ -981,7 +1107,58 @@
                         </div>
                     </div>
 
-                    <!-- Row 2: Diagram Mawar Jangkauan 16 Sektor -->
+                    <!-- Row 2: Audit Kerusakan Radar & Deteksi False Target (CAT 048 / 034) -->
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; padding: 14px 18px; display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-exclamation-triangle" style="color: #ef4444; font-size: 16px;"></i>
+                                <div>
+                                    <span style="font-size: 12px; font-weight: 800; color: #ff8888; letter-spacing: 0.5px;">MONITOR ANOMALI KERUSAKAN RADAR & FALSE TARGET (ASTERIX CAT 048/034)</span>
+                                    <div style="font-size: 10px; color: #94a3b8;">Deteksi real-time target hantu (ghost target), plot splitting Surabaya/area pegunungan, dan integritas pulsa ISLS</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <button onclick="window.openRadarDuplicateAuditModal()" style="padding: 4px 12px; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; border-radius: 4px; color: #ff8888; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.4)';" onmouseout="this.style.background='rgba(239,68,68,0.2)';">
+                                    <i class="fas fa-stethoscope"></i> Buka Detail Diagnosa
+                                </button>
+                                <span class="radar-live-badge" id="auditFalseTargetStatusBadge" style="background: rgba(0, 255, 136, 0.15); color: #00ff88; border-color: #00ff88;">NORMAL</span>
+                            </div>
+                        </div>
+
+                        <!-- 4 Status Anomali Sub-komponen Radar -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;">
+                            <div style="background: rgba(8, 16, 32, 0.6); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 10px;">
+                                <div style="font-size: 10px; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">FALSE / GHOST TARGETS</div>
+                                <div style="font-size: 18px; font-weight: 800; color: #00ff88; font-family: monospace;" id="auditValFalseTargetCount">0 Terdeteksi</div>
+                                <div style="font-size: 10px; color: #64748b; margin-top: 2px;" id="auditTextFalseTargetDetail">Tidak ada target tiruan aktif</div>
+                            </div>
+
+                            <div style="background: rgba(8, 16, 32, 0.6); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 10px;">
+                                <div style="font-size: 10px; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">PLOT SPLITTING (OBA DRIFT)</div>
+                                <div style="font-size: 18px; font-weight: 800; color: #00d4ff; font-family: monospace;" id="auditValPlotSplitStatus">NORMAL</div>
+                                <div style="font-size: 10px; color: #64748b; margin-top: 2px;" id="auditTextPlotSplitDetail">Coalescing window optimal</div>
+                            </div>
+
+                            <div style="background: rgba(8, 16, 32, 0.6); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 10px;">
+                                <div style="font-size: 10px; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">ISLS & SIDELOBE SUPPRESSION</div>
+                                <div style="font-size: 18px; font-weight: 800; color: #ffaa00; font-family: monospace;" id="auditValIslsHealth">P1-P2 BALANCE OK</div>
+                                <div style="font-size: 10px; color: #64748b; margin-top: 2px;" id="auditTextIslsDetail">Control pattern normal</div>
+                            </div>
+
+                            <div style="background: rgba(8, 16, 32, 0.6); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 10px;">
+                                <div style="font-size: 10px; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">ASTERIX CAT 034 / 048 JITTER</div>
+                                <div style="font-size: 18px; font-weight: 800; color: #00ff88; font-family: monospace;" id="auditValAsterixJitter">&lt; 15 ms</div>
+                                <div style="font-size: 10px; color: #64748b; margin-top: 2px;" id="auditTextAsterixJitterDetail">Network sync stabil</div>
+                            </div>
+                        </div>
+
+                        <!-- Daftar Deteksi Kerusakan & Solusi Rekomendasi Teknisi -->
+                        <div id="auditFalseTargetListContainer" style="background: rgba(2, 6, 23, 0.6); border-radius: 6px; padding: 10px 12px; font-size: 11px;">
+                            <div style="color: #64748b; text-align: center; padding: 8px;">Memuat status audit anomali sinyal radar...</div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Diagram Mawar Jangkauan 16 Sektor -->
                     <div style="display: grid; grid-template-columns: 360px 1fr; gap: 14px;">
                         <div class="radar-audit-card" style="display: flex; flex-direction: column; align-items: center;">
                             <span style="font-size: 11px; font-weight: 700; color: #00d4ff; margin-bottom: 8px;">POLAR COVERAGE (16 SEKTOR AZIMUTH)</span>
@@ -1111,15 +1288,17 @@
                     return;
                 }
 
-                // Jika sedang dalam Mode Ukur Jarak (EBRL / Ruler)
-                if (_isRulerMode) {
+                // Fitur Ukur Jarak: Aktif saat tombol Ctrl (atau Cmd di Mac) ditekan saat klik
+                const isCtrlActive = e.ctrlKey || e.metaKey || _isCtrlKeyDown;
+                if (isCtrlActive) {
                     const rect = canvas.getBoundingClientRect();
                     const clickX = e.clientX - rect.left;
                     const clickY = e.clientY - rect.top;
 
-                    // Tentukan koordinat lat/lon dari titik klik
-                    let ptLat = null, ptLon = null, ptLabel = '';
+                    // Tentukan koordinat lat/lon dan targetId dari titik klik
+                    let ptLat = null, ptLon = null, ptLabel = '', targetId = null;
                     if (_radarHoveredTarget) {
+                        targetId = String(_radarHoveredTarget.id || '');
                         ptLat = parseFloat(_radarHoveredTarget.lat);
                         ptLon = parseFloat(_radarHoveredTarget.lon);
                         ptLabel = _radarHoveredTarget.callsign || _radarHoveredTarget.id;
@@ -1129,52 +1308,48 @@
                             ptLat = latLng.lat;
                             ptLon = latLng.lng;
                             ptLabel = `${ptLat.toFixed(2)}, ${ptLon.toFixed(2)}`;
-                        } catch (err) {}
+                        } catch (err) { }
                     }
 
-                    if (!_rulerPointA) {
-                        _rulerPointA = {
+                    if (!_pendingRulerStart) {
+                        // Titik 1 dipilih
+                        _pendingRulerStart = {
                             x: clickX,
                             y: clickY,
+                            targetId: targetId,
                             lat: ptLat,
                             lon: ptLon,
-                            label: ptLabel || 'Titik A'
+                            label: ptLabel || 'Titik 1'
                         };
-                        _rulerPointB = null;
-                        const stateText = document.getElementById('radarRulerStateText');
-                        if (stateText) {
-                            stateText.textContent = `Titik 1: ${_rulerPointA.label} (Klik Titik 2)`;
-                            stateText.style.color = '#ffcc00';
-                        }
-                    } else if (!_rulerPointB) {
-                        _rulerPointB = {
-                            x: clickX,
-                            y: clickY,
-                            lat: ptLat,
-                            lon: ptLon,
-                            label: ptLabel || 'Titik B'
-                        };
-                        const stateText = document.getElementById('radarRulerStateText');
-                        if (stateText) {
-                            stateText.textContent = 'SELESAI (Klik lagi untuk ukur baru)';
-                            stateText.style.color = '#00ff88';
-                        }
                     } else {
-                        // Jika sudah ada A dan B, klik berikutnya mereset ke Titik 1 baru
-                        _rulerPointA = {
-                            x: clickX,
-                            y: clickY,
-                            lat: ptLat,
-                            lon: ptLon,
-                            label: ptLabel || 'Titik A'
-                        };
-                        _rulerPointB = null;
-                        const stateText = document.getElementById('radarRulerStateText');
-                        if (stateText) {
-                            stateText.textContent = `Titik 1: ${_rulerPointA.label} (Klik Titik 2)`;
-                            stateText.style.color = '#ffcc00';
-                        }
+                        // Titik 2 dipilih -> simpan sebagai 1 garis pengukuran utuh ke _activeRulers
+                        const rulerColors = ['#00f0ff', '#ffcc00', '#38bdf8', '#a855f7', '#f43f5e', '#34d399'];
+                        const color = rulerColors[_activeRulers.length % rulerColors.length];
+
+                        _activeRulers.push({
+                            id: Date.now() + Math.random(),
+                            color: color,
+                            ptA: {
+                                targetId: _pendingRulerStart.targetId,
+                                lat: _pendingRulerStart.lat,
+                                lon: _pendingRulerStart.lon,
+                                x: _pendingRulerStart.x,
+                                y: _pendingRulerStart.y,
+                                label: _pendingRulerStart.label
+                            },
+                            ptB: {
+                                targetId: targetId,
+                                lat: ptLat,
+                                lon: ptLon,
+                                x: clickX,
+                                y: clickY,
+                                label: ptLabel || 'Titik 2'
+                            }
+                        });
+                        _pendingRulerStart = null; // Siap untuk mengukur garis berikutnya
                     }
+
+                    updateRadarRulerToolbar();
                     drawRadarPPI();
                     return;
                 }
@@ -1188,21 +1363,30 @@
                 }
             });
 
-            // Keyboard shortcut untuk alat ukur jarak (M / D / Escape)
+            // Deteksi Keyboard: Saat tombol Ctrl / Cmd ditekan, ubah cursor ke crosshair dan perbarui toolbar
             window.addEventListener('keydown', e => {
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
                 const overlay = document.getElementById('radarPpiOverlay');
                 if (!overlay || overlay.style.display !== 'block') return;
 
-                if (e.key === 'm' || e.key === 'M' || e.key === 'd' || e.key === 'D') {
-                    e.preventDefault();
-                    window.toggleRadarRuler();
+                if (e.key === 'Control' || e.key === 'Meta') {
+                    _isCtrlKeyDown = true;
+                    const canvasEl = document.getElementById('radarPpiCanvas');
+                    if (canvasEl) canvasEl.style.cursor = 'crosshair';
+                    updateRadarRulerToolbar();
+                    drawRadarPPI();
                 } else if (e.key === 'Escape') {
-                    if (_rulerPointA || _rulerPointB) {
-                        window.clearRadarRuler();
-                    } else if (_isRulerMode) {
-                        window.toggleRadarRuler();
-                    }
+                    window.clearRadarRuler();
+                }
+            });
+
+            // Saat tombol Ctrl / Cmd dilepas (keyup), kursor kembali normal tapi pengukuran yang sudah dibuat TIDAK hilang
+            window.addEventListener('keyup', e => {
+                if (e.key === 'Control' || e.key === 'Meta') {
+                    _isCtrlKeyDown = false;
+                    const canvasEl = document.getElementById('radarPpiCanvas');
+                    if (canvasEl) canvasEl.style.cursor = 'default';
+                    updateRadarRulerToolbar();
+                    drawRadarPPI();
                 }
             });
 
@@ -1357,6 +1541,8 @@
             pLat = st.lat;
             pLon = st.lon;
         }
+
+        const isLocationShifted = !_lastRadarCoords || Math.abs(_lastRadarCoords.lat - pLat) > 0.01 || Math.abs(_lastRadarCoords.lon - pLon) > 0.01;
         _lastRadarCoords = { lat: pLat, lon: pLon };
 
         // Konversi range (NM) ke Leaflet Zoom level yang proporsional dengan viewport PPI Scope
@@ -1395,9 +1581,9 @@
                 if (typeof drawRadarPPI === 'function') drawRadarPPI();
             });
         } else {
-            // Jika forceCenter aktif (misal saat klik tombol Range), reset peta tepat ke center stasiun radar!
-            if (forceCenter) {
-                _radarMap.setView([_lastRadarCoords.lat, _lastRadarCoords.lon], zoom, { animate: true });
+            // Jika forceCenter aktif atau stasiun radar berpindah lokasi (bukan Surabaya lagi), re-center peta!
+            if (forceCenter || isLocationShifted) {
+                _radarMap.setView([_lastRadarCoords.lat, _lastRadarCoords.lon], zoom, { animate: false });
             } else if (rangeNm) {
                 _radarMap.setZoom(zoom, { animate: false });
             }
@@ -1501,15 +1687,36 @@
     };
 
     window.clearRadarRuler = function () {
-        _rulerPointA = null;
-        _rulerPointB = null;
-        const stateText = document.getElementById('radarRulerStateText');
-        if (stateText && _isRulerMode) {
-            stateText.textContent = 'AKTIF (Klik Titik 1)';
-            stateText.style.color = '#00f0ff';
-        }
+        _activeRulers = [];
+        _pendingRulerStart = null;
+        updateRadarRulerToolbar();
         drawRadarPPI();
     };
+
+    function updateRadarRulerToolbar() {
+        const resetBtn = document.getElementById('radarResetRulerBtn');
+        const countBadge = document.getElementById('radarRulerCountBadge');
+        const activeInd = document.getElementById('radarRulerActiveIndicator');
+
+        if (resetBtn && countBadge) {
+            if (_activeRulers.length > 0) {
+                resetBtn.style.display = 'inline-flex';
+                countBadge.textContent = _activeRulers.length;
+            } else {
+                resetBtn.style.display = 'none';
+                countBadge.textContent = '0';
+            }
+        }
+
+        if (activeInd) {
+            if (_isCtrlKeyDown) {
+                activeInd.style.display = 'inline-block';
+                activeInd.textContent = _pendingRulerStart ? 'KLIK TITIK 2' : 'TAHAN CTRL';
+            } else {
+                activeInd.style.display = 'none';
+            }
+        }
+    }
 
     function resizeRadarCanvas() {
         const container = document.getElementById('radarCanvasContainer');
@@ -1543,71 +1750,103 @@
             for (const pool of Object.values(window._sourcesCache)) {
                 if (!Array.isArray(pool)) continue;
                 if (sourceId) {
-                    const found = pool.find(s => String(s.id) === String(sourceId));
+                    const found = pool.find(s =>
+                        String(s.id) === String(sourceId) ||
+                        String(s.source_id) === String(sourceId) ||
+                        String(s.name) === String(sourceId) ||
+                        String(s.source_name) === String(sourceId)
+                    );
                     if (found) {
                         src = found;
-                        const payload = typeof window.getSourceDetailPayload === 'function' 
-                            ? window.getSourceDetailPayload(found) 
+                        const payload = typeof window.getSourceDetailPayload === 'function'
+                            ? window.getSourceDetailPayload(found)
                             : (found.payload || found);
-                        data = payload.latestData || payload.data || null;
+                        data = payload.latestData || payload.data || payload.currentData || null;
                         break;
                     }
-                }
-                // Jika sourceId null/belum ketemu, cari yang parsing_id-nya radar/adsb
-                if (!src) {
+                } else if (!src) {
+                    // Jika memang sourceId null/kosong, baru cari candidate radar
                     const radarCandidate = pool.find(s => s.parsing_id === 'asterix_radar' || s.parsing_id === 'asterix_adsb');
                     if (radarCandidate) {
                         src = radarCandidate;
-                        const payload = typeof window.getSourceDetailPayload === 'function' 
-                            ? window.getSourceDetailPayload(radarCandidate) 
+                        const payload = typeof window.getSourceDetailPayload === 'function'
+                            ? window.getSourceDetailPayload(radarCandidate)
                             : (radarCandidate.payload || radarCandidate);
-                        data = payload.latestData || payload.data || null;
+                        data = payload.latestData || payload.data || payload.currentData || null;
                     }
                 }
             }
         }
 
-        // 2. Cek dari window.equipmentDataCache
-        if ((!data || !data.targets_detail) && Array.isArray(window.equipmentDataCache)) {
-            for (const eq of window.equipmentDataCache) {
+        // 2. Cek dari window.equipmentDataCache atau window.equipmentData
+        const allEqList = [window.equipmentDataCache, window.equipmentData].filter(Boolean).flat();
+        if (allEqList.length > 0) {
+            for (const eq of allEqList) {
                 if (!eq) continue;
-                // Cek apakah eq memiliki source yang cocok
                 if (Array.isArray(eq.sources)) {
-                    const matchSrc = sourceId 
-                        ? eq.sources.find(s => String(s.id) === String(sourceId))
-                        : eq.sources.find(s => s.parsing_id === 'asterix_radar' || s.parsing_id === 'asterix_adsb');
+                    const matchSrc = sourceId
+                        ? eq.sources.find(s =>
+                            String(s.id) === String(sourceId) ||
+                            String(s.source_id) === String(sourceId) ||
+                            String(s.name) === String(sourceId) ||
+                            String(s.source_name) === String(sourceId)
+                        )
+                        : (!src ? eq.sources.find(s => s.parsing_id === 'asterix_radar' || s.parsing_id === 'asterix_adsb') : null);
                     if (matchSrc) {
                         if (!src) src = matchSrc;
-                        if (typeof window.resolveSourceData === 'function') {
+                        if (!data && typeof window.resolveSourceData === 'function') {
                             const resData = window.resolveSourceData(eq, matchSrc);
                             if (resData) data = resData;
                         }
                     }
                 }
-                // Cek langsung di lastData
+
+                // Cek lastData jika cocok dengan equipment atau source
                 if (eq.lastData && typeof eq.lastData === 'object') {
                     for (const [key, val] of Object.entries(eq.lastData)) {
-                        if (val && (val.targets_detail || val.targets_list || val.radar_name || val.sac)) {
-                            if (!src) src = { id: sourceId || eq.id, name: key, equipt_id: eq.id, parsing_id: 'asterix_radar' };
-                            if (!data || (val.targets_detail && (!data.targets_detail || val.targets_detail.length > 0))) {
-                                data = val;
+                        if (!val) continue;
+                        if (sourceId) {
+                            // Cocokkan key atau id atau nama
+                            if (String(key) === String(sourceId) || (src && (key === src.name || key === src.source_name))) {
+                                if (!src) src = { id: sourceId, name: key, equipt_id: eq.id, parsing_id: 'asterix_radar' };
+                                if (!data || val.targets_detail) data = val;
+                                break;
                             }
+                        } else if (!src && (val.targets_detail || val.targets_list || val.radar_name || val.sac)) {
+                            src = { id: eq.id, name: key, equipt_id: eq.id, parsing_id: 'asterix_radar' };
+                            data = val;
+                            break;
                         }
                     }
+                }
+                if (src && data && (data.targets_detail || data.radar_name || data.sac)) break;
+            }
+        }
+
+        // 3. Cek dari window._activeSourceDetail jika sourceId cocok atau tidak diberikan
+        if ((!data || !src) && window._activeSourceDetail) {
+            const activeSrc = window._activeSourceDetail;
+            if (!sourceId || String(activeSrc.id) === String(sourceId) || String(activeSrc.name) === String(sourceId)) {
+                if (!src) src = activeSrc;
+                const payload = typeof window.getSourceDetailPayload === 'function'
+                    ? window.getSourceDetailPayload(activeSrc)
+                    : (activeSrc.payload || activeSrc);
+                if (payload && (payload.latestData || payload.data || payload.currentData)) {
+                    data = payload.latestData || payload.data || payload.currentData;
                 }
             }
         }
 
-        // 3. Cek dari window._activeSourceDetail
-        if ((!data || !data.targets_detail) && window._activeSourceDetail) {
-            const activeSrc = window._activeSourceDetail;
-            if (!src) src = activeSrc;
-            const payload = typeof window.getSourceDetailPayload === 'function'
-                ? window.getSourceDetailPayload(activeSrc)
-                : (activeSrc.payload || activeSrc);
-            if (payload && (payload.latestData || payload.data)) {
-                data = payload.latestData || payload.data;
-            }
+        // 4. Cek langsung currentData di src jika data belum terisi
+        if (!data && src && (src.currentData || src.data || src.payload)) {
+            data = src.currentData || src.data || src.payload;
+            if (data && data.latestData) data = data.latestData;
+        }
+
+        // Fallback live data resolver jika data belum didapatkan
+        if (!data && src && typeof window.getLiveDataForSource === 'function') {
+            const live = window.getLiveDataForSource(src);
+            if (live) data = live;
         }
 
         return { src, data };
@@ -1620,31 +1859,38 @@
 
     function getSavedRefTxpConfig(sourceId = null) {
         const srcId = sourceId || _activeRadarSourceId || 'default';
-        const defaultCfg = {
-            targetId: 'REF-TXP',
-            squawk: '7000',
-            address: '8A0001',
-            azimuth: 85.20,
-            range: 12.45
-        };
         try {
             let raw = localStorage.getItem(`radar_ref_txp_config_${srcId}`) || localStorage.getItem('radar_ref_txp_config');
             if (raw) {
                 const parsed = JSON.parse(raw);
-                return {
-                    targetId: parsed.targetId || defaultCfg.targetId,
-                    squawk: parsed.squawk || defaultCfg.squawk,
-                    address: (parsed.address || defaultCfg.address).toUpperCase(),
-                    azimuth: parseFloat(parsed.azimuth) || defaultCfg.azimuth,
-                    range: parseFloat(parsed.range) || defaultCfg.range
-                };
+                if (parsed && (parsed.isConfigured || parsed.targetId !== 'REF-TXP' || parsed.azimuth !== 85.20 || parsed.range !== 12.45)) {
+                    return {
+                        targetId: parsed.targetId || 'REF-TXP',
+                        squawk: parsed.squawk || '7000',
+                        address: (parsed.address || '8A0001').toUpperCase(),
+                        azimuth: parseFloat(parsed.azimuth) || 0,
+                        range: parseFloat(parsed.range) || 0,
+                        isConfigured: true
+                    };
+                }
             }
         } catch (e) { }
-        return defaultCfg;
+        return null;
     }
 
     // ── PUBLIC SCOPE CONTROLLER ────────────────────────────────────────────────
     window.openRadarPpiScope = function (sourceId) {
+        if (typeof window.closeAllEnhancementModals === 'function') {
+            window.closeAllEnhancementModals();
+        } else {
+            const m = document.getElementById('dataSourceDetailModal');
+            if (m) m.style.display = 'none';
+            const p = document.getElementById('equipmentDetailPanel');
+            const o = document.getElementById('detailPanelOverlay');
+            if (p) p.classList.remove('open');
+            if (o) o.classList.remove('open');
+        }
+
         ensureRadarPpiDOMElements();
 
         if (!sourceId && window._activeSourceDetail) {
@@ -1656,6 +1902,11 @@
         }
         _activeRadarSourceId = sourceId;
 
+        // Inisialisasi koordinat stasiun radar secara sinkron sebelum renderLoop dimulai
+        const { src: initSrc, data: initData } = findRadarSourceAndData(_activeRadarSourceId);
+        const stCoords = resolveRadarStationCoords(initData, initSrc);
+        _lastRadarCoords = { lat: stCoords.lat, lon: stCoords.lon };
+
         const overlay = document.getElementById('radarPpiOverlay');
         const sidebar = document.getElementById('radarPpiSidebar');
         if (overlay) overlay.style.display = 'block';
@@ -1663,8 +1914,10 @@
 
         setTimeout(() => {
             resizeRadarCanvas();
-            const data = getActiveRadarSourceData() || {};
-            initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm);
+            const { src, data } = findRadarSourceAndData(_activeRadarSourceId);
+            const currentCoords = resolveRadarStationCoords(data, src);
+            _lastRadarCoords = { lat: currentCoords.lat, lon: currentCoords.lon };
+            initOrUpdateRadarMap(currentCoords.lat, currentCoords.lon, _radarRangeNm, true);
         }, 50);
 
         // Start requestAnimationFrame sweep loop
@@ -1722,6 +1975,7 @@
             _radarRefreshTimer = null;
         }
         _activeRadarSourceId = null;
+        _lastRadarCoords = { lat: -7.3798, lon: 112.7874 };
         _radarHoveredTarget = null;
         _radarSelectedTargetId = null;
     };
@@ -1735,9 +1989,10 @@
                 btn.classList.remove('active');
             }
         });
-        const data = getActiveRadarSourceData() || {};
+        const { src, data } = findRadarSourceAndData(_activeRadarSourceId);
+        const stCoords = resolveRadarStationCoords(data, src);
         // autoRecenter: true saat tombol Range diklik (kembali ke tengah radar), false saat scroll/pinch gesture (tetap di posisi pan terakhir)
-        initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm, autoRecenter);
+        initOrUpdateRadarMap(stCoords.lat, stCoords.lon, _radarRangeNm, autoRecenter);
     };
 
     function updateRadarPpiScopeData() {
@@ -1745,8 +2000,9 @@
         if (!data) return;
 
         // Pastikan Map Leaflet selalu tersinkronisasi ke stasiun radar yang tepat
-        if (!_radarMap || (data.lat && Math.abs(parseFloat(data.lat)) > 0.0001) || (data.sac && data.sic)) {
-            initOrUpdateRadarMap(data.lat, data.lon, _radarRangeNm);
+        const stCoords = resolveRadarStationCoords(data, src);
+        if (!_radarMap || (stCoords && stCoords.lat)) {
+            initOrUpdateRadarMap(stCoords.lat, stCoords.lon, _radarRangeNm);
         }
 
         // Update Title & Header Widgets
@@ -1794,7 +2050,7 @@
             });
         }
 
-        const visibleTargets = _isIslsFilterEnabled 
+        const visibleTargets = _isIslsFilterEnabled
             ? targets.filter(t => !islsSuppressedIds.has(String(t.id)))
             : targets;
 
@@ -1848,6 +2104,10 @@
             lastCatEl.textContent = `Update: ${data.last_cat048 ? new Date(data.last_cat048).toLocaleTimeString('id-ID') : 'Real-time'}`;
         }
 
+        // Ambil koordinat stasiun radar dengan fallback aman
+        const stCenterLat = (_lastRadarCoords && _lastRadarCoords.lat != null) ? _lastRadarCoords.lat : -7.3798;
+        const stCenterLon = (_lastRadarCoords && _lastRadarCoords.lon != null) ? _lastRadarCoords.lon : 112.7874;
+
         // 0. Update koordinat dan simpan histori sebelum kalkulasi arah agar deterministik
         visibleTargets.forEach(t => {
             const range = Number(t.range_nm) || 0;
@@ -1855,7 +2115,7 @@
             let tgtLat = parseFloat(t.lat);
             let tgtLon = parseFloat(t.lon);
             if (isNaN(tgtLat) || isNaN(tgtLon) || (Math.abs(tgtLat) < 0.0001 && Math.abs(tgtLon) < 0.0001)) {
-                const geo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, range, azim);
+                const geo = calculatePolarToLatLon(stCenterLat, stCenterLon, range, azim);
                 tgtLat = geo.lat;
                 tgtLon = geo.lon;
                 t.lat = tgtLat;
@@ -1876,7 +2136,7 @@
         let inCount = 0;
         let outCount = 0;
         visibleTargets.forEach(t => {
-            const dir = getTargetTrafficDirection(t, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            const dir = getTargetTrafficDirection(t, stCenterLat, stCenterLon);
             if (dir === 'inbound') inCount++;
             else outCount++;
         });
@@ -1891,7 +2151,7 @@
         // Terapkan filter jika user memilih Incoming atau Outgoing
         const filteredTargets = visibleTargets.filter(t => {
             if (_radarTargetTrafficFilter === 'all') return true;
-            const dir = getTargetTrafficDirection(t, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            const dir = getTargetTrafficDirection(t, stCenterLat, stCenterLon);
             return dir === _radarTargetTrafficFilter;
         });
 
@@ -1906,12 +2166,12 @@
         strip.innerHTML = filteredTargets.map(t => {
             const isSel = String(t.id) === String(_radarSelectedTargetId);
             const isDouble = effectiveDoubleMap.get(String(t.id)) === true;
-            const dir = getTargetTrafficDirection(t, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            const dir = getTargetTrafficDirection(t, stCenterLat, stCenterLon);
             const isInbound = dir === 'inbound';
             let cLat = parseFloat(t.lat);
             let cLon = parseFloat(t.lon);
             if (isNaN(cLat) || isNaN(cLon) || (Math.abs(cLat) < 0.0001 && Math.abs(cLon) < 0.0001)) {
-                const geo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, t.range_nm || 0, t.azimuth_deg || 0);
+                const geo = calculatePolarToLatLon(stCenterLat, stCenterLon, t.range_nm || 0, t.azimuth_deg || 0);
                 cLat = geo.lat;
                 cLon = geo.lon;
             }
@@ -2109,11 +2369,20 @@
         let cy = h / 2;
         let maxRadius = Math.min(w, h) * 0.44;
 
+        // Pastikan koordinat stasiun radar selalu valid dan tidak pernah null
+        if (!_lastRadarCoords || _lastRadarCoords.lat == null) {
+            const { src, data } = findRadarSourceAndData(_activeRadarSourceId);
+            const st = resolveRadarStationCoords(data, src);
+            _lastRadarCoords = { lat: st.lat, lon: st.lon };
+        }
+        const radarCenterLat = _lastRadarCoords.lat;
+        const radarCenterLon = _lastRadarCoords.lon;
+
         // Jika peta Leaflet aktif dan valid, ambil titik proyeksi stasiun radar di layar
         // dan sinkronkan maxRadius secara presisi dengan skala mil laut (NM) pada peta bumi Leaflet!
-        if (_radarMap && _lastRadarCoords && _lastRadarCoords.lat) {
+        if (_radarMap) {
             try {
-                const pt = _radarMap.latLngToContainerPoint([_lastRadarCoords.lat, _lastRadarCoords.lon]);
+                const pt = _radarMap.latLngToContainerPoint([radarCenterLat, radarCenterLon]);
                 if (pt && !isNaN(pt.x) && !isNaN(pt.y)) {
                     cx = pt.x;
                     cy = pt.y;
@@ -2121,9 +2390,9 @@
 
                 // Hitung titik geografis pada jarak _radarRangeNm ke arah timur
                 // 1 derajat bujur di khatulistiwa ~ 60 NM (1 NM = 1 menit busur)
-                const latRad = (_lastRadarCoords.lat * Math.PI) / 180;
+                const latRad = (radarCenterLat * Math.PI) / 180;
                 const dLon = _radarRangeNm / (60 * Math.cos(latRad));
-                const edgePt = _radarMap.latLngToContainerPoint([_lastRadarCoords.lat, _lastRadarCoords.lon + dLon]);
+                const edgePt = _radarMap.latLngToContainerPoint([radarCenterLat, radarCenterLon + dLon]);
                 if (edgePt && !isNaN(edgePt.x)) {
                     const geoRadiusPx = Math.abs(edgePt.x - cx);
                     if (geoRadiusPx > 20) {
@@ -2321,7 +2590,7 @@
             let tgtLat = parseFloat(tgt.lat);
             let tgtLon = parseFloat(tgt.lon);
             if (isNaN(tgtLat) || isNaN(tgtLon) || (Math.abs(tgtLat) < 0.0001 && Math.abs(tgtLon) < 0.0001)) {
-                const geo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, range, azim);
+                const geo = calculatePolarToLatLon(radarCenterLat, radarCenterLon, range, azim);
                 tgtLat = geo.lat;
                 tgtLon = geo.lon;
                 tgt.lat = tgtLat;
@@ -2347,7 +2616,7 @@
             }
 
             // Evaluasi filter traffic arah lalu lintas (Semua / Incoming / Outgoing)
-            const targetDir = getTargetTrafficDirection(tgt, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            const targetDir = getTargetTrafficDirection(tgt, radarCenterLat, radarCenterLon);
             const isTargetInbound = targetDir === 'inbound';
             const matchesTrafficFilter = _radarTargetTrafficFilter === 'all' || targetDir === _radarTargetTrafficFilter;
 
@@ -2360,7 +2629,7 @@
             ctx.translate(tx, ty);
 
             // Hitung heading akurat dan orientasi moncong pesawat
-            const headingDeg = getTargetHeading(tgt, _lastRadarCoords.lat, _lastRadarCoords.lon);
+            const headingDeg = getTargetHeading(tgt, radarCenterLat, radarCenterLon);
             const headingRad = (headingDeg - 90) * (Math.PI / 180);
 
             // Simpan posisi terbaru ke _targetHistoryMap untuk kalkulasi track sapuan berikutnya
@@ -2475,12 +2744,10 @@
             }
 
             // Data Tag Pesawat (ID di atas, Alt di bawah)
-            const dirIcon = isTargetInbound ? '📥' : '📤';
-
             ctx.font = isSelected ? 'bold 11px monospace' : '10px monospace';
             ctx.fillStyle = isDouble ? '#ff5555' : (isSelected ? '#ffcc00' : (_mapTheme === 'light' ? (isTargetInbound ? '#0369a1' : '#b45309') : (isTargetInbound ? '#38bdf8' : '#f59e0b')));
             ctx.textAlign = 'left';
-            const tagLabel = isDouble ? `⚠ ${tgt.callsign || tgt.id} [DBL]` : (isSelected ? `🎯 ${dirIcon} ${tgt.callsign || tgt.id}` : `${dirIcon} ${tgt.callsign || tgt.id}`);
+            const tagLabel = isDouble ? `⚠ ${tgt.callsign || tgt.id} [DBL]` : (isSelected ? `🎯 ${tgt.callsign || tgt.id}` : `${tgt.callsign || tgt.id}`);
             const textX = tx + (isSelected ? 24 : 12);
             ctx.fillText(tagLabel, textX, ty - 2 + tagOffsetY);
 
@@ -2491,72 +2758,74 @@
             ctx.restore();
         });
 
-        // 5b. Gambar Transponder Kalibrasi / Acuan Statis di PPI Scope
+        // 5b. Gambar Transponder Kalibrasi / Acuan Statis di PPI Scope (Hanya jika terkonfigurasi / ada target)
         const refCfg = getSavedRefTxpConfig(_activeRadarSourceId);
-        const refAzim = refCfg.azimuth;
-        const refDist = refCfg.range;
-        if (refDist <= _radarRangeNm) {
-            const refRad = ((refAzim - 90) * Math.PI) / 180;
-            const refScale = maxRadius / _radarRangeNm;
-            const rx = cx + Math.cos(refRad) * (refDist * refScale);
-            const ry = cy + Math.sin(refRad) * (refDist * refScale);
+        if (refCfg && refCfg.range > 0) {
+            const refAzim = refCfg.azimuth;
+            const refDist = refCfg.range;
+            if (refDist <= _radarRangeNm) {
+                const refRad = ((refAzim - 90) * Math.PI) / 180;
+                const refScale = maxRadius / _radarRangeNm;
+                const rx = cx + Math.cos(refRad) * (refDist * refScale);
+                const ry = cy + Math.sin(refRad) * (refDist * refScale);
 
-            const rdx = _radarMousePos.x - rx;
-            const rdy = _radarMousePos.y - ry;
-            const isRefHovered = Math.sqrt(rdx * rdx + rdy * rdy) <= 18;
+                const rdx = _radarMousePos.x - rx;
+                const rdy = _radarMousePos.y - ry;
+                const isRefHovered = Math.sqrt(rdx * rdx + rdy * rdy) <= 18;
 
-            const refGeo = calculatePolarToLatLon(_lastRadarCoords.lat, _lastRadarCoords.lon, refDist, refAzim);
+                const refGeo = calculatePolarToLatLon(radarCenterLat, radarCenterLon, refDist, refAzim);
 
-            if (isRefHovered) {
-                currentHovered = {
-                    id: refCfg.targetId,
-                    callsign: `${refCfg.targetId} (Parrot TXP)`,
-                    squawk: refCfg.squawk || '7000',
-                    address: refCfg.address || '8A0001',
-                    fl: 1,
-                    alt: 85,
-                    lat: refGeo.lat,
-                    lon: refGeo.lon,
-                    range_nm: refDist,
-                    azimuth_deg: refAzim,
-                    speed: 0,
-                    heading: 0,
-                    isRefTransponder: true,
-                    screenX: rx,
-                    screenY: ry
-                };
+                if (isRefHovered) {
+                    currentHovered = {
+                        id: refCfg.targetId,
+                        callsign: `${refCfg.targetId} (Parrot TXP)`,
+                        squawk: refCfg.squawk || '7000',
+                        address: refCfg.address || '8A0001',
+                        fl: 1,
+                        alt: 85,
+                        lat: refGeo.lat,
+                        lon: refGeo.lon,
+                        range_nm: refDist,
+                        azimuth_deg: refAzim,
+                        speed: 0,
+                        heading: 0,
+                        isRefTransponder: true,
+                        screenX: rx,
+                        screenY: ry
+                    };
+                }
+
+                ctx.save();
+                ctx.translate(rx, ry);
+
+                // Diamond / Icon Tower Acuan
+                ctx.beginPath();
+                ctx.moveTo(0, -8);
+                ctx.lineTo(7, 0);
+                ctx.lineTo(0, 8);
+                ctx.lineTo(-7, 0);
+                ctx.closePath();
+                ctx.fillStyle = isRefHovered ? '#ffffff' : '#ffaa00';
+                ctx.shadowColor = '#ffaa00';
+                ctx.shadowBlur = isRefHovered ? 16 : 10;
+                ctx.fill();
+                ctx.strokeStyle = isRefHovered ? '#00ffff' : '#ffffff';
+                ctx.lineWidth = isRefHovered ? 2 : 1.5;
+                ctx.stroke();
+
+                // Ring pulsa statis
+                ctx.beginPath();
+                ctx.arc(0, 0, isRefHovered ? 14 : 11, 0, Math.PI * 2);
+                ctx.strokeStyle = isRefHovered ? '#00ffff' : 'rgba(255, 170, 0, 0.4)';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+                ctx.restore();
+
+                ctx.font = 'bold 9px monospace';
+                ctx.fillStyle = isRefHovered ? '#ffffff' : '#ffaa00';
+                ctx.textAlign = 'left';
+                ctx.fillText(`⛯ ${refCfg.targetId} (${refDist}NM)`, rx + 14, ry + 3);
             }
-
-            ctx.save();
-            ctx.translate(rx, ry);
-
-            // Diamond / Icon Tower Acuan
-            ctx.beginPath();
-            ctx.moveTo(0, -8);
-            ctx.lineTo(7, 0);
-            ctx.lineTo(0, 8);
-            ctx.lineTo(-7, 0);
-            ctx.closePath();
-            ctx.fillStyle = isRefHovered ? '#ffffff' : '#ffaa00';
-            ctx.shadowColor = '#ffaa00';
-            ctx.shadowBlur = isRefHovered ? 16 : 10;
-            ctx.fill();
-            ctx.strokeStyle = isRefHovered ? '#00ffff' : '#ffffff';
-            ctx.lineWidth = isRefHovered ? 2 : 1.5;
-            ctx.stroke();
-
-            // Ring pulsa statis
-            ctx.beginPath();
-            ctx.arc(0, 0, isRefHovered ? 14 : 11, 0, Math.PI * 2);
-            ctx.strokeStyle = isRefHovered ? '#00ffff' : 'rgba(255, 170, 0, 0.4)';
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-            ctx.restore();
-
-            ctx.font = 'bold 9px monospace';
-            ctx.fillStyle = isRefHovered ? '#ffffff' : '#ffaa00';
-            ctx.textAlign = 'left';
-            ctx.fillText(`⛯ ${refCfg.targetId} (${refDist}NM)`, rx + 14, ry + 3);
         }
 
         _radarHoveredTarget = currentHovered;
@@ -2580,7 +2849,7 @@
                         hudStatus.textContent = 'Parrot Site Monitor';
                         hudStatus.style.color = '#ffaa00';
                     } else {
-                        const hDir = getTargetTrafficDirection(currentHovered, _lastRadarCoords.lat, _lastRadarCoords.lon);
+                        const hDir = getTargetTrafficDirection(currentHovered, radarCenterLat, radarCenterLon);
                         const isIn = hDir === 'inbound';
                         hudStatus.textContent = isIn ? '📥 INCOMING (Mendekat)' : '📤 OUTGOING (Menjauh)';
                         hudStatus.style.color = isIn ? '#38bdf8' : '#f59e0b';
@@ -2635,204 +2904,277 @@
             ctx.restore();
         }
 
-        // 8. Electronic Bearing & Range Line (EBRL / Ruler Distance Measurement Tool)
-        if (_isRulerMode || _rulerPointA || _rulerPointB) {
+        // 8. Electronic Bearing & Range Line (EBRL / Multi-Ruler Distance Measurement Tool)
+        if (_activeRulers.length > 0 || _pendingRulerStart || _isCtrlKeyDown) {
             ctx.save();
 
-            // SINKRONKAN POSISI SCREEN DENGAN PETA (Agar saat peta digeser / pan, garis tetap melekat pada koordinat bumi)
-            let p1Screen = null;
-            if (_rulerPointA) {
-                if (_radarMap && _rulerPointA.lat && _rulerPointA.lon) {
-                    try {
-                        const pt = _radarMap.latLngToContainerPoint([_rulerPointA.lat, _rulerPointA.lon]);
-                        p1Screen = { x: pt.x, y: pt.y };
-                    } catch (e) {
-                        p1Screen = { x: _rulerPointA.x, y: _rulerPointA.y };
+            // Helper untuk menyelesaikan posisi koordinat bumi (lat/lon) & screen (x/y) dari endpoint ruler
+            function resolveRulerPoint(pt) {
+                let curLat = pt.lat;
+                let curLon = pt.lon;
+                let curLabel = pt.label;
+
+                // Jika endpoint ini terikat pada pesawat tertentu (targetId), update ke posisi terbaru pesawat jika ada di stream
+                if (pt.targetId) {
+                    const liveTgt = visibleTargets.find(t => String(t.id) === String(pt.targetId));
+                    if (liveTgt && liveTgt.lat && liveTgt.lon) {
+                        curLat = parseFloat(liveTgt.lat);
+                        curLon = parseFloat(liveTgt.lon);
+                        curLabel = liveTgt.callsign || liveTgt.id;
+                    } else if (_targetHistoryMap.has(String(pt.targetId))) {
+                        const hist = _targetHistoryMap.get(String(pt.targetId));
+                        if (hist.lat && hist.lon) {
+                            curLat = hist.lat;
+                            curLon = hist.lon;
+                        }
                     }
-                } else {
-                    p1Screen = { x: _rulerPointA.x, y: _rulerPointA.y };
                 }
+
+                let screenPos = null;
+                if (_radarMap && curLat != null && curLon != null) {
+                    try {
+                        const p = _radarMap.latLngToContainerPoint([curLat, curLon]);
+                        screenPos = { x: p.x, y: p.y };
+                    } catch (e) {
+                        screenPos = { x: pt.x, y: pt.y };
+                    }
+                } else if (curLat != null && curLon != null) {
+                    // Fallback proyeksi polar jika peta Leaflet tidak aktif
+                    const dLat = (curLat - radarCenterLat) * 60; // 1 deg lat ~ 60 NM
+                    const dLon = (curLon - radarCenterLon) * 60 * Math.cos(radarCenterLat * Math.PI / 180);
+                    const rNm = Math.hypot(dLat, dLon);
+                    const az = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
+                    const rad = (az - 90) * (Math.PI / 180);
+                    const px = (rNm / _radarRangeNm) * maxRadius;
+                    screenPos = { x: cx + px * Math.cos(rad), y: cy + px * Math.sin(rad) };
+                } else {
+                    screenPos = { x: pt.x, y: pt.y };
+                }
+
+                return { screenPos, lat: curLat, lon: curLon, label: curLabel };
             }
 
-            let p2Screen = null;
-            let p2Lat = null, p2Lon = null, p2Label = '';
-            if (_rulerPointB) {
-                if (_radarMap && _rulerPointB.lat && _rulerPointB.lon) {
-                    try {
-                        const pt = _radarMap.latLngToContainerPoint([_rulerPointB.lat, _rulerPointB.lon]);
-                        p2Screen = { x: pt.x, y: pt.y };
-                    } catch (e) {
-                        p2Screen = { x: _rulerPointB.x, y: _rulerPointB.y };
-                    }
-                } else {
-                    p2Screen = { x: _rulerPointB.x, y: _rulerPointB.y };
-                }
-                p2Lat = _rulerPointB.lat;
-                p2Lon = _rulerPointB.lon;
-                p2Label = _rulerPointB.label;
-            } else if (_isRulerMode && _rulerPointA && _radarMousePos.x > 0 && _radarMousePos.y > 0) {
-                // Posisi live mouse saat sedang membentangkan garis ukur ke Titik 2
-                p2Screen = { x: _radarMousePos.x, y: _radarMousePos.y };
-                if (_radarHoveredTarget) {
-                    p2Lat = parseFloat(_radarHoveredTarget.lat);
-                    p2Lon = parseFloat(_radarHoveredTarget.lon);
-                    p2Label = _radarHoveredTarget.callsign || _radarHoveredTarget.id;
-                } else if (_radarMap) {
-                    try {
-                        const latLng = _radarMap.containerPointToLatLng([_radarMousePos.x, _radarMousePos.y]);
-                        p2Lat = latLng.lat;
-                        p2Lon = latLng.lng;
-                        p2Label = `${p2Lat.toFixed(2)}, ${p2Lon.toFixed(2)}`;
-                    } catch (e) {}
-                }
-            }
+            // A. Gambar seluruh garis pengukuran yang sudah dibuat (Multi-Ruler)
+            _activeRulers.forEach((ruler, rIdx) => {
+                const resA = resolveRulerPoint(ruler.ptA);
+                const resB = resolveRulerPoint(ruler.ptB);
+                const p1 = resA.screenPos;
+                const p2 = resB.screenPos;
+                if (!p1 || !p2) return;
 
-            // Gambar Garis Ukur & Badge Jarak Realtime
-            if (p1Screen && p2Screen) {
-                // Garis ukur glowing cyan/gold
+                const rulerColor = ruler.color || '#00f0ff';
+
+                // Garis ukur putus-putus bercahaya
                 ctx.beginPath();
-                ctx.moveTo(p1Screen.x, p1Screen.y);
-                ctx.lineTo(p2Screen.x, p2Screen.y);
-                ctx.strokeStyle = '#00f0ff';
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.strokeStyle = rulerColor;
                 ctx.lineWidth = 2.2;
                 ctx.setLineDash([6, 4]);
-                ctx.shadowColor = '#00f0ff';
+                ctx.shadowColor = rulerColor;
                 ctx.shadowBlur = 10;
                 ctx.stroke();
                 ctx.setLineDash([]);
                 ctx.shadowBlur = 0;
 
-                // Hitung Jarak & Azimuth
+                // Hitung jarak & bearing realtime
                 let distNm = 0, distKm = 0, bearing = 0;
-                if (_rulerPointA.lat && _rulerPointA.lon && p2Lat && p2Lon) {
-                    const geo = calculateGeoDistanceAndBearing(_rulerPointA.lat, _rulerPointA.lon, p2Lat, p2Lon);
+                if (resA.lat != null && resA.lon != null && resB.lat != null && resB.lon != null) {
+                    const geo = calculateGeoDistanceAndBearing(resA.lat, resA.lon, resB.lat, resB.lon);
                     distNm = geo.distNm;
                     distKm = geo.distKm;
                     bearing = geo.bearing;
                 } else {
-                    // Fallback hitung rasio pixel terhadap maxRadius
-                    const dx = p2Screen.x - p1Screen.x;
-                    const dy = p2Screen.y - p1Screen.y;
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
                     const pxDist = Math.hypot(dx, dy);
                     distNm = Number(((pxDist / maxRadius) * _radarRangeNm).toFixed(2));
                     distKm = Number((distNm * 1.852).toFixed(2));
                     bearing = Math.round((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360);
                 }
 
-                // Gambar Badge Informasi Jarak Tepat di Tengah Garis
-                const midX = (p1Screen.x + p2Screen.x) / 2;
-                const midY = (p1Screen.y + p2Screen.y) / 2;
+                // Titik A
+                ctx.beginPath();
+                ctx.arc(p1.x, p1.y, 7, 0, Math.PI * 2);
+                ctx.fillStyle = rulerColor;
+                ctx.shadowColor = rulerColor;
+                ctx.shadowBlur = 12;
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
 
-                const textLine1 = `📏 ${distNm} NM (${distKm} km)`;
-                const textLine2 = `🧭 Azim: ${bearing}° | Dari ${_rulerPointA.label || 'T1'} ke ${p2Label || 'T2'}`;
+                ctx.font = 'bold 10px monospace';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'left';
+                ctx.fillText(`① ${resA.label}`, p1.x + 10, p1.y - 8);
+
+                // Titik B
+                ctx.beginPath();
+                ctx.arc(p2.x, p2.y, 7, 0, Math.PI * 2);
+                ctx.fillStyle = rulerColor;
+                ctx.shadowColor = rulerColor;
+                ctx.shadowBlur = 12;
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                ctx.font = 'bold 10px monospace';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'left';
+                ctx.fillText(`② ${resB.label}`, p2.x + 10, p2.y - 8);
+
+                // Badge Informasi Jarak di tengah garis
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                const textLine1 = `📏 [${rIdx + 1}] ${distNm} NM (${distKm} km)`;
+                const textLine2 = `🧭 Azim: ${bearing}° | ${resA.label} ➔ ${resB.label}`;
 
                 ctx.font = 'bold 12px monospace';
                 const w1 = ctx.measureText(textLine1).width;
                 ctx.font = '10px monospace';
                 const w2 = ctx.measureText(textLine2).width;
                 const badgeW = Math.max(w1, w2) + 24;
-                const badgeH = 44;
+                const badgeH = 42;
 
-                ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
-                ctx.strokeStyle = '#00f0ff';
-                ctx.lineWidth = 1.5;
-                ctx.shadowColor = 'rgba(0, 240, 255, 0.6)';
-                ctx.shadowBlur = 12;
+                ctx.fillStyle = 'rgba(2, 6, 23, 0.94)';
+                ctx.strokeStyle = rulerColor;
+                ctx.lineWidth = 1.4;
+                ctx.shadowColor = rulerColor;
+                ctx.shadowBlur = 10;
                 ctx.beginPath();
                 ctx.roundRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH, 6);
                 ctx.fill();
                 ctx.stroke();
                 ctx.shadowBlur = 0;
 
-                // Teks baris 1: Jarak
-                ctx.fillStyle = '#00f0ff';
+                ctx.fillStyle = rulerColor;
                 ctx.font = 'bold 12px monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(textLine1, midX, midY - 8);
 
-                // Teks baris 2: Azimuth / Keterangan
                 ctx.fillStyle = '#f8fafc';
                 ctx.font = '10px monospace';
                 ctx.fillText(textLine2, midX, midY + 11);
+            });
+
+            // B. Gambar Live Preview Garis saat Titik 1 sudah diklik dan mouse digerakkan ke Titik 2
+            if (_pendingRulerStart && _radarMousePos.x > 0 && _radarMousePos.y > 0) {
+                const resA = resolveRulerPoint(_pendingRulerStart);
+                const p1 = resA.screenPos;
+                const p2 = { x: _radarMousePos.x, y: _radarMousePos.y };
+
+                let p2Lat = null, p2Lon = null, p2Label = 'Kursor';
+                if (_radarHoveredTarget) {
+                    p2Lat = parseFloat(_radarHoveredTarget.lat);
+                    p2Lon = parseFloat(_radarHoveredTarget.lon);
+                    p2Label = _radarHoveredTarget.callsign || _radarHoveredTarget.id;
+                } else if (_radarMap) {
+                    try {
+                        const latLng = _radarMap.containerPointToLatLng([p2.x, p2.y]);
+                        p2Lat = latLng.lat;
+                        p2Lon = latLng.lng;
+                        p2Label = `${p2Lat.toFixed(2)}, ${p2Lon.toFixed(2)}`;
+                    } catch (e) { }
+                }
+
+                if (p1) {
+                    // Garis preview kuning animasi
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = '#ffea00';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 4]);
+                    ctx.shadowColor = '#ffea00';
+                    ctx.shadowBlur = 8;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.shadowBlur = 0;
+
+                    let distNm = 0, distKm = 0, bearing = 0;
+                    if (resA.lat != null && resA.lon != null && p2Lat != null && p2Lon != null) {
+                        const geo = calculateGeoDistanceAndBearing(resA.lat, resA.lon, p2Lat, p2Lon);
+                        distNm = geo.distNm;
+                        distKm = geo.distKm;
+                        bearing = geo.bearing;
+                    } else {
+                        const dx = p2.x - p1.x;
+                        const dy = p2.y - p1.y;
+                        const pxDist = Math.hypot(dx, dy);
+                        distNm = Number(((pxDist / maxRadius) * _radarRangeNm).toFixed(2));
+                        distKm = Number((distNm * 1.852).toFixed(2));
+                        bearing = Math.round((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360);
+                    }
+
+                    // Titik 1 Marker
+                    ctx.beginPath();
+                    ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffcc00';
+                    ctx.shadowColor = '#ffcc00';
+                    ctx.shadowBlur = 14;
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    ctx.font = 'bold 11px monospace';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`① ${resA.label}`, p1.x + 12, p1.y - 10);
+
+                    // Badge preview di tengah
+                    const midX = (p1.x + p2.x) / 2;
+                    const midY = (p1.y + p2.y) / 2;
+                    const previewTxt = `📏 ${distNm} NM (${bearing}°) ➔ ${p2Label}`;
+                    ctx.font = 'bold 11px monospace';
+                    const pw = ctx.measureText(previewTxt).width + 20;
+
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                    ctx.strokeStyle = '#ffea00';
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    ctx.roundRect(midX - pw / 2, midY - 14, pw, 26, 4);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffea00';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(previewTxt, midX, midY);
+                }
             }
 
-            // Gambar Titik 1 (Target Marker A - Lingkaran Kuning Pulsing)
-            if (p1Screen) {
-                ctx.beginPath();
-                ctx.arc(p1Screen.x, p1Screen.y, 8, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffcc00';
-                ctx.shadowColor = '#ffcc00';
-                ctx.shadowBlur = 14;
-                ctx.fill();
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+            // C. Floating Helper Banner di Kiri Bawah saat mode pengukuran atau ada garis aktif
+            if (_isCtrlKeyDown || _pendingRulerStart || _activeRulers.length > 0) {
+                let guideTxt = '';
+                if (_isCtrlKeyDown) {
+                    guideTxt = !_pendingRulerStart
+                        ? '📏 UKUR JARAK: Klik Titik/Pesawat 1'
+                        : '📏 UKUR JARAK: Klik Titik/Pesawat 2 untuk membuat garis pengukuran';
+                } else {
+                    guideTxt = `📏 ${_activeRulers.length} Garis Pengukuran Aktif (Tahan CTRL untuk tambah garis baru, tombol Reset Jarak di atas untuk hapus)`;
+                }
 
-                ctx.beginPath();
-                ctx.arc(p1Screen.x, p1Screen.y, 14, 0, Math.PI * 2);
-                ctx.strokeStyle = '#ffcc00';
-                ctx.lineWidth = 1.5;
-                ctx.setLineDash([3, 3]);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.shadowBlur = 0;
-
-                ctx.font = 'bold 11px monospace';
-                ctx.fillStyle = '#ffffff';
-                ctx.textAlign = 'left';
-                ctx.fillText(`① ${_rulerPointA.label || 'Titik 1'}`, p1Screen.x + 12, p1Screen.y - 10);
-            }
-
-            // Gambar Titik 2 jika sudah fix diklik
-            if (_rulerPointB && p2Screen) {
-                ctx.beginPath();
-                ctx.arc(p2Screen.x, p2Screen.y, 8, 0, Math.PI * 2);
-                ctx.fillStyle = '#00ff88';
-                ctx.shadowColor = '#00ff88';
-                ctx.shadowBlur = 14;
-                ctx.fill();
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                ctx.beginPath();
-                ctx.arc(p2Screen.x, p2Screen.y, 14, 0, Math.PI * 2);
-                ctx.strokeStyle = '#00ff88';
-                ctx.lineWidth = 1.5;
-                ctx.setLineDash([3, 3]);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.shadowBlur = 0;
-
-                ctx.font = 'bold 11px monospace';
-                ctx.fillStyle = '#ffffff';
-                ctx.textAlign = 'left';
-                ctx.fillText(`② ${_rulerPointB.label || 'Titik 2'}`, p2Screen.x + 12, p2Screen.y - 10);
-            }
-
-            // Floating Helper Banner di Kiri Bawah saat Mode Ukur Aktif
-            if (_isRulerMode) {
-                const guideTxt = !_rulerPointA 
-                    ? '📏 MODE UKUR JARAK: Klik Titik 1 (Pesawat / Koordinat Peta)' 
-                    : (!_rulerPointB 
-                        ? '📏 MODE UKUR JARAK: Klik Titik 2 (Tujuan / Pesawat Lain) [ESC: Batal]' 
-                        : '📏 UKUR JARAK SELESAI: Klik lagi untuk ukur baru [ESC: Hapus]');
-                
                 ctx.font = 'bold 11px monospace';
                 const gw = ctx.measureText(guideTxt).width;
                 const gx = 16;
                 const gy = h - 28;
 
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-                ctx.strokeStyle = '#00f0ff';
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+                ctx.strokeStyle = _isCtrlKeyDown ? '#00f0ff' : '#64748b';
                 ctx.lineWidth = 1.2;
                 ctx.beginPath();
                 ctx.roundRect(gx, gy - 14, gw + 24, 26, 4);
                 ctx.fill();
                 ctx.stroke();
 
-                ctx.fillStyle = '#00f0ff';
+                ctx.fillStyle = _isCtrlKeyDown ? '#00f0ff' : '#cbd5e1';
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(guideTxt, gx + 12, gy);
@@ -2907,14 +3249,20 @@
         const refAzimEl = document.getElementById('auditRefAzim');
         const refDistEl = document.getElementById('auditRefDist');
 
-        const nomAz = refCfg.azimuth;
-        const measAz = parseFloat(refObj.measured_azimuth) || nomAz;
-        const calcDrift = (measAz - nomAz).toFixed(2);
-        const signDrift = calcDrift >= 0 ? `+${calcDrift}` : `${calcDrift}`;
+        if (refCfg && refCfg.range > 0) {
+            const nomAz = refCfg.azimuth;
+            const measAz = parseFloat(refObj.measured_azimuth) || nomAz;
+            const calcDrift = (measAz - nomAz).toFixed(2);
+            const signDrift = calcDrift >= 0 ? `+${calcDrift}` : `${calcDrift}`;
 
-        if (refIdEl) refIdEl.innerHTML = `<span style="color: #ffaa00;">${refCfg.targetId}</span> <span style="font-size: 10px; color: #94a3b8;">(SQ: ${refCfg.squawk} | ADDR: ${refCfg.address})</span>`;
-        if (refAzimEl) refAzimEl.textContent = `${measAz.toFixed(2)}° (Drift: ${signDrift}°) | Nom: ${nomAz.toFixed(2)}°`;
-        if (refDistEl) refDistEl.textContent = `${refObj.measured_range || (refCfg.range + ' NM')}`;
+            if (refIdEl) refIdEl.innerHTML = `<span style="color: #ffaa00;">${refCfg.targetId}</span> <span style="font-size: 10px; color: #94a3b8;">(SQ: ${refCfg.squawk} | ADDR: ${refCfg.address})</span>`;
+            if (refAzimEl) refAzimEl.textContent = `${measAz.toFixed(2)}° (Drift: ${signDrift}°) | Nom: ${nomAz.toFixed(2)}°`;
+            if (refDistEl) refDistEl.textContent = `${refObj.measured_range || (refCfg.range + ' NM')}`;
+        } else {
+            if (refIdEl) refIdEl.innerHTML = `<span style="color: #94a3b8;">Belum Dikonfigurasi</span> <span style="font-size: 10px; color: #64748b;">(Menunggu Input Site)</span>`;
+            if (refAzimEl) refAzimEl.textContent = `— (Klik Kalibrasi Transponder Ref)`;
+            if (refDistEl) refDistEl.textContent = `—`;
+        }
 
         const avgEl = document.getElementById('auditAvgRange');
         if (avgEl) avgEl.textContent = audit.avg_coverage_range_nm ? `${audit.avg_coverage_range_nm} NM` : '110.0 NM';
@@ -2938,6 +3286,103 @@
                     </tr>
                 `;
             }).join('');
+        }
+
+        // Update Nilai & Status Audit Kerusakan Radar & False Target
+        const report = Array.isArray(_lastDuplicateAuditReport) ? _lastDuplicateAuditReport : [];
+        const ftCountEl = document.getElementById('auditValFalseTargetCount');
+        const ftDetailEl = document.getElementById('auditTextFalseTargetDetail');
+        const ftBadge = document.getElementById('auditFalseTargetStatusBadge');
+        const psStatusEl = document.getElementById('auditValPlotSplitStatus');
+        const psDetailEl = document.getElementById('auditTextPlotSplitDetail');
+        const islsHealthEl = document.getElementById('auditValIslsHealth');
+        const islsDetailEl = document.getElementById('auditTextIslsDetail');
+        const listContainer = document.getElementById('auditFalseTargetListContainer');
+
+        let splitCount = 0;
+        let echoCount = 0;
+        report.forEach(r => {
+            if (r.category.includes('SPLIT')) splitCount++;
+            if (r.category.includes('REFLECTION')) echoCount++;
+        });
+
+        if (ftCountEl) {
+            if (report.length > 0) {
+                ftCountEl.textContent = `${report.length} Kasus Anomali`;
+                ftCountEl.style.color = '#ef4444';
+            } else {
+                ftCountEl.textContent = '0 Terdeteksi';
+                ftCountEl.style.color = '#00ff88';
+            }
+        }
+
+        if (ftDetailEl) {
+            ftDetailEl.textContent = report.length > 0
+                ? `${splitCount} Plot Splitting, ${echoCount} Multipath/Echo Surabaya`
+                : 'Tidak ada false target atau echo aktif';
+        }
+
+        if (ftBadge) {
+            if (report.length > 0) {
+                ftBadge.textContent = 'PERHATIAN';
+                ftBadge.style.color = '#ef4444';
+                ftBadge.style.borderColor = '#ef4444';
+                ftBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+            } else {
+                ftBadge.textContent = 'NORMAL';
+                ftBadge.style.color = '#00ff88';
+                ftBadge.style.borderColor = '#00ff88';
+                ftBadge.style.background = 'rgba(0, 255, 136, 0.15)';
+            }
+        }
+
+        if (psStatusEl) {
+            psStatusEl.textContent = splitCount > 0 ? 'ANOMALI OBA' : 'NORMAL';
+            psStatusEl.style.color = splitCount > 0 ? '#ffaa00' : '#00d4ff';
+        }
+        if (psDetailEl) {
+            psDetailEl.textContent = splitCount > 0
+                ? `${splitCount} target mengalami kegagalan coalescing reply`
+                : 'Coalescing window optimal & fasa monopulse sinkron';
+        }
+
+        if (islsHealthEl) {
+            islsHealthEl.textContent = echoCount > 0 ? 'MULTIPATH ECHO' : 'P1-P2 BALANCE OK';
+            islsHealthEl.style.color = echoCount > 0 ? '#ffaa00' : '#00ff88';
+        }
+        if (islsDetailEl) {
+            islsDetailEl.textContent = echoCount > 0
+                ? 'Terdeteksi pantulan echo sekunder (butuh kalibrasi ISLS)'
+                : 'Daya pulsa kontrol P2 dalam toleransi standar';
+        }
+
+        if (listContainer) {
+            if (report.length === 0) {
+                listContainer.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px;">
+                        <span style="color: #00ff88;"><i class="fas fa-check-circle" style="margin-right: 6px;"></i>Semua parameter subsistem radar (Transmitter, Receiver Monopulse OBA, & Plot Extractor) bekerja normal tanpa anomali.</span>
+                        <span style="color: #64748b; font-size: 10px;">ICAO Doc 9924 Compliant</span>
+                    </div>
+                `;
+            } else {
+                listContainer.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="color: #ff8888; font-weight: 700; font-size: 11px; margin-bottom: 2px;">
+                            <i class="fas fa-satellite-dish" style="margin-right: 6px;"></i>LOG KERUSAKAN & ANOMALI SINYAL TERDETEKSI:
+                        </div>
+                        ${report.map((item, idx) => `
+                            <div style="background: rgba(15, 23, 42, 0.85); border-left: 3px solid #ef4444; border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 700; color: #ffaa00;">#${idx + 1} ${item.category}</span>
+                                    <span style="color: #94a3b8; font-family: monospace; font-size: 10px;">ΔR: ${item.deltaRange} NM | ΔAzim: ${item.deltaAzim}°</span>
+                                </div>
+                                <div style="color: #cbd5e1; font-size: 10.5px;">${item.reason}</div>
+                                <div style="color: #38bdf8; font-size: 10px;"><i class="fas fa-wrench" style="margin-right: 4px;"></i><strong>Rekomendasi Teknisi:</strong> ${item.recommendation}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
         }
 
         if (_currentRadarTab === 'audit') {
@@ -3024,65 +3469,73 @@
         });
 
         const refCfg = getSavedRefTxpConfig(_activeRadarSourceId);
-        const refAzim = refCfg.azimuth;
-        const refDist = refCfg.range;
-        const refRad = ((refAzim - 90) * Math.PI) / 180;
-        const refR = (refDist / maxRangeRef) * maxRadius;
-        const refX = cx + Math.cos(refRad) * refR;
-        const refY = cy + Math.sin(refRad) * refR;
+        if (refCfg && refCfg.range > 0) {
+            const refAzim = refCfg.azimuth;
+            const refDist = refCfg.range;
+            const refRad = ((refAzim - 90) * Math.PI) / 180;
+            const refR = (refDist / maxRangeRef) * maxRadius;
+            const refX = cx + Math.cos(refRad) * refR;
+            const refY = cy + Math.sin(refRad) * refR;
 
-        ctx.save();
-        ctx.translate(refX, refY);
+            ctx.save();
+            ctx.translate(refX, refY);
 
-        ctx.beginPath();
-        ctx.arc(0, 0, 7, 0, Math.PI * 2);
-        ctx.strokeStyle = '#ffaa00';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, 0, 7, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ffaa00';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
 
-        ctx.beginPath();
-        ctx.moveTo(0, -4);
-        ctx.lineTo(4, 0);
-        ctx.lineTo(0, 4);
-        ctx.lineTo(-4, 0);
-        ctx.closePath();
-        ctx.fillStyle = '#ffaa00';
-        ctx.shadowColor = '#ffaa00';
-        ctx.shadowBlur = 8;
-        ctx.fill();
-        ctx.restore();
+            ctx.beginPath();
+            ctx.moveTo(0, -4);
+            ctx.lineTo(4, 0);
+            ctx.lineTo(0, 4);
+            ctx.lineTo(-4, 0);
+            ctx.closePath();
+            ctx.fillStyle = '#ffaa00';
+            ctx.shadowColor = '#ffaa00';
+            ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.restore();
 
-        const labelText = `⛯ ${refCfg.targetId} (${refAzim}° / ${refDist}NM)`;
-        ctx.font = 'bold 9px monospace';
-        const txtWidth = ctx.measureText(labelText).width;
+            const labelText = `⛯ ${refCfg.targetId} (${refAzim}° / ${refDist}NM)`;
+            ctx.font = 'bold 9px monospace';
+            const txtWidth = ctx.measureText(labelText).width;
 
-        ctx.fillStyle = 'rgba(2, 6, 14, 0.85)';
-        ctx.fillRect(refX + 8, refY - 8, txtWidth + 6, 14);
-        ctx.strokeStyle = '#ffaa00';
-        ctx.lineWidth = 0.8;
-        ctx.strokeRect(refX + 8, refY - 8, txtWidth + 6, 14);
+            ctx.fillStyle = 'rgba(2, 6, 14, 0.85)';
+            ctx.fillRect(refX + 8, refY - 8, txtWidth + 6, 14);
+            ctx.strokeStyle = '#ffaa00';
+            ctx.lineWidth = 0.8;
+            ctx.strokeRect(refX + 8, refY - 8, txtWidth + 6, 14);
 
-        ctx.fillStyle = '#ffcc00';
-        ctx.textAlign = 'left';
-        ctx.fillText(labelText, refX + 11, refY + 3);
+            ctx.fillStyle = '#ffcc00';
+            ctx.textAlign = 'left';
+            ctx.fillText(labelText, refX + 11, refY + 3);
+        }
     }
 
     // ── MODAL SETTING TRANSPONDER REFERENSI ────────────────────────────────────
     window.openRefTxpConfigModal = function () {
         const modal = document.getElementById('radarRefModal');
         if (!modal) return;
-        const cfg = getSavedRefTxpConfig(_activeRadarSourceId);
+        const cfg = getSavedRefTxpConfig(_activeRadarSourceId) || {
+            targetId: '',
+            squawk: '',
+            address: '',
+            azimuth: '',
+            range: ''
+        };
         const inputId = document.getElementById('cfgRefTargetId');
         const inputSq = document.getElementById('cfgRefSquawk');
         const inputAddr = document.getElementById('cfgRefAddress');
         const inputAz = document.getElementById('cfgRefAzimuth');
         const inputRng = document.getElementById('cfgRefRange');
 
-        if (inputId) inputId.value = cfg.targetId;
-        if (inputSq) inputSq.value = cfg.squawk;
-        if (inputAddr) inputAddr.value = cfg.address;
-        if (inputAz) inputAz.value = cfg.azimuth;
-        if (inputRng) inputRng.value = cfg.range;
+        if (inputId) inputId.value = cfg.targetId || '';
+        if (inputSq) inputSq.value = cfg.squawk || '';
+        if (inputAddr) inputAddr.value = cfg.address || '';
+        if (inputAz) inputAz.value = cfg.azimuth !== undefined ? cfg.azimuth : '';
+        if (inputRng) inputRng.value = cfg.range !== undefined ? cfg.range : '';
         modal.style.display = 'flex';
     };
 
@@ -3099,17 +3552,32 @@
         const inputAz = document.getElementById('cfgRefAzimuth');
         const inputRng = document.getElementById('cfgRefRange');
 
-        const cfg = {
-            targetId: (inputId?.value || 'REF-TXP').trim().toUpperCase(),
-            squawk: (inputSq?.value || '7000').trim(),
-            address: (inputAddr?.value || '8A0001').trim().toUpperCase(),
-            azimuth: parseFloat(inputAz?.value) || 85.20,
-            range: parseFloat(inputRng?.value) || 12.45
-        };
+        const tId = (inputId?.value || '').trim().toUpperCase();
+        const sq = (inputSq?.value || '').trim();
+        const addr = (inputAddr?.value || '').trim().toUpperCase();
+        const az = parseFloat(inputAz?.value);
+        const rng = parseFloat(inputRng?.value);
 
-        try {
-            localStorage.setItem(`radar_ref_txp_config_${srcId}`, JSON.stringify(cfg));
-        } catch (e) { }
+        if (!tId && isNaN(rng)) {
+            // Kosongkan konfigurasi jika di-clear user
+            try {
+                localStorage.removeItem(`radar_ref_txp_config_${srcId}`);
+                localStorage.removeItem('radar_ref_txp_config');
+            } catch (e) { }
+        } else {
+            const cfg = {
+                targetId: tId || 'REF-TXP',
+                squawk: sq || '7000',
+                address: addr || '8A0001',
+                azimuth: !isNaN(az) ? az : 0,
+                range: !isNaN(rng) ? rng : 0,
+                isConfigured: true
+            };
+
+            try {
+                localStorage.setItem(`radar_ref_txp_config_${srcId}`, JSON.stringify(cfg));
+            } catch (e) { }
+        }
 
         window.closeRefTxpConfigModal();
 

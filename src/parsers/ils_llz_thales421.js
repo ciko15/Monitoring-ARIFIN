@@ -421,7 +421,6 @@ class IlsLlzThales421Parser extends BaseParser {
             const latest = frames[frames.length - 1];
             this._lastDecoded = latest.decoded;
             this._lastDataTime = now;
-            if (this._mode === 'ACTIVE') this._mode = 'PASSIVE';
             const advance = latest.decoded.frameLen ? latest.decoded.frameLen : PKT_C_SIZE;
             this._buf = this._buf.slice(latest.pos + advance);
 

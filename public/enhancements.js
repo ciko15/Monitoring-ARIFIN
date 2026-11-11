@@ -679,6 +679,18 @@
         if (modal) modal.style.display = 'none';
         stopSourceDetailLiveUpdates();
     }
+    window.closeDetailModal = closeDetailModal;
+
+    window.closeAllEnhancementModals = function () {
+        closeDetailModal();
+        const panel = document.getElementById('equipmentDetailPanel');
+        const overlay = document.getElementById('detailPanelOverlay');
+        if (panel) panel.classList.remove('open');
+        if (overlay) overlay.classList.remove('open');
+        document.querySelectorAll('.cabang-card').forEach(c => c.classList.remove('card-selected'));
+        _selectedEqId = null;
+        stopSourcePanelLiveUpdates();
+    };
 
     let _isFetchingSourceDetail = false;
     async function refreshSourceDetailModal(src, forceRender = false) {
@@ -1024,10 +1036,19 @@
 
                         <div class="sp-card-meta" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%;">
                             <span class="sp-conn-badge"><i class="fas fa-database"></i> ${ip}:${port}</span>
-                            <span class="sp-conn-badge sp-parser-badge" title="${parserName}"><i class="fas fa-code"></i> ${parserName}</span>
+                            ${effParserId === 'snmp_network_basic' ? `
+                                <button class="sp-conn-badge" onclick="event.stopPropagation(); window.openSwitchAuditScope('${src.id}')" style="background: rgba(0, 212, 255, 0.16); color: #00d4ff; border: 1px solid #00d4ff; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; transition: all 0.2s;" title="Buka Audit Switch Realtime Layar Penuh">
+                                    <i class="fas fa-network-wired" style="color: #00d4ff;"></i> Audit Switch
+                                </button>
+                            ` : ''}
+                            ${(effParserId === 'snmp_system' || effParserId === 'snmp_host_resources_01' || src.parsing_id === 'snmp_system' || src.parsing_id === 'snmp_host_resources_01' || (srcData && srcData.audit_server)) ? `
+                                <button class="sp-conn-badge" onclick="event.stopPropagation(); window.openServerAuditScope('${src.id}')" style="background: rgba(0, 212, 255, 0.16); color: #00d4ff; border: 1px solid #00d4ff; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; transition: all 0.2s;" title="Buka Audit Aplikasi Server / PC Layar Penuh">
+                                    <i class="fas fa-server" style="color: #00d4ff;"></i> Audit Aplikasi
+                                </button>
+                            ` : ''}
                             ${effParserId === 'asterix_radar' ? `
-                                <button class="sp-conn-badge" onclick="event.stopPropagation(); window.openRadarPpiScope('${src.id}')" style="background: rgba(0, 212, 255, 0.16); color: #00d4ff; border: 1px solid #00d4ff; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; transition: all 0.2s;" title="Buka PPI Radar Scope (CAT 048)">
-                                    <i class="fas fa-crosshairs fa-spin" style="animation-duration: 6s; color: #00ff88;"></i> Radar Scope (PPI)
+                                <button class="sp-conn-badge" onclick="event.stopPropagation(); window.openRadarPpiScope('${src.id}')" style="background: rgba(0, 212, 255, 0.16); color: #00d4ff; border: 1px solid #00d4ff; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; transition: all 0.2s;" title="Buka Audit Radar PPI Scope Layar Penuh">
+                                    <i class="fas fa-crosshairs fa-spin" style="animation-duration: 6s; color: #00ff88;"></i> Audit Radar (PPI)
                                 </button>
                             ` : ''}
                             ${pingLabel}
@@ -1254,14 +1275,39 @@
             }
         }
 
+        const isSwitchDevice = (src && src.parsing_id === 'snmp_network_basic') || (data && data._parsing_id === 'snmp_network_basic') || (data && data.audit_switch);
+
+        const switchAuditBtnHtml = isSwitchDevice ? `
+            <button onclick="window.openSwitchAuditScope('${src.id}')"
+                style="background: rgba(0, 212, 255, 0.18); color: #00ffff; border: 1px solid #00ffff; border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s;"
+                onmouseover="this.style.background='rgba(0,212,255,0.35)'"
+                onmouseout="this.style.background='rgba(0,212,255,0.18)'"
+                title="Buka Halaman Audit Switch Realtime Layar Penuh">
+                <i class="fas fa-network-wired" style="color: #00d4ff;"></i> Audit Switch
+            </button>
+        ` : '';
+
+        const isServerDevice = (src && (src.parsing_id === 'snmp_system' || src.parsing_id === 'snmp_host_resources_01')) ||
+            (data && (data._parsing_id === 'snmp_system' || data._parsing_id === 'snmp_host_resources_01' || data.audit_server));
+
+        const serverAuditBtnHtml = isServerDevice ? `
+            <button onclick="window.openServerAuditScope('${src.id}')"
+                style="background: rgba(0, 212, 255, 0.18); color: #00ffff; border: 1px solid #00ffff; border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s;"
+                onmouseover="this.style.background='rgba(0,212,255,0.35)'"
+                onmouseout="this.style.background='rgba(0,212,255,0.18)'"
+                title="Buka Halaman Audit Aplikasi Server / PC Layar Penuh">
+                <i class="fas fa-server" style="color: #00d4ff;"></i> Audit Aplikasi
+            </button>
+        ` : '';
+
         const radarBtnHtml = (src && src.parsing_id === 'asterix_radar') ? `
-            <button onclick="window.openRadarPpiScope('${src.id}')" style="background: rgba(0, 212, 255, 0.18); color: #00ffff; border: 1px solid #00ffff; border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(0,212,255,0.35)'" onmouseout="this.style.background='rgba(0,212,255,0.18)'" title="Buka Sidebar Radar PPI Scope 60%">
-                <i class="fas fa-crosshairs fa-spin" style="animation-duration: 6s; color: #00ff88;"></i> Radar PPI Scope (60%)
+            <button onclick="window.openRadarPpiScope('${src.id}')" style="background: rgba(0, 212, 255, 0.18); color: #00ffff; border: 1px solid #00ffff; border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(0,212,255,0.35)'" onmouseout="this.style.background='rgba(0,212,255,0.18)'" title="Buka Layar Penuh Audit Radar PPI Scope">
+                <i class="fas fa-crosshairs fa-spin" style="animation-duration: 6s; color: #00ff88;"></i> Audit Radar (PPI Scope)
             </button>
         ` : '';
 
         document.getElementById('srcDetailStatus').innerHTML =
-            radarBtnHtml + pingBadge + `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${statusColors[status]}18;color:${statusColors[status]};border:1px solid ${statusColors[status]}40;letter-spacing:0.5px;">${status.toUpperCase()}</span>`;
+            switchAuditBtnHtml + serverAuditBtnHtml + radarBtnHtml + pingBadge + `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${statusColors[status]}18;color:${statusColors[status]};border:1px solid ${statusColors[status]}40;letter-spacing:0.5px;">${status.toUpperCase()}</span>`;
 
         const modalContainer = modal.querySelector('div');
         const isTdme = src && (
@@ -2166,7 +2212,29 @@
             }
 
             // Nilai tampil & satuan
-            let valDisplay = (val !== null && val !== undefined && val !== '') ? String(val) : '—';
+            let valDisplay = '—';
+            if (val !== null && val !== undefined && val !== '') {
+                if (Array.isArray(val)) {
+                    if (val.length === 0) {
+                        valDisplay = '0 item';
+                    } else if (typeof val[0] === 'object' && val[0] !== null) {
+                        // Array of objects (misal: active_interfaces, temperature_sensors)
+                        if (val[0].name && val[0].value_c !== undefined) {
+                            valDisplay = val.map(s => `${s.name}: ${s.value_c}°C`).join(', ');
+                        } else if (val[0].name) {
+                            valDisplay = val.map(i => i.name).join(', ');
+                        } else {
+                            valDisplay = `${val.length} item`;
+                        }
+                    } else {
+                        valDisplay = val.join(', ');
+                    }
+                } else if (typeof val === 'object') {
+                    valDisplay = JSON.stringify(val);
+                } else {
+                    valDisplay = String(val);
+                }
+            }
             if (valDisplay !== '—' && unit) {
                 valDisplay = `${valDisplay} <span style="font-size:12px;font-weight:500;color:#94a3b8;margin-left:2px;">${unit}</span>`;
             }

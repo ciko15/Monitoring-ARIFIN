@@ -1885,6 +1885,68 @@ const app = new Elysia()
         })
     )
 
+    // --- SERVER AUDIT WATCHLIST ROUTES ---
+    .group('/api/server-audit', app => app
+        .use(authenticate)
+        .get('/watchlist', async ({ query }) => {
+            const fs = require('fs');
+            const path = require('path');
+            const filePath = path.resolve(process.cwd(), 'db/server_watchlist_config.json');
+            try {
+                if (fs.existsSync(filePath)) {
+                    const raw = fs.readFileSync(filePath, 'utf8');
+                    const parsed = JSON.parse(raw);
+                    const host = (query.host as string) || '';
+                    if (host) {
+                        if (parsed[host] && Array.isArray(parsed[host].apps)) {
+                            return { success: true, host, apps: parsed[host].apps };
+                        }
+                        if (Array.isArray(parsed.watchlist)) {
+                            const found = parsed.watchlist.find((w: any) => w.device === host);
+                            if (found && Array.isArray(found.apps)) {
+                                return { success: true, host, apps: found.apps };
+                            }
+                        }
+                        return { success: true, host, apps: [] };
+                    }
+                    return { success: true, config: parsed };
+                }
+            } catch (err: any) {
+                console.error('[SERVER AUDIT] Error reading watchlist:', err);
+            }
+            return { success: true, config: {} };
+        })
+        .post('/watchlist', async ({ body, set }) => {
+            const fs = require('fs');
+            const path = require('path');
+            const filePath = path.resolve(process.cwd(), 'db/server_watchlist_config.json');
+            try {
+                const { host, apps } = body as any;
+                if (!host || !Array.isArray(apps)) {
+                    set.status = 400;
+                    return { success: false, error: 'host (string) dan apps (array) diperlukan' };
+                }
+                let config: any = {};
+                if (fs.existsSync(filePath)) {
+                    try {
+                        config = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    } catch {}
+                }
+                config[host] = {
+                    device: host,
+                    description: `Watchlist target ${host}`,
+                    updated_at: new Date().toISOString(),
+                    apps
+                };
+                fs.writeFileSync(filePath, JSON.stringify(config, null, 2), 'utf8');
+                return { success: true, message: `Watchlist untuk ${host} berhasil diperbarui`, host, appsCount: apps.length };
+            } catch (err: any) {
+                set.status = 500;
+                return { success: false, error: err.message };
+            }
+        })
+    )
+
     // --- PACKET EXPORT ROUTE ---
     .group('/api/sniffer', app => app
         .use(authenticate)

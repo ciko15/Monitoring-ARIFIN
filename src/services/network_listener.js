@@ -43,7 +43,7 @@ async function checkIcmpPing(ip) {
     const now = Date.now();
     if (_pingCache.has(ip)) {
         const cached = _pingCache.get(ip);
-        if (now - cached.time < 15000) return cached.result; // Cache 15 detik
+        if (now - cached.time < 3000) return cached.result; // Cache 3 detik agar respons realtime
     }
 
     if (_pingInFlight.has(ip)) {
@@ -850,18 +850,16 @@ class NetworkListenerService {
             }
         }
 
-        // Jangan timpa parameter menjadi strip jika alat adalah SNMP system monitor (biarkan Last Known Good Value bertahan)
-        if ((isDisconnect || finalStatus === 'Offline') &&
-            source.parsing_id !== 'snmp_system' &&
-            source.parsing_id !== 'snmp_network_basic') {
-            const prevData = this._lkgvCache.get(source.id);
-            if (prevData) {
-                const dashData = {};
-                for (const key of Object.keys(prevData)) {
-                    dashData[key] = '—';
+        if (isDisconnect || finalStatus === 'Offline') {
+            if (source.parsing_id !== 'snmp_system' && source.parsing_id !== 'snmp_network_basic') {
+                const prevData = this._lkgvCache.get(source.id);
+                if (prevData) {
+                    const dashData = {};
+                    for (const key of Object.keys(prevData)) {
+                        dashData[key] = '—';
+                    }
+                    parsedData.data = { ...parsedData.data, ...dashData };
                 }
-                dashData.connectivity = 'Disconnected';
-                parsedData.data = { ...parsedData.data, ...dashData };
             }
             if (parsedData.data) {
                 if (parsedData.data.status_label) parsedData.data.status_label = finalStatus || 'Disconnect';

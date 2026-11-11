@@ -19,8 +19,15 @@
 
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const snmp = require('snmp-native');
 const { readAlcatelTemperature, readTemperatureSensors, readUcdTemperatureSensors } = require('./snmp_sensor_utils');
+const auditConfig = require('../config/server_audit_config');
+const { computeServerAudit } = require('./server_audit_engine');
+
+// Cache in-memory audit server & proses agar UI audit tidak pernah kosong/blank
+const lastKnownAuditServerMap = new Map();
 
 const OID = {
     sysDescr: [1, 3, 6, 1, 2, 1, 1, 1, 0],
@@ -182,6 +189,117 @@ function snmpWalk(session, oid) {
             resolve(!err && vbs ? vbs : []);
         });
     });
+}
+
+function snmpWalkSafe(session, oid, timeoutMs = 4000, maxRows = 500) {
+    return new Promise(resolve => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                resolve([]);
+            }
+        }, timeoutMs);
+
+        session.getSubtree({ oid, combinedTimeout: timeoutMs }, (err, vbs) => {
+            if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                if (err || !vbs) return resolve([]);
+                resolve(vbs.slice(0, maxRows));
+            }
+        });
+    });
+}
+
+function toIndexMap(vbs) {
+    const map = {};
+    for (const vb of vbs) {
+        if (!vb || !vb.oid) continue;
+        const idx = vb.oid[vb.oid.length - 1];
+        map[idx] = vb.value;
+    }
+    return map;
+}
+
+function loadWatchlistForHost(host, discoveredProcesses = []) {
+    try {
+        const filePath = path.resolve(process.cwd(), 'db/server_watchlist_config.json');
+        let parsed = {};
+        if (fs.existsSync(filePath)) {
+            try {
+                parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            } catch (e) {
+                parsed = {};
+            }
+        }
+
+        // 1. Cek format Object Key: { "172.20.8.68": { apps: [...] } }
+        if (host && parsed[host] && Array.isArray(parsed[host].apps)) {
+            return parsed[host].apps;
+        }
+
+        // 2. Cek format Array: { "watchlist": [ { "device": "172.20.8.68", "apps": [...] } ] }
+        if (Array.isArray(parsed.watchlist)) {
+            const found = parsed.watchlist.find(w => w.device === host);
+            if (found && Array.isArray(found.apps)) {
+                return found.apps;
+            }
+        }
+
+        // 3. AUTO-DISCOVERY PERANGKAT BARU:
+        // Jika host belum punya watchlist dan ada proses nyata yang berhasil ditarik lewat SNMP
+        if (host && Array.isArray(discoveredProcesses) && discoveredProcesses.length > 0) {
+            const ignoreList = new Set(auditConfig.systemProcessIgnoreList.map(s => s.toLowerCase()));
+            const candidateApps = [];
+            const seenNames = new Set();
+
+            for (const p of discoveredProcesses) {
+                const name = String(p.name || '').trim();
+                const nameLower = name.toLowerCase();
+                if (!name || seenNames.has(nameLower)) continue;
+                if (ignoreList.has(nameLower)) continue;
+                if (nameLower.startsWith('kworker') || nameLower.startsWith('rcu_') || nameLower.startsWith('scsi_')) continue;
+                if (p.type === 'operatingSystem' || p.type === 'deviceDriver') continue;
+
+                // Kandidat aplikasi / service yang berjalan nyata
+                seenNames.add(nameLower);
+                candidateApps.push({
+                    name: name.charAt(0).toUpperCase() + name.slice(1),
+                    match: {
+                        type: 'process',
+                        name: name
+                    },
+                    expectedCount: 1,
+                    severity: 'critical'
+                });
+
+                if (candidateApps.length >= 10) break; // Ambil hingga 10 service utama pertama
+            }
+
+            if (candidateApps.length > 0) {
+                // Simpan otomatis ke server_watchlist_config.json
+                parsed[host] = {
+                    device: host,
+                    description: `Auto-discovered Watchlist untuk ${host}`,
+                    updated_at: new Date().toISOString(),
+                    apps: candidateApps
+                };
+
+                try {
+                    fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2), 'utf8');
+                    console.log(`[SERVER AUDIT] Auto-discovery watchlist created for host ${host} (${candidateApps.length} apps)`);
+                } catch (writeErr) {
+                    console.warn(`[SERVER AUDIT] Failed to save auto-discovered watchlist:`, writeErr.message);
+                }
+
+                return candidateApps;
+            }
+        }
+    } catch (e) {
+        // fallback
+    }
+    return [];
 }
 
 async function readDeviceTemperature(session, sysObjectID, sysDescr) {
@@ -412,6 +530,168 @@ async function pollSNMP(host, community = 'public', options = {}) {
             temperature_sensors: temperatureSensors,
         };
 
+        // ── BAGIAN AUDIT APLIKASI SERVER / PC ─────────────────────────────────
+        // Berjalan aman untuk mengambil proses & service dengan session terdedikasi
+        let auditServerResult = null;
+        let auditSession = null;
+        try {
+            const auditOids = auditConfig.oids;
+            const snmpOpts = normalizeSnmpOptions(options);
+            // Gunakan session terpisah agar walk subtree tidak bersaing paket UDP dengan polling telemetri
+            auditSession = new snmp.Session({
+                host,
+                community,
+                port: snmpOpts.port,
+                version: normalizeSnmpVersion(snmpOpts.version),
+                timeouts: [3000, 5000, 7000],
+            });
+
+            const [
+                runIndexVbs, runNameVbs, runPathVbs, runParamVbs, runTypeVbs, runStatusVbs,
+                perfCpuVbs, perfMemVbs,
+                svcNameVbs, svcOpStateVbs,
+                prNameVbs, prMinVbs, prMaxVbs, prCountVbs, prErrFlagVbs, prErrMsgVbs
+            ] = await Promise.all([
+                snmpWalkSafe(auditSession, auditOids.hrSWRunIndex, 12000, 500),
+                snmpWalkSafe(auditSession, auditOids.hrSWRunName, 12000, 500),
+                snmpWalkSafe(auditSession, auditOids.hrSWRunPath, 12000, 500),
+                snmpWalkSafe(auditSession, auditOids.hrSWRunParameters, 8000, 500),
+                snmpWalkSafe(auditSession, auditOids.hrSWRunType, 8000, 500),
+                snmpWalkSafe(auditSession, auditOids.hrSWRunStatus, 8000, 500),
+                snmpWalkSafe(auditSession, auditOids.hrSWRunPerfCPU, 8000, 500),
+                snmpWalkSafe(auditSession, auditOids.hrSWRunPerfMem, 8000, 500),
+                snmpWalkSafe(auditSession, auditOids.svSvcName, 4000, 200),
+                snmpWalkSafe(auditSession, auditOids.svSvcOperatingState, 4000, 200),
+                snmpWalkSafe(auditSession, auditOids.prNames, 3000, 100),
+                snmpWalkSafe(auditSession, auditOids.prMin, 3000, 100),
+                snmpWalkSafe(auditSession, auditOids.prMax, 3000, 100),
+                snmpWalkSafe(auditSession, auditOids.prCount, 3000, 100),
+                snmpWalkSafe(auditSession, auditOids.prErrorFlag, 3000, 100),
+                snmpWalkSafe(auditSession, auditOids.prErrMessage, 3000, 100)
+            ]);
+
+            // Mapping hrSWRunEntry
+            const runNameMap = toIndexMap(runNameVbs);
+            const runPathMap = toIndexMap(runPathVbs);
+            const runParamMap = toIndexMap(runParamVbs);
+            const runTypeMap = toIndexMap(runTypeVbs);
+            const runStatusMap = toIndexMap(runStatusVbs);
+            const perfCpuMap = toIndexMap(perfCpuVbs);
+            const perfMemMap = toIndexMap(perfMemVbs);
+
+            // Tipe hrSWRunType: 1=unknown, 2=operatingSystem, 3=deviceDriver, 4=application
+            const swTypeLabel = (t) => {
+                const code = Number(t);
+                if (code === 4) return 'application';
+                if (code === 2) return 'operatingSystem';
+                if (code === 3) return 'deviceDriver';
+                return 'unknown';
+            };
+
+            // Status hrSWRunStatus: 1=running, 2=runnable, 3=notRunnable, 4=invalid
+            const swStatusLabel = (s) => {
+                const code = Number(s);
+                if (code === 1) return 'running';
+                if (code === 2) return 'runnable';
+                if (code === 3) return 'notRunnable';
+                if (code === 4) return 'invalid';
+                return 'unknown';
+            };
+
+            const procIndexes = Object.keys(runNameMap);
+            const processes = procIndexes.map(idx => {
+                const pid = Number(idx);
+                const name = String(runNameMap[idx] || '').trim();
+                const pathStr = runPathMap[idx] ? String(runPathMap[idx]).trim() : '';
+                const paramStr = runParamMap[idx] ? String(runParamMap[idx]).trim() : '';
+                const type = swTypeLabel(runTypeMap[idx]);
+                const procStatus = swStatusLabel(runStatusMap[idx]);
+                const cpuTicks = perfCpuMap[idx] !== undefined ? Number(perfCpuMap[idx]) : 0;
+                const memKb = perfMemMap[idx] !== undefined ? Number(perfMemMap[idx]) : 0;
+
+                return {
+                    pid,
+                    name,
+                    path: pathStr,
+                    parameters: paramStr,
+                    type,
+                    status: procStatus,
+                    cpu: cpuTicks,
+                    memory: memKb
+                };
+            });
+
+            // Mapping svSvcEntry (Windows Services)
+            const svcNameMap = toIndexMap(svcNameVbs);
+            const svcOpStateMap = toIndexMap(svcOpStateVbs);
+            const svcIndexes = Object.keys(svcNameMap);
+            const services = svcIndexes.map(idx => {
+                const sName = String(svcNameMap[idx] || '').trim();
+                const opVal = Number(svcOpStateMap[idx]);
+                let sState = 'unknown';
+                if (opVal === 1) sState = 'active';
+                else if (opVal === 2) sState = 'continue-pending';
+                else if (opVal === 3) sState = 'pause-pending';
+                else if (opVal === 4) sState = 'paused';
+
+                return {
+                    name: sName,
+                    state: sState
+                };
+            });
+
+            // Mapping Linux prTable
+            const prNameMap = toIndexMap(prNameVbs);
+            const prMinMap = toIndexMap(prMinVbs);
+            const prMaxMap = toIndexMap(prMaxVbs);
+            const prCountMap = toIndexMap(prCountVbs);
+            const prErrFlagMap = toIndexMap(prErrFlagVbs);
+            const prErrMsgMap = toIndexMap(prErrMsgVbs);
+            const ucdProcs = Object.keys(prNameMap).map(idx => ({
+                name: String(prNameMap[idx] || ''),
+                min: Number(prMinMap[idx] || 0),
+                max: Number(prMaxMap[idx] || 0),
+                count: Number(prCountMap[idx] || 0),
+                errorFlag: Number(prErrFlagMap[idx] || 0),
+                errorMessage: String(prErrMsgMap[idx] || '')
+            }));
+
+            // Ambil watchlist konfigurasi perangkat (mendukung auto-discovery jika host belum terdaftar)
+            const watchlist = loadWatchlistForHost(host, processes);
+
+            // Hitung hasil audit via engine
+            auditServerResult = await computeServerAudit(host, {
+                processes,
+                services,
+                ucdProcs,
+                systemMetrics: {
+                    cpu_usage: rawData.cpu_usage,
+                    ram_usage_pct: rawData.ram_usage_pct,
+                    disk_usage_pct: rawData.disk_usage_pct,
+                    sys_uptime: rawData.sys_uptime
+                },
+                watchlist
+            });
+        } catch (auditErr) {
+            console.warn(`[SNMP SYSTEM] Server Audit error for ${host}:`, auditErr.message);
+        }
+
+        // Gabungkan audit_server dan health_score ke dalam rawData (dengan proteksi cache persisten)
+        if (auditServerResult && Array.isArray(auditServerResult.processes) && auditServerResult.processes.length > 0) {
+            lastKnownAuditServerMap.set(host, auditServerResult);
+            rawData.audit_server = auditServerResult;
+            rawData.health_score = auditServerResult.health_score ? auditServerResult.health_score.level : 'Normal';
+        } else if (lastKnownAuditServerMap.has(host)) {
+            // Gunakan snapshot proses sebelumnya agar antarmuka tidak blank saat interval refresh
+            const cachedAudit = lastKnownAuditServerMap.get(host);
+            rawData.audit_server = cachedAudit;
+            rawData.health_score = cachedAudit.health_score ? cachedAudit.health_score.level : 'Normal';
+        } else if (auditServerResult) {
+            rawData.audit_server = auditServerResult;
+            rawData.health_score = auditServerResult.health_score ? auditServerResult.health_score.level : 'Normal';
+        }
+
+        try { if (auditSession) auditSession.close(); } catch (e) {}
         session.close();
         return {
             success: true,
@@ -474,6 +754,10 @@ async function pollSNMP(host, community = 'public', options = {}) {
                 disk_usage_pct: fallbackRaw.disk_usage_pct
             }
         };
+
+        if (lastKnownAuditServerMap.has(host)) {
+            structuredFallback.audit_server = lastKnownAuditServerMap.get(host);
+        }
 
         return {
             success: false,
