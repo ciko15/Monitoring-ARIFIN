@@ -7,7 +7,7 @@ let currentUser = null;
 try {
   const storedUser = localStorage.getItem('currentUser');
   if (storedUser) currentUser = JSON.parse(storedUser);
-} catch(e) {
+} catch (e) {
   console.warn('Failed to parse currentUser from cache');
 }
 let equipmentData = [];
@@ -287,11 +287,11 @@ function getAirportPrefix(airportId = null) {
 }
 
 // Global "Pick Location" logic
-window.getCurrentLocation = function(type) {
+window.getCurrentLocation = function (type) {
   if (navigator.geolocation) {
     showToast('Mengambil lokasi saat ini...', 'info');
     navigator.geolocation.getCurrentPosition(
-      function(position) {
+      function (position) {
         let prefix = 'equipment';
         if (type === 'airport') prefix = 'airport';
         if (type === 'dataSource') prefix = 'dataSource';
@@ -305,7 +305,7 @@ window.getCurrentLocation = function(type) {
           showToast('Lokasi berhasil didapatkan!', 'success');
         }
       },
-      function(error) {
+      function (error) {
         console.error('Error fetching location:', error);
         let errorMessage = 'Gagal mendapatkan lokasi.';
         if (error.code === error.PERMISSION_DENIED) {
@@ -590,7 +590,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
   // Populate equipmentSelect
   if (equipmentSelect) {
     const sortedEquip = (equipmentData || []).sort((a, b) => a.name.localeCompare(b.name));
-    
+
     // Check if equipmentId is in sortedEquip
     const equipExists = sortedEquip.find(e => String(e.id) === String(equipmentId));
     let extraOption = '';
@@ -674,7 +674,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     }
 
     // Parse extra_config safely
-    const extra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? (() => { try { return JSON.parse(editSource.extra_config); } catch(e) { return {}; } })() : editSource.extra_config) : {};
+    const extra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? (() => { try { return JSON.parse(editSource.extra_config); } catch (e) { return {}; } })() : editSource.extra_config) : {};
 
     // Populate ASTERIX extra fields if editing
     const astDiv = document.getElementById('asterixExtraFields');
@@ -748,10 +748,10 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       iologikDiv.style.display = 'block';
       let ioExtraStr = '';
       if (editSource.extra_config && editSource.extra_config !== 'null') {
-          ioExtraStr = typeof editSource.extra_config === 'string' ? editSource.extra_config : JSON.stringify(editSource.extra_config, null, 2);
+        ioExtraStr = typeof editSource.extra_config === 'string' ? editSource.extra_config : JSON.stringify(editSource.extra_config, null, 2);
       }
       if (document.getElementById('iologikExtraConfigJson')) {
-          document.getElementById('iologikExtraConfigJson').value = ioExtraStr;
+        document.getElementById('iologikExtraConfigJson').value = ioExtraStr;
       }
       // Render the UI builder
       if (typeof renderIologikBuilderFromJson === 'function') {
@@ -763,7 +763,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         renderIologikBuilderFromJson('');
       }
     }
-    
+
     // Populate Universal API extra fields if editing
     const univApiDiv = document.getElementById('universalApiExtraFields');
     if (parserId === 'universal_api' && univApiDiv) {
@@ -773,54 +773,54 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       if (document.getElementById('univApiMethod')) document.getElementById('univApiMethod').value = (univExtra.api_options && univExtra.api_options.method) ? univExtra.api_options.method : 'GET';
       if (document.getElementById('univApiInterval')) document.getElementById('univApiInterval').value = univExtra.poll_interval || 15;
       if (document.getElementById('univApiHeaders')) {
-          if (univExtra.api_options && univExtra.api_options.headers) {
-              const h = { ...univExtra.api_options.headers };
-              delete h['Accept'];
-              if (Object.keys(h).length > 0) document.getElementById('univApiHeaders').value = JSON.stringify(h);
-              else document.getElementById('univApiHeaders').value = '';
-          } else {
-              document.getElementById('univApiHeaders').value = '';
-          }
+        if (univExtra.api_options && univExtra.api_options.headers) {
+          const h = { ...univExtra.api_options.headers };
+          delete h['Accept'];
+          if (Object.keys(h).length > 0) document.getElementById('univApiHeaders').value = JSON.stringify(h);
+          else document.getElementById('univApiHeaders').value = '';
+        } else {
+          document.getElementById('univApiHeaders').value = '';
+        }
       }
-      
+
       // Re-initialize Sortable groups
       window.univApiSortables = [];
       const availContainer = document.getElementById('univApiAvailableFields');
       const groupsContainer = document.getElementById('univApiGroupsContainer');
       if (availContainer) {
-          availContainer.innerHTML = '';
-          initUnivApiSortable(availContainer);
+        availContainer.innerHTML = '';
+        initUnivApiSortable(availContainer);
       }
       if (groupsContainer) {
-          groupsContainer.innerHTML = ''; // Completely clear custom groups
+        groupsContainer.innerHTML = ''; // Completely clear custom groups
       }
-      
+
       if (univExtra.mappings && Array.isArray(univExtra.mappings)) {
-          // Group mappings by group name
-          const grouped = {};
-          univExtra.mappings.forEach(m => {
-              const g = m.group || '';
-              if (!grouped[g]) grouped[g] = [];
-              grouped[g].push(m);
-          });
-          
-          for (const [gName, maps] of Object.entries(grouped)) {
-              let dropzone = null;
-              if (gName === '') {
-                  dropzone = availContainer;
-              } else {
-                  const box = addUnivApiGroup(gName);
-                  dropzone = box.querySelector('.univ-api-group-dropzone');
-              }
-              
-              if (dropzone) {
-                  maps.forEach(map => {
-                      // If it goes to availContainer, we don't show inputs initially
-                      const showInputs = gName !== '';
-                      dropzone.appendChild(createUnivApiMappingRow(map.json_path, map.name, map.divisor, showInputs));
-                  });
-              }
+        // Group mappings by group name
+        const grouped = {};
+        univExtra.mappings.forEach(m => {
+          const g = m.group || '';
+          if (!grouped[g]) grouped[g] = [];
+          grouped[g].push(m);
+        });
+
+        for (const [gName, maps] of Object.entries(grouped)) {
+          let dropzone = null;
+          if (gName === '') {
+            dropzone = availContainer;
+          } else {
+            const box = addUnivApiGroup(gName);
+            dropzone = box.querySelector('.univ-api-group-dropzone');
           }
+
+          if (dropzone) {
+            maps.forEach(map => {
+              // If it goes to availContainer, we don't show inputs initially
+              const showInputs = gName !== '';
+              dropzone.appendChild(createUnivApiMappingRow(map.json_path, map.name, map.divisor, showInputs));
+            });
+          }
+        }
       }
     } else if (univApiDiv) {
       univApiDiv.style.display = 'none';
@@ -887,15 +887,15 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       if (pm5350Extra) pm5350Extra.style.display = isPm5350 ? 'block' : 'none';
       if (tempHumExtra) tempHumExtra.style.display = isTempHum ? 'block' : 'none';
       if (iologikExtra) {
-          iologikExtra.style.display = isIologik ? 'block' : 'none';
-          if (isIologik && typeof renderIologikBuilderFromJson === 'function') {
-              const hiddenInput = document.getElementById('iologikExtraConfigJson');
-              if (hiddenInput && hiddenInput.value) {
-                  renderIologikBuilderFromJson(hiddenInput.value);
-              } else {
-                  renderIologikBuilderFromJson('');
-              }
+        iologikExtra.style.display = isIologik ? 'block' : 'none';
+        if (isIologik && typeof renderIologikBuilderFromJson === 'function') {
+          const hiddenInput = document.getElementById('iologikExtraConfigJson');
+          if (hiddenInput && hiddenInput.value) {
+            renderIologikBuilderFromJson(hiddenInput.value);
+          } else {
+            renderIologikBuilderFromJson('');
           }
+        }
       }
       if (tcpPortGroup) tcpPortGroup.style.display = isSnmp ? 'none' : '';
       if (portField) {
@@ -920,18 +920,18 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         if (snmpPollIntervalInput && !snmpPollIntervalInput.value) snmpPollIntervalInput.value = '60';
       }
       if (templateSelect.value !== 'vhf_marc_rse') clearMarcPortsCheckboxes();
-      
+
       // Load existing marc_pae config if editing
       if (templateSelect.value === 'marc_pae' && editSource && typeof editSource.extra_config === 'string') {
-          try {
-              const cfg = JSON.parse(editSource.extra_config);
-              if (cfg && cfg.rse_configs) {
-                  renderMarcPaeCheckboxes(cfg.rse_configs, true);
-              }
-          } catch(e) {}
+        try {
+          const cfg = JSON.parse(editSource.extra_config);
+          if (cfg && cfg.rse_configs) {
+            renderMarcPaeCheckboxes(cfg.rse_configs, true);
+          }
+        } catch (e) { }
       } else if (templateSelect.value !== 'marc_pae') {
-          const resDiv = document.getElementById('marcPaeDiscoveryResults');
-          if (resDiv) resDiv.innerHTML = '';
+        const resDiv = document.getElementById('marcPaeDiscoveryResults');
+        if (resDiv) resDiv.innerHTML = '';
       }
     });
   }
@@ -944,10 +944,10 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     });
 
     templateSelect.innerHTML = '<option value="">Pilih Template</option>' + options.join('');
-    
+
     // WAJIB set value secara eksplisit agar event change membaca value yang benar
     if (editSource && editSource.parsing_id) {
-        templateSelect.value = editSource.parsing_id;
+      templateSelect.value = editSource.parsing_id;
     }
 
     console.log(`[UI] Populated ${options.length} options into template selector`);
@@ -998,13 +998,13 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
         endpoint_url: document.getElementById('univApiUrl') ? document.getElementById('univApiUrl').value : '',
         poll_interval: document.getElementById('univApiInterval') ? parseInt(document.getElementById('univApiInterval').value) || 15 : 15,
         api_options: {
-            method: document.getElementById('univApiMethod') ? document.getElementById('univApiMethod').value : 'GET',
-            headers: (function() {
-                try {
-                    const h = document.getElementById('univApiHeaders');
-                    return h && h.value ? { 'Accept': 'application/json', ...JSON.parse(h.value) } : { 'Accept': 'application/json' };
-                } catch(e) { return { 'Accept': 'application/json' }; }
-            })()
+          method: document.getElementById('univApiMethod') ? document.getElementById('univApiMethod').value : 'GET',
+          headers: (function () {
+            try {
+              const h = document.getElementById('univApiHeaders');
+              return h && h.value ? { 'Accept': 'application/json', ...JSON.parse(h.value) } : { 'Accept': 'application/json' };
+            } catch (e) { return { 'Accept': 'application/json' }; }
+          })()
         },
         mappings: typeof getUniversalApiConfigs === 'function' ? getUniversalApiConfigs() : []
       }) : templateSelect.value === 'pm5350_modbus' ? JSON.stringify({
@@ -1025,14 +1025,14 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       // MARC RSE: simpan marc_ports langsung di root object (bukan extra_config)
       ...(templateSelect.value === 'vhf_marc_rse' ? { marc_ports: getMarcPortsFromCheckboxes() } : {}),
       ...(templateSelect.value === 'vhf_marc_rse' ? { poll_interval: 30 } : {}),
-      
+
       // ASTERIX SAC, SIC & Coordinates
       ...((templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar') ? {
-          sac: document.getElementById('asterixSac') && document.getElementById('asterixSac').value ? parseInt(document.getElementById('asterixSac').value, 10) : 0,
-          sic: document.getElementById('asterixSic') && document.getElementById('asterixSic').value ? parseInt(document.getElementById('asterixSic').value, 10) : 0,
-          lat: document.getElementById('asterixLat') && document.getElementById('asterixLat').value !== '' ? parseFloat(document.getElementById('asterixLat').value) : null,
-          lon: document.getElementById('asterixLon') && document.getElementById('asterixLon').value !== '' ? parseFloat(document.getElementById('asterixLon').value) : null,
-          protocol: 'udp'
+        sac: document.getElementById('asterixSac') && document.getElementById('asterixSac').value ? parseInt(document.getElementById('asterixSac').value, 10) : 0,
+        sic: document.getElementById('asterixSic') && document.getElementById('asterixSic').value ? parseInt(document.getElementById('asterixSic').value, 10) : 0,
+        lat: document.getElementById('asterixLat') && document.getElementById('asterixLat').value !== '' ? parseFloat(document.getElementById('asterixLat').value) : null,
+        lon: document.getElementById('asterixLon') && document.getElementById('asterixLon').value !== '' ? parseFloat(document.getElementById('asterixLon').value) : null,
+        protocol: 'udp'
       } : {}),
 
       // SNMP: simpan parameter komunikasi dari form.
@@ -1358,7 +1358,7 @@ async function loadStats() {
 async function loadEquipment() {
   if (pollState.equipment) return;
   pollState.equipment = true;
-  
+
   // Optimistic load from local storage
   if (!equipmentData || equipmentData.length === 0) {
     try {
@@ -1371,7 +1371,7 @@ async function loadEquipment() {
       console.warn('Failed to parse equipment cache', e);
     }
   }
-  
+
   try {
     const res = await fetch(`${API_URL}/equipment?isActive=all`, { headers: getAuthHeaders() });
     const result = await res.json();
@@ -1470,8 +1470,8 @@ function renderEquipmentTable(data) {
       `;
     }).join('');
   }
-  
-    if (window._lastEquipmentTableHtml !== newHtml) {
+
+  if (window._lastEquipmentTableHtml !== newHtml) {
     tbody.innerHTML = newHtml;
     window._lastEquipmentTableHtml = newHtml;
   }
@@ -1589,7 +1589,7 @@ async function handleEquipmentSubmit(e) {
       try {
         const errBody = await res.json();
         if (errBody.message) errMsg = errBody.message;
-      } catch (_) {}
+      } catch (_) { }
 
       if (res.status === 401) {
         errMsg = 'Sesi habis, silakan login ulang';
@@ -1703,33 +1703,33 @@ window.viewEquipmentDetail = async function (id) {
 
   const loadAndRender = async () => {
     try {
-    // 1. Fetch latest Data Sources (Authentications)
-    if (typeof loadAuthentications === 'function' && (!authenticationsData || authenticationsData.length === 0)) {
-      await loadAuthentications();
-    }
-
-    // 2. Fetch Parsing Configs
-    let parsings = [];
-    if (typeof loadParsingConfig === 'function') {
-      parsings = await loadParsingConfig();
-    }
-
-    // Filter sources for this equipment (using loose equality for string/number id)
-    const mySources = (authenticationsData || []).filter(auth => String(auth.equipt_id) === String(item.id));
-
-    // 3. Fetch live lastData (dengan includeData=true) — diperlukan untuk render per-radio MARC
-    let itemWithData = item;
-    try {
-      const dataRes = await fetch(`${API_URL}/equipment?includeData=true&limit=1000`, { headers: getAuthHeaders() });
-      if (dataRes.ok) {
-        const dataResult = await dataRes.json();
-        const dataList = dataResult.data || dataResult;
-        const found = Array.isArray(dataList) ? dataList.find(e => String(e.id) === String(item.id)) : null;
-        if (found) itemWithData = found;
+      // 1. Fetch latest Data Sources (Authentications)
+      if (typeof loadAuthentications === 'function' && (!authenticationsData || authenticationsData.length === 0)) {
+        await loadAuthentications();
       }
-    } catch (e) { /* gunakan item tanpa lastData jika fetch gagal */ }
 
-    const generalInfoHtml = `
+      // 2. Fetch Parsing Configs
+      let parsings = [];
+      if (typeof loadParsingConfig === 'function') {
+        parsings = await loadParsingConfig();
+      }
+
+      // Filter sources for this equipment (using loose equality for string/number id)
+      const mySources = (authenticationsData || []).filter(auth => String(auth.equipt_id) === String(item.id));
+
+      // 3. Fetch live lastData (dengan includeData=true) — diperlukan untuk render per-radio MARC
+      let itemWithData = item;
+      try {
+        const dataRes = await fetch(`${API_URL}/equipment?includeData=true&limit=1000`, { headers: getAuthHeaders() });
+        if (dataRes.ok) {
+          const dataResult = await dataRes.json();
+          const dataList = dataResult.data || dataResult;
+          const found = Array.isArray(dataList) ? dataList.find(e => String(e.id) === String(item.id)) : null;
+          if (found) itemWithData = found;
+        }
+      } catch (e) { /* gunakan item tanpa lastData jika fetch gagal */ }
+
+      const generalInfoHtml = `
       <div class="detail-card">
         <h4><i class="fas fa-info-circle"></i> General Information</h4>
         <p><strong>Name:</strong> ${item.name}</p>
@@ -1741,47 +1741,47 @@ window.viewEquipmentDetail = async function (id) {
       </div>
     `;
 
-    // ── Helper: render sub-card satu radio MARC ─────────────────────────────
-    function renderMarcRadioCard(radioName, radioData) {
-      const status = radioData._status || 'Disconnect';
-      const statusClass = status.toLowerCase();
-      const isRx = radioData.is_rx;
-      const loggedAt = radioData._logged_at
-        ? new Date(radioData._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        : '-';
+      // ── Helper: render sub-card satu radio MARC ─────────────────────────────
+      function renderMarcRadioCard(radioName, radioData) {
+        const status = radioData._status || 'Disconnect';
+        const statusClass = status.toLowerCase();
+        const isRx = radioData.is_rx;
+        const loggedAt = radioData._logged_at
+          ? new Date(radioData._logged_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          : '-';
 
-      const txFields = [
-        { key: 'frequency_mhz', label: 'Frequency MHz' },
-        { key: 'mode', label: 'Mode' },
-        { key: 'status', label: 'Status' },
-        { key: 'fwd_power_w', label: 'Fwd Power (W)' },
-        { key: 'refl_power_w', label: 'Refl Power (W)' },
-        { key: 'pa_temp_c', label: 'PA Temp (°C)' },
-        { key: 'modulation_pct', label: 'Modulation (%)' },
-        { key: 'supply_voltage', label: 'Supply Voltage (V)' },
-      ];
-      const rxFields = [
-        { key: 'frequency_mhz', label: 'Frequency MHz' },
-        { key: 'sensitivity_dbm', label: 'Sensitivity (dBm)' },
-        { key: 'squelch_dbm', label: 'Squelch (dBm)' },
-        { key: 'rx_supply_voltage', label: 'Supply Voltage (V)' },
-      ];
-      const fields = isRx ? rxFields : txFields;
+        const txFields = [
+          { key: 'frequency_mhz', label: 'Frequency MHz' },
+          { key: 'mode', label: 'Mode' },
+          { key: 'status', label: 'Status' },
+          { key: 'fwd_power_w', label: 'Fwd Power (W)' },
+          { key: 'refl_power_w', label: 'Refl Power (W)' },
+          { key: 'pa_temp_c', label: 'PA Temp (°C)' },
+          { key: 'modulation_pct', label: 'Modulation (%)' },
+          { key: 'supply_voltage', label: 'Supply Voltage (V)' },
+        ];
+        const rxFields = [
+          { key: 'frequency_mhz', label: 'Frequency MHz' },
+          { key: 'sensitivity_dbm', label: 'Sensitivity (dBm)' },
+          { key: 'squelch_dbm', label: 'Squelch (dBm)' },
+          { key: 'rx_supply_voltage', label: 'Supply Voltage (V)' },
+        ];
+        const fields = isRx ? rxFields : txFields;
 
-      const rows = fields.map(f => {
-        const val = radioData[f.key];
-        const display = (val === null || val === undefined || val === '-' || val === '—') ? '—' : val;
-        const isStale = status === 'Disconnect';
-        return `
+        const rows = fields.map(f => {
+          const val = radioData[f.key];
+          const display = (val === null || val === undefined || val === '-' || val === '—') ? '—' : val;
+          const isStale = status === 'Disconnect';
+          return `
           <div class="data-point ${isStale ? 'stale' : ''}">
             <span class="data-label">${f.label}</span>
             <span class="data-value">${display}</span>
           </div>`;
-      }).join('');
+        }).join('');
 
-      const radioTypeLabel = radioData.radio_type || (isRx ? 'RX' : 'TX');
+        const radioTypeLabel = radioData.radio_type || (isRx ? 'RX' : 'TX');
 
-      return `
+        return `
         <div class="source-group ${statusClass}" style="margin-bottom: 10px;">
           <div class="source-header">
             <div class="source-header-main">
@@ -1794,38 +1794,38 @@ window.viewEquipmentDetail = async function (id) {
           </div>
           <div class="card-data-grid">${rows}</div>
         </div>`;
-    }
+      }
 
-    let sourcesHtml = '';
-    if (mySources.length > 0) {
-      // Cek apakah ada source MARC RSE atau MARC PAE
-      const hasMarcSource = mySources.some(s => s.parsing_id === 'vhf_marc_rse' || s.parsing_id === 'marc_pae');
+      let sourcesHtml = '';
+      if (mySources.length > 0) {
+        // Cek apakah ada source MARC RSE atau MARC PAE
+        const hasMarcSource = mySources.some(s => s.parsing_id === 'vhf_marc_rse' || s.parsing_id === 'marc_pae');
 
-      // Section 1: Data live per radio (untuk MARC RSE)
-      let liveRadioHtml = '';
-      if (hasMarcSource && itemWithData.lastData) {
-        let radioEntries = [];
-        Object.entries(itemWithData.lastData).forEach(([srcName, d]) => {
-          if (d._parsing_id === 'vhf_marc_rse' || d._parsing_id === 'marc_pae') {
-            if (d._isMarcMulti && d.radios) {
-              Object.entries(d.radios).forEach(([radName, radData]) => {
-                radioEntries.push([radName, Object.assign({}, radData, { _status: radData.status === 'ALARM' ? 'Alarm' : (radData.connected ? 'Normal' : 'Disconnect'), _logged_at: d._logged_at })]);
-              });
-            } else {
-              radioEntries.push([srcName, d]);
+        // Section 1: Data live per radio (untuk MARC RSE)
+        let liveRadioHtml = '';
+        if (hasMarcSource && itemWithData.lastData) {
+          let radioEntries = [];
+          Object.entries(itemWithData.lastData).forEach(([srcName, d]) => {
+            if (d._parsing_id === 'vhf_marc_rse' || d._parsing_id === 'marc_pae') {
+              if (d._isMarcMulti && d.radios) {
+                Object.entries(d.radios).forEach(([radName, radData]) => {
+                  radioEntries.push([radName, Object.assign({}, radData, { _status: radData.status === 'ALARM' ? 'Alarm' : (radData.connected ? 'Normal' : 'Disconnect'), _logged_at: d._logged_at })]);
+                });
+              } else {
+                radioEntries.push([srcName, d]);
+              }
             }
-          }
-        });
-        if (radioEntries.length > 0) {
-          liveRadioHtml = `
+          });
+          if (radioEntries.length > 0) {
+            liveRadioHtml = `
             <div class="detail-card" style="grid-column: 1 / -1; margin-top: 20px;">
               <h4><i class="fas fa-broadcast-tower"></i> DATA SOURCES (${mySources.length})</h4>
               <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-top: 10px;">
                 ${radioEntries.map(([name, data]) => renderMarcRadioCard(name, data)).join('')}
               </div>
               ${mySources.map(src => {
-            const marcPorts = src.marc_ports || [];
-            return `
+              const marcPorts = src.marc_ports || [];
+              return `
                   <div style="margin-top:12px;padding:8px 10px;background:#0a1628;border-radius:6px;border:1px solid #1a3a5c;">
                     <div style="font-size:10px;color:#3a6a8a;letter-spacing:1px;margin-bottom:4px;">⚙ SOURCE CONFIG</div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -1838,16 +1838,16 @@ window.viewEquipmentDetail = async function (id) {
                       </span>
                     </div>
                   </div>`;
-          }).join('')}
+            }).join('')}
             </div>`;
+          }
         }
-      }
 
-      // Section 2: Source table untuk non-MARC (atau jika tidak ada live data)
-      const nonMarcSources = mySources.filter(s => s.parsing_id !== 'vhf_marc_rse');
-      let sourceTableHtml = '';
-      if (nonMarcSources.length > 0) {
-        sourceTableHtml = `
+        // Section 2: Source table untuk non-MARC (atau jika tidak ada live data)
+        const nonMarcSources = mySources.filter(s => s.parsing_id !== 'vhf_marc_rse');
+        let sourceTableHtml = '';
+        if (nonMarcSources.length > 0) {
+          sourceTableHtml = `
           <div class="detail-card" style="grid-column: 1 / -1; margin-top: 20px;">
             <h4><i class="fas fa-database"></i> Connected Data Sources</h4>
             <div class="table-responsive">
@@ -1862,8 +1862,8 @@ window.viewEquipmentDetail = async function (id) {
                 </thead>
                 <tbody>
                   ${nonMarcSources.map(source => {
-          const template = (parsings || []).find(p => String(p.id) === String(source.parsing_id));
-          return `
+            const template = (parsings || []).find(p => String(p.id) === String(source.parsing_id));
+            return `
                       <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 10px;">${source.name}</td>
                         <td style="padding: 10px; font-family: monospace;">${source.ip_address}</td>
@@ -1872,47 +1872,47 @@ window.viewEquipmentDetail = async function (id) {
                           <span class="badge badge-outline">${template ? template.name : 'Unknown'}</span>
                         </td>
                       </tr>`;
-        }).join('')}
+          }).join('')}
                 </tbody>
               </table>
             </div>
           </div>`;
-      }
+        }
 
-      sourcesHtml = (liveRadioHtml || '') + (sourceTableHtml || '');
+        sourcesHtml = (liveRadioHtml || '') + (sourceTableHtml || '');
 
-      // Fallback jika tidak ada live data dan tidak ada non-marc
-      if (!sourcesHtml) {
-        sourcesHtml = `
+        // Fallback jika tidak ada live data dan tidak ada non-marc
+        if (!sourcesHtml) {
+          sourcesHtml = `
           <div class="detail-card" style="grid-column: 1 / -1; margin-top: 20px;">
             <h4><i class="fas fa-database"></i> DATA SOURCES (${mySources.length})</h4>
             <p class="empty-state"><i class="fas fa-satellite-dish fa-spin"></i> Menunggu data dari radio...</p>
           </div>`;
-      }
-    } else {
-      sourcesHtml = `
+        }
+      } else {
+        sourcesHtml = `
         <div class="detail-card" style="grid-column: 1 / -1; margin-top: 20px;">
           <h4><i class="fas fa-database"></i> Connected Data Sources</h4>
           <p class="empty-state">No data sources configured for this equipment.</p>
         </div>
       `;
-    }
-
-    // 2. Fetch Standard Limitations
-    const limitRes = await fetch(`${API_URL}/config/limitations`, { headers: getAuthHeaders() });
-    let matchingLimits = [];
-    if (limitRes.ok) {
-      const limitations = await limitRes.json();
-      const limitArray = Array.isArray(limitations) ? limitations : (limitations.data || []);
-      if (Array.isArray(limitArray)) {
-        // Filter all limitations for this sub-category
-        matchingLimits = limitArray.filter(l => l.sup_category === item.sup_category);
       }
-    }
 
-    let limitHtml = '';
-    if (matchingLimits.length > 0) {
-      limitHtml = `
+      // 2. Fetch Standard Limitations
+      const limitRes = await fetch(`${API_URL}/config/limitations`, { headers: getAuthHeaders() });
+      let matchingLimits = [];
+      if (limitRes.ok) {
+        const limitations = await limitRes.json();
+        const limitArray = Array.isArray(limitations) ? limitations : (limitations.data || []);
+        if (Array.isArray(limitArray)) {
+          // Filter all limitations for this sub-category
+          matchingLimits = limitArray.filter(l => l.sup_category === item.sup_category);
+        }
+      }
+
+      let limitHtml = '';
+      if (matchingLimits.length > 0) {
+        limitHtml = `
         <div class="table-responsive">
           <table class="config-table" style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
             <thead>
@@ -1925,8 +1925,8 @@ window.viewEquipmentDetail = async function (id) {
             </thead>
             <tbody>
               ${matchingLimits.map(limit => {
-        const isNumeric = (limit.value_type === 'numeric' || limit.value_type === 'percent' || !limit.value_type);
-        const thresholdHtml = isNumeric ? `
+          const isNumeric = (limit.value_type === 'numeric' || limit.value_type === 'percent' || !limit.value_type);
+          const thresholdHtml = isNumeric ? `
                   <div style="display: flex; gap: 4px; flex-wrap: wrap;">
                     <span class="status-badge Alert" style="padding: 2px 6px; font-size: 0.75rem;" title="Alarm Low">${limit.min_alarm_limit || limit.alv || '-'}</span>
                     <span class="status-badge Warning" style="padding: 2px 6px; font-size: 0.75rem;" title="Warning Low">${limit.min_warning_limit || limit.wlv || '-'}</span>
@@ -1935,7 +1935,7 @@ window.viewEquipmentDetail = async function (id) {
                   </div>
                 ` : '<span class="text-muted" style="font-size: 0.75rem;">Non-numeric</span>';
 
-        return `
+          return `
                   <tr style="border-bottom: 1px solid var(--border-color);">
                     <td style="padding: 8px; font-weight: 600; color: var(--text-primary);">${limit.name}</td>
                     <td style="padding: 8px;">${limit.expected_value || limit.value || '-'}</td>
@@ -1945,17 +1945,17 @@ window.viewEquipmentDetail = async function (id) {
                     <td style="padding: 8px;">${thresholdHtml}</td>
                   </tr>
                 `;
-      }).join('')}
+        }).join('')}
             </tbody>
           </table>
         </div>
       `;
-    } else {
-      limitHtml = '<p class="empty-state">No standard limitation for this sub-category</p>';
-    }
+      } else {
+        limitHtml = '<p class="empty-state">No standard limitation for this sub-category</p>';
+      }
 
-    // 4. Update Modal Content
-    const newModalHtml = `
+      // 4. Update Modal Content
+      const newModalHtml = `
       <div class="detail-grid">
         ${generalInfoHtml}
         <div class="detail-card" style="${matchingLimits.length > 2 ? 'grid-column: 1 / -1;' : ''}">
@@ -1965,14 +1965,14 @@ window.viewEquipmentDetail = async function (id) {
         ${sourcesHtml}
       </div>
     `;
-    
-    if (window._lastEquipmentDetailHtml !== newModalHtml) {
-      content.innerHTML = newModalHtml;
-      window._lastEquipmentDetailHtml = newModalHtml;
-    }
-  } catch (err) {
-    console.error('Detail error:', err);
-    content.innerHTML = `
+
+      if (window._lastEquipmentDetailHtml !== newModalHtml) {
+        content.innerHTML = newModalHtml;
+        window._lastEquipmentDetailHtml = newModalHtml;
+      }
+    } catch (err) {
+      console.error('Detail error:', err);
+      content.innerHTML = `
       <div class="detail-grid">
         ${generalInfoHtml}
         <div class="detail-card">
@@ -2160,7 +2160,7 @@ async function handleAirportSubmit(e) {
     } else {
       showToast('Gagal menyimpan lokasi airport', 'error');
     }
-  } catch (err) { 
+  } catch (err) {
     console.error('Airport save error:', err);
     showToast('Terjadi kesalahan saat menyimpan lokasi airport', 'error');
   }
@@ -2591,7 +2591,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('addEquipmentBtn').addEventListener('click', () => {
     document.getElementById('equipmentForm').reset();
-    
+
     // Auto-select first airport if available
     const airportSelect = document.getElementById('equipmentAirport');
     let selectedAirportId = null;
@@ -3055,7 +3055,7 @@ window.renderConfigTable = function (tab, data, tbody) {
         ? `<div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px;">${String(item.target_parsers).split(',').map(p => `<span class="badge" style="background: rgba(0, 212, 255, 0.15); color: #00d4ff; font-size: 0.7rem; padding: 1px 5px;">${p.trim()}</span>`).join('')}</div>`
         : `<div style="margin-top: 3px;"><small class="text-muted" style="font-size: 0.72rem;">Semua Parser (Global)</small></div>`;
 
-      const matchBadge = item.match_mode === 'exact' 
+      const matchBadge = item.match_mode === 'exact'
         ? `<span class="badge" style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; font-size: 0.68rem; margin-left: 5px;">Exact</span>`
         : `<span class="badge" style="background: rgba(0, 255, 136, 0.15); color: #00ff88; font-size: 0.68rem; margin-left: 5px;">Contains</span>`;
 
@@ -4018,13 +4018,13 @@ async function loadUsers() {
   }
 }
 
-window.filterUsersTable = function(query) {
+window.filterUsersTable = function (query) {
   const q = (query || '').toLowerCase().trim();
   if (!q) {
     renderUserTable(usersData);
     return;
   }
-  const filtered = usersData.filter(u => 
+  const filtered = usersData.filter(u =>
     (u.name && u.name.toLowerCase().includes(q)) ||
     (u.username && u.username.toLowerCase().includes(q)) ||
     (u.role && u.role.toLowerCase().includes(q))
@@ -4361,7 +4361,7 @@ function addIoDevice(deviceName = '', params = {}) {
   if (!builder) return;
 
   const deviceId = `io_device_${ioDeviceCounter}`;
-  
+
   const deviceHtml = `
     <div id="${deviceId}" class="io-device-block" style="border:1px solid #1a3a5c; border-radius:4px; padding:8px; background:#112238;">
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
@@ -4376,14 +4376,14 @@ function addIoDevice(deviceName = '', params = {}) {
       </button>
     </div>
   `;
-  
+
   builder.insertAdjacentHTML('beforeend', deviceHtml);
 
   // Add initial params if provided
   for (const [key, pin] of Object.entries(params)) {
     addIoParam(deviceId, key, pin);
   }
-  
+
   syncIologikBuilderToJson();
 }
 
@@ -4396,9 +4396,9 @@ function removeIoDevice(deviceId) {
 function addIoParam(deviceId, key = '', pin = '') {
   const container = document.getElementById(`${deviceId}_params`);
   if (!container) return;
-  
+
   const paramId = `io_param_${Math.random().toString(36).substring(2, 9)}`;
-  
+
   let pinVal = pin;
   let logicVal = 'NC';
   let typeVal = 'normal';
@@ -4436,14 +4436,14 @@ function addIoParam(deviceId, key = '', pin = '') {
       </button>
     </div>
   `;
-  
+
   container.insertAdjacentHTML('beforeend', paramHtml);
-  
+
   // Attach event listener to select to toggle custom key input
   const row = document.getElementById(paramId);
   const select = row.querySelector('.io-param-key');
   const customInput = row.querySelector('.io-param-custom-key');
-  
+
   select.addEventListener('change', (e) => {
     if (e.target.value === 'custom') {
       customInput.style.display = 'block';
@@ -4469,27 +4469,27 @@ function syncIologikBuilderToJson() {
   if (!builder || !hiddenInput) return;
 
   const devices = {};
-  
+
   builder.querySelectorAll('.io-device-block').forEach(deviceBlock => {
     const deviceName = deviceBlock.querySelector('.io-device-name').value.trim();
     if (!deviceName) return; // Skip if no name
-    
+
     devices[deviceName] = {};
-    
+
     deviceBlock.querySelectorAll('.io-param-row').forEach(paramRow => {
       const selectVal = paramRow.querySelector('.io-param-key').value;
       const customVal = paramRow.querySelector('.io-param-custom-key').value.trim();
       const key = selectVal === 'custom' ? customVal : selectVal;
-      
+
       let pin = paramRow.querySelector('.io-param-pin').value;
       let logic = paramRow.querySelector('.io-param-logic').value;
       let type = paramRow.querySelector('.io-param-type').value;
-      
+
       if (key && pin !== '') {
         devices[deviceName][key] = {
-            pin: parseInt(pin, 10),
-            logic: logic,
-            type: type
+          pin: parseInt(pin, 10),
+          logic: logic,
+          type: type
         };
       }
     });
@@ -4506,14 +4506,14 @@ function syncIologikBuilderToJson() {
 function renderIologikBuilderFromJson(jsonStr) {
   const builder = document.getElementById('iologikDynamicBuilder');
   if (!builder) return;
-  
+
   builder.innerHTML = ''; // Clear existing
   ioDeviceCounter = 0;
-  
+
   if (!jsonStr || jsonStr.trim() === '' || jsonStr === 'null') {
     return; // Leave empty
   }
-  
+
   try {
     const config = JSON.parse(jsonStr);
     if (config && config.devices) {
@@ -4541,96 +4541,96 @@ document.getElementById('btnDiscoverMarcPae')?.addEventListener('click', async (
   const ip = document.getElementById('dataSourceIp')?.value;
   const port = document.getElementById('dataSourceUdpPort')?.value || 950;
   const range = document.getElementById('marcPaeRange')?.value || '1-127';
-  
+
   if (!ip) {
-      showToast('Masukkan IP Address terlebih dahulu', 'error');
-      return;
+    showToast('Masukkan IP Address terlebih dahulu', 'error');
+    return;
   }
 
   const resDiv = document.getElementById('marcPaeDiscoveryResults');
   const icon = document.getElementById('marcPaeSearchIcon');
-  
+
   if (resDiv) {
-      resDiv.style.display = 'block';
-      resDiv.innerHTML = '<div style="color:#00d4ff;">Mencari RSE aktif... Mohon tunggu.</div>';
+    resDiv.style.display = 'block';
+    resDiv.innerHTML = '<div style="color:#00d4ff;">Mencari RSE aktif... Mohon tunggu.</div>';
   }
   if (icon) icon.className = 'fas fa-spinner fa-spin';
 
   try {
-      const res = await fetch(`${API_URL}/equipment/discover-marc?ip=${ip}&port=${port}&rse_range=${range}`, {
-          headers: getAuthHeaders()
-      });
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-          if (data.data.length === 0) {
-              if (resDiv) resDiv.innerHTML = '<div style="color:#f59e0b;">Tidak ada RSE yang ditemukan.</div>';
-          } else {
-              renderMarcPaeCheckboxes(data.data, false);
-          }
+    const res = await fetch(`${API_URL}/equipment/discover-marc?ip=${ip}&port=${port}&rse_range=${range}`, {
+      headers: getAuthHeaders()
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      if (data.data.length === 0) {
+        if (resDiv) resDiv.innerHTML = '<div style="color:#f59e0b;">Tidak ada RSE yang ditemukan.</div>';
       } else {
-          if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${data.message || data.error || 'Gagal melakukan discovery'}</div>`;
+        renderMarcPaeCheckboxes(data.data, false);
       }
-  } catch(e) {
-      if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${e.message}</div>`;
+    } else {
+      if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${data.message || data.error || 'Gagal melakukan discovery'}</div>`;
+    }
+  } catch (e) {
+    if (resDiv) resDiv.innerHTML = `<div style="color:#ef4444;">Error: ${e.message}</div>`;
   } finally {
-      if (icon) icon.className = 'fas fa-search';
+    if (icon) icon.className = 'fas fa-search';
   }
 });
 
 function renderMarcPaeCheckboxes(rseList, isEdit = false) {
-    const resDiv = document.getElementById('marcPaeDiscoveryResults');
-    if (!resDiv) return;
-    
-    resDiv.style.display = 'block';
-    if (rseList.length === 0 && !isEdit) {
-        resDiv.innerHTML = '<div style="color:#f59e0b;">Tidak ada RSE yang ditemukan.</div>';
-        return;
-    }
+  const resDiv = document.getElementById('marcPaeDiscoveryResults');
+  if (!resDiv) return;
 
-    let html = `<div style="margin-bottom:8px; font-weight:bold; color:#a3e635;">RSE Ditemukan (Pilih yang ingin dimonitor):</div>`;
-    
-    // rseList format: [ { rse_id: 90, ports: [2,3] } ]
-    rseList.forEach((rse, rseIdx) => {
-        html += `<div style="margin-bottom:6px; padding:6px; background:rgba(0,0,0,0.2); border-radius:4px;">
+  resDiv.style.display = 'block';
+  if (rseList.length === 0 && !isEdit) {
+    resDiv.innerHTML = '<div style="color:#f59e0b;">Tidak ada RSE yang ditemukan.</div>';
+    return;
+  }
+
+  let html = `<div style="margin-bottom:8px; font-weight:bold; color:#a3e635;">RSE Ditemukan (Pilih yang ingin dimonitor):</div>`;
+
+  // rseList format: [ { rse_id: 90, ports: [2,3] } ]
+  rseList.forEach((rse, rseIdx) => {
+    html += `<div style="margin-bottom:6px; padding:6px; background:rgba(0,0,0,0.2); border-radius:4px;">
                     <div style="font-weight:bold; margin-bottom:4px; color:#60a5fa;">RSE ID: ${rse.rse_id}</div>
                     <div style="display:flex; flex-wrap:wrap; gap:8px;">`;
-        rse.ports.forEach((port) => {
-            const chkId = `chk_marcPae_${rse.rse_id}_${port}`;
-            // If edit mode, assume existing is selected. If discovery mode, select all by default.
-            html += `<label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+    rse.ports.forEach((port) => {
+      const chkId = `chk_marcPae_${rse.rse_id}_${port}`;
+      // If edit mode, assume existing is selected. If discovery mode, select all by default.
+      html += `<label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
                         <input type="checkbox" class="marcPae-port-chk" data-rse="${rse.rse_id}" value="${port}" checked>
                         <span>Port ${port}</span>
                      </label>`;
-        });
-        html += `   </div>
-                 </div>`;
     });
-    
-    resDiv.innerHTML = html;
+    html += `   </div>
+                 </div>`;
+  });
+
+  resDiv.innerHTML = html;
 }
 
 function getMarcPaeConfigsFromCheckboxes() {
-    const checkboxes = document.querySelectorAll('.marcPae-port-chk');
-    const rseMap = {};
-    
-    checkboxes.forEach(chk => {
-        if (chk.checked) {
-            const rseId = parseInt(chk.getAttribute('data-rse'), 10);
-            const port = parseInt(chk.value, 10);
-            if (!rseMap[rseId]) rseMap[rseId] = [];
-            rseMap[rseId].push(port);
-        }
-    });
-    
-    const configs = [];
-    for (const [rseId, ports] of Object.entries(rseMap)) {
-        configs.push({
-            rse_id: parseInt(rseId, 10),
-            ports: ports.sort((a,b) => a-b)
-        });
+  const checkboxes = document.querySelectorAll('.marcPae-port-chk');
+  const rseMap = {};
+
+  checkboxes.forEach(chk => {
+    if (chk.checked) {
+      const rseId = parseInt(chk.getAttribute('data-rse'), 10);
+      const port = parseInt(chk.value, 10);
+      if (!rseMap[rseId]) rseMap[rseId] = [];
+      rseMap[rseId].push(port);
     }
-    return configs;
+  });
+
+  const configs = [];
+  for (const [rseId, ports] of Object.entries(rseMap)) {
+    configs.push({
+      rse_id: parseInt(rseId, 10),
+      ports: ports.sort((a, b) => a - b)
+    });
+  }
+  return configs;
 }
 
 window.renderMarcPaeCheckboxes = renderMarcPaeCheckboxes;
@@ -4639,301 +4639,301 @@ window.getMarcPaeConfigsFromCheckboxes = getMarcPaeConfigsFromCheckboxes;
 // ── UNIVERSAL API UI FUNCTIONS ───────────────────────────────────────────
 
 document.getElementById('univApiFilter')?.addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    const container = document.getElementById('univApiMappingsContainer');
-    if (!container) return;
-    const rows = container.querySelectorAll('.univ-api-row');
-    rows.forEach(row => {
-        const path = row.getAttribute('data-path').toLowerCase();
-        if (path.includes(term)) {
-            row.style.display = 'flex';
-        } else {
-            row.style.display = 'none';
-        }
-    });
+  const term = e.target.value.toLowerCase();
+  const container = document.getElementById('univApiMappingsContainer');
+  if (!container) return;
+  const rows = container.querySelectorAll('.univ-api-row');
+  rows.forEach(row => {
+    const path = row.getAttribute('data-path').toLowerCase();
+    if (path.includes(term)) {
+      row.style.display = 'flex';
+    } else {
+      row.style.display = 'none';
+    }
+  });
 });
 
 
 document.getElementById('btnViewRawUniversalApi')?.addEventListener('click', async () => {
-    const ip = document.getElementById('dataSourceIp')?.value || '127.0.0.1';
-    const port = document.getElementById('dataSourceUdpPort')?.value || '80';
-    let url = document.getElementById('univApiUrl')?.value || `http://{ip}:{port}/api`;
-    const method = document.getElementById('univApiMethod')?.value || 'GET';
-    const headersStr = document.getElementById('univApiHeaders')?.value;
-    
-    url = url.replace(/{ip}/g, ip).replace(/{port}/g, port);
-    
-    let customHeaders = {};
-    if (headersStr) {
-        try {
-            customHeaders = JSON.parse(headersStr);
-        } catch (e) {
-            alert('Format Custom Headers harus JSON valid!');
-            return;
-        }
-    }
-    
-    const rawContainer = document.getElementById('univApiRawContainer');
-    if (!rawContainer) return;
-    
-    rawContainer.style.display = 'block';
-    rawContainer.textContent = 'Membaca API...';
-    
+  const ip = document.getElementById('dataSourceIp')?.value || '127.0.0.1';
+  const port = document.getElementById('dataSourceUdpPort')?.value || '80';
+  let url = document.getElementById('univApiUrl')?.value || `http://{ip}:{port}/api`;
+  const method = document.getElementById('univApiMethod')?.value || 'GET';
+  const headersStr = document.getElementById('univApiHeaders')?.value;
+
+  url = url.replace(/{ip}/g, ip).replace(/{port}/g, port);
+
+  let customHeaders = {};
+  if (headersStr) {
     try {
-        const res = await fetch(`${API_URL}/proxy`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
-            },
-            body: JSON.stringify({ url, method, headers: customHeaders })
-        });
-        
-        const data = await res.json();
-        if (!res.ok || data.error) {
-            rawContainer.style.color = 'red';
-            rawContainer.textContent = `Error: ${data.error || 'Gagal memanggil API'}`;
-            return;
-        }
-        
-        // Smart Discovery Heuristic for Arrays with IDs
-        if (Array.isArray(data.data) && data.data.length > 0 && (data.data[0].id || data.data[0].device_id)) {
-            rawContainer.style.color = '#fff';
-            rawContainer.innerHTML = '<div style="margin-bottom:8px; font-weight:bold; color:#00d4ff;">Daftar Alat Ditemukan (Klik untuk menarik parameter):</div>';
-            
-            const listDiv = document.createElement('div');
-            listDiv.style.display = 'flex';
-            listDiv.style.flexDirection = 'column';
-            listDiv.style.gap = '6px';
-            
-            data.data.forEach(item => {
-                const itemId = item.id || item.device_id;
-                const itemName = item.name || item.device_type || 'Unknown';
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'btn btn-secondary btn-sm';
-                btn.style.textAlign = 'left';
-                btn.style.padding = '6px';
-                btn.style.fontSize = '11px';
-                btn.style.cursor = 'pointer';
-                btn.innerHTML = `<i class="fas fa-plug" style="margin-right:6px; color:#a0b4c4;"></i> <strong style="color:#0f0;">${itemId}</strong> - ${itemName}`;
-                
-                btn.onclick = () => {
-                    const urlInput = document.getElementById('univApiUrl');
-                    const originalUrl = urlInput.value.trim().replace(/\/+$/, '');
-                    
-                    // Replace existing device ID if URL already ends with /latest
-                    const match = originalUrl.match(/^(.*\/)([^\/]+)(\/latest)$/);
-                    if (match) {
-                         urlInput.value = `${match[1]}${itemId}${match[3]}`;
-                    } else if (!originalUrl.endsWith(itemId)) {
-                         urlInput.value = `${originalUrl}/${itemId}/latest`;
-                    }
-                    
-                    rawContainer.style.display = 'none';
-                    document.getElementById('btnSyncUniversalApi').click();
-                };
-                listDiv.appendChild(btn);
-            });
-            rawContainer.appendChild(listDiv);
-        } else {
-            // Fallback to Raw JSON
-            rawContainer.style.color = '#0f0';
-            rawContainer.textContent = JSON.stringify(data.data, null, 2);
-        }
+      customHeaders = JSON.parse(headersStr);
     } catch (e) {
-        rawContainer.style.color = 'red';
-        rawContainer.textContent = `Gagal: ${e.message}`;
+      alert('Format Custom Headers harus JSON valid!');
+      return;
     }
+  }
+
+  const rawContainer = document.getElementById('univApiRawContainer');
+  if (!rawContainer) return;
+
+  rawContainer.style.display = 'block';
+  rawContainer.textContent = 'Membaca API...';
+
+  try {
+    const res = await fetch(`${API_URL}/proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ url, method, headers: customHeaders })
+    });
+
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      rawContainer.style.color = 'red';
+      rawContainer.textContent = `Error: ${data.error || 'Gagal memanggil API'}`;
+      return;
+    }
+
+    // Smart Discovery Heuristic for Arrays with IDs
+    if (Array.isArray(data.data) && data.data.length > 0 && (data.data[0].id || data.data[0].device_id)) {
+      rawContainer.style.color = '#fff';
+      rawContainer.innerHTML = '<div style="margin-bottom:8px; font-weight:bold; color:#00d4ff;">Daftar Alat Ditemukan (Klik untuk menarik parameter):</div>';
+
+      const listDiv = document.createElement('div');
+      listDiv.style.display = 'flex';
+      listDiv.style.flexDirection = 'column';
+      listDiv.style.gap = '6px';
+
+      data.data.forEach(item => {
+        const itemId = item.id || item.device_id;
+        const itemName = item.name || item.device_type || 'Unknown';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-secondary btn-sm';
+        btn.style.textAlign = 'left';
+        btn.style.padding = '6px';
+        btn.style.fontSize = '11px';
+        btn.style.cursor = 'pointer';
+        btn.innerHTML = `<i class="fas fa-plug" style="margin-right:6px; color:#a0b4c4;"></i> <strong style="color:#0f0;">${itemId}</strong> - ${itemName}`;
+
+        btn.onclick = () => {
+          const urlInput = document.getElementById('univApiUrl');
+          const originalUrl = urlInput.value.trim().replace(/\/+$/, '');
+
+          // Replace existing device ID if URL already ends with /latest
+          const match = originalUrl.match(/^(.*\/)([^\/]+)(\/latest)$/);
+          if (match) {
+            urlInput.value = `${match[1]}${itemId}${match[3]}`;
+          } else if (!originalUrl.endsWith(itemId)) {
+            urlInput.value = `${originalUrl}/${itemId}/latest`;
+          }
+
+          rawContainer.style.display = 'none';
+          document.getElementById('btnSyncUniversalApi').click();
+        };
+        listDiv.appendChild(btn);
+      });
+      rawContainer.appendChild(listDiv);
+    } else {
+      // Fallback to Raw JSON
+      rawContainer.style.color = '#0f0';
+      rawContainer.textContent = JSON.stringify(data.data, null, 2);
+    }
+  } catch (e) {
+    rawContainer.style.color = 'red';
+    rawContainer.textContent = `Gagal: ${e.message}`;
+  }
 });
 
 
 document.getElementById('btnSyncUniversalApi')?.addEventListener('click', async () => {
-    const ip = document.getElementById('dataSourceIp')?.value || '127.0.0.1';
-    const port = document.getElementById('dataSourceUdpPort')?.value || '80';
-    let url = document.getElementById('univApiUrl')?.value || `http://{ip}:{port}/api`;
-    const method = document.getElementById('univApiMethod')?.value || 'GET';
-    const headersStr = document.getElementById('univApiHeaders')?.value;
-    
-    url = url.replace(/{ip}/g, ip).replace(/{port}/g, port);
-    
-    let customHeaders = {};
-    if (headersStr) {
-        try {
-            customHeaders = JSON.parse(headersStr);
-        } catch (e) {
-            if (typeof showToast === 'function') showToast('Format Custom Headers harus JSON valid!', 'error');
-            else alert('Format Custom Headers harus JSON valid!');
-            return;
-        }
-    }
-    
-    const container = document.getElementById('univApiAvailableFields');
-    const icon = document.getElementById('syncApiIcon');
-    if (icon) icon.className = 'fas fa-spinner fa-spin';
-    if (container) container.innerHTML = '<div style="color:#00d4ff; padding:8px;">Fetching data dari API...</div>';
-    initUnivApiSortable(container); // Ensure available fields is sortable
-    
-    try {
-        const res = await fetch(`${API_URL}/proxy`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
-            },
-            body: JSON.stringify({ url, method, headers: customHeaders })
-        });
-        
-        const data = await res.json();
-        if (icon) icon.className = 'fas fa-sync';
-        
-        if (!res.ok || data.error) {
-            if (container) container.innerHTML = `<div style="color:red;">Error: ${data.error || 'Gagal memanggil API'}</div>`;
-            return;
-        }
-        
-        if (data.data) {
-            // Confirm with user if they have existing items
-            const existingItems = document.querySelectorAll('.univ-api-group-dropzone .univ-api-row');
-            if (existingItems.length > 0) {
-                if (!confirm('Perhatian: Melakukan Sync ulang akan mereset semua parameter yang sudah Anda tarik ke dalam grup. Anda harus menarik ulangnya dari awal. Lanjutkan?')) {
-                    if (container) container.innerHTML = '<div style="color:orange; padding:8px;">Sync dibatalkan.</div>';
-                    return;
-                }
-                // Hapus semua parameter dari dalam grup (kembali kosong)
-                existingItems.forEach(r => r.remove());
-                
-                // Hapus juga box group custom agar bersih sebelum auto-generate
-                const customGroups = document.querySelectorAll('.univ-api-group-box');
-                customGroups.forEach(g => g.remove());
-            }
+  const ip = document.getElementById('dataSourceIp')?.value || '127.0.0.1';
+  const port = document.getElementById('dataSourceUdpPort')?.value || '80';
+  let url = document.getElementById('univApiUrl')?.value || `http://{ip}:{port}/api`;
+  const method = document.getElementById('univApiMethod')?.value || 'GET';
+  const headersStr = document.getElementById('univApiHeaders')?.value;
 
-            const flatKeys = flattenObjectKeys(data.data);
-            if (container) {
-                container.innerHTML = '';
-                
-                const groupMap = {};
-                
-                flatKeys.forEach(key => {
-                    const pathParts = key.split('.');
-                    
-                    // Intelligent Grouping: Gunakan top-level object key sebagai nama grup
-                    let groupName = 'General';
-                    if (pathParts.length > 1) {
-                        // Contoh: "system.cpu.temp" -> "System"
-                        groupName = pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1);
-                        groupName = groupName.replace(/_/g, ' ');
-                    }
-                    
-                    if (!groupMap[groupName]) {
-                        const box = window.addUnivApiGroup(groupName);
-                        groupMap[groupName] = box.querySelector('.univ-api-group-dropzone');
-                    }
-                    const dropzone = groupMap[groupName];
-                    
-                    let defaultName = pathParts[pathParts.length - 1];
-                    if ((defaultName === 'value' || defaultName === 'string_value') && pathParts.length >= 2) {
-                        defaultName = pathParts[pathParts.length - 2]; 
-                    }
-                    
-                    // Set showInputs = true karena kita langsung menaruhnya di dalam group!
-                    const row = createUnivApiMappingRow(key, defaultName, 1, true);
-                    
-                    const filterTerm = document.getElementById('univApiFilter')?.value?.toLowerCase();
-                    if (filterTerm && !key.toLowerCase().includes(filterTerm)) {
-                        row.style.display = 'none';
-                    }
-                    
-                    dropzone.appendChild(row);
-                });
-            }
-        } else {
-            if (container) container.innerHTML = '<div style="color:orange;">Response kosong atau bukan JSON.</div>';
-        }
+  url = url.replace(/{ip}/g, ip).replace(/{port}/g, port);
+
+  let customHeaders = {};
+  if (headersStr) {
+    try {
+      customHeaders = JSON.parse(headersStr);
     } catch (e) {
-        if (icon) icon.className = 'fas fa-sync';
-        if (container) container.innerHTML = `<div style="color:red;">Gagal: ${e.message}</div>`;
+      if (typeof showToast === 'function') showToast('Format Custom Headers harus JSON valid!', 'error');
+      else alert('Format Custom Headers harus JSON valid!');
+      return;
     }
+  }
+
+  const container = document.getElementById('univApiAvailableFields');
+  const icon = document.getElementById('syncApiIcon');
+  if (icon) icon.className = 'fas fa-spinner fa-spin';
+  if (container) container.innerHTML = '<div style="color:#00d4ff; padding:8px;">Fetching data dari API...</div>';
+  initUnivApiSortable(container); // Ensure available fields is sortable
+
+  try {
+    const res = await fetch(`${API_URL}/proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ url, method, headers: customHeaders })
+    });
+
+    const data = await res.json();
+    if (icon) icon.className = 'fas fa-sync';
+
+    if (!res.ok || data.error) {
+      if (container) container.innerHTML = `<div style="color:red;">Error: ${data.error || 'Gagal memanggil API'}</div>`;
+      return;
+    }
+
+    if (data.data) {
+      // Confirm with user if they have existing items
+      const existingItems = document.querySelectorAll('.univ-api-group-dropzone .univ-api-row');
+      if (existingItems.length > 0) {
+        if (!confirm('Perhatian: Melakukan Sync ulang akan mereset semua parameter yang sudah Anda tarik ke dalam grup. Anda harus menarik ulangnya dari awal. Lanjutkan?')) {
+          if (container) container.innerHTML = '<div style="color:orange; padding:8px;">Sync dibatalkan.</div>';
+          return;
+        }
+        // Hapus semua parameter dari dalam grup (kembali kosong)
+        existingItems.forEach(r => r.remove());
+
+        // Hapus juga box group custom agar bersih sebelum auto-generate
+        const customGroups = document.querySelectorAll('.univ-api-group-box');
+        customGroups.forEach(g => g.remove());
+      }
+
+      const flatKeys = flattenObjectKeys(data.data);
+      if (container) {
+        container.innerHTML = '';
+
+        const groupMap = {};
+
+        flatKeys.forEach(key => {
+          const pathParts = key.split('.');
+
+          // Intelligent Grouping: Gunakan top-level object key sebagai nama grup
+          let groupName = 'General';
+          if (pathParts.length > 1) {
+            // Contoh: "system.cpu.temp" -> "System"
+            groupName = pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1);
+            groupName = groupName.replace(/_/g, ' ');
+          }
+
+          if (!groupMap[groupName]) {
+            const box = window.addUnivApiGroup(groupName);
+            groupMap[groupName] = box.querySelector('.univ-api-group-dropzone');
+          }
+          const dropzone = groupMap[groupName];
+
+          let defaultName = pathParts[pathParts.length - 1];
+          if ((defaultName === 'value' || defaultName === 'string_value') && pathParts.length >= 2) {
+            defaultName = pathParts[pathParts.length - 2];
+          }
+
+          // Set showInputs = true karena kita langsung menaruhnya di dalam group!
+          const row = createUnivApiMappingRow(key, defaultName, 1, true);
+
+          const filterTerm = document.getElementById('univApiFilter')?.value?.toLowerCase();
+          if (filterTerm && !key.toLowerCase().includes(filterTerm)) {
+            row.style.display = 'none';
+          }
+
+          dropzone.appendChild(row);
+        });
+      }
+    } else {
+      if (container) container.innerHTML = '<div style="color:orange;">Response kosong atau bukan JSON.</div>';
+    }
+  } catch (e) {
+    if (icon) icon.className = 'fas fa-sync';
+    if (container) container.innerHTML = `<div style="color:red;">Gagal: ${e.message}</div>`;
+  }
 });
 
 function flattenObjectKeys(obj, prefix = '') {
-    let keys = [];
-    for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-            const propName = prefix ? `${prefix}.${key}` : key;
-            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                // Smart Discovery Heuristic: Telemetry block detection
-                if (obj[key].hasOwnProperty('value') && (obj[key].hasOwnProperty('parameter') || obj[key].hasOwnProperty('timestamp'))) {
-                    // It's a telemetry block. Only extract the primary value field to reduce clutter
-                    if (obj[key].value !== null && obj[key].value !== undefined) {
-                        keys.push(`${propName}.value`);
-                    } else if (obj[key].string_value !== null && obj[key].string_value !== undefined) {
-                        keys.push(`${propName}.string_value`);
-                    } else {
-                        keys.push(`${propName}.value`);
-                    }
-                } else {
-                    keys = keys.concat(flattenObjectKeys(obj[key], propName));
-                }
-            } else if (Array.isArray(obj[key])) {
-                obj[key].forEach((item, index) => {
-                    const arrPropName = `${propName}[${index}]`;
-                    if (typeof item === 'object' && item !== null) {
-                        keys = keys.concat(flattenObjectKeys(item, arrPropName));
-                    } else {
-                        keys.push(arrPropName);
-                    }
-                });
-            } else {
-                keys.push(propName);
-            }
+  let keys = [];
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const propName = prefix ? `${prefix}.${key}` : key;
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        // Smart Discovery Heuristic: Telemetry block detection
+        if (obj[key].hasOwnProperty('value') && (obj[key].hasOwnProperty('parameter') || obj[key].hasOwnProperty('timestamp'))) {
+          // It's a telemetry block. Only extract the primary value field to reduce clutter
+          if (obj[key].value !== null && obj[key].value !== undefined) {
+            keys.push(`${propName}.value`);
+          } else if (obj[key].string_value !== null && obj[key].string_value !== undefined) {
+            keys.push(`${propName}.string_value`);
+          } else {
+            keys.push(`${propName}.value`);
+          }
+        } else {
+          keys = keys.concat(flattenObjectKeys(obj[key], propName));
         }
+      } else if (Array.isArray(obj[key])) {
+        obj[key].forEach((item, index) => {
+          const arrPropName = `${propName}[${index}]`;
+          if (typeof item === 'object' && item !== null) {
+            keys = keys.concat(flattenObjectKeys(item, arrPropName));
+          } else {
+            keys.push(arrPropName);
+          }
+        });
+      } else {
+        keys.push(propName);
+      }
     }
-    return keys;
+  }
+  return keys;
 }
 
 function getNestedValue(obj, path) {
-    if (!path) return undefined;
-    const parts = path.split('.');
-    let current = obj;
-    for (const part of parts) {
-        if (current === undefined || current === null) return current;
-        const arrayMatch = part.match(/^(.+)\[(\d+)\]$/);
-        if (arrayMatch) {
-            const arrayName = arrayMatch[1];
-            const index = parseInt(arrayMatch[2], 10);
-            if (current[arrayName] && Array.isArray(current[arrayName])) {
-                current = current[arrayName][index];
-            } else return undefined;
-        } else {
-            current = current[part];
-        }
+  if (!path) return undefined;
+  const parts = path.split('.');
+  let current = obj;
+  for (const part of parts) {
+    if (current === undefined || current === null) return current;
+    const arrayMatch = part.match(/^(.+)\[(\d+)\]$/);
+    if (arrayMatch) {
+      const arrayName = arrayMatch[1];
+      const index = parseInt(arrayMatch[2], 10);
+      if (current[arrayName] && Array.isArray(current[arrayName])) {
+        current = current[arrayName][index];
+      } else return undefined;
+    } else {
+      current = current[part];
     }
-    return current;
+  }
+  return current;
 }
 
 function getUniversalApiConfigs() {
-    const mappings = [];
-    const groupBoxes = document.querySelectorAll('.univ-api-group-box');
-    groupBoxes.forEach(box => {
-        const groupInput = box.querySelector('.univ-api-group-name');
-        const groupName = groupInput ? groupInput.value.trim() : (box.getAttribute('data-group-name') || '');
-        const rows = box.querySelectorAll('.univ-api-row');
-        
-        rows.forEach(row => {
-            const path = row.getAttribute('data-path');
-            const nameInput = row.querySelector('.univ-api-name');
-            const divInput = row.querySelector('.univ-api-divisor');
-            
-            mappings.push({
-                json_path: path,
-                name: (nameInput && nameInput.value) ? nameInput.value.trim() : path.split('.').pop(),
-                divisor: (divInput && divInput.value) ? parseFloat(divInput.value) : 1,
-                group: groupName
-            });
-        });
+  const mappings = [];
+  const groupBoxes = document.querySelectorAll('.univ-api-group-box');
+  groupBoxes.forEach(box => {
+    const groupInput = box.querySelector('.univ-api-group-name');
+    const groupName = groupInput ? groupInput.value.trim() : (box.getAttribute('data-group-name') || '');
+    const rows = box.querySelectorAll('.univ-api-row');
+
+    rows.forEach(row => {
+      const path = row.getAttribute('data-path');
+      const nameInput = row.querySelector('.univ-api-name');
+      const divInput = row.querySelector('.univ-api-divisor');
+
+      mappings.push({
+        json_path: path,
+        name: (nameInput && nameInput.value) ? nameInput.value.trim() : path.split('.').pop(),
+        divisor: (divInput && divInput.value) ? parseFloat(divInput.value) : 1,
+        group: groupName
+      });
     });
-    return mappings;
+  });
+  return mappings;
 }
 
 // --- UNIVERSAL API DRAG & DROP HELPERS ---
@@ -4941,56 +4941,56 @@ function getUniversalApiConfigs() {
 window.univApiSortables = [];
 
 function initUnivApiSortable(el) {
-    if (!el || !window.Sortable) return;
-    
-    // Check if already initialized
-    if (el._sortable) return;
-    
-    const sortable = new Sortable(el, {
-        group: 'univApiGroup',
-        animation: 150,
-        ghostClass: 'sortable-ghost',
-        onAdd: function (evt) {
-            // When dropped into a group box, show inputs
-            const item = evt.item;
-            const inputs = item.querySelector('.univ-api-inputs');
-            if (evt.to.id !== 'univApiAvailableFields' && inputs) {
-                inputs.style.display = 'flex';
-                item.style.background = 'rgba(0,255,136,0.1)';
-                item.style.borderColor = '#00ff88';
-            }
-        },
-        onRemove: function (evt) {
-            // When moved back to available list, hide inputs
-            if (evt.to.id === 'univApiAvailableFields') {
-                const item = evt.item;
-                const inputs = item.querySelector('.univ-api-inputs');
-                if (inputs) {
-                    inputs.style.display = 'none';
-                    item.style.background = '#112238';
-                    item.style.borderColor = '#1a3a5c';
-                }
-            }
+  if (!el || !window.Sortable) return;
+
+  // Check if already initialized
+  if (el._sortable) return;
+
+  const sortable = new Sortable(el, {
+    group: 'univApiGroup',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onAdd: function (evt) {
+      // When dropped into a group box, show inputs
+      const item = evt.item;
+      const inputs = item.querySelector('.univ-api-inputs');
+      if (evt.to.id !== 'univApiAvailableFields' && inputs) {
+        inputs.style.display = 'flex';
+        item.style.background = 'rgba(0,255,136,0.1)';
+        item.style.borderColor = '#00ff88';
+      }
+    },
+    onRemove: function (evt) {
+      // When moved back to available list, hide inputs
+      if (evt.to.id === 'univApiAvailableFields') {
+        const item = evt.item;
+        const inputs = item.querySelector('.univ-api-inputs');
+        if (inputs) {
+          inputs.style.display = 'none';
+          item.style.background = '#112238';
+          item.style.borderColor = '#1a3a5c';
         }
-    });
-    el._sortable = sortable;
-    window.univApiSortables.push(sortable);
+      }
+    }
+  });
+  el._sortable = sortable;
+  window.univApiSortables.push(sortable);
 }
 
 function createUnivApiMappingRow(path, defaultName, divisor = 1, showInputs = false) {
-    const div = document.createElement('div');
-    div.className = 'univ-api-row';
-    div.setAttribute('data-path', path);
-    div.style.border = showInputs ? '1px solid #00ff88' : '1px solid #1a3a5c';
-    div.style.background = showInputs ? 'rgba(0,255,136,0.1)' : '#112238';
-    div.style.padding = '6px';
-    div.style.borderRadius = '4px';
-    div.style.display = 'flex';
-    div.style.flexDirection = 'column';
-    div.style.gap = '6px';
-    div.style.cursor = 'grab';
-    
-    div.innerHTML = `
+  const div = document.createElement('div');
+  div.className = 'univ-api-row';
+  div.setAttribute('data-path', path);
+  div.style.border = showInputs ? '1px solid #00ff88' : '1px solid #1a3a5c';
+  div.style.background = showInputs ? 'rgba(0,255,136,0.1)' : '#112238';
+  div.style.padding = '6px';
+  div.style.borderRadius = '4px';
+  div.style.display = 'flex';
+  div.style.flexDirection = 'column';
+  div.style.gap = '6px';
+  div.style.cursor = 'grab';
+
+  div.innerHTML = `
         <div style="font-size:11px; color:#fff; word-break:break-all; display:flex; align-items:center;">
             <i class="fas fa-grip-vertical" style="color:#5a8aaa; margin-right:6px;"></i>
             ${path}
@@ -5000,38 +5000,38 @@ function createUnivApiMappingRow(path, defaultName, divisor = 1, showInputs = fa
             <input type="number" class="univ-api-divisor" value="${divisor}" placeholder="Divisor" style="width:50px; font-size:10px; padding:4px; background:#0a1628; color:#fff; border:1px solid #1a3a5c; border-radius:3px;">
         </div>
     `;
-    return div;
+  return div;
 }
 
 let univApiGroupCounter = 0;
-window.addUnivApiGroup = function(name = '') {
-    univApiGroupCounter++;
-    const container = document.getElementById('univApiGroupsContainer');
-    if (!container) return;
-    
-    const groupId = 'univ_api_group_' + univApiGroupCounter;
-    
-    const groupDiv = document.createElement('div');
-    groupDiv.className = 'univ-api-group-box';
-    groupDiv.setAttribute('data-is-custom', 'true');
-    groupDiv.setAttribute('data-group-name', name);
-    groupDiv.style.border = '1px dashed #00d4ff';
-    groupDiv.style.borderRadius = '4px';
-    groupDiv.style.padding = '6px';
-    groupDiv.style.background = '#0a1628';
-    
-    groupDiv.innerHTML = `
+window.addUnivApiGroup = function (name = '') {
+  univApiGroupCounter++;
+  const container = document.getElementById('univApiGroupsContainer');
+  if (!container) return;
+
+  const groupId = 'univ_api_group_' + univApiGroupCounter;
+
+  const groupDiv = document.createElement('div');
+  groupDiv.className = 'univ-api-group-box';
+  groupDiv.setAttribute('data-is-custom', 'true');
+  groupDiv.setAttribute('data-group-name', name);
+  groupDiv.style.border = '1px dashed #00d4ff';
+  groupDiv.style.borderRadius = '4px';
+  groupDiv.style.padding = '6px';
+  groupDiv.style.background = '#0a1628';
+
+  groupDiv.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
             <input type="text" class="univ-api-group-name" value="${name}" placeholder="Nama Group (Cth: Transmitter)" style="flex:1; font-size:10px; padding:2px 4px; background:#112238; color:#00d4ff; border:1px solid #1a3a5c; margin-right:8px;" onchange="this.closest('.univ-api-group-box').setAttribute('data-group-name', this.value.trim())">
             <button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('.univ-api-group-box').remove()" style="padding:2px 6px; font-size:9px; color:#ff3355; background:none; border:1px solid #ff3355;"><i class="fas fa-trash"></i></button>
         </div>
         <div class="univ-api-group-dropzone sortable-list" id="${groupId}_dropzone" style="min-height:40px; display:flex; flex-direction:column; gap:4px; background:rgba(0,0,0,0.3); padding:4px; border-radius:2px;"></div>
     `;
-    
-    container.appendChild(groupDiv);
-    
-    const dropzone = groupDiv.querySelector('.univ-api-group-dropzone');
-    initUnivApiSortable(dropzone);
-    
-    return groupDiv;
+
+  container.appendChild(groupDiv);
+
+  const dropzone = groupDiv.querySelector('.univ-api-group-dropzone');
+  initUnivApiSortable(dropzone);
+
+  return groupDiv;
 };
