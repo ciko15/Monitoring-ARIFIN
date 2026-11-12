@@ -504,7 +504,7 @@ class NetworkListenerService {
                             clearTimeout(this._streamThrottleTimers.get(sourceId));
                             this._streamThrottleTimers.delete(sourceId);
                         }
-                        
+
                         const timeSinceLast = Date.now() - state.lastEmitAt;
                         if (nextPending.isBypass || timeSinceLast >= config.windowMs) {
                             invokeLogOutput(nextPending.logData, nextPending.status, nextPending.isBypass);
@@ -1530,7 +1530,7 @@ class NetworkListenerService {
                     }
                     console.log(`[LLZ-SNIFFER] Available capture interfaces:\n${stdout.trim()}`);
                     const lines = stdout.split('\n').map(l => l.trim()).filter(Boolean);
-                    
+
                     // Prioritas 1: Cocokkan persis nama kartu jaringan yang diminta oleh user jika ada (misal: "ethernet 2", "ethernet 4", dsb)
                     if (targetIfaceName) {
                         for (const line of lines) {
@@ -2080,7 +2080,7 @@ class NetworkListenerService {
         }
 
         const port = parseInt(udp_port || source.tcp_port || extraCfg.port || extraCfg.udp_port) || (parserId === 'asterix_adsb' ? 50000 : 13842);
-        
+
         // Cek jika ip_address diisi alamat Multicast (224.0.0.0 s/d 239.255.255.255)
         let mcastIp = multicast_ip || extraCfg.multicast_ip;
         let radarSenderIp = extraCfg.radar_ip || extraCfg.sender_ip;
@@ -2134,7 +2134,7 @@ class NetworkListenerService {
                     parser.setFallbackCoords(bLat, bLon, profile.airportName || profile.siteId || 'Airport');
                     console.log(`[Asterix] ${location || name}: koordinat dari branch_profile → lat=${bLat} lon=${bLon}`);
                 }
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         if (!this._asterixSockets) this._asterixSockets = new Map();
