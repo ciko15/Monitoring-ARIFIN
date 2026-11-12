@@ -673,6 +673,9 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
       resetSnmpFields();
     }
 
+    // Parse extra_config safely
+    const extra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? (() => { try { return JSON.parse(editSource.extra_config); } catch(e) { return {}; } })() : editSource.extra_config) : {};
+
     // Populate ASTERIX extra fields if editing
     const astDiv = document.getElementById('asterixExtraFields');
     if ((editSource.parsing_id === 'asterix_adsb' || editSource.parsing_id === 'asterix_radar') && astDiv) {
@@ -692,7 +695,6 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
     }
 
     // Populate T6TV extra fields if editing
-    const extra = editSource.extra_config ? (typeof editSource.extra_config === 'string' ? JSON.parse(editSource.extra_config) : editSource.extra_config) : {};
     const t6tvDiv = document.getElementById('t6tvExtraFields');
     if (editSource.parsing_id === 'vhf_t6tv' && t6tvDiv) {
       t6tvDiv.style.display = 'block';
