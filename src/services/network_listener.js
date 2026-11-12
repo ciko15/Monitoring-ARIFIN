@@ -2079,7 +2079,7 @@ class NetworkListenerService {
             } catch (e) { }
         }
 
-        const port = parseInt(udp_port || extraCfg.port || extraCfg.udp_port) || (parserId === 'asterix_adsb' ? 50000 : 13842);
+        const port = parseInt(udp_port || source.tcp_port || extraCfg.port || extraCfg.udp_port) || (parserId === 'asterix_adsb' ? 50000 : 13842);
         
         // Cek jika ip_address diisi alamat Multicast (224.0.0.0 s/d 239.255.255.255)
         let mcastIp = multicast_ip || extraCfg.multicast_ip;

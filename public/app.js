@@ -1028,6 +1028,7 @@ window.showAddDataSourceForm = async function (equipmentId, editSource = null) {
 
       // ASTERIX SAC, SIC & Coordinates
       ...((templateSelect.value === 'asterix_adsb' || templateSelect.value === 'asterix_radar') ? {
+        udp_port: normalizedPort,
         sac: document.getElementById('asterixSac') && document.getElementById('asterixSac').value ? parseInt(document.getElementById('asterixSac').value, 10) : 0,
         sic: document.getElementById('asterixSic') && document.getElementById('asterixSic').value ? parseInt(document.getElementById('asterixSic').value, 10) : 0,
         lat: document.getElementById('asterixLat') && document.getElementById('asterixLat').value !== '' ? parseFloat(document.getElementById('asterixLat').value) : null,
