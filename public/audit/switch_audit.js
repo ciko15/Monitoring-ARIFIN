@@ -233,6 +233,8 @@
 
     // Cache persisten port antarmuka switch agar tidak pernah hilang/blank saat disconnect sementara
     const _cachedPortsBySource = new Map();
+    // Cache riwayat octet client-side untuk perhitungan laju aliran (bps) secara realtime
+    const _clientPortTrafficHistory = new Map();
 
     /**
      * Normalisasi array port/interface dari berbagai struktur
@@ -261,17 +263,49 @@
             raw = _cachedPortsBySource.get(cacheKey) || [];
         }
 
+        const now = Date.now();
+        if (!_clientPortTrafficHistory.has(cacheKey)) {
+            _clientPortTrafficHistory.set(cacheKey, new Map());
+        }
+        const portHistory = _clientPortTrafficHistory.get(cacheKey);
+
         return raw.map(p => {
             if (!p) return null;
+            const portName = String(p.name || (p.index ? `Port ${p.index}` : 'Unknown')).trim();
+            const inOct = Number(p.in_octets ?? p.inOctets) || 0;
+            const outOct = Number(p.out_octets ?? p.outOctets) || 0;
+
+            let inBps = p.in_bps ?? p.inBps;
+            let outBps = p.out_bps ?? p.outBps;
+
+            // Hitung delta bps di client jika backend belum mengisi atau masih 'menghitung...' / null
+            if (inBps === null || inBps === undefined || inBps === 'menghitung...' || isNaN(inBps)) {
+                if (portHistory.has(portName)) {
+                    const prev = portHistory.get(portName);
+                    const dt = (now - prev.time) / 1000;
+                    if (dt >= 1) {
+                        let dIn = inOct - prev.inOct;
+                        let dOut = outOct - prev.outOct;
+                        if (dIn >= 0 && dIn < 1e11) inBps = Math.round((dIn * 8) / dt);
+                        if (dOut >= 0 && dOut < 1e11) outBps = Math.round((dOut * 8) / dt);
+                    }
+                }
+            }
+
+            // Simpan snapshot untuk putaran berikutnya jika octets berubah atau baru pertama kali
+            if (!portHistory.has(portName) || portHistory.get(portName).inOct !== inOct || portHistory.get(portName).outOct !== outOct) {
+                portHistory.set(portName, { inOct, outOct, time: now });
+            }
+
             return {
-                name: String(p.name || (p.index ? `Port ${p.index}` : 'Unknown')).trim(),
+                name: portName,
                 admin_status: p.admin_status || (p.adminStatus === 1 ? 'up' : 'down'),
                 oper_status: p.oper_status || (p.operStatus === 1 ? 'up' : (p.status === 'up' ? 'up' : 'down')),
-                in_bps: p.in_bps ?? p.inBps,
-                out_bps: p.out_bps ?? p.outBps,
+                in_bps: inBps,
+                out_bps: outBps,
                 speed: p.speed || p.speedMbps,
-                in_octets: p.in_octets ?? p.inOctets,
-                out_octets: p.out_octets ?? p.outOctets,
+                in_octets: inOct,
+                out_octets: outOct,
                 in_errors: p.in_errors ?? p.inErrors,
                 out_errors: p.out_errors ?? p.outErrors,
                 in_discards: p.in_discards ?? p.inDiscards,
@@ -357,8 +391,8 @@
 
             // Port khusus: Loopback, VLAN, Management, CPU, Dummy, Null
             const isSpecialName = name.match(/^(?:lo|loopback|vlan|mgmt|management|null|dummy|cpu)/i) ||
-                                  (p.type && String(p.type).match(/softwareLoopback|propVirtual/i)) ||
-                                  desc.match(/loopback|vlan|management/i);
+                (p.type && String(p.type).match(/softwareLoopback|propVirtual/i)) ||
+                desc.match(/loopback|vlan|management/i);
 
             // Port stacking Alcatel / Cisco misal 1/StackA, 1/StackB
             const isStackSpecial = name.match(/stack/i) && !name.match(/\/\d+$/);
@@ -759,13 +793,13 @@
                 <!-- Container Scrollable: Tinggi pas untuk 10 baris item -->
                 <div id="switchAuditFindingsScrollContainer" style="max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 6px;" class="custom-audit-scrollbar">
                     ${findings.map((f, idx) => {
-                        const sevKey = String(f.severity || 'info').toLowerCase();
-                        const sev = severityMap[sevKey] || severityMap.info;
-                        const msg = f.message || f.issue || 'Anomali terdeteksi';
-                        const rec = f.recommendation || f.detail || '';
-                        const target = f.target || f.component || '';
+            const sevKey = String(f.severity || 'info').toLowerCase();
+            const sev = severityMap[sevKey] || severityMap.info;
+            const msg = f.message || f.issue || 'Anomali terdeteksi';
+            const rec = f.recommendation || f.detail || '';
+            const target = f.target || f.component || '';
 
-                        return `
+            return `
                             <div style="background: ${sev.bg}; border: 1px solid ${sev.border}; border-radius: 8px; padding: 10px 14px; display: flex; align-items: flex-start; gap: 12px; transition: background 0.15s ease;"
                                  onmouseover="this.style.background='rgba(255,255,255,0.03)'"
                                  onmouseout="this.style.background='${sev.bg}'">
@@ -787,7 +821,7 @@
                                 </div>
                             </div>
                         `;
-                    }).join('')}
+        }).join('')}
                 </div>
             </div>
         `;

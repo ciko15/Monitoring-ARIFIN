@@ -312,8 +312,8 @@
         const container = document.getElementById('serverAuditMetricsRow');
         if (!container) return;
 
-        const summary = audit ? audit.summary : {};
-        const health = audit && audit.health_score ? audit.health_score : { level: 'Normal', score: 100 };
+        const summary = (audit && audit.summary) ? audit.summary : {};
+        const health = (audit && audit.health_score) ? audit.health_score : { level: 'Normal', score: 100 };
 
         let healthColor = '#34d399';
         let healthBg = 'rgba(16, 185, 129, 0.15)';
