@@ -914,6 +914,15 @@
         const content = document.getElementById('serverAuditContent');
         if (!content) return;
 
+        // Jangan refresh DOM jika user sedang aktif menyeleksi/memblok teks di dalam area audit server
+        const sel = window.getSelection ? window.getSelection() : null;
+        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+            const anchorNode = sel.anchorNode;
+            if (anchorNode && content.contains(anchorNode)) {
+                return; // Tunda render ulang saat pengguna sedang memblok kalimat
+            }
+        }
+
         const audit = _lastAuditData;
         const live = _lastLiveData;
 

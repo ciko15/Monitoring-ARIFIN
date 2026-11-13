@@ -158,6 +158,15 @@ function normalizeInterfaceName(name) {
     const portMatch = text.match(/(\d+\/\d+(?:\/\d+)?(?:\.\d+)?)/);
     if (portMatch) return portMatch[1];
 
+    // Jika format if1001..if1048 atau 1001..1048 (Alcatel standard slot/port index)
+    const alcatelIndexMatch = text.match(/^(?:if)?10(\d{2})$/i);
+    if (alcatelIndexMatch) {
+        const portNum = parseInt(alcatelIndexMatch[1], 10);
+        if (portNum >= 1 && portNum <= 60) {
+            return `1/${portNum}`;
+        }
+    }
+
     return text
         .replace(/^Alcatel-Lucent Enterprise\s+/i, '')
         .replace(/^Alcatel\s+/i, '')
@@ -177,6 +186,12 @@ function pickInterfaceName(idx, descrMap, ifNameMap) {
 
     const ifName = String(ifNameMap[idx] || '').trim();
     if (ifName) return ifName;
+
+    // Jika idx numerik Alcatel (1001..1048), konversi langsung ke format 1/X
+    const numIdx = Number(idx);
+    if (numIdx >= 1001 && numIdx <= 1060) {
+        return `1/${numIdx - 1000}`;
+    }
 
     return `if${idx}`;
 }
@@ -309,12 +324,18 @@ async function pollSNMP(host, community = 'public', options = {}) {
         const interfaces = interfaceIndexes.map((idx) => {
             const rawName = pickInterfaceName(idx, descrMap, ifNameMap);
             const name = normalizeInterfaceName(rawName);
-            const adminStatus = adminMap[idx] !== undefined ? Number(adminMap[idx]) : 1;
-            const operStatus = operMap[idx] !== undefined ? Number(operMap[idx]) : 2;
-            const status = operStatusText(operStatus);
             const inOctets = parseCounter(hcInMap[idx] ?? inOctMap[idx]);
             const outOctets = parseCounter(hcOutMap[idx] ?? outOctMap[idx]);
             const speedMbps = speedMap[idx] !== undefined ? Number(speedMap[idx]) : 0;
+            const adminStatus = adminMap[idx] !== undefined ? Number(adminMap[idx]) : 1;
+
+            // Jika operMap terisi gunakan itu, namun jika operMap tidak terdefinisi/timeout tapi port memiliki traffic octets (> 0), tandai sebagai up
+            let operStatus = operMap[idx] !== undefined ? Number(operMap[idx]) : 2;
+            if (operStatus !== 1 && (inOctets > 0 || outOctets > 0)) {
+                // Port aktif melewatkan traffic
+                operStatus = 1;
+            }
+            const status = operStatusText(operStatus);
 
             return {
                 index: idx,
@@ -387,23 +408,45 @@ async function pollSNMP(host, community = 'public', options = {}) {
         let psuFault = false;
         const psuList = [];
         if (psuVbs && psuVbs.length > 0) {
-            for (const vb of psuVbs) {
+            psuVbs.forEach((vb, idx) => {
+                if (vb.value === null || vb.value === undefined) return;
                 const val = Number(vb.value);
-                const isFault = val === 2 || val === 4; // fault or notPresent
+                if (isNaN(val)) return;
+
+                // Status Alcatel & RFC Standard:
+                // 1 = up / operational / ok
+                // 2 = down / fault
+                // 3 = testing
+                // 4 = unknown / notPresent
+                // Not present (4) tidak dianggap fault perangkat aktif kecuali dinyatakan fault (2)
+                const isFault = val === 2;
                 if (isFault) psuFault = true;
-                psuList.push({ index: vb.oid[vb.oid.length - 1], status: val === 1 ? 'ok' : 'fault', code: val });
-            }
+                
+                const lastSubId = vb.oid && vb.oid.length > 0 ? vb.oid[vb.oid.length - 1] : 0;
+                const psuIndex = lastSubId > 0 ? lastSubId : (idx + 1);
+                const status = val === 1 ? 'ok' : (val === 2 ? 'fault' : (val === 4 ? 'notPresent' : 'unknown'));
+
+                psuList.push({ index: psuIndex, status, code: val });
+            });
         }
 
         let fanFault = false;
         const fanList = [];
         if (fanVbs && fanVbs.length > 0) {
-            for (const vb of fanVbs) {
+            fanVbs.forEach((vb, idx) => {
+                if (vb.value === null || vb.value === undefined) return;
                 const val = Number(vb.value);
-                const isFault = val === 2 || val === 4;
+                if (isNaN(val)) return;
+
+                const isFault = val === 2;
                 if (isFault) fanFault = true;
-                fanList.push({ index: vb.oid[vb.oid.length - 1], status: val === 1 ? 'ok' : 'fault', code: val });
-            }
+                
+                const lastSubId = vb.oid && vb.oid.length > 0 ? vb.oid[vb.oid.length - 1] : 0;
+                const fanIndex = lastSubId > 0 ? lastSubId : (idx + 1);
+                const status = val === 1 ? 'ok' : (val === 2 ? 'fault' : (val === 4 ? 'notPresent' : 'unknown'));
+
+                fanList.push({ index: fanIndex, status, code: val });
+            });
         }
 
         const hardwareHealth = {

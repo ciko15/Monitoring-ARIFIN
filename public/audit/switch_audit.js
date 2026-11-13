@@ -271,7 +271,18 @@
 
         return raw.map(p => {
             if (!p) return null;
-            const portName = String(p.name || (p.index ? `Port ${p.index}` : 'Unknown')).trim();
+            let portName = String(p.name || (p.index ? `Port ${p.index}` : 'Unknown')).trim();
+            const originalIndex = p.index ? String(p.index) : (portName.match(/(\d+)$/) ? portName.match(/(\d+)$/)[1] : '');
+
+            // Normalisasi nama port Alcatel: jika if1001..if1048 atau 1001..1048, konversi ke 1/X
+            const alcatelIndexMatch = portName.match(/^(?:if)?10(\d{2})$/i);
+            if (alcatelIndexMatch) {
+                const portNum = parseInt(alcatelIndexMatch[1], 10);
+                if (portNum >= 1 && portNum <= 60) {
+                    portName = `1/${portNum}`;
+                }
+            }
+
             const inOct = Number(p.in_octets ?? p.inOctets) || 0;
             const outOct = Number(p.out_octets ?? p.outOctets) || 0;
 
@@ -297,10 +308,18 @@
                 portHistory.set(portName, { inOct, outOct, time: now });
             }
 
+            // Evaluasi oper_status: jika ada traffic aktif (bps > 0 atau total octets > 0), port adalah 'up'
+            let operStatus = p.oper_status || (p.operStatus === 1 ? 'up' : (p.status === 'up' ? 'up' : 'down'));
+            if (operStatus !== 'up' && ((inBps && inBps > 0) || (outBps && outBps > 0) || (inOct > 0 || outOct > 0))) {
+                operStatus = 'up';
+            }
+
             return {
                 name: portName,
+                index: originalIndex,
+                raw_id: p.rawName || (originalIndex ? `if${originalIndex}` : portName),
                 admin_status: p.admin_status || (p.adminStatus === 1 ? 'up' : 'down'),
-                oper_status: p.oper_status || (p.operStatus === 1 ? 'up' : (p.status === 'up' ? 'up' : 'down')),
+                oper_status: operStatus,
                 in_bps: inBps,
                 out_bps: outBps,
                 speed: p.speed || p.speedMbps,
@@ -314,7 +333,7 @@
                 out_errors_delta: p.out_errors_delta ?? 0,
                 is_flapping: !!p.is_flapping || !!p.isFlapping,
                 last_change: p.last_change || (p.lastChangeTicks ? `${p.lastChangeTicks} ticks` : '—'),
-                description: p.description || p.name
+                description: p.description || p.rawName || p.name
             };
         }).filter(Boolean);
     }
@@ -581,9 +600,11 @@
 
             if (isSpecial) {
                 // Tampilan rapi untuk port khusus (Management / Stacking / Virtual): Box ikon di atas, teks nama port di bawah
+                const tooltipText = p.raw_id && p.raw_id !== p.name ? `Port ${p.name} (ID: ${p.raw_id})` : `Port ${p.name}`;
                 return `
                     <div class="switch-port-cell-special"
                          data-port-name="${p.name}"
+                         title="${tooltipText}"
                          onclick="window.switchAuditSelectPort('${encodeURIComponent(p.name)}')"
                          style="display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; user-select: none; opacity: ${opacity}; transition: transform 0.15s ease;"
                          onmouseover="this.style.transform='translateY(-2px)'"
@@ -603,10 +624,12 @@
             }
 
             const cleanName = String(p.name).replace(/^(?:port|ethernet|fastethernet|gigabitethernet)/i, '').trim();
+            const tooltipText = p.raw_id && p.raw_id !== p.name ? `Port ${p.name} (ID: ${p.raw_id})` : `Port ${p.name}`;
 
             return `
                 <div class="switch-port-cell"
                      data-port-name="${p.name}"
+                     title="${tooltipText}"
                      onclick="window.switchAuditSelectPort('${encodeURIComponent(p.name)}')"
                      style="width: 52px; height: 46px; background: ${st.bg}; border: ${selBorder}; box-shadow: ${selShadow};
                             border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -702,8 +725,17 @@
         return `
             <div id="switchAuditPortDetailContainer" style="background: #091322; border: 1px solid #1e293b; border-radius: 10px; padding: 18px; margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                         <span style="font-size: 16px; font-weight: 800; color: #00d4ff; font-family: monospace;">Port: ${port.name}</span>
+                        ${port.raw_id && port.raw_id !== port.name ? `
+                            <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-family: monospace;" title="ID Interface SNMP">
+                                ID: ${port.raw_id}${port.index ? ` (Index: ${port.index})` : ''}
+                            </span>
+                        ` : (port.index ? `
+                            <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-family: monospace;" title="ID Interface SNMP">
+                                Index: ${port.index}
+                            </span>
+                        ` : '')}
                         <span style="font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 4px; background: ${st.bg}; color: ${st.color}; border: 1px solid ${st.border};">
                             <i class="fas ${st.icon}"></i> ${st.label}
                         </span>
@@ -848,24 +880,40 @@
                     ${psu.length > 0 ? `
                         <div style="background: #040812; padding: 12px; border-radius: 8px; border: 1px solid #1e293b;">
                             <div style="font-size: 11.5px; font-weight: 700; color: #94a3b8; margin-bottom: 8px;"><i class="fas fa-bolt" style="color: #eab308;"></i> Catu Daya (PSU)</div>
-                            ${psu.map(p => `
+                            ${psu.map((p, idx) => {
+                                const st = String(p.status || '').toLowerCase();
+                                const isOk = st.includes('ok') || st.includes('up');
+                                const isNotPresent = st.includes('notpresent') || st.includes('not present') || st.includes('absent');
+                                const color = isOk ? '#10b981' : (isNotPresent ? '#64748b' : '#ef4444');
+                                const label = isOk ? 'OK' : (isNotPresent ? 'Not Present' : (p.status || 'Fault'));
+                                const psuNum = (p.index && p.index > 0) ? p.index : (idx + 1);
+                                return `
                                 <div style="display: flex; justify-content: space-between; font-size: 11.5px; padding: 3px 0;">
-                                    <span style="color: #cbd5e1;">PSU #${p.index || 1}:</span>
-                                    <span style="font-weight: 700; color: ${String(p.status).toLowerCase().includes('ok') || String(p.status).toLowerCase().includes('up') ? '#10b981' : '#ef4444'}">${p.status}</span>
+                                    <span style="color: #cbd5e1;">PSU #${psuNum}:</span>
+                                    <span style="font-weight: 700; color: ${color};">${label}</span>
                                 </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </div>
                     ` : ''}
 
                     ${fans.length > 0 ? `
                         <div style="background: #040812; padding: 12px; border-radius: 8px; border: 1px solid #1e293b;">
                             <div style="font-size: 11.5px; font-weight: 700; color: #94a3b8; margin-bottom: 8px;"><i class="fas fa-fan fa-spin" style="color: #38bdf8; animation-duration: 4s;"></i> Kipas Pendingin (Fan)</div>
-                            ${fans.map(f => `
+                            ${fans.map((f, idx) => {
+                                const st = String(f.status || '').toLowerCase();
+                                const isOk = st.includes('ok') || st.includes('up');
+                                const isNotPresent = st.includes('notpresent') || st.includes('not present') || st.includes('absent');
+                                const color = isOk ? '#10b981' : (isNotPresent ? '#64748b' : '#ef4444');
+                                const label = isOk ? 'OK' : (isNotPresent ? 'Not Present' : (f.status || 'Fault'));
+                                const fanNum = (f.index && f.index > 0) ? f.index : (idx + 1);
+                                return `
                                 <div style="display: flex; justify-content: space-between; font-size: 11.5px; padding: 3px 0;">
-                                    <span style="color: #cbd5e1;">Fan #${f.index || 1}:</span>
-                                    <span style="font-weight: 700; color: ${String(f.status).toLowerCase().includes('ok') || String(f.status).toLowerCase().includes('up') ? '#10b981' : '#ef4444'}">${f.status}</span>
+                                    <span style="color: #cbd5e1;">Fan #${fanNum}:</span>
+                                    <span style="font-weight: 700; color: ${color};">${label}</span>
                                 </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </div>
                     ` : ''}
 
@@ -1162,6 +1210,15 @@
                 </div>
             `;
             return;
+        }
+
+        // Jangan refresh DOM jika user sedang aktif menyeleksi/memblok teks di dalam modal audit
+        const sel = window.getSelection ? window.getSelection() : null;
+        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+            const anchorNode = sel.anchorNode;
+            if (anchorNode && body.contains(anchorNode)) {
+                return; // Tunda render ulang saat pengguna sedang memblok kalimat
+            }
         }
 
         // Render konten aktif tanpa mereset scroll container utama dan sub-container
