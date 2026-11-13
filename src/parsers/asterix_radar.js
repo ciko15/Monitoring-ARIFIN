@@ -144,16 +144,31 @@ function decodeCat034(data, radarName, radarLat, radarLon) {
                 let statusVal = [];
                 let byteIdx = 0;
                 let malfunctions = [];
+                let txStatus = 'Normal';
+                let channel = 'Ch A';
                 
                 while (ext && offset < data.length) {
                     let b = data[offset];
                     statusVal.push(b.toString(16).padStart(2,'0'));
                     
-                    // Decode System Status (ASTERIX Eurocontrol)
-                    // Byte 0 adalah Primary Subfield: 0x80 = COM present, 0x40 = PSR, 0x20 = SSR.
-                    // Bit 0x80 BUKAN COM Fail melainkan indikator bahwa Common Part disertakan.
-                    if (byteIdx > 0) {
-                        if (b & 0x02) malfunctions.push('OVERLOAD');
+                    // Decode System Status (Eurocontrol ASTERIX CAT034 Standard)
+                    // Byte 0: Primary Subfield (COM, PSR, SSR, MDS)
+                    // Subfield COM (Common Subfield):
+                    //   NOGO bit: Bit-5 (0x20) = System Failure, Bit-4 (0x10) = Overload
+                    //   Channel Selected: Bit-3 (0x08)
+                    // Subfield SSR/MDS:
+                    //   Redundancy: Single / Dual
+                    //   TX: Operasional / Degraded / Off
+                    if (byteIdx === 1) {
+                        // Common subfield
+                        if (b & 0x40) malfunctions.push('RED-FAIL'); // Redundancy fault
+                        if (b & 0x20) malfunctions.push('SYS-FAIL'); // System failure
+                        if (b & 0x02) malfunctions.push('OVERLOAD'); // Overload condition
+                        channel = (b & 0x08) ? 'Ch B' : 'Ch A';
+                    } else if (byteIdx >= 2) {
+                        // Subfield SSR / Mode S
+                        if (b & 0x40) txStatus = 'Degraded';
+                        if (b & 0x20) txStatus = 'Tx Off';
                     }
                     
                     ext = (b & 0x01) !== 0;
@@ -162,6 +177,8 @@ function decodeCat034(data, radarName, radarLat, radarLon) {
                 }
                 result.system_config = `0x${statusVal.join('')}`;
                 result.system_status = malfunctions.length > 0 ? malfunctions.join(', ') : 'Normal';
+                result.channel_selected = channel;
+                result.tx_operational_status = txStatus;
             } else if (item === 7) {
                 // I034/060 - System Processing Mode (Variable)
                 let ext = true;
@@ -778,8 +795,10 @@ class AsterixRadarParser extends BaseParser {
 
         // Status transmiter / power dari status system
         const sysStatus = this._lastData ? this._lastData.system_status : 'Normal';
-        const isTxNormal = this._connected && sysStatus === 'Normal';
-        const powerStatus = isTxNormal ? 'Normal (Tx 18.5 kW)' : (this._connected ? 'Degraded' : 'Off');
+        const txOper = this._lastData ? this._lastData.tx_operational_status : 'Normal';
+        const channel = this._lastData ? this._lastData.channel_selected : 'Ch A';
+        const isTxNormal = this._connected && sysStatus === 'Normal' && txOper === 'Normal';
+        const powerStatus = !this._connected ? 'Off' : (isTxNormal ? `Normal (18.5 kW - ${channel})` : `${txOper} (${channel})`);
 
         const targetsArray = this._recentTargets ? Array.from(this._recentTargets.values()) : [];
 
