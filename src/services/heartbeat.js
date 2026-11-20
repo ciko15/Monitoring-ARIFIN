@@ -2,6 +2,24 @@ const { publishMessage, isEmsEnabled } = require('../connection/ems');
 const fs = require('fs');
 const path = require('path');
 
+function getAppVersion() {
+    if (process.env.APP_VERSION) {
+        return process.env.APP_VERSION;
+    }
+    try {
+        const pkgPath = path.join(__dirname, '../../package.json');
+        if (fs.existsSync(pkgPath)) {
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+            if (pkg && pkg.version) {
+                return pkg.version.startsWith('v') ? pkg.version : `v${pkg.version}`;
+            }
+        }
+    } catch (e) {
+        console.warn('[Heartbeat] Failed to read version from package.json:', e.message);
+    }
+    return 'v1.0.0';
+}
+
 function getAirportConfig() {
     try {
         const configPath = path.join(__dirname, '../../db/airport_config.json');
@@ -30,6 +48,7 @@ function startHeartbeat() {
             const airportConfig = getAirportConfig();
             const siteId = process.env.SITE_ID || airportConfig.siteId || 'UNKNOWN_SITE';
             const airportCode = airportConfig.code || siteId;
+            const appVersion = getAppVersion();
             const now = new Date().toISOString();
 
             const payload = {
@@ -37,12 +56,14 @@ function startHeartbeat() {
                 airport_code: airportCode,
                 status: "online",
                 uptime_seconds: Math.floor(process.uptime()),
+                app_version: appVersion,
                 timestamp: now
             };
 
             // publishMessage(messagePattern, messageName, payload, options)
             publishMessage('EVENT', 'branch.heartbeat.sent', payload, {
-                requestType: 'branch.heartbeat.sent'
+                requestType: 'branch.heartbeat.sent',
+                appVersion: appVersion
             }).catch(e => {
                 console.error('[Heartbeat] Failed to send heartbeat (promise rejected):', e.message);
             });

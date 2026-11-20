@@ -252,7 +252,7 @@ function normalizeSiteId(siteId) {
 }
 
 function buildMessageEnvelope(messagePattern, messageName, payload = {}, options = {}) {
-    return {
+    const envelope = {
         header: {
             REQUEST_TYPE: options.requestType || messageName,
             SOURCE_SERVICE: process.env.SOURCE_SERVICE || DEFAULT_SOURCE_SERVICE,
@@ -260,6 +260,12 @@ function buildMessageEnvelope(messagePattern, messageName, payload = {}, options
         },
         body: payload
     };
+
+    if (options.appVersion || options.app_version) {
+        envelope.header.APP_VERSION = options.appVersion || options.app_version;
+    }
+
+    return envelope;
 }
 
 function resolveQueue(messagePattern, messageName, targetSiteId) {
